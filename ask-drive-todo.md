@@ -177,16 +177,16 @@ mix hex.audit
 
 ## Phase 8 — 生成フェーズ
 
-- [ ] 8-1 `AskDrive.LLM.Ollama.generate/2`（`/api/generate`、`stream: false`、`receive_timeout: 180_000`）
-- [ ] 8-2 `AskDrive.Generate.QA`: 想定質問・回答の生成プロンプト（主要言語追従: 日英対応）と JSON パース
-- [ ] 8-3 JSON パース失敗時に 1 回だけ再試行し、なお失敗ならチャンクを `failed` にする
-- [ ] 8-4 根拠外の固有名詞・数値の簡易検出と `hallucination_flag`
-- [ ] 8-5 重複想定質問（類似度 0.97 以上）の統合
-- [ ] 8-6 `AskDrive.Generate.Summary`（文書 / セクション要約）。**回答の根拠には使わない**
-- [ ] 8-7 `AskDrive.Generate.Extraction`（日付・金額・型番などの構造化抽出）
-- [ ] 8-8 生成物への `generated_by` / `generated_at` / `source_hash` の記録
-- [ ] 8-9 `AskDrive.Batch.EmbedQuestionsWorker`（想定質問のベクトル化）
-- [ ] 8-10 **ビルドゲート**
+- [x] 8-1 `AskDrive.LLM.Ollama.generate/2`（`/api/generate`、`stream: false`、`receive_timeout: 180_000`）
+- [x] 8-2 `AskDrive.Generate.QA`: 想定質問・回答の生成プロンプト（主要言語追従: 日英対応）と JSON パース
+- [x] 8-3 JSON パース失敗時に 1 回だけ再試行し、なお失敗ならチャンクを `failed` にする
+- [x] 8-4 根拠外の固有名詞・数値の簡易検出と `hallucination_flag`
+- [x] 8-5 重複想定質問（類似度 0.97 以上）の統合
+- [x] 8-6 `AskDrive.Generate.Summary`（文書 / セクション要約）。**回答の根拠には使わない**
+- [x] 8-7 `AskDrive.Generate.Extraction`（日付・金額・型番などの構造化抽出）
+- [x] 8-8 生成物への `generated_by` / `generated_at` / `source_hash` の記録
+- [x] 8-9 `AskDrive.Batch.EmbedQuestionsWorker`（想定質問のベクトル化）
+- [x] 8-10 **ビルドゲート**
 
 **完了条件**: 1 文書分の QA が生成され、`qa_pairs` に質問ベクトル付きで保存される。
 
