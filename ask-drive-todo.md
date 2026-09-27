@@ -71,16 +71,16 @@ mix hex.audit
 
 ## Phase 2 — データモデル
 
-- [ ] 2-1 マイグレーション: `sqlite-vec` 仮想テーブル（`vec_qa_pairs` / `vec_chunks` float[1024] cosine）と FTS5 仮想テーブル（`chunks_fts` tokenize='trigram'）
-- [ ] 2-2 マイグレーション: `settings`（シングルトン）/ `google_accounts`
-- [ ] 2-3 マイグレーション: `documents` / `chunks`（`content_hash`、親文書カスケード削除、embedding BLOB）
-- [ ] 2-4 マイグレーション: `qa_pairs`（`document_id` カスケード、`chunk_id` nullable/ON DELETE SET NULL、`question_embedding` BLOB、`source_hash`、`status`、`generated_by`）
-- [ ] 2-5 マイグレーション: `answer_cache`（`qa_pair_id` カスケード）/ `question_log`
-- [ ] 2-6 マイグレーション: `doc_summaries` / `extractions` / `batch_runs` / `batch_phase_stats`
-- [ ] 2-7 マイグレーション: 仕様書 7.9 節の B-Tree インデックス一式（`answer_cache` ユニークインデックス、無効化追跡インデックス含む）
-- [ ] 2-8 Ecto スキーマを全テーブル分作る（float32 BLOB 相互変換ヘルパー含む）
-- [ ] 2-9 `AskDrive.Settings` コンテキスト（シングルトン取得と更新、バリデーション）と seeds
-- [ ] 2-10 **ビルドゲート**
+- [x] 2-1 マイグレーション: `sqlite-vec` 仮想テーブル（`vec_qa_pairs` / `vec_chunks` float[1024] cosine）と FTS5 仮想テーブル（`chunks_fts` tokenize='trigram'）
+- [x] 2-2 マイグレーション: `settings`（シングルトン）/ `google_accounts`
+- [x] 2-3 マイグレーション: `documents` / `chunks`（`content_hash`、親文書カスケード削除、embedding BLOB）
+- [x] 2-4 マイグレーション: `qa_pairs`（`document_id` カスケード、`chunk_id` nullable/ON DELETE SET NULL、`question_embedding` BLOB、`source_hash`、`status`、`generated_by`）
+- [x] 2-5 マイグレーション: `answer_cache`（`qa_pair_id` カスケード）/ `question_log`
+- [x] 2-6 マイグレーション: `doc_summaries` / `extractions` / `batch_runs` / `batch_phase_stats`
+- [x] 2-7 マイグレーション: 仕様書 7.9 節の B-Tree インデックス一式（`answer_cache` ユニークインデックス、無効化追跡インデックス含む）
+- [x] 2-8 Ecto スキーマを全テーブル分作る（float32 BLOB 相互変換ヘルパー含む）
+- [x] 2-9 `AskDrive.Settings` コンテキスト（シングルトン取得と更新、バリデーション）と seeds
+- [x] 2-10 **ビルドゲート**
 
 **完了条件**: `mix ecto.reset` が通り、`chunks` / `vec_chunks` にダミーのベクトルを insert してコサイン距離で近傍検索できる。
 
@@ -285,7 +285,7 @@ mix hex.audit
 |---|---|---|---|
 | 0 | 環境準備 | ☑ | 2026-09-28 |
 | 1 | プロジェクト骨格 | ☑ | 2026-09-28 |
-| 2 | データモデル | ☐ | |
+| 2 | データモデル | ☑ | 2026-09-28 |
 | 3 | 暗号化と OAuth | ☐ | |
 | 4 | Drive 同期 | ☐ | |
 | 5 | 本文抽出 | ☐ | |
