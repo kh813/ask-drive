@@ -1,0 +1,34 @@
+defmodule AskDriveWeb.ChatLiveTest do
+  use AskDriveWeb.ConnCase
+  import Phoenix.LiveViewTest
+
+  test "renders chat page and submits question", %{conn: conn} do
+    {:ok, view, html} = live(conn, ~p"/")
+    assert html =~ "AskDrive"
+    assert html =~ "chat-form"
+
+    # Submit question
+    html =
+      view
+      |> form("#chat-form", %{"question" => "社内規定について教えてください"})
+      |> render_submit()
+
+    assert html =~ "社内規定について教えてください"
+  end
+
+  test "resets chat history", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    view
+    |> form("#chat-form", %{"question" => "質問1"})
+    |> render_submit()
+
+    assert render(view) =~ "質問1"
+
+    view
+    |> element("#reset-chat-btn")
+    |> render_click()
+
+    refute render(view) =~ "質問1"
+  end
+end

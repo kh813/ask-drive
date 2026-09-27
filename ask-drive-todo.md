@@ -160,16 +160,16 @@ mix hex.audit
 
 ここまでで「原文検索が使える社内検索」として実用価値が出る。
 
-- [ ] 7-1 `AskDrive.Retrieval.vector_search/2`（`sqlite-vec` / `vec_chunks` コサイン距離。bge-m3 による日英クロスリンガル対応）
-- [ ] 7-2 `AskDrive.Retrieval.keyword_search/2`（SQLite FTS5 `chunks_fts` trigram。短文クエリ対策として LIKE 部分一致フォールバックを含む）
-- [ ] 7-3 RRF による統合（k=60）と、同一文書から最大 3 件までの制限
-- [ ] 7-4 `AskDrive.Answering` の Tier 判定骨格（この時点では Tier 2 / 3 のみ）
-- [ ] 7-5 `ChatLive`: 質問入力、Enter 送信 / Shift+Enter 改行
-- [ ] 7-6 Tier 2 の表示（「関連しそうな箇所」として回答と明確に区別、Drive リンク、原文の展開）
-- [ ] 7-7 Tier 3 の表示（記録した旨と翌朝の回答予定）
-- [ ] 7-8 `question_log` への記録（質問文・埋め込み・到達 Tier・候補チャンク ID）
-- [ ] 7-9 空状態の案内（Drive 未接続 / インデックス 0 件 / Ollama 未起動）
-- [ ] 7-10 **ビルドゲート**
+- [x] 7-1 `AskDrive.Retrieval.vector_search/2`（`sqlite-vec` / `vec_chunks` コサイン距離。bge-m3 による日英クロスリンガル対応）
+- [x] 7-2 `AskDrive.Retrieval.keyword_search/2`（SQLite FTS5 `chunks_fts` trigram。短文クエリ対策として LIKE 部分一致フォールバックを含む）
+- [x] 7-3 RRF による統合（k=60）と、同一文書から最大 3 件までの制限
+- [x] 7-4 `AskDrive.Answering` の Tier 判定骨格（この時点では Tier 2 / 3 のみ）
+- [x] 7-5 `ChatLive`: 質問入力、Enter 送信 / Shift+Enter 改行
+- [x] 7-6 Tier 2 の表示（「関連しそうな箇所」として回答と明確に区別、Drive リンク、原文の展開）
+- [x] 7-7 Tier 3 の表示（記録した旨と翌朝の回答予定）
+- [x] 7-8 `question_log` への記録（質問文・埋め込み・到達 Tier・候補チャンク ID）
+- [x] 7-9 空状態の案内（Drive 未接続 / インデックス 0 件 / Ollama 未起動）
+- [x] 7-10 **ビルドゲート**
 
 **完了条件**: ブラウザから質問して、関連する原文チャンクが出典付きで返る。
 
@@ -290,7 +290,7 @@ mix hex.audit
 | 4 | Drive 同期 | ☑ | 2026-09-28 |
 | 5 | 本文抽出 | ☑ | 2026-09-28 |
 | 6 | 分割と埋め込み | ☑ | 2026-09-28 |
-| 7 | Tier 2 とチャット | ☐ | |
+| 7 | Tier 2 とチャット | ☑ | 2026-09-28 |
 | 8 | 生成フェーズ | ☐ | |
 | 9 | 相制御とスケジューラ | ☐ | |
 | 10 | Tier 0/1 と鮮度管理 | ☐ | |
