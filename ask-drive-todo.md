@@ -124,16 +124,16 @@ mix hex.audit
 
 ## Phase 5 — 本文抽出
 
-- [ ] 5-1 `AskDrive.Ingest.Extractor` ビヘイビアと MIME ディスパッチャ
-- [ ] 5-2 Google ドキュメント / スライド（`export` → `text/plain`）
-- [ ] 5-3 Google スプレッドシート（`export` → xlsx → `XlsxReader` で全シート）
-- [ ] 5-4 スプレッドシートのテキスト化（シート名を見出し、`列名: 値` のタブ区切り、空行・空列除去）
-- [ ] 5-5 PDF（`pdftotext -layout`）。外部コマンドはタイムアウト付きで呼ぶ
-- [ ] 5-6 docx / pptx（`pandoc -t plain`）
-- [ ] 5-7 xlsx（`XlsxReader`）とテキスト系（そのまま）
-- [ ] 5-8 未対応 MIME を `skipped` にし、理由を記録する。外部コマンド欠如も `skipped` として案内文を残す
-- [ ] 5-9 抽出本文の SHA-256 を `content_hash` に保存し、同一ならチャンク再生成をスキップする
-- [ ] 5-10 **ビルドゲート**
+- [x] 5-1 `AskDrive.Ingest.Extractor` ビヘイビアと MIME ディスパッチャ
+- [x] 5-2 Google ドキュメント / スライド（`export` → `text/plain`）
+- [x] 5-3 Google スプレッドシート（`export` → xlsx → `XlsxReader` で全シート）
+- [x] 5-4 スプレッドシートのテキスト化（シート名を見出し、`列名: 値` のタブ区切り、空行・空列除去）
+- [x] 5-5 PDF（`pdftotext -layout`）。外部コマンドはタイムアウト付きで呼ぶ
+- [x] 5-6 docx / pptx（`pandoc -t plain`）
+- [x] 5-7 xlsx（`XlsxReader`）とテキスト系（そのまま）
+- [x] 5-8 未対応 MIME を `skipped` にし、理由を記録する。外部コマンド欠如も `skipped` として案内文を残す
+- [x] 5-9 抽出本文の SHA-256 を `content_hash` に保存し、同一ならチャンク再生成をスキップする
+- [x] 5-10 **ビルドゲート**
 
 **完了条件**: 全 7 形式のサンプルを用意し、それぞれから本文が取れることをテストで確認する。
 
@@ -288,7 +288,7 @@ mix hex.audit
 | 2 | データモデル | ☑ | 2026-09-28 |
 | 3 | 暗号化と OAuth | ☑ | 2026-09-28 |
 | 4 | Drive 同期 | ☑ | 2026-09-28 |
-| 5 | 本文抽出 | ☐ | |
+| 5 | 本文抽出 | ☑ | 2026-09-28 |
 | 6 | 分割と埋め込み | ☐ | |
 | 7 | Tier 2 とチャット | ☐ | |
 | 8 | 生成フェーズ | ☐ | |
