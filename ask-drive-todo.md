@@ -107,16 +107,16 @@ mix hex.audit
 
 ## Phase 4 — Drive 同期フェーズ
 
-- [ ] 4-1 `AskDrive.Drive.Url.parse/1`（仕様書 6.2.5 の全 URL 形式）とテスト
-- [ ] 4-2 `AskDrive.Drive.Client` の基盤（トークン注入、`supportsAllDrives=true`、並列度・過密リクエスト制御）
-- [ ] 4-3 429 / 5xx の指数バックオフ（初回 1 秒・最大 5 回・ジッター）
-- [ ] 4-4 `list_files/1`（`pageSize=1000` のページング、サブフォルダ再帰、`path` の組み立て）
-- [ ] 4-5 `get_metadata/1` と `download/1`（`alt=media`）
-- [ ] 4-6 `export/2`（Workspace 形式の変換取得、10MB 超の検知）
-- [ ] 4-7 `AskDrive.Batch.SyncWorker`（Oban）: 列挙 → `modifiedTime` 突合 → 差分のみ後続へ
-- [ ] 4-8 Drive から消えたファイルのレコードとチャンク・QAを削除する
-- [ ] 4-9 ファイル単位の失敗を `documents.status = failed` に記録し、同期全体は継続する
-- [ ] 4-10 **ビルドゲート**
+- [x] 4-1 `AskDrive.Drive.Url.parse/1`（仕様書 6.2.5 の全 URL 形式）とテスト
+- [x] 4-2 `AskDrive.Drive.Client` の基盤（トークン注入、`supportsAllDrives=true`、並列度・過密リクエスト制御）
+- [x] 4-3 429 / 5xx の指数バックオフ（初回 1 秒・最大 5 回・ジッター）
+- [x] 4-4 `list_files/1`（`pageSize=1000` のページング、サブフォルダ再帰、`path` の組み立て）
+- [x] 4-5 `get_metadata/1` と `download/1`（`alt=media`）
+- [x] 4-6 `export/2`（Workspace 形式の変換取得、10MB 超の検知）
+- [x] 4-7 `AskDrive.Batch.SyncWorker`（Oban）: 列挙 → `modifiedTime` 突合 → 差分のみ後続へ
+- [x] 4-8 Drive から消えたファイルのレコードとチャンク・QAを削除する
+- [x] 4-9 ファイル単位の失敗を `documents.status = failed` に記録し、同期全体は継続する
+- [x] 4-10 **ビルドゲート**
 
 **完了条件**: テスト用 Drive フォルダを指定して同期を走らせ、`documents` に全ファイルが登録される。2 回目の実行で全件スキップされる。
 
@@ -287,7 +287,7 @@ mix hex.audit
 | 1 | プロジェクト骨格 | ☑ | 2026-09-28 |
 | 2 | データモデル | ☑ | 2026-09-28 |
 | 3 | 暗号化と OAuth | ☑ | 2026-09-28 |
-| 4 | Drive 同期 | ☐ | |
+| 4 | Drive 同期 | ☑ | 2026-09-28 |
 | 5 | 本文抽出 | ☐ | |
 | 6 | 分割と埋め込み | ☐ | |
 | 7 | Tier 2 とチャット | ☐ | |
