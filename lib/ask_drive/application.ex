@@ -15,6 +15,7 @@ defmodule AskDrive.Application do
       {DNSCluster, query: Application.get_env(:ask_drive, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: AskDrive.PubSub},
       {Oban, Application.fetch_env!(:ask_drive, Oban)},
+      AskDrive.LLM.Semaphore,
       AskDrive.HealthCheck,
       # Start to serve requests, typically the last entry
       AskDriveWeb.Endpoint
