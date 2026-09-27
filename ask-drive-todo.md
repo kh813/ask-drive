@@ -90,16 +90,16 @@ mix hex.audit
 
 `ueberauth` は使わない（仕様書 3.4.1）。
 
-- [ ] 3-1 `AskDrive.Encrypted.Binary` カスタム `Ecto.Type` を実装する（AES-256-GCM / `:crypto.crypto_one_time_aead`）
-- [ ] 3-2 鍵生成用の Mix タスク `mix ask_drive.gen.key` を作る
-- [ ] 3-3 `google_accounts` のトークン 2 カラムに暗号化型を適用し、往復テストを書く
-- [ ] 3-4 `AskDrive.Drive.OAuth.authorize_url/1` を実装する（`access_type=offline`、`prompt=consent`、`state`）
-- [ ] 3-5 認可開始とコールバックのコントローラ・ルートを作り、`state` をセッションで照合する
-- [ ] 3-6 `exchange_code/1`（コード → トークン）を実装する
-- [ ] 3-7 `refresh/1` を実装し、期限 120 秒前で自動更新する。リフレッシュトークンが返らない場合は既存値を温存する
-- [ ] 3-8 `invalid_grant` を専用のエラーとして分類し、再認可要求フラグを立てる
-- [ ] 3-9 `revoke/0`（接続解除）を実装する
-- [ ] 3-10 **ビルドゲート**
+- [x] 3-1 `AskDrive.Encrypted.Binary` カスタム `Ecto.Type` を実装する（AES-256-GCM / `:crypto.crypto_one_time_aead`）
+- [x] 3-2 鍵生成用の Mix タスク `mix ask_drive.gen.key` を作る
+- [x] 3-3 `google_accounts` のトークン 2 カラムに暗号化型を適用し、往復テストを書く
+- [x] 3-4 `AskDrive.Drive.OAuth.authorize_url/1` を実装する（`access_type=offline`、`prompt=consent`、`state`）
+- [x] 3-5 認可開始とコールバックのコントローラ・ルートを作り、`state` をセッションで照合する
+- [x] 3-6 `exchange_code/1`（コード → トークン）を実装する
+- [x] 3-7 `refresh/1` を実装し、期限 120 秒前で自動更新する。リフレッシュトークンが返らない場合は既存値を温存する
+- [x] 3-8 `invalid_grant` を専用のエラーとして分類し、再認可要求フラグを立てる
+- [x] 3-9 `revoke/0`（接続解除）を実装する
+- [x] 3-10 **ビルドゲート**
 
 **完了条件**: ブラウザで Google 認可を通し、`google_accounts` に暗号化されたリフレッシュトークンが保存される。DB を直接見て平文でないことを確認する。
 
@@ -286,7 +286,7 @@ mix hex.audit
 | 0 | 環境準備 | ☑ | 2026-09-28 |
 | 1 | プロジェクト骨格 | ☑ | 2026-09-28 |
 | 2 | データモデル | ☑ | 2026-09-28 |
-| 3 | 暗号化と OAuth | ☐ | |
+| 3 | 暗号化と OAuth | ☑ | 2026-09-28 |
 | 4 | Drive 同期 | ☐ | |
 | 5 | 本文抽出 | ☐ | |
 | 6 | 分割と埋め込み | ☐ | |

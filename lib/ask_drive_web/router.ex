@@ -18,6 +18,10 @@ defmodule AskDriveWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+
+    get "/auth/google", AuthController, :request
+    get "/auth/google/callback", AuthController, :callback
+    delete "/auth/google", AuthController, :disconnect
   end
 
   # Other scopes may use custom stacks.

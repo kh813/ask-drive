@@ -4,8 +4,8 @@ defmodule AskDrive.Accounts.GoogleAccount do
 
   schema "google_accounts" do
     field :email, :string
-    field :access_token, :binary
-    field :refresh_token, :binary
+    field :access_token, AskDrive.Encrypted.Binary
+    field :refresh_token, AskDrive.Encrypted.Binary
     field :token_expires_at, :utc_datetime
     field :scope, :string
     field :status, :string, default: "connected"
