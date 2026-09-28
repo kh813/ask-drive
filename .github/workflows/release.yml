@@ -69,7 +69,14 @@ jobs:
             -x ".env*" \
             -x "tmp/*" \
             -x "log/*" \
-            -x ".runtime/*"
+            -x ".runtime/*" \
+            -x "ask-drive-spec.md" \
+            -x "ask-drive-todo.md" \
+            -x "AGENTS.md" \
+            -x "docs/*" \
+            -x "test/*" \
+            -x "*.DS_Store" \
+            -x ".formatter.exs"
 
           echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
 
