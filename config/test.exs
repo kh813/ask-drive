@@ -13,6 +13,9 @@ config :ask_drive, AskDrive.Repo,
 # The suite exercises the real login/elevation flow; tests opt into POC mode explicitly.
 config :ask_drive, auth_disabled_by_default: false
 
+# Never let the runtime clock start a real nightly batch in the middle of a test run.
+config :ask_drive, auto_nightly_batch: false
+
 # Disable Oban queues in test
 config :ask_drive, Oban, testing: :manual
 

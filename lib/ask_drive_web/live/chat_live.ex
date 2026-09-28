@@ -1,7 +1,7 @@
 defmodule AskDriveWeb.ChatLive do
   use AskDriveWeb, :live_view
 
-  alias AskDrive.{Accounts, Answering, HealthCheck, LLM, Repo, Settings}
+  alias AskDrive.{Accounts, Answering, HealthCheck, LLM, Repo, Settings, Snippet}
   alias AskDrive.Accounts.User
   alias AskDrive.Documents.Chunk
 
@@ -72,6 +72,7 @@ defmodule AskDriveWeb.ChatLive do
       answer: result.answer,
       chunks: result.chunks,
       qa_pair: result.qa_pair,
+      question: result.question,
       index_empty?: Map.get(result, :index_empty?, false),
       inserted_at: DateTime.utc_now()
     }
@@ -272,7 +273,10 @@ defmodule AskDriveWeb.ChatLive do
 
                             <%= if msg.qa_pair.generated_at do %>
                               <span class="text-zinc-400">
-                                生成日時: {Calendar.strftime(msg.qa_pair.generated_at, "%Y-%m-%d %H:%M")}
+                                生成日時: {AskDrive.Clock.format(
+                                  msg.qa_pair.generated_at,
+                                  "%Y-%m-%d %H:%M"
+                                )}
                               </span>
                             <% end %>
                           </div>
@@ -305,7 +309,9 @@ defmodule AskDriveWeb.ChatLive do
                     <%!-- Tier 2 Excerpt Sources --%>
                     <%= if msg.tier == 2 and msg.chunks != [] do %>
                       <div class="space-y-3">
-                        <p class="text-xs text-zinc-500">以下のドキュメントセクションが関連しています:</p>
+                        <p class="text-xs text-zinc-500">
+                          関連しそうな箇所です（原文の抜粋。質問の語を<mark class="bg-yellow-200 dark:bg-yellow-700/60 text-inherit rounded px-0.5">ハイライト</mark>しています）:
+                        </p>
                         <div class="space-y-2">
                           <%= for chunk <- msg.chunks do %>
                             <div class="p-3 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200/70 dark:border-zinc-800 space-y-1.5">
@@ -332,9 +338,18 @@ defmodule AskDriveWeb.ChatLive do
                                 </div>
                               <% end %>
 
-                              <div class="text-xs text-zinc-600 dark:text-zinc-400 font-mono bg-zinc-50 dark:bg-zinc-900 p-2 rounded-md leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
-                                {chunk.content}
+                              <% snippet = Snippet.build(chunk.content, msg[:question]) %>
+                              <div class="text-sm text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900 p-3 rounded-md leading-relaxed">
+                                {excerpt_html(snippet.segments, snippet.before?, snippet.after?)}
                               </div>
+                              <details class="text-xs">
+                                <summary class="cursor-pointer text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 select-none">
+                                  全文を表示
+                                </summary>
+                                <div class="mt-1.5 text-xs text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-900 p-2 rounded-md leading-relaxed max-h-72 overflow-y-auto">
+                                  {excerpt_html(Snippet.full(chunk.content, msg[:question]))}
+                                </div>
+                              </details>
                             </div>
                           <% end %>
                         </div>
@@ -389,7 +404,7 @@ defmodule AskDriveWeb.ChatLive do
   end
 
   defp format_time(%DateTime{} = dt) do
-    Calendar.strftime(dt, "%H:%M")
+    AskDrive.Clock.format(dt, "%H:%M")
   end
 
   defp format_time(_), do: ""
@@ -404,4 +419,37 @@ defmodule AskDriveWeb.ChatLive do
   end
 
   defp format_number(_), do: "0"
+
+  # Excerpt HTML is built here rather than in the template: the text keeps its line breaks
+  # (as <br>) without relying on whitespace-pre-wrap, which would also render the
+  # template's own indentation. Every piece of document text is escaped.
+  defp excerpt_html(segments, before? \\ false, after? \\ false) do
+    body =
+      Enum.map(segments, fn
+        {:hit, text} ->
+          [
+            ~s(<mark class="bg-yellow-200 dark:bg-yellow-700/60 text-inherit rounded px-0.5">),
+            escape_lines(text),
+            "</mark>"
+          ]
+
+        {:text, text} ->
+          escape_lines(text)
+      end)
+
+    ellipsis = ~s(<span class="text-zinc-400">…</span>)
+
+    Phoenix.HTML.raw([
+      if(before?, do: ellipsis, else: ""),
+      body,
+      if(after?, do: ellipsis, else: "")
+    ])
+  end
+
+  defp escape_lines(text) do
+    text
+    |> String.split("\n")
+    |> Enum.map(&(&1 |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()))
+    |> Enum.intersperse("<br>")
+  end
 end

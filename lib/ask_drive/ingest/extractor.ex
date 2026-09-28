@@ -4,6 +4,7 @@ defmodule AskDrive.Ingest.Extractor do
   """
   alias AskDrive.Drive.Client, as: DriveClient
   alias AskDrive.Ingest.Extractors.Spreadsheet
+  alias AskDrive.Ingest.TextCleaner
 
   @doc """
   Computes SHA-256 hash of extracted text string.
@@ -122,12 +123,12 @@ defmodule AskDrive.Ingest.Extractor do
         with_temp_file(binary, ".pdf", fn temp_path ->
           case System.cmd(path, ["-layout", temp_path, "-"], stderr_to_stdout: true) do
             {output, 0} ->
-              format_extracted_text(output)
+              output |> TextCleaner.clean() |> format_extracted_text()
 
             {output, code} ->
               # Exit code 0 or check if output exists
               if byte_size(String.trim(output)) > 0 do
-                format_extracted_text(output)
+                output |> TextCleaner.clean() |> format_extracted_text()
               else
                 {:error, "pdftotext failed (exit #{code}): #{output}"}
               end

@@ -179,6 +179,7 @@ defmodule AskDrive.Retrieval do
       |> Map.new(fn {{chunk_id, _rank}, rank} -> {chunk_id, 1.0 / (@rrf_k + rank)} end)
 
     all_chunk_ids = (Map.keys(vec_scores) ++ Map.keys(kw_scores)) |> Enum.uniq()
+    terms = if query_text, do: extract_terms(query_text), else: []
 
     if Enum.empty?(all_chunk_ids) do
       []
@@ -199,7 +200,7 @@ defmodule AskDrive.Retrieval do
           chunk = Map.get(chunks, chunk_id)
           v_score = Map.get(vec_scores, chunk_id, 0.0)
           k_score = Map.get(kw_scores, chunk_id, 0.0)
-          total_score = v_score + k_score
+          total_score = v_score + k_score + coverage_bonus(chunk, terms)
           {chunk, total_score}
         end)
         |> Enum.reject(fn {chunk, _score} -> is_nil(chunk) end)
@@ -220,5 +221,30 @@ defmodule AskDrive.Retrieval do
 
       final_chunks
     end
+  end
+
+  # RRF only sees ranks, so a chunk that literally contains "USBメモリ" could sit below ones
+  # that are merely on the same topic. Add up to one top rank's worth (1/(k+1)) for the share
+  # of the question's term characters the chunk contains (whitespace-insensitive, so the
+  # document's "USB メモリ" counts). Topic matches still show; literal ones come first.
+  defp coverage_bonus(nil, _terms), do: 0.0
+  defp coverage_bonus(_chunk, []), do: 0.0
+
+  defp coverage_bonus(chunk, terms) do
+    haystack =
+      (chunk.content || "")
+      |> :unicode.characters_to_nfkc_binary()
+      |> String.downcase()
+      |> String.replace(~r/[\s\x{3000}]/u, "")
+
+    total = terms |> Enum.map(&String.length/1) |> Enum.sum()
+
+    covered =
+      terms
+      |> Enum.filter(&String.contains?(haystack, String.replace(&1, ~r/\s/u, "")))
+      |> Enum.map(&String.length/1)
+      |> Enum.sum()
+
+    covered / total * (1.0 / (@rrf_k + 1))
   end
 end

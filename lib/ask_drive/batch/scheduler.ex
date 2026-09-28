@@ -34,11 +34,40 @@ defmodule AskDrive.Batch.Scheduler do
   alias AskDrive.Runtime.Mode
 
   @doc """
+  Whether a batch is currently running. Batches run inside this process, so two at once
+  would fight over the single local model and the same documents.
+  """
+  def running? do
+    Repo.exists?(from b in BatchRun, where: b.status == "running")
+  end
+
+  @doc "Whether a full batch has started at or after `since` (UTC)."
+  def ran_since?(%DateTime{} = since) do
+    Repo.exists?(from b in BatchRun, where: b.kind == "full" and b.started_at >= ^since)
+  end
+
+  @doc """
   Runs the entire 6-phase batch process synchronously.
   Can be invoked by Oban Cron or manually from Admin dashboard.
+
+  `ingest_only: true` runs only sync and indexing (phases 1-3, then 6) and never loads the
+  generation model (spec 6.3.8 F-331). Meant for daytime manual runs: a full batch spends
+  hours generating QA with the local model, and chat query embeddings queue behind it.
+  It also stays out of `:night_batch`, so the embedding model stays resident for chat.
   """
   def run_batch(opts \\ []) do
+    # The nightly cron and a manual run could otherwise overlap and fight over the model.
+    if running?() do
+      Logger.warning("Batch requested while another is running; skipped")
+      {:error, :already_running}
+    else
+      do_run_batch(opts)
+    end
+  end
+
+  defp do_run_batch(opts) do
     force_all = Keyword.get(opts, :force, false)
+    ingest_only? = Keyword.get(opts, :ingest_only, false)
     setting = Settings.get_setting!()
 
     # 1. Create batch_run record
@@ -51,12 +80,14 @@ defmodule AskDrive.Batch.Scheduler do
         chunks_processed: 0,
         qa_generated: 0,
         qa_invalidated: 0,
-        questions_resolved: 0
+        questions_resolved: 0,
+        kind: if(ingest_only?, do: "ingest_only", else: "full")
       })
       |> Repo.insert()
 
-    # Transition runtime mode into night_batch
-    Mode.set_mode(:night_batch)
+    # Transition runtime mode into night_batch (a full batch only: ingest-only never loads the
+    # generation model, and the daytime mode keeps the embedding model resident for chat)
+    unless ingest_only?, do: Mode.set_mode(:night_batch)
 
     deadline = calculate_deadline(setting)
     Logger.info("Starting Night Batch ##{batch_run.id}. Deadline: #{inspect(deadline)}")
@@ -82,18 +113,26 @@ defmodule AskDrive.Batch.Scheduler do
       # --- Phase 3: Embed Chunks ---
       {_p3_stat, batch_run} = run_phase_3_embed_chunks(batch_run, setting)
 
-      # --- Phase 4: Generate (Deadline-controlled) ---
-      {_p4_stat, batch_run, deadline_reached?} =
-        run_phase_4_generate(batch_run, setting, deadline, force_all)
+      {batch_run, deadline_reached?} =
+        if ingest_only? do
+          Logger.info("Batch ##{batch_run.id} - ingest only: skipping Phase 4 (Generate) and 5")
+          {batch_run, false}
+        else
+          # --- Phase 4: Generate (Deadline-controlled) ---
+          {_p4_stat, batch_run, deadline_reached?} =
+            run_phase_4_generate(batch_run, setting, deadline, force_all)
 
-      # --- Phase 5: Embed Questions ---
-      {_p5_stat, batch_run} = run_phase_5_embed_questions(batch_run, setting)
+          # --- Phase 5: Embed Questions ---
+          {_p5_stat, batch_run} = run_phase_5_embed_questions(batch_run, setting)
+          {batch_run, deadline_reached?}
+        end
 
       # --- Phase 6: Verify & Finish ---
       {_p6_stat, batch_run} = run_phase_6_verify(batch_run, setting, deadline_reached?)
 
       # Leave night_batch for whatever mode the clock calls for (daytime or standby)
       Mode.end_batch()
+      if ingest_only?, do: rewarm_embedding(setting)
 
       if caffeinate_port, do: Port.close(caffeinate_port)
 
@@ -111,6 +150,7 @@ defmodule AskDrive.Batch.Scheduler do
         |> Repo.update()
 
         Mode.end_batch()
+        if ingest_only?, do: rewarm_embedding(setting)
         if caffeinate_port, do: Port.close(caffeinate_port)
         {:error, e}
     end
@@ -570,23 +610,25 @@ defmodule AskDrive.Batch.Scheduler do
 
   # --- Helpers ---
 
+  # The next batch_end_hour:00 in local time (it used to be UTC: "07:00" meant 16:00 JST).
   defp calculate_deadline(setting) do
-    # e.g. batch_end_hour
-    now = DateTime.utc_now()
+    now = AskDrive.Clock.local_now()
     end_hour = setting.batch_end_hour || 7
+    today_deadline = NaiveDateTime.new!(NaiveDateTime.to_date(now), Time.new!(end_hour, 0, 0))
 
-    # Deadline is today or tomorrow at end_hour:00
-    today_deadline =
-      DateTime.new!(
-        Date.utc_today(),
-        Time.new!(end_hour, 0, 0),
-        "Etc/UTC"
-      )
+    deadline =
+      if NaiveDateTime.compare(now, today_deadline) == :lt,
+        do: today_deadline,
+        else: NaiveDateTime.add(today_deadline, 86_400)
 
-    if DateTime.compare(now, today_deadline) == :lt do
-      today_deadline
-    else
-      DateTime.add(today_deadline, 24 * 3600, :second)
+    AskDrive.Clock.local_to_utc(deadline)
+  end
+
+  # Phase 3 unloads the embedding model at its boundary. After a full batch the switch back
+  # to daytime re-warms it; an ingest-only run never left daytime, so do it here.
+  defp rewarm_embedding(setting) do
+    if Mode.current_mode() == :daytime do
+      Task.start(fn -> LLM.prewarm_embedding(setting.embed_model, setting: setting) end)
     end
   end
 

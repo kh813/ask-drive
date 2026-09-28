@@ -65,17 +65,25 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   @impl true
-  def handle_event("trigger_batch", _params, socket) do
-    Logger.info("AdminLive: Triggering manual batch run...")
+  def handle_event("trigger_batch", params, socket) do
+    ingest_only? = params["kind"] == "ingest_only"
 
-    Task.start(fn ->
-      Scheduler.run_batch()
-    end)
+    if Scheduler.running?() do
+      {:noreply, put_flash(socket, :error, "バッチが実行中です。終了してから実行してください。")}
+    else
+      Logger.info("AdminLive: Triggering manual batch run (ingest_only: #{ingest_only?})...")
+      Task.start(fn -> Scheduler.run_batch(ingest_only: ingest_only?) end)
 
-    {:noreply,
-     socket
-     |> put_flash(:info, "夜間バッチの実行を開始しました。")
-     |> load_dashboard_data()}
+      message =
+        if ingest_only?,
+          do: "取り込みのみのバッチを開始しました（QA 生成は行いません）。",
+          else: "バッチ（QA 生成あり）の実行を開始しました。"
+
+      {:noreply,
+       socket
+       |> put_flash(:info, message)
+       |> load_dashboard_data()}
+    end
   end
 
   @impl true
@@ -373,19 +381,32 @@ defmodule AskDriveWeb.AdminLive do
             </p>
           </div>
 
-          <div class="flex items-center gap-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <%!-- Ingest only (spec 6.3.8 F-331): sync + indexing, no QA generation, so the
+                  local model stays free for chat. The safe default for daytime runs. --%>
+            <button
+              id="trigger-ingest-btn"
+              phx-click="trigger_batch"
+              phx-value-kind="ingest_only"
+              title="Drive の同期と取り込み（本文抽出・埋め込み）だけを行います。QA 生成は行わないため、実行中もチャットは通常どおり使えます。"
+              class="text-xs px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm flex items-center gap-1.5 transition"
+            >
+              <.icon name="hero-arrow-down-tray" class="w-4 h-4" /> 取り込みのみ実行
+            </button>
             <button
               id="trigger-batch-btn"
               phx-click="trigger_batch"
+              phx-value-kind="full"
               data-confirm={
                 if(@current_mode == :daytime,
-                  do: "現在は営業時間相です。バッチを実行すると生成モデルがロードされ一時的にメモリを消費します。実行しますか？",
-                  else: "バッチを手動実行しますか？"
+                  do:
+                    "現在は営業時間相です。QA 生成ありのバッチは生成モデルを長時間占有し、その間チャットは原文検索のみ（キーワード中心）になります。通常は「取り込みのみ実行」で十分です。実行しますか？",
+                  else: "バッチ（QA 生成あり）を手動実行しますか？"
                 )
               }
-              class="text-xs px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm flex items-center gap-1.5 transition"
+              class="text-xs px-3.5 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium flex items-center gap-1.5 transition"
             >
-              <.icon name="hero-play" class="w-4 h-4" /> 今すぐバッチ実行
+              <.icon name="hero-play" class="w-4 h-4" /> フル実行（QA 生成あり）
             </button>
           </div>
         </div>
@@ -517,7 +538,7 @@ defmodule AskDriveWeb.AdminLive do
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                   <.icon name="hero-cpu-chip" class="w-5 h-5 text-indigo-600" /> 直近の夜間バッチ実行状況
                 </h2>
-                <%= if @latest_run do %>
+                <div :if={@latest_run} class="flex items-center gap-2">
                   <span class={[
                     "text-xs px-2.5 py-1 rounded-full font-medium",
                     case @latest_run.status do
@@ -536,7 +557,13 @@ defmodule AskDriveWeb.AdminLive do
                   ]}>
                     {@latest_run.status}
                   </span>
-                <% end %>
+                  <span
+                    :if={@latest_run.kind == "ingest_only"}
+                    class="text-xs px-2.5 py-1 rounded-full font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
+                  >
+                    取り込みのみ
+                  </span>
+                </div>
               </div>
 
               <%= if @latest_run do %>
@@ -544,14 +571,14 @@ defmodule AskDriveWeb.AdminLive do
                   <div>
                     <span class="text-zinc-400 block">開始日時</span>
                     <span class="font-mono text-zinc-800 dark:text-zinc-200">
-                      {Calendar.strftime(@latest_run.started_at, "%Y-%m-%d %H:%M:%S")}
+                      {AskDrive.Clock.format(@latest_run.started_at, "%Y-%m-%d %H:%M:%S")}
                     </span>
                   </div>
                   <div>
                     <span class="text-zinc-400 block">終了日時</span>
                     <span class="font-mono text-zinc-800 dark:text-zinc-200">
                       {if @latest_run.finished_at,
-                        do: Calendar.strftime(@latest_run.finished_at, "%Y-%m-%d %H:%M:%S"),
+                        do: AskDrive.Clock.format(@latest_run.finished_at, "%Y-%m-%d %H:%M:%S"),
                         else: "実行中..."}
                     </span>
                   </div>
@@ -762,7 +789,7 @@ defmodule AskDriveWeb.AdminLive do
                       <div>
                         <p class="font-medium text-zinc-900 dark:text-zinc-100">{q.question}</p>
                         <p class="text-[11px] text-zinc-400 mt-0.5">
-                          到達: Tier {q.tier_reached} ・ 質問日時: {Calendar.strftime(
+                          到達: Tier {q.tier_reached} ・ 質問日時: {AskDrive.Clock.format(
                             q.asked_at,
                             "%Y-%m-%d %H:%M"
                           )}
@@ -792,7 +819,7 @@ defmodule AskDriveWeb.AdminLive do
                       <div class="flex items-center justify-between">
                         <p class="font-medium text-zinc-900 dark:text-zinc-100">{q.question}</p>
                         <span class="text-[10px] text-zinc-400">
-                          解消: {Calendar.strftime(q.resolved_at, "%Y-%m-%d %H:%M")}
+                          解消: {AskDrive.Clock.format(q.resolved_at, "%Y-%m-%d %H:%M")}
                         </span>
                       </div>
                       <%= if q.resolved_qa do %>
@@ -882,7 +909,7 @@ defmodule AskDriveWeb.AdminLive do
                         </td>
                         <td class="py-3 px-2 text-zinc-400">
                           {if doc.synced_at,
-                            do: Calendar.strftime(doc.synced_at, "%Y-%m-%d %H:%M"),
+                            do: AskDrive.Clock.format(doc.synced_at, "%Y-%m-%d %H:%M"),
                             else: "—"}
                         </td>
                         <td class="py-3 px-2 text-right">
@@ -991,12 +1018,12 @@ defmodule AskDriveWeb.AdminLive do
                         <td class="py-3 px-2 text-zinc-400">
                           <div>
                             {if user.last_login_at,
-                              do: Calendar.strftime(user.last_login_at, "%Y-%m-%d %H:%M"),
+                              do: AskDrive.Clock.format(user.last_login_at, "%Y-%m-%d %H:%M"),
                               else: "—"}
                           </div>
                           <div class="text-[10px]">
                             昇格: {if user.last_elevated_at,
-                              do: Calendar.strftime(user.last_elevated_at, "%Y-%m-%d %H:%M"),
+                              do: AskDrive.Clock.format(user.last_elevated_at, "%Y-%m-%d %H:%M"),
                               else: "—"}
                           </div>
                         </td>
@@ -1090,7 +1117,7 @@ defmodule AskDriveWeb.AdminLive do
                     <%= for log <- @elevation_logs do %>
                       <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
                         <td class="py-2.5 px-2 font-mono text-[11px] whitespace-nowrap">
-                          {Calendar.strftime(log.occurred_at, "%Y-%m-%d %H:%M:%S")}
+                          {AskDrive.Clock.format(log.occurred_at, "%Y-%m-%d %H:%M:%S")}
                         </td>
                         <td class="py-2.5 px-2 font-mono text-[11px] text-zinc-900 dark:text-zinc-100">
                           {log.email}

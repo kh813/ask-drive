@@ -33,6 +33,39 @@ defmodule AskDriveWeb.ChatLiveTest do
     refute has_element?(view, "#answer-loading")
   end
 
+  test "Tier 2 excerpts highlight the question's terms", %{conn: conn} do
+    {:ok, doc} =
+      %AskDrive.Documents.Document{}
+      |> AskDrive.Documents.Document.changeset(%{
+        drive_file_id: "chat_hl_doc",
+        name: "sme_guideline.pdf",
+        mime_type: "application/pdf",
+        status: "indexed"
+      })
+      |> AskDrive.Repo.insert()
+
+    {:ok, _} =
+      %AskDrive.Documents.Chunk{}
+      |> AskDrive.Documents.Chunk.changeset(%{
+        document_id: doc.id,
+        position: 0,
+        content_hash: "c",
+        content: "[文書: sme_guideline.pdf]\nじ じ\nメールやウェブ閲覧に利用せず、USB メモリ、外付け HDD も接続を禁止する。"
+      })
+      |> AskDrive.Repo.insert()
+
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    view
+    |> form("#chat-form", %{"question" => "USBメモリの利用ルールは？"})
+    |> render_submit()
+
+    html = render_async(view, 20_000)
+    assert html =~ "関連しそうな箇所"
+    assert html =~ ~r{<mark[^>]*>USB メモリ</mark>}
+    refute html =~ "じ じ"
+  end
+
   test "resets chat history", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/")
 

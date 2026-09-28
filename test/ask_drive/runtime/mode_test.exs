@@ -19,13 +19,45 @@ defmodule AskDrive.Runtime.ModeTest do
       assert Mode.current_mode() == :night_batch
     end
 
-    test "sync_with_clock/0 keeps night_batch, but end_batch/0 leaves it for the clock's mode" do
+    test "night_batch is held only while a batch runs; end_batch/0 returns to the clock" do
+      {:ok, run} =
+        %AskDrive.Batch.BatchRun{}
+        |> AskDrive.Batch.BatchRun.changeset(%{started_at: DateTime.utc_now(), status: "running"})
+        |> AskDrive.Repo.insert()
+
       :ok = Mode.set_mode(:night_batch)
       assert Mode.sync_with_clock() == :night_batch
 
-      expected = Mode.calculate_current_mode()
-      assert Mode.end_batch() == expected
-      assert Mode.current_mode() == expected
+      run |> AskDrive.Batch.BatchRun.changeset(%{status: "completed"}) |> AskDrive.Repo.update!()
+
+      resting = Mode.end_batch()
+      assert resting in [:daytime, :standby]
+      assert Mode.current_mode() == resting
+    end
+
+    test "without a running batch the clock never rests in night_batch" do
+      :ok = Mode.set_mode(:night_batch)
+      assert Mode.sync_with_clock() in [:daytime, :standby]
+    end
+
+    test "calculate_current_mode/1 uses the local hour against the batch window (21-7)" do
+      assert Mode.calculate_current_mode(~N[2026-09-28 22:30:00]) == :night_batch
+      assert Mode.calculate_current_mode(~N[2026-09-29 06:59:00]) == :night_batch
+      assert Mode.calculate_current_mode(~N[2026-09-29 10:00:00]) == :daytime
+    end
+
+    test "night_window_start_utc/1 is the latest local batch_start_hour" do
+      offset = AskDrive.Clock.utc_offset_seconds()
+
+      expected = fn local ->
+        local |> NaiveDateTime.add(-offset) |> DateTime.from_naive!("Etc/UTC")
+      end
+
+      assert Mode.night_window_start_utc(~N[2026-09-28 23:00:00]) ==
+               expected.(~N[2026-09-28 21:00:00])
+
+      assert Mode.night_window_start_utc(~N[2026-09-29 03:00:00]) ==
+               expected.(~N[2026-09-28 21:00:00])
     end
 
     test "generation is disabled during daytime when daytime_llm_enabled is false" do

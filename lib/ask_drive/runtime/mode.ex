@@ -72,7 +72,7 @@ defmodule AskDrive.Runtime.Mode do
   @impl true
   def init(_opts) do
     # Calculate mode based on current time
-    initial_mode = calculate_current_mode()
+    initial_mode = resting_mode(calculate_current_mode())
     Logger.info("AskDrive.Runtime.Mode initialized with mode: #{initial_mode}")
 
     # Transition into initial mode
@@ -101,17 +101,14 @@ defmodule AskDrive.Runtime.Mode do
 
   @impl true
   def handle_call(:end_batch, _from, state) do
-    calculated = calculate_current_mode()
+    target = resting_mode(calculate_current_mode())
 
-    if calculated != state.mode do
-      Logger.info(
-        "Batch finished; runtime mode transitioning from #{state.mode} to #{calculated}"
-      )
-
-      apply_mode_transition(state.mode, calculated)
+    if target != state.mode do
+      Logger.info("Batch finished; runtime mode transitioning from #{state.mode} to #{target}")
+      apply_mode_transition(state.mode, target)
     end
 
-    {:reply, calculated, %{state | mode: calculated}}
+    {:reply, target, %{state | mode: target}}
   end
 
   @impl true
@@ -132,36 +129,70 @@ defmodule AskDrive.Runtime.Mode do
 
   @impl true
   def handle_call(:sync_with_clock, _from, state) do
-    # Only auto-switch if not currently running a batch or if clock indicates phase change
-    calculated = calculate_current_mode()
-
-    new_state =
-      if calculated != state.mode and state.mode != :night_batch do
-        Logger.info("Clock sync triggered mode change from #{state.mode} to #{calculated}")
-        apply_mode_transition(state.mode, calculated)
-        %{state | mode: calculated}
-      else
-        state
-      end
-
+    new_state = follow_clock(state, "Clock sync")
     {:reply, new_state.mode, new_state}
   end
 
   @impl true
   def handle_info(:clock_tick, state) do
-    calculated = calculate_current_mode()
-
-    new_state =
-      if calculated != state.mode and state.mode != :night_batch do
-        Logger.info("Clock tick auto-transitioning from #{state.mode} to #{calculated}")
-        apply_mode_transition(state.mode, calculated)
-        %{state | mode: calculated}
-      else
-        state
-      end
-
+    maybe_start_nightly_batch()
+    new_state = follow_clock(state, "Clock tick")
     schedule_clock_tick()
     {:noreply, new_state}
+  end
+
+  # `:night_batch` belongs to a running batch: the scheduler enters it and leaves it via
+  # end_batch/0, and the clock never touches it while a batch runs. Outside a batch the
+  # night window rests in `:standby`. (The clock used to switch into `:night_batch` itself
+  # and then refused to ever leave it, so the mode stuck there until a restart.)
+  defp follow_clock(state, reason) do
+    if state.mode == :night_batch and AskDrive.Batch.Scheduler.running?() do
+      state
+    else
+      target = resting_mode(calculate_current_mode())
+
+      if target != state.mode do
+        Logger.info("#{reason}: runtime mode transitioning from #{state.mode} to #{target}")
+        apply_mode_transition(state.mode, target)
+      end
+
+      %{state | mode: target}
+    end
+  end
+
+  defp resting_mode(:night_batch), do: :standby
+  defp resting_mode(mode), do: mode
+
+  # The nightly batch (spec 6.3) had no trigger at all: nothing ever called run_batch/1
+  # except the admin button. Start it from the clock once per night window. "Once" is read
+  # from batch_runs, so a restart inside the window doesn't start a second one.
+  defp maybe_start_nightly_batch do
+    if Application.get_env(:ask_drive, :auto_nightly_batch, true) and
+         calculate_current_mode() == :night_batch and
+         not AskDrive.Batch.Scheduler.running?() and
+         not AskDrive.Batch.Scheduler.ran_since?(night_window_start_utc()) do
+      Logger.info("Night window reached: starting the nightly batch")
+      Task.start(fn -> AskDrive.Batch.Scheduler.run_batch() end)
+    end
+  rescue
+    e -> Logger.error("Could not start the nightly batch: #{Exception.message(e)}")
+  end
+
+  @doc """
+  Start of the current (or most recent) night window, in UTC: today's `batch_start_hour`
+  in local time, or yesterday's if that is still in the future.
+  """
+  def night_window_start_utc(now \\ AskDrive.Clock.local_now()) do
+    setting = Settings.get_setting()
+    start_h = (setting && setting.batch_start_hour) || 21
+    today_start = NaiveDateTime.new!(NaiveDateTime.to_date(now), Time.new!(start_h, 0, 0))
+
+    start =
+      if NaiveDateTime.compare(now, today_start) == :lt,
+        do: NaiveDateTime.add(today_start, -86_400),
+        else: today_start
+
+    AskDrive.Clock.local_to_utc(start)
   end
 
   # --- Internal Helpers ---
@@ -170,12 +201,13 @@ defmodule AskDrive.Runtime.Mode do
     Process.send_after(self(), :clock_tick, 60_000)
   end
 
-  def calculate_current_mode(now \\ DateTime.utc_now()) do
-    # Convert to local time or use UTC hour based on settings
+  def calculate_current_mode(now \\ AskDrive.Clock.local_now()) do
+    # Local wall-clock hour: batch hours are office hours, not UTC (see AskDrive.Clock)
     hour = now.hour
     setting = Settings.get_setting()
 
-    batch_start = (setting && setting.batch_start_hour) || 2
+    # Same defaults as the settings schema (21:00-07:00)
+    batch_start = (setting && setting.batch_start_hour) || 21
     batch_end = (setting && setting.batch_end_hour) || 7
 
     cond do

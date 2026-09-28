@@ -59,5 +59,39 @@ defmodule AskDrive.Batch.SchedulerTest do
       assert "embed_questions" in phase_names
       assert "verify" in phase_names
     end
+
+    @tag timeout: 120_000
+    test "run_batch(ingest_only: true) skips generation and never enters night_batch" do
+      AskDrive.Runtime.Mode.set_mode(:daytime)
+
+      {:ok, batch_run} = Scheduler.run_batch(ingest_only: true)
+
+      assert batch_run.kind == "ingest_only"
+      assert batch_run.status == "completed"
+
+      phase_names =
+        Repo.all(from s in BatchPhaseStat, where: s.batch_run_id == ^batch_run.id)
+        |> Enum.map(& &1.phase_name)
+
+      assert "sync" in phase_names
+      assert "embed_chunks" in phase_names
+      assert "verify" in phase_names
+      refute "generate" in phase_names
+      refute "embed_questions" in phase_names
+
+      refute AskDrive.Runtime.Mode.current_mode() == :night_batch
+    end
+
+    test "running?/0 reflects a batch in progress" do
+      refute Scheduler.running?()
+
+      {:ok, _} =
+        %AskDrive.Batch.BatchRun{}
+        |> AskDrive.Batch.BatchRun.changeset(%{started_at: DateTime.utc_now(), status: "running"})
+        |> Repo.insert()
+
+      assert Scheduler.running?()
+      assert {:error, :already_running} = Scheduler.run_batch(ingest_only: true)
+    end
   end
 end
