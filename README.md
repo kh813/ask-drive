@@ -103,18 +103,69 @@ cd ask-drive
 
 ---
 
-## 初期設定手順（Web 管理画面）
+## 初期設定と Google 連携手順
 
-1. ブラウザで `http://localhost:4000/admin?tab=settings` を開きます。
-2. 以下の設定を入力して保存します:
+AskDrive は、全社公開マニュアルなどの Google Drive フォルダを同期する **「同期専用 Google アカウント」** と、チャットを利用する **「一般社員アカウント」** の 2 種類のアカウント形態をサポートしています。
+
+```
+[ Google Drive マニュアルフォルダ ]
+               │ (夜間自動同期 / 専用アカウント認可)
+         ┌─────▼─────┐
+         │  AskDrive │ ◄── LAN 公開 (http://<ホスト>:4000)
+         └─────▲─────┘
+               │ (質問・閲覧 / 各自の Google Workspace アカウント)
+   [ 社員 A ] [ 社員 B ] [ 社員 C ] (@company.com ドメイン限定)
+```
+
+---
+
+### ステップ 1: Google Cloud Console での事前準備（5分）
+
+1. **[Google Cloud Console](https://console.cloud.google.com/)** に自社 Google Workspace 管理者アカウントでログインします。
+2. **Google Drive API の有効化**:
+   - `[API とサービス]` ➔ `[ライブラリ]` を開き、**`Google Drive API`** を検索して **「有効にする」** をクリックします。
+3. **OAuth 同意画面の設定**:
+   - `[API とサービス]` ➔ `[OAuth 同意画面]` を開きます。
+   - **User Type**: **「内部 (Internal)」** を選択（自社 Google Workspace ドメインのユーザーのみアクセス許可）。
+   - アプリ名（例: `AskDrive`）、ユーザーサポートメール、開発者連絡先メールを入力して保存します。
+   - スコープに `.../auth/drive.readonly` と `.../auth/userinfo.email` を追加します。
+4. **OAuth 2.0 クライアント ID の作成**:
+   - `[API とサービス]` ➔ `[認証情報]` ➔ `[+ 認証情報を作成]` ➔ **「OAuth クライアント ID」** を選択します。
+   - **アプリケーションの種類**: **「ウェブ アプリケーション」** を選択。
+   - **承認済みのリダイレクト URI**:
+     - AskDrive 稼働マシンのコールバック URL を登録します：
+       ```text
+       http://<AskDrive稼働機のIPまたはホスト名>:4000/auth/google/callback
+       ```
+       （例: `http://192.168.11.42:4000/auth/google/callback` や `http://localhost:4000/auth/google/callback`）
+   - **「作成」** をクリックし、表示された **「クライアント ID」** と **「クライアント シークレット」** を控えます。
+
+---
+
+### ステップ 2: Web 管理画面での設定
+
+1. ブラウザで `http://<AskDrive稼働機のIP>:4000/admin?tab=settings` を開きます。
+2. **システム・OAuth 設定** を入力して **「設定を保存」** をクリックします:
+   - **OAuth クライアント ID / シークレット**: Google Cloud Console で取得した値を貼り付け
    - **許可 Google Workspace ドメイン**: 自社ドメイン（例: `company.com`）
-   - **Google Drive フォルダ ID / URL**: 取り込み対象のマニュアル・文書が格納された共有フォルダの ID または URL
-3. `http://localhost:4000/` に戻り、「Google 連携」から指定ドメインの専用 Google アカウントで認可します。
-4. 管理画面の「今すぐバッチ実行」を押すか、夜間 02:00 の自動スケジュールにより同期と QA 生成が実行されます。
+   - **Google Drive フォルダ ID / URL**: 取り込み対象のマニュアルや文書が格納された共有フォルダの URL または ID
+3. **Google Drive 同期専用アカウントの認可**:
+   - 画面上部の **「Google Drive 同期専用アカウント連携」** カード内にある **「専用 Google アカウントで認可」** をクリックします。
+   - 対象フォルダの閲覧権限を持つ同期専用 Google アカウントで認可を完了します。
+4. **同期の開始**:
+   - 管理画面トップの「今すぐバッチ実行」を押すか、夜間 21:00〜07:00 の自動スケジュールにより同期・QA 生成が実行されます。
+
+---
+
+### ステップ 3: 一般ユーザーの利用
+
+- 社員はブラウザから `http://<AskDrive稼働機のIP>:4000/` にアクセスし、各自の Google Workspace アカウントでログインして質問チャットを利用します。
+- `許可 Google Workspace ドメイン` 以外のアカウントによるアクセスは自動的に遮断されます。
 
 ---
 
 ## ライセンス
 
 [MIT License](LICENSE) © 2026 kh813
+
 
