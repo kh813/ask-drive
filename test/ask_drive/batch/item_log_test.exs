@@ -27,6 +27,12 @@ defmodule AskDrive.Batch.ItemLogTest do
     assert Repo.aggregate(ItemLog, :count, :id) == 0
   end
 
+  test "describe_reason/1 explains cannotDownloadFile with the setting to change" do
+    msg = ItemLog.describe_reason(~s(HTTP 403: "{\"reason\": \"cannotDownloadFile\"}"))
+    assert msg =~ "ダウンロードが禁止"
+    assert msg =~ "投稿者"
+  end
+
   test "describe_reason/1 explains Drive's 404 as a permission problem" do
     assert ItemLog.describe_reason("HTTP 404: %{...}") =~ "閲覧権限"
   end

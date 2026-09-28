@@ -104,10 +104,20 @@ defmodule AskDrive.Batch.ItemLog do
   def describe_reason("HTTP 404" <> _),
     do: "Drive: ファイルが見つからないか、同期アカウントに閲覧権限がありません (HTTP 404)"
 
-  def describe_reason("HTTP 403" <> _ = raw),
-    do: "Drive: アクセスが拒否されました (HTTP 403) — #{String.slice(raw, 0, 300)}"
+  def describe_reason("HTTP 403" <> rest = raw) do
+    if String.contains?(rest, "cannotDownloadFile") do
+      "Drive: 閲覧はできるがダウンロードが禁止されています (cannotDownloadFile)。" <>
+        "共有ドライブの「閲覧者と閲覧者（コメント可）にファイルのダウンロード、印刷、コピーを許可」を有効にするか、" <>
+        "同期ユーザーを「投稿者」以上にするか、ファイルの共有設定（歯車）で「閲覧者と閲覧者（コメント可）に、ダウンロード、印刷、コピーの項目を表示する」を有効にしてください"
+    else
+      describe_generic_403(raw)
+    end
+  end
 
   def describe_reason(reason) when is_binary(reason), do: String.slice(reason, 0, 1000)
   def describe_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
   def describe_reason(reason), do: reason |> inspect() |> String.slice(0, 1000)
+
+  defp describe_generic_403(raw),
+    do: "Drive: アクセスが拒否されました (HTTP 403) — #{String.slice(raw, 0, 300)}"
 end
