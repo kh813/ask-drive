@@ -123,6 +123,15 @@ defmodule AskDrive.Documents do
     |> Repo.update()
   end
 
+  @doc """
+  Creates a structured extraction item.
+  """
+  def create_extraction(attrs) do
+    %AskDrive.Documents.Extraction{}
+    |> AskDrive.Documents.Extraction.changeset(attrs)
+    |> Repo.insert()
+  end
+
   defp parse_iso_datetime(nil), do: nil
 
   defp parse_iso_datetime(str) when is_binary(str) do

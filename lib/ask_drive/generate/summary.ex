@@ -15,21 +15,27 @@ defmodule AskDrive.Generate.Summary do
   Generates a summary for document or section text.
   """
   def generate(text, model, num_ctx \\ 4096) when is_binary(text) do
-    prompt = """
-    【文書内容】
-    #{text}
+    case AskDrive.Runtime.Mode.check_generation_allowed() do
+      :ok ->
+        prompt = """
+        【文書内容】
+        #{text}
 
-    上記の要点を簡潔に要約してください:
-    """
+        上記の要点を簡潔に要約してください:
+        """
 
-    Semaphore.run(fn ->
-      case Ollama.generate(model, prompt, system: @system_prompt, num_ctx: num_ctx) do
-        {:ok, response} ->
-          {:ok, String.trim(response)}
+        Semaphore.run(fn ->
+          case Ollama.generate(model, prompt, system: @system_prompt, num_ctx: num_ctx) do
+            {:ok, response} ->
+              {:ok, String.trim(response)}
 
-        {:error, reason} ->
-          {:error, reason}
-      end
-    end)
+            {:error, reason} ->
+              {:error, reason}
+          end
+        end)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 end

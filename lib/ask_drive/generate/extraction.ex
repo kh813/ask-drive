@@ -21,25 +21,31 @@ defmodule AskDrive.Generate.Extraction do
   Extracts structured items from chunk text.
   """
   def extract(text, model, num_ctx \\ 4096) when is_binary(text) do
-    prompt = """
-    【文書内容】
-    #{text}
+    case AskDrive.Runtime.Mode.check_generation_allowed() do
+      :ok ->
+        prompt = """
+        【文書内容】
+        #{text}
 
-    上記の文書から重要項目をJSON配列形式で抽出してください:
-    """
+        上記の文書から重要項目をJSON配列形式で抽出してください:
+        """
 
-    Semaphore.run(fn ->
-      case Ollama.generate(model, prompt, system: @system_prompt, num_ctx: num_ctx) do
-        {:ok, response} ->
-          case parse_json(response) do
-            {:ok, items} -> {:ok, items}
-            _ -> {:ok, []}
+        Semaphore.run(fn ->
+          case Ollama.generate(model, prompt, system: @system_prompt, num_ctx: num_ctx) do
+            {:ok, response} ->
+              case parse_json(response) do
+                {:ok, items} -> {:ok, items}
+                _ -> {:ok, []}
+              end
+
+            {:error, reason} ->
+              {:error, reason}
           end
+        end)
 
-        {:error, reason} ->
-          {:error, reason}
-      end
-    end)
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp parse_json(response) do

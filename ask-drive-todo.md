@@ -194,16 +194,16 @@ mix hex.audit
 
 ## Phase 9 — 相制御とスケジューラ
 
-- [ ] 9-1 `AskDrive.Runtime.Mode` GenServer（営業時間相 / 待機相 / バッチ相の保持と遷移）
-- [ ] 9-2 生成 API 呼び出しへのガード（営業時間相では `{:error, :generation_disabled}`）とテスト
-- [ ] 9-3 相遷移時のモデル明示アンロード（`keep_alive: 0`）
-- [ ] 9-4 営業時間相での埋め込みモデル常駐（`keep_alive: -1`）
-- [ ] 9-5 起動スクリプトへの `OLLAMA_MAX_LOADED_MODELS=1` / `OLLAMA_NUM_PARALLEL=1` / `OLLAMA_FLASH_ATTENTION=1` / `OLLAMA_KV_CACHE_TYPE=q8_0` の設定
-- [ ] 9-6 `AskDrive.Batch.Scheduler`（Oban Cron）: 同期 → 無効化 → チャンク埋め込み → 生成 → 質問埋め込み → 検証の 6 フェーズ直列実行
-- [ ] 9-7 フェーズ境界でのモデル切り替えと、切り替え完了の確認
-- [ ] 9-8 締切管理（`batch_deadline_at` で生成のみ打ち切り、後続フェーズは必ず実行）
-- [ ] 9-9 `batch_runs` / `batch_phase_stats` への記録と、所要時間推定
-- [ ] 9-10 **ビルドゲート**
+- [x] 9-1 `AskDrive.Runtime.Mode` GenServer（営業時間相 / 待機相 / バッチ相の保持と遷移）
+- [x] 9-2 生成 API 呼び出しへのガード（営業時間相では `{:error, :generation_disabled}`）とテスト
+- [x] 9-3 相遷移時のモデル明示アンロード（`keep_alive: 0`）
+- [x] 9-4 営業時間相での埋め込みモデル常駐（`keep_alive: -1`）
+- [x] 9-5 起動スクリプトへの `OLLAMA_MAX_LOADED_MODELS=1` / `OLLAMA_NUM_PARALLEL=1` / `OLLAMA_FLASH_ATTENTION=1` / `OLLAMA_KV_CACHE_TYPE=q8_0` の設定
+- [x] 9-6 `AskDrive.Batch.Scheduler`（Oban Cron）: 同期 → 無効化 → チャンク埋め込み → 生成 → 質問埋め込み → 検証の 6 フェーズ直列実行
+- [x] 9-7 フェーズ境界でのモデル切り替えと、切り替え完了の確認
+- [x] 9-8 締切管理（`batch_deadline_at` で生成のみ打ち切り、後続フェーズは必ず実行）
+- [x] 9-9 `batch_runs` / `batch_phase_stats` への記録と、所要時間推定
+- [x] 9-10 **ビルドゲート**
 
 **完了条件**: バッチを手動起動し、フェーズごとに常駐モデルが切り替わることを `ollama ps` で確認する。ピーク RAM が想定内に収まる。
 

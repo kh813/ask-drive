@@ -29,6 +29,16 @@ defmodule AskDrive.Generate.QA do
   Returns `{:ok, [%{question: q, answer: a, hallucination_flag: bool}]}` or `{:error, reason}`.
   """
   def generate_for_chunk(%Chunk{} = chunk, model, num_ctx \\ 4096) do
+    case AskDrive.Runtime.Mode.check_generation_allowed() do
+      :ok ->
+        do_generate_for_chunk(chunk, model, num_ctx)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp do_generate_for_chunk(%Chunk{} = chunk, model, num_ctx) do
     prompt = """
     【文書セクション】
     #{chunk.content}

@@ -17,6 +17,7 @@ defmodule AskDrive.Application do
       {Oban, Application.fetch_env!(:ask_drive, Oban)},
       AskDrive.LLM.Semaphore,
       AskDrive.HealthCheck,
+      AskDrive.Runtime.Mode,
       # Start to serve requests, typically the last entry
       AskDriveWeb.Endpoint
     ]

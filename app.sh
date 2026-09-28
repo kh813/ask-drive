@@ -75,6 +75,12 @@ cmd_start() {
   load_env
   echo -e "${GREEN}==> AskDrive をフォアグラウンドで起動します...${NC}"
   
+  # Ollama 実行時環境変数の最適化設定 (9-5)
+  export OLLAMA_MAX_LOADED_MODELS="${OLLAMA_MAX_LOADED_MODELS:-1}"
+  export OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-1}"
+  export OLLAMA_FLASH_ATTENTION="${OLLAMA_FLASH_ATTENTION:-1}"
+  export OLLAMA_KV_CACHE_TYPE="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
+
   if [[ -f "${SCRIPT_DIR}/_build/prod/rel/ask_drive/bin/ask_drive" ]]; then
     export MIX_ENV=prod
     export PHX_SERVER=true
@@ -225,6 +231,14 @@ service_install() {
         <string>prod</string>
         <key>PHX_SERVER</key>
         <string>true</string>
+        <key>OLLAMA_MAX_LOADED_MODELS</key>
+        <string>1</string>
+        <key>OLLAMA_NUM_PARALLEL</key>
+        <string>1</string>
+        <key>OLLAMA_FLASH_ATTENTION</key>
+        <string>1</string>
+        <key>OLLAMA_KV_CACHE_TYPE</key>
+        <string>q8_0</string>
     </dict>
 </dict>
 </plist>
