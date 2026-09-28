@@ -54,9 +54,9 @@ Apple Silicon Mac (8GB〜) の単一マシン上で、Google Drive 内の共有�
 ### 1. リリースアーカイブ（ZIP）の取得と展開
 GitHub Releases から最新版の ZIP をダウンロードして展開します。
 ```bash
-# 例: v0.0.18 の場合
-curl -fLO https://github.com/kh813/ask-drive/releases/download/v0.0.18/ask-drive-v0.0.18.zip
-unzip ask-drive-v0.0.18.zip -d ask-drive
+# 例: v0.0.19 の場合
+curl -fLO https://github.com/kh813/ask-drive/releases/download/v0.0.19/ask-drive-v0.0.19.zip
+unzip ask-drive-v0.0.19.zip -d ask-drive
 cd ask-drive
 ```
 
@@ -281,6 +281,20 @@ AskDrive は、全社公開マニュアルなどの Google Drive フォルダを
 >
 > 管理者パスワードが未設定のまま起動した場合は、昇格画面で初回パスワードの設定を求められます。
 
+#### POC 段階で認証を丸ごと無効化する場合
+
+社内 LAN のみで動く検証段階で、各利用者の Google ログインがまだ安定しない場合は、`.env.prod` に以下を追記すると **ログインと管理者昇格の両方を一時的にスキップ**できます。
+
+```bash
+ASK_DRIVE_DISABLE_AUTH=true
+```
+
+`./app.sh restart` すると、`/` と `/admin` の両方に誰でも(未ログインのまま)アクセスできるようになります。
+
+> ⚠️ **この設定はセキュリティ上のトレードオフを伴います。** 誰がアクセスしたかの識別ができなくなり、LAN 上の誰でも管理者相当の操作(設定変更・API キー変更・Drive 連携解除など)ができてしまいます。**社内の信頼できる LAN に限定された検証環境でのみ使用し、社外に公開したり複数拠点からアクセス可能な環境では絶対に使用しないでください。**
+>
+> この設定は DB や Web 画面からは変更できず、`.env.prod` の編集とサーバー再起動でのみ切り替わります。本番相当の運用に入る前に、この設定を削除し、通常のログイン・管理者パスワードによる保護に戻してください（`ask-drive-todo.md` の Phase 17 に将来対応として記録済みです）。
+
 ---
 
 ### ステップ 3: Web 管理画面での設定
@@ -366,6 +380,7 @@ Claude API は埋め込みエンドポイントを提供しないため、埋め
 | `ASK_DRIVE_ALLOWED_DOMAIN` | `company.com` |
 | `ASK_DRIVE_ADMIN_EMAILS` | `admin@company.com,ops@company.com` |
 | `ASK_DRIVE_ADMIN_PASSWORD` | `(8 文字以上。起動時にハッシュ化して保存されます)` |
+| `ASK_DRIVE_DISABLE_AUTH` | `true`(⚠️ POC限定。ログイン・管理者昇格を全面無効化。上記「POC段階で認証を丸ごと無効化する場合」参照) |
 | `OLLAMA_HOST` | `http://localhost:11434` |
 | `LMSTUDIO_BASE_URL` | `http://localhost:1234/v1` |
 | `OPENAI_API_KEY` | `sk-...` |
