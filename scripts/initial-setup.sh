@@ -110,9 +110,9 @@ if [[ ! -f "${VEC_EXT}" ]]; then
   mkdir -p "${SCRIPT_DIR}/priv/sqlite_vec"
   TMP_DIR="$(mktemp -d)"
   if [[ "${ARCH}" == "arm64" ]]; then
-    VEC_URL="https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-v0.1.9-loadable-macos-aarch64.tar.gz"
+    VEC_URL="https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-0.1.9-loadable-macos-aarch64.tar.gz"
   else
-    VEC_URL="https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-v0.1.9-loadable-macos-x86_64.tar.gz"
+    VEC_URL="https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-0.1.9-loadable-macos-x86_64.tar.gz"
   fi
   curl -fL -o "${TMP_DIR}/sqlite-vec.tar.gz" "${VEC_URL}"
   tar -xzf "${TMP_DIR}/sqlite-vec.tar.gz" -C "${TMP_DIR}"

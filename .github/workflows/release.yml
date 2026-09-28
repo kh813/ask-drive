@@ -53,8 +53,8 @@ jobs:
 
           # Download sqlite-vec arm64 extension and place it in priv/sqlite_vec/vec0.dylib
           mkdir -p priv/sqlite_vec
-          curl -L -o /tmp/sqlite-vec.tar.gz \
-            https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-v0.1.9-loadable-macos-aarch64.tar.gz
+          curl -fL -o /tmp/sqlite-vec.tar.gz \
+            https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-0.1.9-loadable-macos-aarch64.tar.gz
           tar -xzf /tmp/sqlite-vec.tar.gz -C /tmp
           if [ -f /tmp/vec0.dylib ]; then
             cp /tmp/vec0.dylib priv/sqlite_vec/vec0.dylib
