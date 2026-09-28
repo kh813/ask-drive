@@ -31,6 +31,8 @@ defmodule AskDriveWeb.AdminLive do
     if connected?(socket) do
       # Refresh status periodically
       :timer.send_interval(5000, self(), :tick)
+      # Ollama model download progress (spec F-827)
+      Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.LLM.OllamaModels.topic())
     end
 
     setting = Settings.get_setting!()
@@ -55,8 +57,33 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   @impl true
+  def handle_info({:ollama_pulls, pulls}, socket) do
+    socket = assign(socket, :ollama_pulls, pulls)
+
+    # a finished download changes what's installed
+    socket =
+      if Enum.any?(pulls, fn {_m, p} -> p.status in ["done", "failed"] end),
+        do: assign_ollama_models(socket),
+        else: socket
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_info(:tick, socket) do
     {:noreply, load_dashboard_data(socket)}
+  end
+
+  @impl true
+  def handle_event("pull_model", %{"model" => model}, socket) do
+    case String.trim(model) do
+      "" ->
+        {:noreply, socket}
+
+      name ->
+        AskDrive.LLM.OllamaModels.pull_async(name)
+        {:noreply, put_flash(socket, :info, "#{name} の取得を開始しました（数分かかることがあります）。")}
+    end
   end
 
   @impl true
@@ -99,6 +126,9 @@ defmodule AskDriveWeb.AdminLive do
 
     case Settings.update_setting(socket.assigns.setting, setting_params) do
       {:ok, updated} ->
+        # A model named in the settings that Ollama doesn't have yet starts downloading now
+        AskDrive.LLM.OllamaModels.ensure_required(updated)
+
         message =
           if reindex? do
             case Vector.rebuild_index(updated.embedding_dim) do
@@ -343,6 +373,7 @@ defmodule AskDriveWeb.AdminLive do
     users = Accounts.list_users()
 
     socket
+    |> assign_ollama_models()
     |> assign(:users, users)
     |> assign(:elevation_logs, AdminAccess.list_elevation_logs(100))
     |> assign(:admin_password_set?, AdminAccess.password_set?(setting))
@@ -1949,6 +1980,122 @@ defmodule AskDriveWeb.AdminLive do
                 </div>
               </.form>
             </div>
+
+            <%!-- Local models (Ollama) — pulled by the app itself, spec F-827 --%>
+            <div
+              id="ollama-models"
+              class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
+            >
+              <div>
+                <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-arrow-down-tray" class="w-5 h-5 text-indigo-600" />
+                  ローカルモデル（Ollama）
+                </h2>
+                <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  Ollama はアプリ専用のため、モデルはここ（またはアプリの起動時）に AskDrive が取得します。設定で使うモデルが未取得なら、起動時・設定の保存時に自動で取得を始めます。
+                </p>
+              </div>
+
+              <%= case @ollama_installed do %>
+                <% {:error, reason} -> %>
+                  <p class="text-xs text-red-600">
+                    Ollama に接続できません: {inspect(reason)}
+                  </p>
+                <% _ -> %>
+              <% end %>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                  <thead class="text-[11px] text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                    <tr>
+                      <th class="py-2 px-2">用途</th>
+                      <th class="py-2 px-2">モデル</th>
+                      <th class="py-2 px-2">状態</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                    <tr
+                      :for={{{role, model}, i} <- Enum.with_index(@ollama_required)}
+                      id={"required-model-#{i}"}
+                      data-model={model}
+                    >
+                      <td class="py-2 px-2 whitespace-nowrap">{role}</td>
+                      <td class="py-2 px-2 font-mono">{model}</td>
+                      <td class="py-2 px-2">
+                        <% pull = Map.get(@ollama_pulls, model) %>
+                        <%= cond do %>
+                          <% pull && pull.status in ["starting", "pulling"] -> %>
+                            <span class="text-blue-600">
+                              取得中{if p = pull_percent(pull), do: " #{p}%"}
+                            </span>
+                          <% model_installed?(@ollama_installed, model) -> %>
+                            <span class="text-emerald-600">取得済み</span>
+                          <% pull && pull.status == "failed" -> %>
+                            <span class="text-red-600">取得失敗: {pull.error}</span>
+                            <button
+                              type="button"
+                              phx-click="pull_model"
+                              phx-value-model={model}
+                              class="ml-2 underline text-indigo-600"
+                            >
+                              再試行
+                            </button>
+                          <% true -> %>
+                            <span class="text-amber-600">未取得</span>
+                            <button
+                              type="button"
+                              phx-click="pull_model"
+                              phx-value-model={model}
+                              class="ml-2 underline text-indigo-600"
+                            >
+                              取得
+                            </button>
+                        <% end %>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <form
+                id="pull-model-form"
+                phx-submit="pull_model"
+                class="flex flex-wrap items-center gap-2"
+              >
+                <input
+                  type="text"
+                  name="model"
+                  placeholder="例: qwen3:4b-instruct-2507-q4_K_M"
+                  class="flex-1 min-w-[16rem] px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono"
+                />
+                <button
+                  type="submit"
+                  class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium"
+                >
+                  モデルを取得
+                </button>
+              </form>
+
+              <div
+                :for={{model, pull} <- @ollama_pulls}
+                :if={
+                  pull.status in ["starting", "pulling"] and
+                    model not in Enum.map(@ollama_required, &elem(&1, 1))
+                }
+                class="text-xs text-blue-600"
+              >
+                {model}: 取得中{if p = pull_percent(pull), do: " #{p}%"}
+              </div>
+
+              <details :if={match?({:ok, _}, @ollama_installed)} class="text-xs">
+                <summary class="cursor-pointer text-zinc-500">
+                  取得済みのモデル（{length(elem(@ollama_installed, 1))} 件）
+                </summary>
+                <ul class="mt-1 font-mono text-[11px] text-zinc-600 dark:text-zinc-400 space-y-0.5">
+                  <li :for={name <- elem(@ollama_installed, 1)}>{name}</li>
+                </ul>
+              </details>
+            </div>
           </div>
         <% end %>
       </div>
@@ -2072,4 +2219,25 @@ defmodule AskDriveWeb.AdminLive do
   defp format_seconds(sec) when sec < 60, do: "#{sec}秒"
   defp format_seconds(sec) when sec < 3600, do: "#{div(sec, 60)}分#{rem(sec, 60)}秒"
   defp format_seconds(sec), do: "#{div(sec, 3600)}時間#{div(rem(sec, 3600), 60)}分"
+
+  # Installed / required Ollama models and download progress for the settings screen.
+  defp assign_ollama_models(socket) do
+    alias AskDrive.LLM.OllamaModels
+
+    setting = socket.assigns[:setting] || Settings.get_setting!()
+    installed = OllamaModels.installed(setting)
+
+    socket
+    |> assign(:ollama_installed, installed)
+    |> assign(:ollama_required, OllamaModels.required(setting))
+    |> assign(:ollama_pulls, OllamaModels.pulls())
+  end
+
+  defp model_installed?({:ok, names}, model),
+    do: AskDrive.LLM.OllamaModels.installed?(model, names)
+
+  defp model_installed?(_, _), do: false
+
+  defp pull_percent(%{completed: c, total: t}) when is_integer(t) and t > 0, do: div(c * 100, t)
+  defp pull_percent(_), do: nil
 end

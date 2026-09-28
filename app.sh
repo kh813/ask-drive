@@ -44,6 +44,7 @@ AskDrive 管理スクリプト
   repair-ollama      .runtime の Ollama を再インストール (llama-server 欠落の修復)
   admin grant <mail> 指定メールアドレスに管理者への昇格を許可 (ロックアウト時の復旧)
   admin password     管理者パスワードを再設定 (対話入力)
+  ollama <args>      アプリ専用の Ollama を操作 (例: ./app.sh ollama pull <model> / ./app.sh ollama list)
   drive service-account [key.json] [--subject user@example.com]
                      Drive 同期をサービスアカウント認証に設定 (Web 管理画面を使わずに設定)
                      --subject: ドメイン全体の委任でなりすます社内ユーザー (社内限定の共有ドライブ用)
@@ -331,6 +332,18 @@ cmd_drive() {
   esac
 }
 
+# アプリ専用の Ollama（.runtime/bin）をそのまま操作する。
+# 例: ./app.sh ollama pull qwen3:4b-instruct-2507-q4_K_M / ./app.sh ollama list
+# 通常はアプリが起動時・管理画面から必要なモデルを取得するため、手動操作は不要。
+cmd_ollama() {
+  load_env
+  if ! command -v ollama >/dev/null 2>&1; then
+    echo -e "${RED}ollama が見つかりません（${RUNTIME_BIN}）。scripts/initial-setup.sh を実行してください。${NC}"
+    exit 1
+  fi
+  ollama "$@"
+}
+
 cmd_deploy() {
   if ! command -v mix >/dev/null 2>&1; then
     echo -e "${YELLOW}mix が見つからないため、初期セットアップ (setup) を実行します...${NC}"
@@ -597,6 +610,9 @@ case "${COMMAND}" in
     ;;
   drive)
     cmd_drive "$@"
+    ;;
+  ollama)
+    cmd_ollama "$@"
     ;;
   service)
     SUB_COMMAND="${1:-}"

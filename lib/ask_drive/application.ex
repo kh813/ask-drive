@@ -19,6 +19,7 @@ defmodule AskDrive.Application do
       AskDrive.Drive.ServiceAccount,
       AskDrive.HealthCheck,
       AskDrive.Runtime.Mode,
+      AskDrive.LLM.OllamaModels,
       # Start to serve requests, typically the last entry
       AskDriveWeb.Endpoint
     ]

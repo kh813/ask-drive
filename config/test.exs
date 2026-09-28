@@ -16,6 +16,9 @@ config :ask_drive, auth_disabled_by_default: false
 # Never let the runtime clock start a real nightly batch in the middle of a test run.
 config :ask_drive, auto_nightly_batch: false
 
+# Don't try to pull Ollama models from a test run.
+config :ask_drive, auto_pull_models: false
+
 # Disable Oban queues in test
 config :ask_drive, Oban, testing: :manual
 

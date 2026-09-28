@@ -50,6 +50,36 @@ defmodule AskDrive.StubOllama do
     conn
   end
 
+  get "/api/tags" do
+    names = :persistent_term.get({__MODULE__, :installed}, [])
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(%{models: Enum.map(names, &%{name: &1})}))
+  end
+
+  # Streams two progress lines then success, and marks the model installed.
+  post "/api/pull" do
+    model = conn.body_params["model"]
+    if pid = :persistent_term.get({__MODULE__, :owner}, nil), do: send(pid, {:stub_pull, model})
+    conn = conn |> put_resp_content_type("application/x-ndjson") |> send_chunked(200)
+
+    lines = [
+      %{status: "pulling manifest"},
+      %{status: "downloading", total: 100, completed: 50},
+      %{status: "success"}
+    ]
+
+    conn =
+      Enum.reduce(lines, conn, fn line, conn ->
+        {:ok, conn} = chunk(conn, Jason.encode!(line) <> "\n")
+        conn
+      end)
+
+    put_installed([model | :persistent_term.get({__MODULE__, :installed}, [])])
+    conn
+  end
+
   match _ do
     send_resp(conn, 404, "")
   end
@@ -76,10 +106,14 @@ defmodule AskDrive.StubOllama do
     end
   end
 
+  @doc "Sets the model names /api/tags reports as installed."
+  def put_installed(names), do: :persistent_term.put({__MODULE__, :installed}, names)
+
   @doc "Starts the stub on a free port and returns its base URL."
   def start!(owner, dim \\ 1024) do
     :persistent_term.put({__MODULE__, :owner}, owner)
     :persistent_term.put({__MODULE__, :dim}, dim)
+    :persistent_term.put({__MODULE__, :installed}, [])
     {:ok, pid} = Bandit.start_link(plug: __MODULE__, port: 0, ip: {127, 0, 0, 1})
     {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
     {pid, "http://127.0.0.1:#{port}"}

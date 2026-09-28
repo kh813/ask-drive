@@ -179,6 +179,61 @@ defmodule AskDrive.LLM.Providers.Ollama do
     {Enum.reject(complete, &(&1 == "")), rest}
   end
 
+  @doc """
+  Pulls `model` via `/api/pull`, calling `on_progress.(%{completed:, total:, detail:})` as
+  Ollama reports it. Returns `:ok` or `{:error, reason}`. Downloads can take many minutes,
+  so each streamed chunk may take up to 10 minutes to arrive.
+  """
+  def pull(model, opts, on_progress) when is_function(on_progress, 1) do
+    collect = fn {:data, data}, {req, resp} ->
+      buffer = Req.Response.get_private(resp, :buffer, "") <> data
+      {lines, rest} = split_lines(buffer)
+
+      error =
+        Enum.reduce(lines, Req.Response.get_private(resp, :error), fn line, err ->
+          case Jason.decode(line) do
+            {:ok, %{"error" => message}} ->
+              message
+
+            {:ok, %{"status" => status} = progress} ->
+              on_progress.(%{
+                completed: progress["completed"] || 0,
+                total: progress["total"] || 0,
+                detail: status
+              })
+
+              err
+
+            _ ->
+              err
+          end
+        end)
+
+      {:cont,
+       {req,
+        resp |> Req.Response.put_private(:buffer, rest) |> Req.Response.put_private(:error, error)}}
+    end
+
+    case Req.post(base_url(opts) <> "/api/pull",
+           json: %{model: model, stream: true},
+           into: collect,
+           receive_timeout: 600_000,
+           retry: false
+         ) do
+      {:ok, %{status: 200} = resp} ->
+        case Req.Response.get_private(resp, :error) do
+          nil -> :ok
+          message -> {:error, message}
+        end
+
+      {:ok, %{status: status} = resp} ->
+        {:error, "HTTP #{status}: #{Req.Response.get_private(resp, :buffer, "")}"}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   @impl true
   def list_models(opts \\ []) do
     case HTTP.get_json(base_url(opts) <> "/api/tags", [], 5_000, retry: false) do

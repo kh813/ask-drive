@@ -9,6 +9,8 @@ defmodule AskDrive.ChatSummary do
   can link each claim to its source. The excerpts themselves are always shown too: the
   summary is a reading aid, the excerpts are the evidence.
   """
+  require Logger
+
   alias AskDrive.{LLM, Settings, Snippet}
 
   @max_excerpt_chars 1_200
@@ -47,6 +49,7 @@ defmodule AskDrive.ChatSummary do
   def generate(question, chunks, on_event \\ fn _ -> :ok end) when is_list(chunks) do
     setting = Settings.get_setting!()
     {provider, model} = provider_and_model(setting)
+    model = available_model(provider, model, setting)
     ja? = japanese?(question)
     cap = if ja?, do: @ja_display_cap, else: @en_display_cap
     thinks? = reasoning_model?(model)
@@ -149,6 +152,31 @@ defmodule AskDrive.ChatSummary do
       {:ok, %{text: cap_text(answer, cap, on_event), thinking: String.trim(notes)}}
     end
   end
+
+  # A chat model that isn't pulled yet (e.g. right after an update switched to it, while the
+  # app is still downloading it) would fail every summary. Start the pull and answer with
+  # the batch model meanwhile.
+  defp available_model("ollama", model, setting) do
+    alias AskDrive.LLM.OllamaModels
+
+    with {:ok, names} <- OllamaModels.installed(setting),
+         false <- OllamaModels.installed?(model, names) do
+      OllamaModels.pull_async(model)
+      fallback = LLM.generation_model(setting)
+
+      if LLM.generation_provider(setting) == "ollama" and is_binary(fallback) and
+           OllamaModels.installed?(fallback, names) do
+        Logger.info("ChatSummary: #{model} not installed yet (pulling); using #{fallback}")
+        fallback
+      else
+        model
+      end
+    else
+      _ -> model
+    end
+  end
+
+  defp available_model(_provider, model, _setting), do: model
 
   @doc "The prompt for the second pass: excerpts, the first attempt as notes, the rules."
   def finalize_prompt(question, chunks, notes, model \\ nil) do
