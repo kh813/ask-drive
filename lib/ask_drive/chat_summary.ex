@@ -14,9 +14,15 @@ defmodule AskDrive.ChatSummary do
   @max_excerpt_chars 1_200
   @timeout 120_000
 
+  # Answers were far too long for a chat reply. The prompt asks for a budget and max_tokens
+  # (Ollama: num_predict) enforces a hard stop a little above it.
+  @ja_chars 250
+  @en_words 150
+  @max_tokens 450
+
   @system_prompt """
-  あなたは社内文書の検索アシスタントです。与えられた「抜粋」だけを根拠に、日本語で簡潔に答えます。
-  抜粋に書かれていないことは推測で補わず、一般論も付け加えません。
+  あなたは社内文書の検索アシスタントです。与えられた「抜粋」だけを根拠に、質問と同じ言語で、短く簡潔に答えます。
+  抜粋に書かれていないことは推測で補わず、一般論も前置きも付け加えません。
   """
 
   @doc "Whether chat summaries are switched on in the settings."
@@ -36,7 +42,7 @@ defmodule AskDrive.ChatSummary do
       provider: provider,
       system: @system_prompt,
       timeout: @timeout,
-      max_tokens: 800,
+      max_tokens: @max_tokens,
       temperature: 0.2
     ]
 
@@ -79,6 +85,10 @@ defmodule AskDrive.ChatSummary do
           (chunk.content |> Snippet.display_text() |> String.slice(0, @max_excerpt_chars))
       end)
 
+    if japanese?(question), do: ja_prompt(question, excerpts), else: en_prompt(question, excerpts)
+  end
+
+  defp ja_prompt(question, excerpts) do
     """
     質問: #{question}
 
@@ -86,11 +96,33 @@ defmodule AskDrive.ChatSummary do
     #{excerpts}
 
     指示:
-    - 抜粋に書かれている内容だけを使い、質問に簡潔に答えてください（300字程度。必要なら箇条書き）。
+    - 必ず日本語で答えてください。
+    - #{@ja_chars}字以内で答えてください。要点が複数あれば3点以内の箇条書きにしてください。前置き・まとめ・繰り返しは不要です。
+    - 抜粋に書かれている内容だけを使ってください。
     - 根拠にした抜粋の番号を、該当する文の末尾に [1] のように付けてください。
     - 抜粋から答えられない場合は「資料からは確認できませんでした。」とだけ答えてください。
     """
   end
+
+  defp en_prompt(question, excerpts) do
+    """
+    Question: #{question}
+
+    Excerpts:
+    #{excerpts}
+
+    Instructions:
+    - Answer in the same language as the question.
+    - Keep it under #{@en_words} words; use at most 3 bullet points if there are several points. No preamble or recap.
+    - Use only what the excerpts say.
+    - Cite the excerpt(s) you rely on at the end of the sentence, like [1].
+    - If the excerpts don't answer the question, reply only: "The documents don't cover this."
+    """
+  end
+
+  @doc "Whether the question is written in Japanese (contains kana or kanji)."
+  def japanese?(text) when is_binary(text),
+    do: Regex.match?(~r/[\x{3040}-\x{30FF}\x{4E00}-\x{9FFF}]/u, text)
 
   @doc "\"doc name p.N\" for a chunk."
   def source_label(chunk) do

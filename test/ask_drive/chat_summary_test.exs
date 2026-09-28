@@ -34,6 +34,8 @@ defmodule AskDrive.ChatSummaryTest do
     assert_received {:stub_generate, body}
     assert body["stream"] == true
     assert body["think"] == false
+    # the length cap reaches Ollama as num_predict
+    assert body["options"]["num_predict"] == 450
   end
 
   test "the prompt numbers the excerpts with their source and page, cleaned", %{chunk: chunk} do
@@ -44,6 +46,15 @@ defmodule AskDrive.ChatSummaryTest do
     refute prompt =~ "じ じ"
     refute prompt =~ "[文書:"
     assert prompt =~ "資料からは確認できませんでした"
+    assert prompt =~ "必ず日本語で答えてください"
+    assert prompt =~ "250字以内"
+  end
+
+  test "an English question gets an English prompt with a word budget", %{chunk: chunk} do
+    prompt = ChatSummary.build_prompt("What are the rules for USB drives?", [chunk])
+    assert prompt =~ "Answer in the same language as the question"
+    assert prompt =~ "under 150 words"
+    refute prompt =~ "必ず日本語"
   end
 
   test "chat can use its own provider/model while the batch stays local" do

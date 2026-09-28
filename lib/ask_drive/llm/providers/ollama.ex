@@ -48,7 +48,7 @@ defmodule AskDrive.LLM.Providers.Ollama do
         model: model,
         prompt: prompt,
         stream: false,
-        options: %{num_ctx: Keyword.get(opts, :num_ctx, 4096)}
+        options: ollama_options(opts)
       }
       |> maybe_put(:system, Keyword.get(opts, :system))
       |> put_keep_alive(opts)
@@ -82,7 +82,7 @@ defmodule AskDrive.LLM.Providers.Ollama do
         prompt: prompt,
         stream: true,
         think: false,
-        options: %{num_ctx: Keyword.get(opts, :num_ctx, 4096)}
+        options: ollama_options(opts)
       }
       |> maybe_put(:system, Keyword.get(opts, :system))
       |> put_keep_alive(opts)
@@ -142,6 +142,14 @@ defmodule AskDrive.LLM.Providers.Ollama do
       {:error, reason} ->
         {:error, {:network, reason}}
     end
+  end
+
+  # num_predict caps the answer length: without it a max_tokens given by the caller (e.g. the
+  # chat summary's) was simply ignored by Ollama and answers ran on.
+  defp ollama_options(opts) do
+    %{num_ctx: Keyword.get(opts, :num_ctx, 4096)}
+    |> maybe_put(:num_predict, Keyword.get(opts, :max_tokens))
+    |> maybe_put(:temperature, Keyword.get(opts, :temperature))
   end
 
   defp split_lines(buffer) do
