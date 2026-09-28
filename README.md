@@ -40,9 +40,9 @@ Apple Silicon Mac (8GB〜) の単一マシン上で、Google Drive 内の共有�
 ### 1. リリースアーカイブ（ZIP）の取得と展開
 GitHub Releases から最新版の ZIP をダウンロードして展開します。
 ```bash
-# 例: v0.0.7 の場合
-curl -fLO https://github.com/kh813/ask-drive/releases/download/v0.0.7/ask-drive-v0.0.7.zip
-unzip ask-drive-v0.0.7.zip -d ask-drive
+# 例: v0.0.8 の場合
+curl -fLO https://github.com/kh813/ask-drive/releases/download/v0.0.8/ask-drive-v0.0.8.zip
+unzip ask-drive-v0.0.8.zip -d ask-drive
 cd ask-drive
 ```
 

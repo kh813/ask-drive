@@ -49,26 +49,15 @@ end
 if config_env() == :prod do
   database_path =
     System.get_env("DATABASE_PATH") ||
-      raise """
-      environment variable DATABASE_PATH is missing.
-      For example: /etc/ask_drive/ask_drive.db
-      """
+      Path.expand("ask_drive_prod.db")
 
   config :ask_drive, AskDrive.Repo,
     database: database_path,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "5")
 
-  # The secret key base is used to sign/encrypt cookies and other secrets.
-  # A default value is used in config/dev.exs and config/test.exs but you
-  # want to use a different value for prod and you most likely don't want
-  # to check this value into version control, so we use an environment
-  # variable instead.
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||
-      raise """
-      environment variable SECRET_KEY_BASE is missing.
-      You can generate one by calling: mix phx.gen.secret
-      """
+      "D3faul7S3cr3tK3y8as3ForPr0dBuildOnlyMust0verrideInEnvFile123456789012"
 
   host = System.get_env("PHX_HOST") || "example.com"
 

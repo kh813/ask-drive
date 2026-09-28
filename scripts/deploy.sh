@@ -19,27 +19,36 @@ NC='\033[0m'
 echo -e "${GREEN}=== AskDrive デプロイ処理を開始します ===${NC}"
 cd "${SCRIPT_DIR}"
 
-# mix の存在確認 (未インストール時は初回セットアップを実行)
-if ! command -v mix >/dev/null 2>&1; then
-  echo -e "${YELLOW}mix が見つかりません。初回セットアップ (scripts/initial-setup.sh) を自動実行します...${NC}"
+# 1. mix コマンドおよび .env.prod の確認 (未準備なら initial-setup.sh を実行)
+if ! command -v mix >/dev/null 2>&1 || [[ ! -f "${SCRIPT_DIR}/.env.prod" ]]; then
+  echo -e "${YELLOW}初期環境が未構築のため、初期セットアップ (scripts/initial-setup.sh) を実行します...${NC}"
   bash "${SCRIPT_DIR}/scripts/initial-setup.sh"
   exit 0
 fi
 
-# 1. 依存関係の更新
+# 環境変数を読み込み
+set -a
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/.env.prod"
+set +a
+
+# 2. 依存関係の更新
 echo -e "\n${YELLOW}[1/4] 依存関係の取得中...${NC}"
+mix local.hex --force || true
+mix local.rebar --force || true
 mix deps.get
 
-# 2. マイグレーション
+# 3. マイグレーション
 echo -e "\n${YELLOW}[2/4] データベースマイグレーションの実行中...${NC}"
+MIX_ENV=prod mix ecto.create || true
 MIX_ENV=prod mix ecto.migrate
 
-# 3. アセットとリリースの再ビルド
+# 4. アセットとリリースの再ビルド
 echo -e "\n${YELLOW}[3/4] アセットとリリースのビルド中...${NC}"
 MIX_ENV=prod mix assets.deploy
 MIX_ENV=prod mix release --overwrite
 
-# 4. サービスの再起動
+# 5. サービスの再起動
 echo -e "\n${YELLOW}[4/4] サービスの再起動中...${NC}"
 "${SCRIPT_DIR}/app.sh" restart || "${SCRIPT_DIR}/app.sh" service restart || true
 
