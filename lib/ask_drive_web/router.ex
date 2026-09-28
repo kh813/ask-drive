@@ -22,6 +22,7 @@ defmodule AskDriveWeb.Router do
 
     get "/auth/google", AuthController, :request
     get "/auth/google/callback", AuthController, :callback
+    get "/auth/google/disconnect", AuthController, :disconnect
     delete "/auth/google", AuthController, :disconnect
   end
 

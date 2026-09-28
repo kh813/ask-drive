@@ -134,12 +134,32 @@ defmodule AskDrive.Drive.OAuth do
   end
 
   def get_client_id do
-    Application.get_env(:ask_drive, :google_client_id) ||
-      System.get_env("GOOGLE_CLIENT_ID") || ""
+    case AskDrive.Settings.get_setting() do
+      %{google_client_id: id} when is_binary(id) and id != "" ->
+        id
+
+      _ ->
+        Application.get_env(:ask_drive, :google_client_id) ||
+          System.get_env("GOOGLE_CLIENT_ID") || ""
+    end
+  rescue
+    _ ->
+      Application.get_env(:ask_drive, :google_client_id) ||
+        System.get_env("GOOGLE_CLIENT_ID") || ""
   end
 
   def get_client_secret do
-    Application.get_env(:ask_drive, :google_client_secret) ||
-      System.get_env("GOOGLE_CLIENT_SECRET") || ""
+    case AskDrive.Settings.get_setting() do
+      %{google_client_secret: secret} when is_binary(secret) and secret != "" ->
+        secret
+
+      _ ->
+        Application.get_env(:ask_drive, :google_client_secret) ||
+          System.get_env("GOOGLE_CLIENT_SECRET") || ""
+    end
+  rescue
+    _ ->
+      Application.get_env(:ask_drive, :google_client_secret) ||
+        System.get_env("GOOGLE_CLIENT_SECRET") || ""
   end
 end

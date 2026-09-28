@@ -552,111 +552,188 @@ defmodule AskDriveWeb.AdminLive do
 
         <%!-- Tab 4: Settings Management --%>
         <%= if @current_tab == "settings" do %>
-          <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-6">
-            <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-              <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-indigo-600" /> システム・バッチ設定
-            </h2>
-
-            <.form for={@form} id="settings-form" phx-submit="save_settings" class="space-y-4">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <.input
-                  field={@form[:drive_folder_id]}
-                  type="text"
-                  label="Google Drive フォルダ ID / URL (drive_folder_id)"
-                />
-                <.input
-                  field={@form[:drive_folder_name]}
-                  type="text"
-                  label="Drive フォルダ表示名 (drive_folder_name)"
-                />
+          <div class="space-y-6">
+            <%!-- Card 1: Google Drive Sync Account Connection --%>
+            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+              <div class="flex items-center justify-between">
+                <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-cloud-arrow-down" class="w-5 h-5 text-indigo-600" />
+                  Google Drive 同期専用アカウント連携
+                </h2>
+                <%= if @account do %>
+                  <span class="text-xs px-2.5 py-1 rounded-full font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200/50">
+                    連携中: {@account.email}
+                  </span>
+                <% else %>
+                  <span class="text-xs px-2.5 py-1 rounded-full font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/50">
+                    未連携
+                  </span>
+                <% end %>
               </div>
 
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <.input
-                  field={@form[:allowed_domain]}
-                  type="text"
-                  label="許可 Google Workspace ドメイン (例: company.com)"
-                />
-                <.input
-                  field={@form[:similarity_threshold]}
-                  type="number"
-                  step="0.01"
-                  min="0.0"
-                  max="1.0"
-                  label="Tier 1 類似度閾値 (0.0〜1.0)"
-                />
-              </div>
+              <p class="text-xs text-zinc-500 leading-relaxed">
+                全社公開マニュアル等の Google Drive フォルダにアクセス可能な <strong>システム管理用アカウント（または専用同期アカウント）</strong> で連携してください。<br />
+                ※ 一般ユーザーがチャット画面で質問する際は、各自の通常アカウントで利用します。
+              </p>
 
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <.input
-                  field={@form[:batch_model]}
-                  type="text"
-                  label="夜間生成モデル (batch_model: qwen3:4b)"
-                />
-                <.input
-                  field={@form[:embed_model]}
-                  type="text"
-                  label="埋め込みモデル (embed_model: bge-m3)"
-                />
-              </div>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <.input
-                  field={@form[:batch_start_hour]}
-                  type="number"
-                  label="バッチ開始時刻 (時: 0〜23)"
-                  min="0"
-                  max="23"
-                />
-                <.input
-                  field={@form[:batch_end_hour]}
-                  type="number"
-                  label="バッチ締切時刻 (時: 0〜23)"
-                  min="0"
-                  max="23"
-                />
-              </div>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <.input
-                  field={@form[:batch_num_ctx]}
-                  type="number"
-                  label="バッチ生成コンテキスト長 (num_ctx)"
-                />
-                <.input
-                  field={@form[:maintenance_message]}
-                  type="text"
-                  label="メンテナンス告知メッセージ"
-                />
-              </div>
-
-              <div class="pt-2 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3">
-                <.input
-                  field={@form[:maintenance_mode]}
-                  type="checkbox"
-                  label="メンテナンスモード（チャット画面を停止し告知を表示する）"
-                />
-                <.input
-                  field={@form[:serve_stale_qa]}
-                  type="checkbox"
-                  label="無効化（Stale）されたQAを警告付きで配信する"
-                />
-                <.input
-                  field={@form[:daytime_llm_enabled]}
-                  type="checkbox"
-                  label="営業時間中のLLM生成を例外的に許可する (RAM消費に注意)"
-                />
-              </div>
-
-              <div class="pt-4 flex justify-end">
-                <button
-                  type="submit"
-                  class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+              <div class="flex flex-wrap items-center gap-3 pt-2">
+                <.link
+                  href={~p"/auth/google?#{[return_to: "/admin?tab=settings"]}"}
+                  class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                 >
-                  設定を保存
-                </button>
+                  <.icon name="hero-arrow-path-rounded-square" class="w-4 h-4" />
+                  {if @account, do: "専用 Google アカウントを再認可", else: "専用 Google アカウントで認可"}
+                </.link>
+
+                <%= if @account do %>
+                  <.link
+                    href={~p"/auth/google/disconnect?#{[return_to: "/admin?tab=settings"]}"}
+                    class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 font-medium text-xs transition"
+                  >
+                    <.icon name="hero-x-circle" class="w-4 h-4" /> 連携解除
+                  </.link>
+                <% end %>
               </div>
-            </.form>
+            </div>
+
+            <%!-- Card 2: System Settings Form --%>
+            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-6">
+              <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-indigo-600" /> システム・OAuth・バッチ設定
+              </h2>
+
+              <.form for={@form} id="settings-form" phx-submit="save_settings" class="space-y-5">
+                <%!-- Google Cloud OAuth Credentials --%>
+                <div class="space-y-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800">
+                  <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                    <.icon name="hero-key" class="w-4 h-4 text-indigo-500" /> Google Cloud OAuth 認証情報
+                  </h3>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <.input
+                      field={@form[:google_client_id]}
+                      type="text"
+                      label="OAuth クライアント ID (Client ID)"
+                      placeholder="例: xxxxxxxx.apps.googleusercontent.com"
+                    />
+                    <.input
+                      field={@form[:google_client_secret]}
+                      type="password"
+                      label="OAuth クライアント シークレット (Client Secret)"
+                      placeholder="例: GOCSPX-xxxxxxxxxxxx"
+                    />
+                  </div>
+
+                  <div class="text-xs text-zinc-500 space-y-1 pt-1">
+                    <p class="font-medium text-zinc-700 dark:text-zinc-300">
+                      Google Cloud Console に登録する「承認済みのリダイレクト URI」:
+                    </p>
+                    <div class="p-2 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono text-[11px] text-indigo-600 dark:text-indigo-400 select-all">
+                      http://localhost:4000/auth/google/callback（リモートホスト経由の場合はホスト名/IPに置換）
+                    </div>
+                  </div>
+                </div>
+
+                <%!-- Drive & Domain Settings --%>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <.input
+                    field={@form[:drive_folder_id]}
+                    type="text"
+                    label="Google Drive フォルダ ID / URL (drive_folder_id)"
+                  />
+                  <.input
+                    field={@form[:drive_folder_name]}
+                    type="text"
+                    label="Drive フォルダ表示名 (drive_folder_name)"
+                  />
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <.input
+                    field={@form[:allowed_domain]}
+                    type="text"
+                    label="許可 Google Workspace ドメイン (例: company.com)"
+                  />
+                  <.input
+                    field={@form[:similarity_threshold]}
+                    type="number"
+                    step="0.01"
+                    min="0.0"
+                    max="1.0"
+                    label="Tier 1 類似度閾値 (0.0〜1.0)"
+                  />
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <.input
+                    field={@form[:batch_model]}
+                    type="text"
+                    label="夜間生成モデル (batch_model: qwen3:4b)"
+                  />
+                  <.input
+                    field={@form[:embed_model]}
+                    type="text"
+                    label="埋め込みモデル (embed_model: bge-m3)"
+                  />
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <.input
+                    field={@form[:batch_start_hour]}
+                    type="number"
+                    label="バッチ開始時刻 (時: 0〜23)"
+                    min="0"
+                    max="23"
+                  />
+                  <.input
+                    field={@form[:batch_end_hour]}
+                    type="number"
+                    label="バッチ締切時刻 (時: 0〜23)"
+                    min="0"
+                    max="23"
+                  />
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <.input
+                    field={@form[:batch_num_ctx]}
+                    type="number"
+                    label="バッチ生成コンテキスト長 (num_ctx)"
+                  />
+                  <.input
+                    field={@form[:maintenance_message]}
+                    type="text"
+                    label="メンテナンス告知メッセージ"
+                  />
+                </div>
+
+                <div class="pt-2 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3">
+                  <.input
+                    field={@form[:maintenance_mode]}
+                    type="checkbox"
+                    label="メンテナンスモード（チャット画面を停止し告知を表示する）"
+                  />
+                  <.input
+                    field={@form[:serve_stale_qa]}
+                    type="checkbox"
+                    label="無効化（Stale）されたQAを警告付きで配信する"
+                  />
+                  <.input
+                    field={@form[:daytime_llm_enabled]}
+                    type="checkbox"
+                    label="営業時間中のLLM生成を例外的に許可する (RAM消費に注意)"
+                  />
+                </div>
+
+                <div class="pt-4 flex justify-end">
+                  <button
+                    type="submit"
+                    class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                  >
+                    設定を保存
+                  </button>
+                </div>
+              </.form>
+            </div>
           </div>
         <% end %>
       </div>

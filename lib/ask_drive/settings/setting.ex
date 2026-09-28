@@ -14,6 +14,8 @@ defmodule AskDrive.Settings.Setting do
     field :serve_stale_qa, :boolean, default: false
     field :daytime_llm_enabled, :boolean, default: false
     field :allowed_domain, :string
+    field :google_client_id, :string
+    field :google_client_secret, :string
     field :maintenance_mode, :boolean, default: false
     field :maintenance_message, :string
 
@@ -26,6 +28,8 @@ defmodule AskDrive.Settings.Setting do
     |> cast(attrs, [
       :drive_folder_id,
       :drive_folder_name,
+      :google_client_id,
+      :google_client_secret,
       :batch_start_hour,
       :batch_end_hour,
       :batch_model,
