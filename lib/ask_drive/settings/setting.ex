@@ -31,6 +31,11 @@ defmodule AskDrive.Settings.Setting do
     field :serve_stale_qa, :boolean, default: false
     field :daytime_llm_enabled, :boolean, default: false
     field :chat_summary_enabled, :boolean, default: true
+    # Nightly batch generation: "local" (llm_provider / batch_model) or "cloud"
+    # (cloud_llm_provider / cloud_llm_model) — spec F-821
+    field :batch_llm_mode, :string, default: "local"
+    field :cloud_llm_provider, :string, default: "gemini"
+    field :cloud_llm_model, :string
     # nil = same as llm_provider / batch_model (spec F-415)
     field :chat_summary_provider, :string
     field :chat_summary_model, :string
@@ -121,6 +126,9 @@ defmodule AskDrive.Settings.Setting do
         :serve_stale_qa,
         :daytime_llm_enabled,
         :chat_summary_enabled,
+        :batch_llm_mode,
+        :cloud_llm_provider,
+        :cloud_llm_model,
         :chat_summary_provider,
         :chat_summary_model,
         :allowed_domain,
@@ -183,6 +191,7 @@ defmodule AskDrive.Settings.Setting do
     |> validate_base_urls()
     |> validate_api_keys()
     |> validate_chat_summary_provider()
+    |> validate_batch_llm_mode()
     |> validate_drive_service_account()
     |> update_change(:drive_impersonate_email, &(&1 && String.trim(&1)))
     |> validate_format(:drive_impersonate_email, ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/,
@@ -213,7 +222,12 @@ defmodule AskDrive.Settings.Setting do
   # batch from starting a run it cannot finish (spec 10 章).
   defp validate_api_keys(changeset) do
     changeset
-    |> validate_api_key(:llm_provider, "回答生成プロバイダ")
+    |> then(fn cs ->
+      # In cloud mode the batch doesn't use llm_provider, so its key isn't required
+      if get_field(cs, :batch_llm_mode) == "cloud",
+        do: cs,
+        else: validate_api_key(cs, :llm_provider, "回答生成プロバイダ")
+    end)
     |> validate_api_key(:embed_provider, "埋め込みプロバイダ")
   end
 
@@ -261,6 +275,29 @@ defmodule AskDrive.Settings.Setting do
       changeset
     end
   end
+
+  @cloud_providers ~w(gemini anthropic openai)
+
+  # Cloud mode needs a cloud provider, its API key and a model name; local mode is validated
+  # by the existing llm_provider rules.
+  defp validate_batch_llm_mode(changeset) do
+    changeset = validate_inclusion(changeset, :batch_llm_mode, ["local", "cloud"])
+
+    if get_field(changeset, :batch_llm_mode) == "cloud" do
+      changeset
+      |> validate_inclusion(:cloud_llm_provider, @cloud_providers, message: "はクラウドのプロバイダを選んでください")
+      |> validate_api_key(:cloud_llm_provider, "夜間バッチのクラウドプロバイダ")
+      |> then(fn cs ->
+        if blank?(get_field(cs, :cloud_llm_model)),
+          do: add_error(cs, :cloud_llm_model, "クラウドで実行する場合はモデル名を指定してください"),
+          else: cs
+      end)
+    else
+      changeset
+    end
+  end
+
+  def cloud_providers, do: @cloud_providers
 
   # The chat summary may run on its own provider; when it does, it needs that provider's key
   # and an explicit model name (the batch model belongs to the other provider).

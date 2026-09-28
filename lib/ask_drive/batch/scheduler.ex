@@ -83,7 +83,7 @@ defmodule AskDrive.Batch.Scheduler do
       |> BatchRun.changeset(%{
         started_at: DateTime.utc_now(),
         status: "running",
-        model_used: setting.batch_model,
+        model_used: "#{LLM.generation_provider(setting)}:#{LLM.generation_model(setting)}",
         chunks_processed: 0,
         qa_generated: 0,
         qa_invalidated: 0,
@@ -373,7 +373,7 @@ defmodule AskDrive.Batch.Scheduler do
         full_text = Enum.map_join(chunks, "\n\n", & &1.content)
 
         if full_text != "" do
-          case Summary.generate(full_text, setting.batch_model, setting.batch_num_ctx) do
+          case Summary.generate(full_text, LLM.generation_model(setting), setting.batch_num_ctx) do
             {:ok, summary_text} ->
               %AskDrive.Documents.DocSummary{}
               |> AskDrive.Documents.DocSummary.changeset(%{
@@ -432,7 +432,7 @@ defmodule AskDrive.Batch.Scheduler do
     else
       # 1. Generate QA pairs
       new_qas =
-        case QA.generate_for_chunk(chunk, setting.batch_model, setting.batch_num_ctx) do
+        case QA.generate_for_chunk(chunk, LLM.generation_model(setting), setting.batch_num_ctx) do
           {:ok, qa_list} ->
             saved =
               Enum.map(qa_list, fn item ->
@@ -444,7 +444,7 @@ defmodule AskDrive.Batch.Scheduler do
                     answer: item.answer,
                     status: "active",
                     hallucination_flag: item.hallucination_flag,
-                    generated_by: setting.batch_model,
+                    generated_by: LLM.generation_model(setting),
                     generated_at: DateTime.utc_now(),
                     source_hash: chunk.content_hash
                   })
@@ -461,7 +461,11 @@ defmodule AskDrive.Batch.Scheduler do
 
       # 2. Extract structured fields if enabled
       if Map.get(setting, :extraction_enabled, false) == true do
-        case Extraction.extract(chunk.content, setting.batch_model, setting.batch_num_ctx) do
+        case Extraction.extract(
+               chunk.content,
+               LLM.generation_model(setting),
+               setting.batch_num_ctx
+             ) do
           {:ok, items} when items != [] ->
             # Save extractions
             Enum.each(items, fn item ->

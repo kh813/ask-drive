@@ -58,6 +58,25 @@ echo -e "\n${YELLOW}[4/4] サービスの再起動中...${NC}"
 if launchctl list "${SERVICE_NAME}" >/dev/null 2>&1; then
   echo "launchd サービス (${SERVICE_NAME}) を再起動します..."
   "${SCRIPT_DIR}/app.sh" service restart
+
+  # kickstart は起動を待たずに戻るため、直後にステータスを出すと Ollama・AskDrive とも
+  # 「停止中」と表示されてしまう。HTTP が応答するまで最大 120 秒待ってから表示する。
+  port="${PORT:-4000}"
+  echo -n "AskDrive の起動を待っています"
+  for _ in $(seq 1 120); do
+    if curl -s -o /dev/null "http://localhost:${port}/" 2>/dev/null; then
+      echo " 起動しました。"
+      break
+    fi
+    echo -n "."
+    sleep 1
+  done
+  if ! curl -s -o /dev/null "http://localhost:${port}/" 2>/dev/null; then
+    echo ""
+    echo -e "${YELLOW}120 秒以内に応答しませんでした。ログを確認してください:${NC}"
+    echo "  ${SCRIPT_DIR}/log/ask_drive_stdout.log / ask_drive_stderr.log"
+    tail -n 20 "${SCRIPT_DIR}/log/ask_drive_stderr.log" 2>/dev/null || true
+  fi
   "${SCRIPT_DIR}/app.sh" service status || true
 else
   echo "launchd サービスは未登録のため、フォアグラウンドで起動します（Ctrl+C で停止します）..."

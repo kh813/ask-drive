@@ -9,8 +9,6 @@ defmodule AskDrive.ChatSummary do
   can link each claim to its source. The excerpts themselves are always shown too: the
   summary is a reading aid, the excerpts are the evidence.
   """
-  require Logger
-
   alias AskDrive.{LLM, Settings, Snippet}
 
   @max_excerpt_chars 1_200
@@ -53,7 +51,7 @@ defmodule AskDrive.ChatSummary do
   @doc """
   Provider and model for chat summaries: `chat_summary_provider` / `chat_summary_model`
   when set (e.g. Gemini for fast, accurate answers), otherwise the nightly batch's
-  `llm_provider` / `batch_model` (spec F-415).
+  generation provider / model (local or cloud per `batch_llm_mode`, spec F-415 / F-821).
   """
   def provider_and_model(setting) do
     provider =
@@ -65,7 +63,7 @@ defmodule AskDrive.ChatSummary do
     model =
       case setting.chat_summary_model do
         m when is_binary(m) and m != "" -> m
-        _ -> setting.batch_model
+        _ -> LLM.generation_model(setting)
       end
 
     {provider, model}

@@ -724,7 +724,10 @@ defmodule AskDriveWeb.AdminLive do
                         <span class="text-red-600">未接続: {err}</span>
                     <% end %>
                   </span>
-                  <span class="text-[10px] text-zinc-400 mt-0.5 block">{@setting.batch_model}</span>
+                  <span class="text-[10px] text-zinc-400 mt-0.5 block">
+                    {LLM.generation_model(@setting)}{if LLM.cloud_mode?(@setting),
+                      do: "（クラウド）"}
+                  </span>
                 </div>
 
                 <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
@@ -1425,7 +1428,7 @@ defmodule AskDriveWeb.AdminLive do
 
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <%= for {role, label, provider, model} <- [
-                      {:generation, "回答生成", @generation_provider, @setting.batch_model},
+                      {:generation, "回答生成", @generation_provider, LLM.generation_model(@setting)},
                       {:embedding, "埋め込み", @embedding_provider, @setting.embed_model}
                     ] do %>
                   <div class="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800 space-y-2">
@@ -1536,19 +1539,54 @@ defmodule AskDriveWeb.AdminLive do
                     <.icon name="hero-cpu-chip" class="w-4 h-4 text-indigo-500" /> LLM プロバイダとモデル
                   </h3>
 
+                  <%!-- Nightly batch: local LLM or cloud API (spec F-821). Both configurations
+                        are kept so switching doesn't mean retyping model names. --%>
                   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <.input
-                      field={@form[:llm_provider]}
+                      field={@form[:batch_llm_mode]}
                       type="select"
-                      label="回答生成プロバイダ"
-                      options={provider_options(LLM.generation_providers())}
+                      label="夜間バッチ（QA 生成）の実行方法"
+                      options={[{"ローカル LLM", "local"}, {"クラウド API", "cloud"}]}
                     />
-                    <.input field={@form[:batch_model]} type="text" label="生成モデル名" />
                     <.input
                       field={@form[:llm_max_tokens]}
                       type="number"
                       label="生成トークン上限 (外部 API)"
                       min="1"
+                    />
+                    <p class="text-[11px] text-zinc-500 leading-relaxed sm:pt-6">
+                      クラウド API は高精度・高速ですが、夜間に全チャンクの本文が API 提供元に送信され、従量課金になります。
+                    </p>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <.input
+                      field={@form[:llm_provider]}
+                      type="select"
+                      label="ローカル LLM プロバイダ"
+                      options={
+                        provider_options(Enum.filter(LLM.generation_providers(), &LLM.local?/1))
+                      }
+                    />
+                    <.input
+                      field={@form[:batch_model]}
+                      type="text"
+                      label="ローカル LLM のモデル名"
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <.input
+                      field={@form[:cloud_llm_provider]}
+                      type="select"
+                      label="クラウド API プロバイダ"
+                      options={provider_options(AskDrive.Settings.Setting.cloud_providers())}
+                    />
+                    <.input
+                      field={@form[:cloud_llm_model]}
+                      type="text"
+                      label="クラウド API のモデル名"
+                      placeholder="例: Gemini のモデル名"
                     />
                   </div>
 

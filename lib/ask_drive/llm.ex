@@ -60,13 +60,25 @@ defmodule AskDrive.LLM do
 
   # --- Configured providers -------------------------------------------------
 
-  @doc "Provider identifier used for text generation."
+  @doc """
+  Provider identifier used for text generation (the nightly batch, and chat summaries unless
+  they have their own). Follows `batch_llm_mode` (spec F-821): "cloud" uses
+  `cloud_llm_provider`, otherwise the local `llm_provider`.
+  """
   def generation_provider(setting \\ nil) do
-    setting
-    |> resolve_setting()
-    |> field(:llm_provider, "ASK_DRIVE_LLM_PROVIDER", @default_provider)
-    |> normalize()
+    setting = resolve_setting(setting)
+
+    if cloud_mode?(setting) do
+      normalize(get(setting, :cloud_llm_provider) || "gemini")
+    else
+      setting
+      |> field(:llm_provider, "ASK_DRIVE_LLM_PROVIDER", @default_provider)
+      |> normalize()
+    end
   end
+
+  @doc "Whether the nightly batch is set to generate with a cloud API."
+  def cloud_mode?(setting \\ nil), do: get(resolve_setting(setting), :batch_llm_mode) == "cloud"
 
   @doc "Provider identifier used for embedding."
   def embedding_provider(setting \\ nil) do
@@ -144,8 +156,10 @@ defmodule AskDrive.LLM do
     with :ok <- check_api_key(provider, setting) do
       Code.ensure_loaded(mod)
 
+      # apply/3: calling mod.generate_stream/4 directly makes the type checker (Elixir 1.20)
+      # warn for every provider module that has no streaming variant.
       if function_exported?(mod, :generate_stream, 4) do
-        mod.generate_stream(model, prompt, gen_opts, on_delta)
+        apply(mod, :generate_stream, [model, prompt, gen_opts, on_delta])
       else
         with {:ok, text} <- mod.generate(model, prompt, gen_opts) do
           on_delta.(text)
@@ -273,9 +287,13 @@ defmodule AskDrive.LLM do
     end
   end
 
-  @doc "Configured generation model name."
+  @doc "Generation model name in effect: `cloud_llm_model` in cloud mode, else `batch_model`."
   def generation_model(setting \\ nil) do
-    setting |> resolve_setting() |> field(:batch_model, "ASK_DRIVE_LLM_MODEL", "qwen3:4b")
+    setting = resolve_setting(setting)
+
+    if cloud_mode?(setting),
+      do: get(setting, :cloud_llm_model),
+      else: field(setting, :batch_model, "ASK_DRIVE_LLM_MODEL", "qwen3:4b")
   end
 
   @doc "Configured embedding model name."
