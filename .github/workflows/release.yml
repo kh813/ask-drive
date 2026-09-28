@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 0.0.1)'
+        required: true
+        default: '0.0.1'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build and Package Release Artifact
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set Release Version
+        id: vars
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "TAG=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+            echo "VERSION=${TAG_NAME#v}" >> $GITHUB_OUTPUT
+            echo "TAG=${TAG_NAME}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Elixir and Erlang
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.17'
+          otp-version: '27'
+
+      - name: Install dependencies and compile
+        run: |
+          mix deps.get
+          MIX_ENV=prod mix compile
+
+      - name: Prepare Release Archive
+        run: |
+          VERSION="${{ steps.vars.outputs.VERSION }}"
+          ARCHIVE_NAME="ask-drive-v${VERSION}.zip"
+
+          # Download sqlite-vec arm64 extension and place it in priv/sqlite_vec/vec0.dylib
+          mkdir -p priv/sqlite_vec
+          curl -L -o priv/sqlite_vec/vec0.dylib \
+            https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-v0.1.9-loadable-macos-aarch64.tar.gz || true
+
+          # Create distribution zip archive excluding .git, _build, and local development files
+          zip -r "${ARCHIVE_NAME}" . \
+            -x "*.git*" \
+            -x "_build/*" \
+            -x "deps/*" \
+            -x "*.db*" \
+            -x ".env*" \
+            -x "tmp/*" \
+            -x "log/*"
+
+          echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.TAG }}
+          name: AskDrive v${{ steps.vars.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          files: ${{ env.ARCHIVE_NAME }}
+          generate_release_notes: true

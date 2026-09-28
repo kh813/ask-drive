@@ -216,44 +216,80 @@ cmd_update() {
   echo -e "${BLUE}=== AskDrive 自己アップデート ===${NC}"
   cd "${SCRIPT_DIR}"
 
-  if [[ -n "${target_ver}" ]]; then
-    echo "指定バージョン: ${target_ver}"
+  local repo_url="https://github.com/kh813/ask-drive"
+
+  if [[ ! -d "${SCRIPT_DIR}/.git" ]]; then
+    # 非 Git (ZIP 展開環境) でのアップデート
+    echo "ZIP インストール環境を検出しました。GitHub Release から更新を取得します..."
+    local download_ver="${target_ver}"
+    if [[ -z "${download_ver}" ]]; then
+      # 最新リリースタグの取得
+      download_ver="$(curl -s "https://api.github.com/repos/kh813/ask-drive/releases/latest" | sed -n 's/.*"tag_name": *"v\?\([^"]*\)".*/\1/p' || echo "")"
+    fi
+
+    if [[ -z "${download_ver}" ]]; then
+      echo -e "${RED}最新バージョン情報を取得できませんでした。${NC}"
+      exit 1
+    fi
+
+    echo "対象バージョン: v${download_ver}"
     if [[ "${auto_yes}" != "true" ]]; then
-      read -rp "バージョン ${target_ver} に切り替えてアップデート/ロールバックを実行しますか？ (y/N): " answer
+      read -rp "バージョン v${download_ver} をダウンロードしてアップデートを実行しますか？ (y/N): " answer
       if [[ "${answer}" != "y" && "${answer}" != "Y" ]]; then
         echo "アップデートを中止しました。"
         return 0
       fi
     fi
 
-    echo -e "${YELLOW}==> バージョン ${target_ver} をチェックアウト中...${NC}"
-    git fetch --tags --all || true
-    git checkout "${target_ver}"
-  else
-    echo "最新バージョンへの更新を確認中..."
-    git fetch origin || true
-    local local_hash upstream_hash
-    local_hash="$(git rev-parse HEAD 2>/dev/null || echo "")"
-    upstream_hash="$(git rev-parse '@{u}' 2>/dev/null || echo "")"
+    local zip_url="${repo_url}/releases/download/v${download_ver}/ask-drive-v${download_ver}.zip"
+    local tmp_zip="/tmp/ask-drive-v${download_ver}.zip"
+    echo -e "${YELLOW}==> ${zip_url} をダウンロード中...${NC}"
+    curl -fL -o "${tmp_zip}" "${zip_url}"
 
-    if [[ -n "${local_hash}" && -n "${upstream_hash}" && "${local_hash}" == "${upstream_hash}" ]]; then
-      echo -e "${GREEN}既に最新のバージョンです (${local_hash:0:7})。${NC}"
+    echo -e "${YELLOW}==> アーカイブを展開中...${NC}"
+    unzip -o -q "${tmp_zip}" -d "${SCRIPT_DIR}"
+    rm -f "${tmp_zip}"
+  else
+    # Git 環境でのアップデート
+    if [[ -n "${target_ver}" ]]; then
+      echo "指定バージョン: ${target_ver}"
       if [[ "${auto_yes}" != "true" ]]; then
-        read -rp "再ビルドとマイグレーションを再実行しますか？ (y/N): " answer
-        if [[ "${answer}" != "y" && "${answer}" != "Y" ]]; then
-          return 0
-        fi
-      fi
-    else
-      if [[ "${auto_yes}" != "true" ]]; then
-        read -rp "最新コードを取得してアップデートを実行しますか？ (y/N): " answer
+        read -rp "バージョン ${target_ver} に切り替えてアップデート/ロールバックを実行しますか？ (y/N): " answer
         if [[ "${answer}" != "y" && "${answer}" != "Y" ]]; then
           echo "アップデートを中止しました。"
           return 0
         fi
       fi
-      echo -e "${YELLOW}==> 最新コードを取得中 (git pull)...${NC}"
-      git pull --rebase origin "$(git branch --show-current)"
+
+      echo -e "${YELLOW}==> バージョン ${target_ver} をチェックアウト中...${NC}"
+      git fetch --tags --all || true
+      git checkout "${target_ver}"
+    else
+      echo "最新バージョンへの更新を確認中..."
+      git fetch origin || true
+      local local_hash upstream_hash
+      local_hash="$(git rev-parse HEAD 2>/dev/null || echo "")"
+      upstream_hash="$(git rev-parse '@{u}' 2>/dev/null || echo "")"
+
+      if [[ -n "${local_hash}" && -n "${upstream_hash}" && "${local_hash}" == "${upstream_hash}" ]]; then
+        echo -e "${GREEN}既に最新のバージョンです (${local_hash:0:7})。${NC}"
+        if [[ "${auto_yes}" != "true" ]]; then
+          read -rp "再ビルドとマイグレーションを再実行しますか？ (y/N): " answer
+          if [[ "${answer}" != "y" && "${answer}" != "Y" ]]; then
+            return 0
+          fi
+        fi
+      else
+        if [[ "${auto_yes}" != "true" ]]; then
+          read -rp "最新コードを取得してアップデートを実行しますか？ (y/N): " answer
+          if [[ "${answer}" != "y" && "${answer}" != "Y" ]]; then
+            echo "アップデートを中止しました。"
+            return 0
+          fi
+        fi
+        echo -e "${YELLOW}==> 最新コードを取得中 (git pull)...${NC}"
+        git pull --rebase origin "$(git branch --show-current)"
+      fi
     fi
   fi
 
