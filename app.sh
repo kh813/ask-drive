@@ -230,12 +230,16 @@ cmd_update() {
     echo "ZIP インストール環境を検出しました。GitHub Release から更新を取得します..."
     local download_ver="${target_ver}"
     if [[ -z "${download_ver}" ]]; then
-      # 最新リリースタグの取得
-      download_ver="$(curl -s "https://api.github.com/repos/kh813/ask-drive/releases/latest" | sed -n 's/.*"tag_name": *"v\?\([^"]*\)".*/\1/p' || echo "")"
+      # 最新リリースタグの取得 (macOS BSD sed および Linux GNU sed 互換)
+      download_ver="$(curl -sL "https://api.github.com/repos/kh813/ask-drive/releases/latest" | grep '"tag_name":' | sed -E 's/.*"tag_name": *"v?([^"]+)".*/\1/' || echo "")"
     fi
 
+    # 先頭の v / V を除去して正規化
+    download_ver="${download_ver#v}"
+    download_ver="${download_ver#V}"
+
     if [[ -z "${download_ver}" ]]; then
-      echo -e "${RED}最新バージョン情報を取得できませんでした。${NC}"
+      echo -e "${RED}最新バージョン情報を取得できませんでした。ネットワーク接続または '--ver <version>' で明示してください。${NC}"
       exit 1
     fi
 
@@ -256,6 +260,7 @@ cmd_update() {
     echo -e "${YELLOW}==> アーカイブを展開中...${NC}"
     unzip -o -q "${tmp_zip}" -d "${SCRIPT_DIR}"
     rm -f "${tmp_zip}"
+    chmod +x "${SCRIPT_DIR}/app.sh" "${SCRIPT_DIR}/scripts"/*.sh 2>/dev/null || true
   else
     # Git 環境でのアップデート
     if [[ -n "${target_ver}" ]]; then
