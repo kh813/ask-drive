@@ -16,10 +16,12 @@ defmodule Mix.Tasks.AskDrive.GrantAdmin do
   """
   use Mix.Task
 
-  @requirements ["app.start"]
-
   @impl Mix.Task
-  def run([email]) do
+  def run(args) do
+    AskDrive.CliTask.run(fn -> run_task(args) end)
+  end
+
+  defp run_task([email]) do
     case AskDrive.Accounts.grant_admin(email) do
       {:ok, user} ->
         Mix.shell().info("""
@@ -32,7 +34,7 @@ defmodule Mix.Tasks.AskDrive.GrantAdmin do
     end
   end
 
-  def run(_args) do
+  defp run_task(_args) do
     Mix.raise("使用方法: mix ask_drive.grant_admin <email>")
   end
 end

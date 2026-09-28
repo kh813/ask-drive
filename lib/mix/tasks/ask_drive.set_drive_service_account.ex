@@ -32,13 +32,15 @@ defmodule Mix.Tasks.AskDrive.SetDriveServiceAccount do
   alias AskDrive.Drive.ServiceAccount
   alias AskDrive.Settings
 
-  @requirements ["app.start"]
-
   @impl Mix.Task
-  def run([]), do: run_pasted()
-  def run(["-"]), do: run_pasted()
+  def run(args) do
+    AskDrive.CliTask.run(fn -> run_task(args) end)
+  end
 
-  def run([path]) do
+  defp run_task([]), do: run_pasted()
+  defp run_task(["-"]), do: run_pasted()
+
+  defp run_task([path]) do
     if File.exists?(path) do
       case File.read(path) do
         {:ok, content} -> apply_json(content)
@@ -50,7 +52,7 @@ defmodule Mix.Tasks.AskDrive.SetDriveServiceAccount do
     end
   end
 
-  def run(_args) do
+  defp run_task(_args) do
     Mix.raise("""
     使用方法:
       mix ask_drive.set_drive_service_account <path-to-key.json>

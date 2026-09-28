@@ -19,12 +19,14 @@ defmodule Mix.Tasks.AskDrive.SetAdminPassword do
 
   alias AskDrive.Accounts.AdminAccess
 
-  @requirements ["app.start"]
-
   @impl Mix.Task
-  def run([password]), do: store(password)
+  def run(args) do
+    AskDrive.CliTask.run(fn -> run_task(args) end)
+  end
 
-  def run([]) do
+  defp run_task([password]), do: store(password)
+
+  defp run_task([]) do
     password = prompt("新しい管理者パスワード: ")
     confirmation = prompt("確認のためもう一度: ")
 
@@ -35,7 +37,7 @@ defmodule Mix.Tasks.AskDrive.SetAdminPassword do
     end
   end
 
-  def run(_args), do: Mix.raise("使用方法: mix ask_drive.set_admin_password [password]")
+  defp run_task(_args), do: Mix.raise("使用方法: mix ask_drive.set_admin_password [password]")
 
   defp store(password) do
     case AdminAccess.force_set_password(password) do
