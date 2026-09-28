@@ -81,6 +81,31 @@ ensure_dirs() {
   mkdir -p "${SCRIPT_DIR}/log"
 }
 
+# 旧バージョンのセットアップは .runtime/bin に ollama 本体だけを置いていた。推論ランナー
+# llama-server が無いとモデルのロード時に "llama-server binary not found" で失敗するため、
+# 起動のたびに確認し、欠けていれば公式のスタンドアロン tarball を丸ごと展開して補う
+# (scripts/initial-setup.sh の install_ollama_runtime と同じ手順)。
+repair_ollama_runtime() {
+  [[ "$(command -v ollama || true)" == "${RUNTIME_BIN}/ollama" ]] || return 0
+  [[ -x "${RUNTIME_BIN}/llama-server" ]] && return 0
+
+  echo -e "${YELLOW}ollama の推論ランナー (llama-server) が欠落しています。Ollama を再取得します (約 160MB)...${NC}"
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+  if curl -fL --retry 3 -o "${tmp_dir}/ollama-darwin.tgz" "https://ollama.com/download/ollama-darwin.tgz" &&
+    tar -xzf "${tmp_dir}/ollama-darwin.tgz" -C "${RUNTIME_BIN}"; then
+    chmod +x "${RUNTIME_BIN}/ollama" "${RUNTIME_BIN}/llama-server" 2>/dev/null || true
+    # 欠落した状態で起動済みの ollama serve は古いバイナリのままなので止めて起動し直させる。
+    # cmd_start は PATH 経由で起動するため、argv は "ollama serve" になる。
+    pkill -f "^(${RUNTIME_BIN}/)?ollama serve" 2>/dev/null || true
+    sleep 1
+    echo -e "${GREEN}ollama と llama-server を ${RUNTIME_BIN} に配置しました。${NC}"
+  else
+    echo -e "${RED}Ollama の再取得に失敗しました。ローカル推論は動作しません。${NC}"
+  fi
+  rm -rf "${tmp_dir}"
+}
+
 # --- アプリケーション制御 ---
 
 cmd_start() {
@@ -93,6 +118,8 @@ cmd_start() {
   export OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-1}"
   export OLLAMA_FLASH_ATTENTION="${OLLAMA_FLASH_ATTENTION:-1}"
   export OLLAMA_KV_CACHE_TYPE="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
+
+  repair_ollama_runtime
 
   # Ollama サーバーの稼働確認と自動起動
   local ollama_host="${OLLAMA_HOST:-http://localhost:11434}"

@@ -140,6 +140,14 @@ defmodule AskDrive.HealthCheck do
       {:ok, ver} -> Logger.info("  [✓] pandoc: #{ver}")
       {:error, err} -> Logger.warning("  [✗] pandoc: #{err}")
     end
+
+    # Say which auth mode is live, so "is the flag in .env.prod actually reaching the
+    # process?" can be answered from the log instead of by trial and error in a browser.
+    if AskDriveWeb.UserAuth.auth_disabled?() do
+      Logger.warning("  [!] 認証: 無効 (ASK_DRIVE_DISABLE_AUTH) — /admin を含め誰でも管理者として操作できます")
+    else
+      Logger.info("  [✓] 認証: 有効 (管理画面は Google ログイン + 管理者パスワードが必要)")
+    end
   end
 
   defp log_provider(role, provider, result) do

@@ -47,10 +47,12 @@ defmodule AskDriveWeb.UserAuth do
 
   @doc """
   Whether `ASK_DRIVE_DISABLE_AUTH` is set. See the moduledoc before using this outside the
-  two call sites that already exist (`fetch_current_user/2`, `assign_current_user/2`).
+  call sites that already exist (`fetch_current_user/2`, `assign_current_user/2`, and the
+  startup health check's log line).
   """
   def auth_disabled? do
-    System.get_env("ASK_DRIVE_DISABLE_AUTH") in ["true", "1"]
+    value = System.get_env("ASK_DRIVE_DISABLE_AUTH", "")
+    String.downcase(String.trim(value)) in ["true", "1", "yes", "on"]
   end
 
   # --- Session lifecycle ----------------------------------------------------
