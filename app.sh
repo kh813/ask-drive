@@ -276,14 +276,17 @@ cmd_drive() {
   case "${sub}" in
     service-account)
       local key_path="${1:-}"
+      # 引数なし、またはファイルが無い場合は JSON を対話的に貼り付けるモードへ
+      # 自動的にフォールバックする（mix タスク側で処理する）。
       if [[ -z "${key_path}" ]]; then
-        echo -e "${RED}使用方法: ./app.sh drive service-account <path-to-key.json>${NC}"
-        exit 1
+        MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.set_drive_service_account
+      else
+        MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.set_drive_service_account "${key_path}"
       fi
-      MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.set_drive_service_account "${key_path}"
       ;;
     *)
-      echo -e "${RED}使用方法: ./app.sh drive service-account <path-to-key.json>${NC}"
+      echo -e "${RED}使用方法: ./app.sh drive service-account [path-to-key.json]${NC}"
+      echo "  パスを省略すると、JSON の中身を貼り付けて設定できます。"
       exit 1
       ;;
   esac

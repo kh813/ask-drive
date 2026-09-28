@@ -54,9 +54,9 @@ Apple Silicon Mac (8GB〜) の単一マシン上で、Google Drive 内の共有�
 ### 1. リリースアーカイブ（ZIP）の取得と展開
 GitHub Releases から最新版の ZIP をダウンロードして展開します。
 ```bash
-# 例: v0.0.15 の場合
-curl -fLO https://github.com/kh813/ask-drive/releases/download/v0.0.15/ask-drive-v0.0.15.zip
-unzip ask-drive-v0.0.15.zip -d ask-drive
+# 例: v0.0.16 の場合
+curl -fLO https://github.com/kh813/ask-drive/releases/download/v0.0.16/ask-drive-v0.0.16.zip
+unzip ask-drive-v0.0.16.zip -d ask-drive
 cd ask-drive
 ```
 
@@ -158,11 +158,21 @@ Anthropic API キー: ********
 
 Drive 同期の設定は本来 Web 管理画面（ログイン + 管理者昇格が必要）から行いますが、社員ログインの OAuth がまだ通っていない、あるいは管理者パスワードが未設定などの理由でそこに到達できない場合は、**サービスアカウント方式**（後述の「ステップ3・方式A」参照）を CLI から直接設定できます。Web 側の認証状態に一切依存しません。
 
+JSON ファイルが手元にある場合:
+
 ```bash
 ./app.sh drive service-account /path/to/service-account-key.json
 ```
 
-JSON キーの妥当性（`client_email` / `private_key` の有無）をその場で検証し、暗号化して保存します。実行後は表示されたサービスアカウントのメールアドレスを、同期対象の Google Drive フォルダに閲覧者として共有してください。
+JSON ファイルをまだ AskDrive 稼働機に置いていない場合は、パスを省略すると Google Cloud Console からダウンロードした JSON の中身をその場に貼り付けて設定できます（貼り付け後、空行または Ctrl+D で確定）:
+
+```bash
+./app.sh drive service-account
+```
+
+> サービスアカウントの秘密鍵は Google が発行するものなので、値を1つずつ質問して新規に作ることはできません。ここでの「対話的」入力は、Google からダウンロードした JSON の**貼り付け**を指します。
+
+JSON の妥当性（`client_email` / `private_key` の有無）をその場で検証し、暗号化して保存します。実行後は表示されたサービスアカウントのメールアドレスを、同期対象の Google Drive フォルダに閲覧者として共有してください。
 
 ---
 
