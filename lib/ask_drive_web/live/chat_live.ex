@@ -78,7 +78,7 @@ defmodule AskDriveWeb.ChatLive do
       question: result.question,
       index_empty?: Map.get(result, :index_empty?, false),
       # Live AI summary of the excerpts (spec 6.4.4): shown above them, streamed in
-      summary: if(summarise?, do: %{status: :running, text: ""}),
+      summary: if(summarise?, do: %{status: :running, text: "", thinking: ""}),
       inserted_at: DateTime.utc_now()
     }
 
@@ -93,8 +93,8 @@ defmodule AskDriveWeb.ChatLive do
         id = assistant_msg.id
 
         start_async(socket, {:summary, id}, fn ->
-          ChatSummary.generate(result.question, result.chunks, fn delta ->
-            send(lv, {:summary_delta, id, delta})
+          ChatSummary.generate(result.question, result.chunks, fn event ->
+            send(lv, {:summary_delta, id, event})
           end)
         end)
       else
@@ -104,8 +104,8 @@ defmodule AskDriveWeb.ChatLive do
     {:noreply, socket}
   end
 
-  def handle_async({:summary, id}, {:ok, {:ok, text}}, socket) do
-    {:noreply, update_summary(socket, id, &%{&1 | status: :done, text: text})}
+  def handle_async({:summary, id}, {:ok, {:ok, %{text: text, thinking: thinking}}}, socket) do
+    {:noreply, update_summary(socket, id, &%{&1 | status: :done, text: text, thinking: thinking})}
   end
 
   def handle_async({:summary, id}, {:ok, {:error, reason}}, socket) do
@@ -131,8 +131,12 @@ defmodule AskDriveWeb.ChatLive do
   end
 
   @impl true
-  def handle_info({:summary_delta, id, delta}, socket) do
+  def handle_info({:summary_delta, id, {:answer, delta}}, socket) do
     {:noreply, update_summary(socket, id, &%{&1 | text: &1.text <> delta})}
+  end
+
+  def handle_info({:summary_delta, id, {:thinking, delta}}, socket) do
+    {:noreply, update_summary(socket, id, &%{&1 | thinking: &1.thinking <> delta})}
   end
 
   defp update_summary(socket, id, fun) do
@@ -378,6 +382,11 @@ defmodule AskDriveWeb.ChatLive do
                               <p class="text-xs text-zinc-500">
                                 要約を作成できませんでした。下の引用元の抜粋をご確認ください。
                               </p>
+                            <% %{status: :running, text: "", thinking: thinking} when thinking != "" -> %>
+                              <p class="text-xs text-zinc-500 flex items-center gap-1.5">
+                                <.icon name="hero-arrow-path" class="w-3.5 h-3.5 animate-spin" />
+                                考えています…（{String.length(thinking)}字）
+                              </p>
                             <% %{status: :running, text: ""} -> %>
                               <p class="text-xs text-zinc-500 flex items-center gap-1.5">
                                 <.icon name="hero-arrow-path" class="w-3.5 h-3.5 animate-spin" />
@@ -395,6 +404,18 @@ defmodule AskDriveWeb.ChatLive do
                                 生成 AI の要約は誤りを含むことがあります。重要な判断の前に、必ず引用元をご確認ください。
                               </p>
                           <% end %>
+                          <%!-- A reasoning model's thinking: kept, but collapsed by default --%>
+                          <details
+                            :if={Map.get(msg.summary, :thinking, "") != ""}
+                            class="text-xs"
+                          >
+                            <summary class="cursor-pointer text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 select-none">
+                              AI の思考過程を表示（{String.length(msg.summary.thinking)}字）
+                            </summary>
+                            <div class="mt-1.5 text-[11px] text-zinc-500 bg-white/60 dark:bg-zinc-900/60 p-2 rounded-md leading-relaxed max-h-60 overflow-y-auto">
+                              {excerpt_html([{:text, msg.summary.thinking}])}
+                            </div>
+                          </details>
                         </div>
 
                         <p class="text-xs text-zinc-500">

@@ -152,4 +152,63 @@ defmodule AskDriveWeb.ChatLiveTest do
     assert html =~ ~r{<a href="#src-\d+-1"[^>]*>\[1\]</a>}
     assert html =~ ~r{id="src-\d+-1"}
   end
+
+  test "a reasoning model's thinking is kept but collapsed, not mixed into the summary", %{
+    conn: conn
+  } do
+    {server, url} = AskDrive.StubOllama.start!(self())
+    on_exit(fn -> Process.exit(server, :normal) end)
+
+    AskDrive.StubOllama.put_generate_pieces([
+      "Okay, let's tackle this query.",
+      "</think>",
+      "持ち出しは許可制です [1]。"
+    ])
+
+    {:ok, _} =
+      AskDrive.Settings.update_setting(AskDrive.Settings.get_setting!(), %{
+        ollama_host: url,
+        llm_provider: "ollama",
+        embed_provider: "ollama",
+        batch_model: "qwen3:4b"
+      })
+
+    {:ok, doc} =
+      %AskDrive.Documents.Document{}
+      |> AskDrive.Documents.Document.changeset(%{
+        drive_file_id: "think_doc",
+        name: "guide.pdf",
+        mime_type: "application/pdf",
+        status: "indexed"
+      })
+      |> AskDrive.Repo.insert()
+
+    {:ok, _} =
+      %AskDrive.Documents.Chunk{}
+      |> AskDrive.Documents.Chunk.changeset(%{
+        document_id: doc.id,
+        position: 0,
+        content_hash: "t",
+        content: "PCの持ち出しは事前申請による許可制とする。"
+      })
+      |> AskDrive.Repo.insert()
+
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    view
+    |> form("#chat-form", %{"question" => "PCの持ち出しルールは？"})
+    |> render_submit()
+
+    render_async(view, 20_000)
+    html = render_async(view, 20_000)
+
+    assert html =~ "持ち出しは許可制です"
+    assert html =~ "AI の思考過程を表示"
+    # the thinking sits inside a <details> (collapsed), after the answer
+    assert html =~
+             ~r{<details[^>]*>\s*<summary[^>]*>\s*AI の思考過程を表示.*Okay, let&#39;s tackle this query\.}s
+
+    [answer_part | _] = String.split(html, "AI の思考過程を表示")
+    refute answer_part =~ "Okay, let"
+  end
 end

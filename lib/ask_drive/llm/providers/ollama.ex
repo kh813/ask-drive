@@ -69,7 +69,8 @@ defmodule AskDrive.LLM.Providers.Ollama do
 
   @doc """
   Streams a completion from `/api/generate`, calling `on_delta.(text)` for each piece as it
-  arrives, and returns `{:ok, full_text}`. Used for the chat summary (spec 6.4.4), where a
+  arrives, and returns `{:ok, full_text}`. If `on_delta` returns `:halt`, generation stops
+  there (the request is closed) and the text so far is returned. Used for the chat summary (spec 6.4.4), where a
   local model takes tens of seconds and showing text as it is written matters.
 
   `think: false` keeps reasoning models (qwen3) from spending the budget on a hidden
@@ -93,23 +94,28 @@ defmodule AskDrive.LLM.Providers.Ollama do
       if resp.status == 200 do
         {lines, rest} = split_lines(buffer)
 
-        text =
-          Enum.map_join(lines, fn line ->
-            case Jason.decode(line) do
-              {:ok, %{"response" => piece}} when is_binary(piece) and piece != "" ->
-                on_delta.(piece)
-                piece
+        {text, halt?} =
+          Enum.reduce(lines, {"", false}, fn
+            _line, {text, true} ->
+              {text, true}
 
-              _ ->
-                ""
-            end
+            line, {text, false} ->
+              case Jason.decode(line) do
+                {:ok, %{"response" => piece}} when is_binary(piece) and piece != "" ->
+                  # on_delta may answer :halt to stop generation early (e.g. length cap)
+                  {text <> piece, on_delta.(piece) == :halt}
+
+                _ ->
+                  {text, false}
+              end
           end)
 
         acc = Req.Response.get_private(resp, :text, "") <> text
 
-        {:cont,
-         {req,
-          resp |> Req.Response.put_private(:buffer, rest) |> Req.Response.put_private(:text, acc)}}
+        resp =
+          resp |> Req.Response.put_private(:buffer, rest) |> Req.Response.put_private(:text, acc)
+
+        if halt?, do: {:halt, {req, resp}}, else: {:cont, {req, resp}}
       else
         {:cont, {req, Req.Response.put_private(resp, :buffer, buffer)}}
       end
