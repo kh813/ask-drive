@@ -77,11 +77,26 @@ defmodule AskDriveWeb.MultiAppTest do
     assert html =~ "全体管理"
     assert has_element?(view, "#app-row-hr")
 
+    # the add form opens right above the list
+    refute has_element?(view, "#new-app-form")
+    view |> element("#show-new-app-btn") |> render_click()
+    assert has_element?(view, "#new-app-form")
+
+    # live validation: a taken slug and a reserved one, and the URL preview
+    html = view |> form("#new-app-form", app: %{name: "X", slug: "hr"}) |> render_change()
+    assert html =~ "は既に使われています"
+    html = view |> form("#new-app-form", app: %{name: "X", slug: "admin"}) |> render_change()
+    assert html =~ "システムで使用するため"
+    view |> form("#new-app-form", app: %{name: "Legal", slug: "legal"}) |> render_change()
+    assert has_element?(view, "#new-app-url", "/legal")
+
     view
     |> form("#new-app-form", app: %{name: "Legal", slug: "legal", description: "法務の相談窓口"})
     |> render_submit()
 
     assert has_element?(view, "#app-row-legal")
+    refute has_element?(view, "#new-app-form")
+    assert has_element?(view, "#open-new-app-settings[href='/legal/admin?tab=settings']")
     legal = Apps.get_by_slug("legal")
     on_exit(fn -> Apps.Repos.stop_app_repo("legal") end)
     assert File.exists?(legal.db_path)

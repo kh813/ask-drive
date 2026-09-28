@@ -59,10 +59,9 @@ defmodule AskDriveWeb.AdminLive do
       |> assign_new(:app, fn -> nil end)
       |> assign_new(:apps, fn -> AskDrive.Apps.list() end)
       |> assign_new(:base_path, fn -> "" end)
-      |> assign(
-        :app_form,
-        to_form(AskDrive.Apps.App.changeset(%AskDrive.Apps.App{}, %{}), as: :app)
-      )
+      |> assign(:app_form, blank_app_form())
+      |> assign(:show_new_app, false)
+      |> assign(:last_created_app, nil)
 
     {:ok,
      socket
@@ -117,20 +116,40 @@ defmodule AskDriveWeb.AdminLive do
   # --- Apps (platform scope, spec 6.11) ---------------------------------------
 
   @impl true
+  def handle_event("toggle_new_app", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_new_app, not socket.assigns.show_new_app)
+     |> assign(:last_created_app, nil)
+     |> assign(:app_form, blank_app_form())}
+  end
+
+  # Live feedback while typing: format, reserved words and slugs already taken
+  def handle_event("validate_app", %{"app" => params}, socket) do
+    changeset =
+      %AskDrive.Apps.App{}
+      |> AskDrive.Apps.App.changeset(params)
+      |> then(fn cs ->
+        slug = Ecto.Changeset.get_field(cs, :slug)
+
+        if slug && AskDrive.Apps.get_by_slug(slug),
+          do: Ecto.Changeset.add_error(cs, :slug, "は既に使われています"),
+          else: cs
+      end)
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign(socket, :app_form, to_form(changeset, as: :app))}
+  end
+
   def handle_event("create_app", %{"app" => params}, socket) do
     case AskDrive.Apps.create(params) do
       {:ok, app} ->
         {:noreply,
          socket
          |> assign(:apps, AskDrive.Apps.list())
-         |> assign(
-           :app_form,
-           to_form(AskDrive.Apps.App.changeset(%AskDrive.Apps.App{}, %{}), as: :app)
-         )
-         |> put_flash(
-           :info,
-           "窓口「#{app.name}」（/#{app.slug}）を作成しました。窓口の管理画面で Google Drive と AI を設定してください。"
-         )
+         |> assign(:show_new_app, false)
+         |> assign(:last_created_app, app)
+         |> assign(:app_form, blank_app_form())
          |> load_dashboard_data()}
 
       {:error, %Ecto.Changeset{} = cs} ->
@@ -1220,13 +1239,103 @@ defmodule AskDriveWeb.AdminLive do
         <%= if @current_tab == "apps" do %>
           <div class="space-y-6">
             <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
-              <div>
-                <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-squares-2x2" class="w-5 h-5 text-indigo-600" /> 窓口（アプリ）
-                </h2>
-                <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  窓口ごとに Google Drive のフォルダ、Gemini などの API キー（費用負担を分けられます）、検索インデックス、QA、質問ログ、夜間バッチの履歴が分かれます。データは窓口ごとに別のデータベースに保存され、混ざりません。
-                </p>
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0 flex-1">
+                  <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                    <.icon name="hero-squares-2x2" class="w-5 h-5 text-indigo-600" /> 窓口（アプリ）
+                  </h2>
+                  <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                    窓口ごとに Google Drive のフォルダ、Gemini などの API キー（費用負担を分けられます）、検索インデックス、QA、質問ログ、夜間バッチの履歴が分かれます。データは窓口ごとに別のデータベースに保存され、混ざりません。
+                  </p>
+                </div>
+                <button
+                  :if={not @show_new_app}
+                  type="button"
+                  id="show-new-app-btn"
+                  phx-click="toggle_new_app"
+                  class="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium shadow-sm transition"
+                >
+                  <.icon name="hero-plus" class="w-4 h-4" /> 窓口を追加
+                </button>
+              </div>
+
+              <%!-- New app, right above the list (spec 6.11): validated as you type, with the
+                    URL the app will get. --%>
+              <div
+                :if={@show_new_app}
+                id="new-app-panel"
+                class="p-4 rounded-xl border-2 border-indigo-200 dark:border-indigo-900 bg-indigo-50/40 dark:bg-indigo-950/20 space-y-3"
+              >
+                <h3 class="font-semibold text-sm text-zinc-900 dark:text-zinc-100">新しい窓口</h3>
+                <.form
+                  for={@app_form}
+                  id="new-app-form"
+                  phx-change="validate_app"
+                  phx-submit="create_app"
+                  class="grid grid-cols-1 sm:grid-cols-3 gap-3"
+                >
+                  <.input
+                    field={@app_form[:name]}
+                    type="text"
+                    label="窓口名（例: HR）"
+                    phx-debounce="300"
+                  />
+                  <.input
+                    field={@app_form[:slug]}
+                    type="text"
+                    label="URL 名（英小文字・数字・ハイフン）"
+                    placeholder="hr"
+                    phx-debounce="300"
+                  />
+                  <.input
+                    field={@app_form[:description]}
+                    type="text"
+                    label="説明（任意・窓口の一覧に表示）"
+                  />
+                  <p class="sm:col-span-3 text-xs text-zinc-600 dark:text-zinc-400">
+                    チャットの URL:
+                    <span id="new-app-url" class="font-mono text-indigo-700 dark:text-indigo-300">
+                      /{slug_preview(@app_form)}
+                    </span>
+                    ・管理画面: <span class="font-mono">/{slug_preview(@app_form)}/admin</span>
+                  </p>
+                  <div class="sm:col-span-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="submit"
+                      id="create-app-btn"
+                      class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium"
+                    >
+                      窓口を作成
+                    </button>
+                    <button
+                      type="button"
+                      phx-click="toggle_new_app"
+                      class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs"
+                    >
+                      キャンセル
+                    </button>
+                    <span class="text-[11px] text-zinc-500">
+                      AI の設定は最初の窓口から引き継ぎます。Google Drive と API キーは作成後に設定します。
+                    </span>
+                  </div>
+                </.form>
+              </div>
+
+              <div
+                :if={@last_created_app}
+                id="app-created-next"
+                class="text-xs rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 dark:border-emerald-900 px-3 py-2 flex flex-wrap items-center gap-2"
+              >
+                <span class="text-emerald-800 dark:text-emerald-200">
+                  窓口「{@last_created_app.name}」（/{@last_created_app.slug}）を作成しました。次に Google Drive のフォルダと認証、必要なら API キーを設定してください。
+                </span>
+                <a
+                  href={"/" <> @last_created_app.slug <> "/admin?tab=settings"}
+                  id="open-new-app-settings"
+                  class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                >
+                  窓口の設定を開く →
+                </a>
               </div>
 
               <div class="overflow-x-auto">
@@ -1274,7 +1383,18 @@ defmodule AskDriveWeb.AdminLive do
                       <td class="py-2 px-2 text-right font-mono">
                         {sum[:docs] || 0} / {sum[:chunks] || 0}
                       </td>
-                      <td class="py-2 px-2">{if sum[:drive?], do: "設定済み", else: "未設定"}</td>
+                      <td class="py-2 px-2 whitespace-nowrap">
+                        <%= if sum[:drive?] do %>
+                          設定済み
+                        <% else %>
+                          <a
+                            href={"/" <> app.slug <> "/admin?tab=settings"}
+                            class="text-amber-700 dark:text-amber-300 underline"
+                          >
+                            未設定（設定する）
+                          </a>
+                        <% end %>
+                      </td>
                       <td class="py-2 px-2 whitespace-nowrap">
                         <%= if run = sum[:last_run] do %>
                           {AskDrive.Clock.format(run.started_at, "%m/%d %H:%M")} {status_label(
@@ -1300,31 +1420,6 @@ defmodule AskDriveWeb.AdminLive do
                   </tbody>
                 </table>
               </div>
-            </div>
-
-            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-3">
-              <h3 class="font-semibold text-sm text-zinc-900 dark:text-zinc-100">窓口を追加</h3>
-              <.form
-                for={@app_form}
-                id="new-app-form"
-                phx-submit="create_app"
-                class="grid grid-cols-1 sm:grid-cols-3 gap-3"
-              >
-                <.input field={@app_form[:name]} type="text" label="窓口名（例: HR）" />
-                <.input field={@app_form[:slug]} type="text" label="URL 名（例: hr → /hr）" />
-                <.input field={@app_form[:description]} type="text" label="説明（任意）" />
-                <div class="sm:col-span-3">
-                  <button
-                    type="submit"
-                    class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium"
-                  >
-                    窓口を作成
-                  </button>
-                  <span class="ml-2 text-[11px] text-zinc-500">
-                    AI の設定は最初の窓口から引き継ぎます。Google Drive と API キーは、作成後に窓口の管理画面で設定してください。
-                  </span>
-                </div>
-              </.form>
             </div>
           </div>
         <% end %>
@@ -2723,5 +2818,15 @@ defmodule AskDriveWeb.AdminLive do
       "file:bg-indigo-600 file:text-white file:text-xs file:font-medium",
       "hover:file:bg-indigo-700"
     ]
+  end
+
+  defp blank_app_form,
+    do: to_form(AskDrive.Apps.App.changeset(%AskDrive.Apps.App{}, %{}), as: :app)
+
+  defp slug_preview(form) do
+    case form[:slug].value |> to_string() |> String.trim() |> String.downcase() do
+      "" -> "（URL 名）"
+      slug -> slug
+    end
   end
 end
