@@ -20,7 +20,7 @@ defmodule AskDriveWeb.AdminLive do
   alias AskDrive.Accounts.{AdminAccess, AdminElevationLog}
   alias AskDrive.Batch.{BatchRun, Scheduler}
   alias AskDrive.Documents.{Chunk, Document}
-  alias AskDrive.Drive.ServiceAccount
+  alias AskDrive.Drive.{Client, ServiceAccount}
   alias AskDrive.LLM
   alias AskDrive.QA.QAPair
   alias AskDrive.{Accounts, Documents, HealthCheck, QA, Repo, Settings, Vector}
@@ -140,15 +140,19 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   @impl true
-  def handle_event(
-        "save_service_account",
-        %{"setting" => %{"drive_service_account_json" => json}},
-        socket
-      ) do
-    case Settings.update_setting(socket.assigns.setting, %{
-           drive_auth_mode: "service_account",
-           drive_service_account_json: json
-         }) do
+  def handle_event("save_service_account", %{"setting" => params}, socket) do
+    json = String.trim(params["drive_service_account_json"] || "")
+
+    # The key field always renders empty (it is a secret), so a blank submit means "keep the
+    # stored key" — that lets the delegation user be changed without re-pasting the key.
+    attrs =
+      %{
+        drive_auth_mode: "service_account",
+        drive_impersonate_email: params["drive_impersonate_email"]
+      }
+      |> then(&if(json == "", do: &1, else: Map.put(&1, :drive_service_account_json, json)))
+
+    case Settings.update_setting(socket.assigns.setting, attrs) do
       {:ok, updated} ->
         {:noreply,
          socket
@@ -170,9 +174,11 @@ defmodule AskDriveWeb.AdminLive do
     result =
       case socket.assigns.setting.drive_service_account_json do
         json when is_binary(json) and json != "" ->
-          case ServiceAccount.fetch_access_token(json) do
+          setting = socket.assigns.setting
+
+          case ServiceAccount.fetch_access_token(json, setting.drive_impersonate_email) do
             {:ok, %{access_token: _}} ->
-              {:ok, "接続に成功しました（#{Accounts.drive_identity()}）。"}
+              check_drive_folder(setting)
 
             {:error, reason} ->
               {:error, "#{reason}"}
@@ -1198,6 +1204,25 @@ defmodule AskDriveWeb.AdminLive do
                     }
                     class="font-mono text-[11px]"
                   />
+                  <p class="text-[11px] text-zinc-500 -mt-1">
+                    保存済みの場合は空欄のままで構いません（既存のキーを維持します）。
+                  </p>
+                  <.input
+                    field={@form[:drive_impersonate_email]}
+                    type="email"
+                    label="なりすますユーザー（ドメイン全体の委任・任意）"
+                    placeholder="sync@example.com"
+                  />
+                  <p class="text-[11px] text-zinc-500 leading-relaxed -mt-1">
+                    同期対象が「組織内のユーザーのみアクセス可」の共有ドライブにある場合、サービスアカウント（組織外扱い）は共有に追加できません。
+                    その場合はフォルダを閲覧できる社内ユーザーのメールアドレスを入力し、Google 管理コンソール →「セキュリティ」→「API の制御」→「ドメイン全体の委任」で
+                    クライアント ID
+                    <code class="font-mono">{service_account_client_id(@setting) ||
+                      "（JSON キーの client_id）"}</code>
+                    にスコープ
+                    <code class="font-mono" phx-no-curly-interpolation>https://www.googleapis.com/auth/drive.readonly</code>
+                    を許可してください。空欄ならサービスアカウント自身としてアクセスします。
+                  </p>
                   <div class="flex flex-wrap items-center gap-3">
                     <button
                       type="submit"
@@ -1611,4 +1636,45 @@ defmodule AskDriveWeb.AdminLive do
     </Layouts.app>
     """
   end
+
+  # A token alone proves only that Google accepted the key (and the delegation). What sync
+  # actually needs is read access to the folder, which is exactly what failed with a bare
+  # 404 when an org-only shared drive refused the service account — so check that too.
+  defp check_drive_folder(%{drive_folder_id: folder_id}) when folder_id in [nil, ""] do
+    {:ok, "トークンの取得に成功しました（#{Accounts.drive_identity()}）。同期フォルダが未設定のため、フォルダの読み取りは確認していません。"}
+  end
+
+  defp check_drive_folder(%{drive_folder_id: folder_id} = setting) do
+    case Client.get_metadata(folder_id) do
+      {:ok, folder} ->
+        {:ok, "接続に成功しました（#{Accounts.drive_identity()}）。同期フォルダ「#{folder["name"]}」を読み取れます。"}
+
+      {:error, "HTTP 404" <> _} ->
+        {:error, folder_not_found_hint(setting)}
+
+      {:error, reason} ->
+        {:error, "トークンは取得できましたが、同期フォルダを読み取れませんでした: #{inspect(reason)}"}
+    end
+  end
+
+  defp folder_not_found_hint(%{drive_impersonate_email: subject})
+       when is_binary(subject) and subject != "" do
+    "トークンは取得できましたが、#{subject} には同期フォルダの閲覧権限がありません。そのユーザーにフォルダ（または共有ドライブ）へのアクセス権を付与してください。"
+  end
+
+  defp folder_not_found_hint(_setting) do
+    "トークンは取得できましたが、同期フォルダを読み取れません（Drive は権限のないファイルを「見つからない」と返します）。" <>
+      "フォルダをサービスアカウントに共有してください。社内限定の共有ドライブでサービスアカウントを追加できない場合は、" <>
+      "下の「なりすますユーザー」を設定してドメイン全体の委任を使ってください。"
+  end
+
+  defp service_account_client_id(%{drive_service_account_json: json})
+       when is_binary(json) and json != "" do
+    case ServiceAccount.parse(json) do
+      {:ok, %{client_id: client_id}} -> client_id
+      _ -> nil
+    end
+  end
+
+  defp service_account_client_id(_setting), do: nil
 end

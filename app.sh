@@ -44,8 +44,9 @@ AskDrive 管理スクリプト
   repair-ollama      .runtime の Ollama を再インストール (llama-server 欠落の修復)
   admin grant <mail> 指定メールアドレスに管理者への昇格を許可 (ロックアウト時の復旧)
   admin password     管理者パスワードを再設定 (対話入力)
-  drive service-account <key.json>
+  drive service-account [key.json] [--subject user@example.com]
                      Drive 同期をサービスアカウント認証に設定 (Web 管理画面を使わずに設定)
+                     --subject: ドメイン全体の委任でなりすます社内ユーザー (社内限定の共有ドライブ用)
 
 サービス管理 (launchd 常駐デーモン):
   service install    launchd 常駐サービスを登録 (OS 起動時自動起動)
@@ -318,17 +319,12 @@ cmd_drive() {
 
   case "${sub}" in
     service-account)
-      local key_path="${1:-}"
       # 引数なし、またはファイルが無い場合は JSON を対話的に貼り付けるモードへ
-      # 自動的にフォールバックする（mix タスク側で処理する）。
-      if [[ -z "${key_path}" ]]; then
-        MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.set_drive_service_account
-      else
-        MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.set_drive_service_account "${key_path}"
-      fi
+      # 自動的にフォールバックする（mix タスク側で処理する）。--subject もそのまま渡す。
+      MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.set_drive_service_account "$@"
       ;;
     *)
-      echo -e "${RED}使用方法: ./app.sh drive service-account [path-to-key.json]${NC}"
+      echo -e "${RED}使用方法: ./app.sh drive service-account [path-to-key.json] [--subject user@example.com]${NC}"
       echo "  パスを省略すると、JSON の中身を貼り付けて設定できます。"
       exit 1
       ;;

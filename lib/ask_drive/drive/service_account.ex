@@ -11,6 +11,14 @@ defmodule AskDrive.Drive.ServiceAccount do
   Google user — no domain-wide delegation or Workspace admin console access required for a
   single shared folder.
 
+  ## Domain-wide delegation (spec F-121)
+
+  A service account is always an identity outside the Workspace organization, so a shared
+  drive restricted to "people inside the organization" can never be shared with it. For that
+  case a Workspace super admin grants the service account's `client_id` domain-wide
+  delegation for the `drive.readonly` scope, and AskDrive puts a `sub` claim (the user to act
+  as) into the JWT. Google then issues a token for that user, and Drive sees an insider.
+
   Implemented directly on `:public_key`/`:crypto` rather than a JWT dependency, consistent
   with this project's preference for the stdlib over small wrapper libraries (spec 3.4).
   """
@@ -42,6 +50,7 @@ defmodule AskDrive.Drive.ServiceAccount do
          client_email: email,
          private_key: private_key,
          private_key_id: decoded["private_key_id"],
+         client_id: decoded["client_id"],
          token_uri: presence(decoded["token_uri"]) || @default_token_uri,
          project_id: decoded["project_id"]
        }}
@@ -55,17 +64,17 @@ defmodule AskDrive.Drive.ServiceAccount do
   minting and caching a new one as needed. Cached per distinct key content, so rotating the
   key immediately invalidates the old token rather than serving it until natural expiry.
   """
-  def get_valid_access_token(json) when is_binary(json) do
-    GenServer.call(__MODULE__, {:get_token, json}, 30_000)
+  def get_valid_access_token(json, subject \\ nil) when is_binary(json) do
+    GenServer.call(__MODULE__, {:get_token, json, presence(subject)}, 30_000)
   end
 
   @doc """
   Mints a fresh access token unconditionally, bypassing the cache. Used for the settings
   screen's "接続テスト" so a stale cached failure can't hide a fix (F-807's Drive equivalent).
   """
-  def fetch_access_token(json) when is_binary(json) do
+  def fetch_access_token(json, subject \\ nil) when is_binary(json) do
     with {:ok, account} <- parse(json) do
-      request_token(account)
+      request_token(account, presence(subject))
     end
   end
 
@@ -75,8 +84,10 @@ defmodule AskDrive.Drive.ServiceAccount do
   def init(state), do: {:ok, state}
 
   @impl true
-  def handle_call({:get_token, json}, _from, state) do
-    key = :crypto.hash(:sha256, json)
+  def handle_call({:get_token, json, subject}, _from, state) do
+    # Keyed on the subject too: changing who is impersonated must not reuse a token minted
+    # for someone else.
+    key = :crypto.hash(:sha256, [json, 0, subject || ""])
     now = System.system_time(:second)
 
     case Map.get(state, key) do
@@ -86,7 +97,7 @@ defmodule AskDrive.Drive.ServiceAccount do
       _ ->
         case parse(json) do
           {:ok, account} ->
-            case request_token(account) do
+            case request_token(account, subject) do
               {:ok, %{access_token: token, expires_in: expires_in}} ->
                 entry = %{token: token, expires_at: now + expires_in}
                 {:reply, {:ok, token}, Map.put(state, key, entry)}
@@ -106,27 +117,32 @@ defmodule AskDrive.Drive.ServiceAccount do
   Exposed (rather than kept private) so the signature can be verified directly in tests
   without a network call to Google — the RS256 signing is the part actually worth testing.
   """
-  def build_assertion(account) do
+  def build_assertion(account, subject \\ nil) do
     now = System.system_time(:second)
 
-    claims = %{
-      iss: account.client_email,
-      scope: @scope,
-      aud: account.token_uri,
-      iat: now,
-      exp: now + @assertion_lifetime_seconds
-    }
+    claims =
+      %{
+        iss: account.client_email,
+        scope: @scope,
+        aud: account.token_uri,
+        iat: now,
+        exp: now + @assertion_lifetime_seconds
+      }
+      |> maybe_put_sub(subject)
 
     sign_jwt(claims, account.private_key, account.private_key_id)
   end
 
   # --- Internals ----------------------------------------------------------------
 
-  defp request_token(account) do
-    with {:ok, assertion} <- build_assertion(account) do
-      exchange(account.token_uri, assertion)
+  defp request_token(account, subject) do
+    with {:ok, assertion} <- build_assertion(account, subject) do
+      exchange(account, subject, assertion)
     end
   end
+
+  defp maybe_put_sub(claims, nil), do: claims
+  defp maybe_put_sub(claims, subject), do: Map.put(claims, :sub, subject)
 
   defp sign_jwt(claims, pem_private_key, key_id) do
     header = %{alg: "RS256", typ: "JWT"} |> maybe_put_kid(key_id)
@@ -152,22 +168,43 @@ defmodule AskDrive.Drive.ServiceAccount do
 
   defp b64(map), do: map |> Jason.encode!() |> Base.url_encode64(padding: false)
 
-  defp exchange(token_uri, assertion) do
+  defp exchange(account, subject, assertion) do
     body = %{grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: assertion}
 
-    case Req.post(token_uri, form: body, retry: false) do
+    case Req.post(account.token_uri, form: body, retry: false) do
       {:ok, %{status: 200, body: %{"access_token" => token} = resp}} ->
         {:ok,
          %{access_token: token, expires_in: resp["expires_in"] || @assertion_lifetime_seconds}}
 
       {:ok, %{status: status, body: body}} ->
         Logger.error("Service account token exchange failed (HTTP #{status}): #{inspect(body)}")
-        {:error, HTTP.describe(HTTP.classify(status, body))}
+        {:error, describe_exchange_error(status, body, account, subject)}
 
       {:error, reason} ->
         Logger.error("Service account token exchange network failure: #{inspect(reason)}")
         {:error, "接続できませんでした: #{inspect(reason)}"}
     end
+  end
+
+  @doc false
+  # Google's token endpoint answers a missing or wrong delegation with a bare
+  # "unauthorized_client" / "invalid_grant", which on its own says nothing about the admin
+  # console step that fixes it. Spell that step out, with the exact values to register.
+  def describe_exchange_error(_status, %{"error" => "unauthorized_client"}, account, subject)
+      when is_binary(subject) do
+    "ドメイン全体の委任が許可されていません。Google 管理コンソール →「セキュリティ」→「API の制御」→" <>
+      "「ドメイン全体の委任」で、クライアント ID #{account[:client_id] || "(JSON キーの client_id)"} に" <>
+      "スコープ #{@scope} を追加してください（反映まで数分〜最大24時間かかることがあります）。"
+  end
+
+  def describe_exchange_error(_status, %{"error" => "invalid_grant"} = body, _account, subject)
+      when is_binary(subject) do
+    "なりすまし先ユーザー #{subject} でトークンを取得できませんでした。Workspace 内に実在する有効な" <>
+      "ユーザーのメールアドレスか確認してください（#{body["error_description"] || "invalid_grant"}）。"
+  end
+
+  def describe_exchange_error(status, body, _account, _subject) do
+    HTTP.describe(HTTP.classify(status, body))
   end
 
   defp decode_json(json) do

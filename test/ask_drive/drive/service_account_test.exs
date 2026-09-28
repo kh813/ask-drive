@@ -86,6 +86,55 @@ defmodule AskDrive.Drive.ServiceAccountTest do
     assert reason =~ "private_key"
   end
 
+  test "build_assertion/2 adds a sub claim for domain-wide delegation", %{private_key_pem: pem} do
+    account = %{
+      client_email: "sync@my-project.iam.gserviceaccount.com",
+      private_key: pem,
+      private_key_id: nil,
+      token_uri: "https://oauth2.googleapis.com/token"
+    }
+
+    assert {:ok, jwt} = ServiceAccount.build_assertion(account, "sync-user@example.com")
+    assert claims(jwt)["sub"] == "sync-user@example.com"
+
+    assert {:ok, jwt} = ServiceAccount.build_assertion(account)
+    refute Map.has_key?(claims(jwt), "sub")
+  end
+
+  test "parse/1 keeps client_id, the value an admin registers for delegation", %{
+    private_key_pem: pem
+  } do
+    json =
+      Jason.encode!(%{
+        client_email: "sync@my-project.iam.gserviceaccount.com",
+        private_key: pem,
+        client_id: "123456789012345678901"
+      })
+
+    assert {:ok, %{client_id: "123456789012345678901"}} = ServiceAccount.parse(json)
+  end
+
+  test "an unauthorized_client answer while delegating names the admin console step" do
+    account = %{client_id: "123456789012345678901"}
+    body = %{"error" => "unauthorized_client"}
+
+    message = ServiceAccount.describe_exchange_error(401, body, account, "u@example.com")
+    assert message =~ "ドメイン全体の委任"
+    assert message =~ "123456789012345678901"
+    assert message =~ "drive.readonly"
+  end
+
+  test "invalid_grant while delegating points at the impersonated user" do
+    body = %{"error" => "invalid_grant", "error_description" => "Invalid email or User ID"}
+    message = ServiceAccount.describe_exchange_error(400, body, %{}, "nobody@example.com")
+    assert message =~ "nobody@example.com"
+  end
+
+  defp claims(jwt) do
+    [_header, claims_b64, _sig] = String.split(jwt, ".")
+    claims_b64 |> Base.url_decode64!(padding: false) |> Jason.decode!()
+  end
+
   defp rsa_public_key_from_private(
          {:RSAPrivateKey, _version, modulus, public_exponent, _d, _p, _q, _e1, _e2, _c, _other}
        ) do

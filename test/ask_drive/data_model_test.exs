@@ -17,6 +17,23 @@ defmodule AskDrive.DataModelTest do
     assert updated.similarity_threshold == 0.7
   end
 
+  test "drive_impersonate_email is trimmed, validated, and clearable" do
+    setting = Settings.get_setting!()
+
+    {:ok, updated} =
+      Settings.update_setting(setting, %{drive_impersonate_email: "  sync@example.com "})
+
+    assert updated.drive_impersonate_email == "sync@example.com"
+
+    assert {:error, changeset} =
+             Settings.update_setting(updated, %{drive_impersonate_email: "not-an-email"})
+
+    assert changeset.errors[:drive_impersonate_email]
+
+    {:ok, cleared} = Settings.update_setting(updated, %{drive_impersonate_email: ""})
+    assert cleared.drive_impersonate_email == nil
+  end
+
   test "inserts document, chunk, and queries vec_chunks via sqlite-vec" do
     {:ok, doc} =
       %Document{}

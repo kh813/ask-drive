@@ -41,6 +41,9 @@ defmodule AskDrive.Settings.Setting do
     # redirect_uri/private-IP/.local restrictions entirely for the sync-only account.
     field :drive_auth_mode, :string, default: "oauth"
     field :drive_service_account_json, Binary
+    # Domain-wide delegation: act as this Workspace user instead of the service account
+    # itself, so org-only shared drives are readable (spec F-121).
+    field :drive_impersonate_email, :string
 
     # --- Administrator elevation (spec 6.2.1.1) ---
     # Digest only. The password itself is never stored, cast, or rendered.
@@ -118,6 +121,7 @@ defmodule AskDrive.Settings.Setting do
         :maintenance_message,
         :drive_auth_mode,
         :drive_service_account_json,
+        :drive_impersonate_email,
         :admin_session_minutes,
         :admin_max_attempts,
         :admin_lockout_minutes,
@@ -172,6 +176,10 @@ defmodule AskDrive.Settings.Setting do
     |> validate_base_urls()
     |> validate_api_keys()
     |> validate_drive_service_account()
+    |> update_change(:drive_impersonate_email, &(&1 && String.trim(&1)))
+    |> validate_format(:drive_impersonate_email, ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+      message: "はメールアドレスの形式で入力してください"
+    )
   end
 
   defp validate_base_urls(changeset) do

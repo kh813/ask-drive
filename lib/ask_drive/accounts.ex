@@ -71,9 +71,9 @@ defmodule AskDrive.Accounts do
   """
   def get_valid_access_token do
     case Settings.get_setting() do
-      %{drive_auth_mode: "service_account", drive_service_account_json: json}
+      %{drive_auth_mode: "service_account", drive_service_account_json: json} = setting
       when is_binary(json) and json != "" ->
-        ServiceAccount.get_valid_access_token(json)
+        ServiceAccount.get_valid_access_token(json, setting.drive_impersonate_email)
 
       %{drive_auth_mode: "service_account"} ->
         {:error, :service_account_not_configured}
@@ -152,11 +152,17 @@ defmodule AskDrive.Accounts do
   """
   def drive_identity do
     case Settings.get_setting() do
-      %{drive_auth_mode: "service_account", drive_service_account_json: json}
+      %{drive_auth_mode: "service_account", drive_service_account_json: json} = setting
       when is_binary(json) and json != "" ->
-        case ServiceAccount.parse(json) do
-          {:ok, %{client_email: email}} -> email
-          {:error, _} -> nil
+        case {ServiceAccount.parse(json), setting.drive_impersonate_email} do
+          {{:ok, _}, subject} when is_binary(subject) and subject != "" ->
+            "#{subject}（サービスアカウントによる委任）"
+
+          {{:ok, %{client_email: email}}, _} ->
+            email
+
+          {{:error, _}, _} ->
+            nil
         end
 
       _oauth_or_unconfigured ->
