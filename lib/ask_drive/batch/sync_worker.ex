@@ -12,20 +12,21 @@ defmodule AskDrive.Batch.SyncWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: args}) do
-    case Accounts.get_account() do
-      nil ->
-        Logger.error("SyncWorker: Google Account is not connected.")
-        {:error, :not_connected}
+    if Accounts.drive_connected?() do
+      folder_id = args["folder_id"] || get_target_folder_id()
 
-      _account ->
-        folder_id = args["folder_id"] || get_target_folder_id()
+      if is_nil(folder_id) or folder_id == "" do
+        Logger.warning("SyncWorker: No Drive folder ID configured.")
+        {:ok, :no_folder_configured}
+      else
+        run_sync(folder_id)
+      end
+    else
+      Logger.error(
+        "SyncWorker: Drive is not connected (neither OAuth account nor service account configured)."
+      )
 
-        if is_nil(folder_id) or folder_id == "" do
-          Logger.warning("SyncWorker: No Drive folder ID configured.")
-          {:ok, :no_folder_configured}
-        else
-          run_sync(folder_id)
-        end
+      {:error, :not_connected}
     end
   end
 

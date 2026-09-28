@@ -16,6 +16,7 @@ defmodule AskDrive.Application do
       {Phoenix.PubSub, name: AskDrive.PubSub},
       {Oban, Application.fetch_env!(:ask_drive, Oban)},
       AskDrive.LLM.Semaphore,
+      AskDrive.Drive.ServiceAccount,
       AskDrive.HealthCheck,
       AskDrive.Runtime.Mode,
       # Start to serve requests, typically the last entry

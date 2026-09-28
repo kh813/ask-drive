@@ -2,11 +2,13 @@ defmodule AskDrive.Settings.Setting do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias AskDrive.Drive.ServiceAccount
   alias AskDrive.Encrypted.Binary
   alias AskDrive.LLM
 
   @generation_providers ~w(ollama lmstudio gemini anthropic openai)
   @embedding_providers ~w(ollama lmstudio gemini openai)
+  @drive_auth_modes ~w(oauth service_account)
 
   @api_key_fields [:openai_api_key, :anthropic_api_key, :gemini_api_key]
   @base_url_fields [
@@ -33,6 +35,12 @@ defmodule AskDrive.Settings.Setting do
     field :google_client_secret, Binary
     field :maintenance_mode, :boolean, default: false
     field :maintenance_message, :string
+
+    # --- Drive sync authentication (spec 6.1, F-110) ---
+    # "service_account" needs no browser OAuth round-trip, so it sidesteps Google's
+    # redirect_uri/private-IP/.local restrictions entirely for the sync-only account.
+    field :drive_auth_mode, :string, default: "oauth"
+    field :drive_service_account_json, Binary
 
     # --- Administrator elevation (spec 6.2.1.1) ---
     # Digest only. The password itself is never stored, cast, or rendered.
@@ -80,7 +88,12 @@ defmodule AskDrive.Settings.Setting do
   Every encrypted secret. A blank submission for these keeps the stored value, so the form
   never has to echo a secret back just to survive a round trip (N-610).
   """
-  def secret_fields, do: [:google_client_secret | @api_key_fields]
+  def secret_fields, do: [:google_client_secret, :drive_service_account_json | @api_key_fields]
+
+  @doc """
+  Accepted values for `drive_auth_mode`.
+  """
+  def drive_auth_modes, do: @drive_auth_modes
 
   @doc false
   def changeset(setting, attrs) do
@@ -103,6 +116,8 @@ defmodule AskDrive.Settings.Setting do
         :allowed_domain,
         :maintenance_mode,
         :maintenance_message,
+        :drive_auth_mode,
+        :drive_service_account_json,
         :admin_session_minutes,
         :admin_max_attempts,
         :admin_lockout_minutes,
@@ -153,8 +168,10 @@ defmodule AskDrive.Settings.Setting do
       greater_than_or_equal_to: 1,
       less_than_or_equal_to: 1440
     )
+    |> validate_inclusion(:drive_auth_mode, @drive_auth_modes, message: "は対応していない認証方式です")
     |> validate_base_urls()
     |> validate_api_keys()
+    |> validate_drive_service_account()
   end
 
   defp validate_base_urls(changeset) do
@@ -197,6 +214,33 @@ defmodule AskDrive.Settings.Setting do
         field,
         "#{label}に #{LLM.label(provider)} を選んだため、API キーが必要です"
       )
+    else
+      changeset
+    end
+  end
+
+  # A service account key is only usable once it actually parses; catching a malformed
+  # paste here (missing client_email/private_key, broken JSON) beats discovering it during
+  # the nightly sync, hours after anyone was watching (spec 10 章).
+  defp validate_drive_service_account(changeset) do
+    if get_field(changeset, :drive_auth_mode) == "service_account" do
+      json = get_field(changeset, :drive_service_account_json)
+
+      cond do
+        blank?(json) ->
+          add_error(
+            changeset,
+            :drive_service_account_json,
+            "Drive 認証方式にサービスアカウントを選んだため、JSON キーが必要です"
+          )
+
+        match?({:error, _}, ServiceAccount.parse(json)) ->
+          {:error, reason} = ServiceAccount.parse(json)
+          add_error(changeset, :drive_service_account_json, reason)
+
+        true ->
+          changeset
+      end
     else
       changeset
     end

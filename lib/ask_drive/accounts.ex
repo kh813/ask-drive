@@ -3,15 +3,19 @@ defmodule AskDrive.Accounts do
   Two kinds of account live here (spec 6.9):
 
     * `AskDrive.Accounts.GoogleAccount` — the singleton Drive-reading service account,
-      whose OAuth tokens are stored and refreshed for the nightly batch.
+      whose OAuth tokens are stored and refreshed for the nightly batch. This is only used
+      when `settings.drive_auth_mode == "oauth"` (the default); in `"service_account"` mode,
+      `AskDrive.Drive.ServiceAccount` mints tokens directly from the stored JSON key instead,
+      and no row here is ever created.
     * `AskDrive.Accounts.User` — the people who sign in, with an `admin` / `user` role.
       No tokens are kept; sign-in only establishes identity.
   """
   import Ecto.Query, warn: false
 
   alias AskDrive.Accounts.{GoogleAccount, User}
-  alias AskDrive.Drive.OAuth
+  alias AskDrive.Drive.{OAuth, ServiceAccount}
   alias AskDrive.Repo
+  alias AskDrive.Settings
 
   @doc """
   Gets the connected Google account (singleton), or nil if not connected.
@@ -58,10 +62,28 @@ defmodule AskDrive.Accounts do
   end
 
   @doc """
-  Retrieves a valid access token. If the current token expires within 120 seconds,
-  it refreshes the token automatically.
+  Retrieves a valid Drive access token, however Drive access is currently authenticated.
+
+  In `"oauth"` mode (the default) this refreshes the stored OAuth token when it expires
+  within 120 seconds. In `"service_account"` mode it mints (and caches) a token directly
+  from the stored JSON key via `AskDrive.Drive.ServiceAccount` — no `google_accounts` row is
+  involved at all.
   """
   def get_valid_access_token do
+    case Settings.get_setting() do
+      %{drive_auth_mode: "service_account", drive_service_account_json: json}
+      when is_binary(json) and json != "" ->
+        ServiceAccount.get_valid_access_token(json)
+
+      %{drive_auth_mode: "service_account"} ->
+        {:error, :service_account_not_configured}
+
+      _oauth_or_unconfigured ->
+        get_oauth_access_token()
+    end
+  end
+
+  defp get_oauth_access_token do
     case get_account() do
       nil ->
         {:error, :not_connected}
@@ -109,6 +131,43 @@ defmodule AskDrive.Accounts do
   end
 
   @doc """
+  Whether Drive sync currently has usable credentials, regardless of which authentication
+  mode is active. Chat/admin banners key off this instead of `get_account/0` directly, since
+  that returns nil in service-account mode even when everything is configured correctly.
+  """
+  def drive_connected? do
+    case Settings.get_setting() do
+      %{drive_auth_mode: "service_account", drive_service_account_json: json} ->
+        is_binary(json) and json != ""
+
+      _oauth_or_unconfigured ->
+        not is_nil(get_account())
+    end
+  end
+
+  @doc """
+  A short, human-readable identifier for whichever Drive credential is active — the OAuth
+  account's email, or the service account's email parsed from its JSON key — for display in
+  the admin dashboard. Returns nil when nothing is configured.
+  """
+  def drive_identity do
+    case Settings.get_setting() do
+      %{drive_auth_mode: "service_account", drive_service_account_json: json}
+      when is_binary(json) and json != "" ->
+        case ServiceAccount.parse(json) do
+          {:ok, %{client_email: email}} -> email
+          {:error, _} -> nil
+        end
+
+      _oauth_or_unconfigured ->
+        case get_account() do
+          %GoogleAccount{email: email} -> email
+          nil -> nil
+        end
+    end
+  end
+
+  @doc """
   Disconnects Google account and clears credentials.
   """
   def disconnect_account do
@@ -124,6 +183,18 @@ defmodule AskDrive.Accounts do
         Repo.delete(account)
         :ok
     end
+  end
+
+  @doc """
+  Removes the stored service account key. The counterpart to `disconnect_account/0` for
+  `"service_account"` mode.
+  """
+  def disconnect_service_account do
+    Settings.get_setting!()
+    |> Ecto.Changeset.change(drive_service_account_json: nil)
+    |> Repo.update()
+
+    :ok
   end
 
   # --- Users (spec 6.9) -----------------------------------------------------

@@ -20,6 +20,7 @@ defmodule AskDriveWeb.AdminLive do
   alias AskDrive.Accounts.{AdminAccess, AdminElevationLog}
   alias AskDrive.Batch.{BatchRun, Scheduler}
   alias AskDrive.Documents.{Chunk, Document}
+  alias AskDrive.Drive.ServiceAccount
   alias AskDrive.LLM
   alias AskDrive.QA.QAPair
   alias AskDrive.{Accounts, Documents, HealthCheck, QA, Repo, Settings, Vector}
@@ -42,6 +43,7 @@ defmodule AskDriveWeb.AdminLive do
      |> assign(:form, form)
      |> assign(:trigger_batch_loading, false)
      |> assign(:connection_test, %{})
+     |> assign(:service_account_test, nil)
      |> assign(:password_form, to_form(%{}, as: :admin_password))
      |> load_dashboard_data()}
   end
@@ -120,6 +122,79 @@ defmodule AskDriveWeb.AdminLive do
 
     {:noreply,
      assign(socket, :connection_test, Map.put(socket.assigns.connection_test, role_atom, result))}
+  end
+
+  @impl true
+  def handle_event("set_drive_auth_mode", %{"mode" => mode}, socket) do
+    case Settings.update_setting(socket.assigns.setting, %{drive_auth_mode: mode}) do
+      {:ok, updated} ->
+        {:noreply,
+         socket
+         |> assign(:setting, updated)
+         |> assign(:form, to_form(Settings.change_setting(updated)))
+         |> assign(:service_account_test, nil)}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, "Drive 認証方式を切り替えられませんでした。")}
+    end
+  end
+
+  @impl true
+  def handle_event(
+        "save_service_account",
+        %{"setting" => %{"drive_service_account_json" => json}},
+        socket
+      ) do
+    case Settings.update_setting(socket.assigns.setting, %{
+           drive_auth_mode: "service_account",
+           drive_service_account_json: json
+         }) do
+      {:ok, updated} ->
+        {:noreply,
+         socket
+         |> assign(:setting, updated)
+         |> assign(:form, to_form(Settings.change_setting(updated)))
+         |> assign(:service_account_test, nil)
+         |> put_flash(:info, "サービスアカウントの認証情報を保存しました。")}
+
+      {:error, changeset} ->
+        {:noreply,
+         socket
+         |> assign(:form, to_form(changeset))
+         |> put_flash(:error, "保存に失敗しました。JSON キーの内容を確認してください。")}
+    end
+  end
+
+  @impl true
+  def handle_event("test_service_account", _params, socket) do
+    result =
+      case socket.assigns.setting.drive_service_account_json do
+        json when is_binary(json) and json != "" ->
+          case ServiceAccount.fetch_access_token(json) do
+            {:ok, %{access_token: _}} ->
+              {:ok, "接続に成功しました（#{Accounts.drive_identity()}）。"}
+
+            {:error, reason} ->
+              {:error, "#{reason}"}
+          end
+
+        _ ->
+          {:error, "先に JSON キーを保存してください。"}
+      end
+
+    {:noreply, assign(socket, :service_account_test, result)}
+  end
+
+  @impl true
+  def handle_event("disconnect_service_account", _params, socket) do
+    Accounts.disconnect_service_account()
+
+    {:noreply,
+     socket
+     |> assign(:setting, Settings.get_setting!())
+     |> assign(:service_account_test, nil)
+     |> put_flash(:info, "サービスアカウントの認証情報を削除しました。")
+     |> load_dashboard_data()}
   end
 
   @impl true
@@ -1033,16 +1108,16 @@ defmodule AskDriveWeb.AdminLive do
               </p>
             </div>
 
-            <%!-- Card 2: Google Drive Sync Account Connection --%>
+            <%!-- Card 2: Google Drive Sync Authentication --%>
             <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
               <div class="flex items-center justify-between">
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                   <.icon name="hero-cloud-arrow-down" class="w-5 h-5 text-indigo-600" />
-                  Google Drive 同期専用アカウント連携
+                  Google Drive 同期認証
                 </h2>
-                <%= if @account do %>
+                <%= if Accounts.drive_connected?() do %>
                   <span class="text-xs px-2.5 py-1 rounded-full font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200/50">
-                    連携中: {@account.email}
+                    連携中: {Accounts.drive_identity()}
                   </span>
                 <% else %>
                   <span class="text-xs px-2.5 py-1 rounded-full font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/50">
@@ -1051,29 +1126,148 @@ defmodule AskDriveWeb.AdminLive do
                 <% end %>
               </div>
 
-              <p class="text-xs text-zinc-500 leading-relaxed">
-                全社公開マニュアル等の Google Drive フォルダにアクセス可能な <strong>システム管理用アカウント（または専用同期アカウント）</strong>
-                で連携してください。<br /> ※ 一般ユーザーがチャット画面で質問する際は、各自の通常アカウントで利用します。
-              </p>
-
-              <div class="flex flex-wrap items-center gap-3 pt-2">
-                <.link
-                  href={~p"/auth/google/drive?#{[return_to: "/admin?tab=settings"]}"}
-                  class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+              <div class="flex gap-2 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 w-fit text-xs font-medium">
+                <button
+                  type="button"
+                  id="drive-auth-mode-oauth"
+                  phx-click="set_drive_auth_mode"
+                  phx-value-mode="oauth"
+                  class={[
+                    "px-3 py-1.5 rounded-lg transition",
+                    if(@setting.drive_auth_mode == "oauth",
+                      do: "bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-100",
+                      else: "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                    )
+                  ]}
                 >
-                  <.icon name="hero-arrow-path-rounded-square" class="w-4 h-4" />
-                  {if @account, do: "専用 Google アカウントを再認可", else: "専用 Google アカウントで認可"}
-                </.link>
-
-                <%= if @account do %>
-                  <.link
-                    href={~p"/auth/google/disconnect?#{[return_to: "/admin?tab=settings"]}"}
-                    class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 font-medium text-xs transition"
-                  >
-                    <.icon name="hero-x-circle" class="w-4 h-4" /> 連携解除
-                  </.link>
-                <% end %>
+                  OAuth（専用アカウント）
+                </button>
+                <button
+                  type="button"
+                  id="drive-auth-mode-service-account"
+                  phx-click="set_drive_auth_mode"
+                  phx-value-mode="service_account"
+                  class={[
+                    "px-3 py-1.5 rounded-lg transition",
+                    if(@setting.drive_auth_mode == "service_account",
+                      do: "bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-100",
+                      else: "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                    )
+                  ]}
+                >
+                  サービスアカウント
+                </button>
               </div>
+
+              <%= if @setting.drive_auth_mode == "service_account" do %>
+                <p class="text-xs text-zinc-500 leading-relaxed">
+                  ブラウザでの認可が不要なため、Google の redirect_uri 制限（生の IP アドレスや
+                  <code
+                    class="font-mono text-[11px]"
+                    phx-no-curly-interpolation
+                  >.local</code>
+                  ホスト名の拒否）を回避できます。
+                  <a
+                    href="https://console.cloud.google.com/iam-admin/serviceaccounts"
+                    target="_blank"
+                    class="text-indigo-600 dark:text-indigo-400 underline"
+                  >
+                    Google Cloud Console
+                  </a>
+                  でサービスアカウントを作成し、JSON キーをダウンロードして貼り付けてください。作成後、同期対象の Drive フォルダをそのサービスアカウントのメールアドレス（<code
+                    class="font-mono text-[11px]"
+                    phx-no-curly-interpolation
+                  >...@...iam.gserviceaccount.com</code>
+                  ）と共有するのを忘れないでください。
+                </p>
+
+                <.form
+                  for={@form}
+                  id="service-account-form"
+                  phx-submit="save_service_account"
+                  class="space-y-3"
+                >
+                  <.input
+                    field={@form[:drive_service_account_json]}
+                    type="textarea"
+                    value=""
+                    rows="6"
+                    label={"サービスアカウントの JSON キー（#{secret_state(@setting.drive_service_account_json)}）"}
+                    placeholder={
+                      ~s({"type": "service_account", "client_email": "...", "private_key": "...", ...})
+                    }
+                    class="font-mono text-[11px]"
+                  />
+                  <div class="flex flex-wrap items-center gap-3">
+                    <button
+                      type="submit"
+                      id="save-service-account-btn"
+                      class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                    >
+                      <.icon name="hero-arrow-up-tray" class="w-4 h-4" /> 保存
+                    </button>
+                    <button
+                      type="button"
+                      id="test-service-account-btn"
+                      phx-click="test_service_account"
+                      class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium transition"
+                    >
+                      接続テスト
+                    </button>
+                    <button
+                      :if={Accounts.drive_connected?()}
+                      type="button"
+                      id="disconnect-service-account-btn"
+                      phx-click="disconnect_service_account"
+                      data-confirm="保存済みのサービスアカウント認証情報を削除しますか？"
+                      class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 font-medium text-xs transition"
+                    >
+                      <.icon name="hero-x-circle" class="w-4 h-4" /> 削除
+                    </button>
+                  </div>
+                  <%= case @service_account_test do %>
+                    <% {:ok, message} -> %>
+                      <p class="text-[11px] text-emerald-600 dark:text-emerald-400">{message}</p>
+                    <% {:error, message} -> %>
+                      <p class="text-[11px] text-red-600 dark:text-red-400">{message}</p>
+                    <% _ -> %>
+                  <% end %>
+                </.form>
+              <% else %>
+                <p class="text-xs text-zinc-500 leading-relaxed">
+                  全社公開マニュアル等の Google Drive フォルダにアクセス可能な <strong>システム管理用アカウント（または専用同期アカウント）</strong>
+                  で連携してください。<br /> ※ 一般ユーザーがチャット画面で質問する際は、各自の通常アカウントで利用します。
+                </p>
+
+                <div class="flex flex-wrap items-center gap-3 pt-2">
+                  <.link
+                    href={~p"/auth/google/drive?#{[return_to: "/admin?tab=settings"]}"}
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                  >
+                    <.icon name="hero-arrow-path-rounded-square" class="w-4 h-4" />
+                    {if @account, do: "専用 Google アカウントを再認可", else: "専用 Google アカウントで認可"}
+                  </.link>
+
+                  <%= if @account do %>
+                    <.link
+                      href={~p"/auth/google/disconnect?#{[return_to: "/admin?tab=settings"]}"}
+                      class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 font-medium text-xs transition"
+                    >
+                      <.icon name="hero-x-circle" class="w-4 h-4" /> 連携解除
+                    </.link>
+                  <% end %>
+                </div>
+
+                <p class="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed pt-1">
+                  <.icon name="hero-exclamation-triangle" class="w-3.5 h-3.5 inline" />
+                  この方式は Google Cloud Console にブラウザでアクセスした URL と完全一致するリダイレクト URI の登録が必要です。生の IP アドレスや
+                  <code
+                    class="font-mono text-[10px]"
+                    phx-no-curly-interpolation
+                  >.local</code>
+                  ホスト名は Google 側で拒否されます。LAN 内からの利用でこの制約を避けたい場合は上の「サービスアカウント」を選んでください。
+                </p>
+              <% end %>
             </div>
 
             <%!-- Card 3: LLM Provider Settings --%>

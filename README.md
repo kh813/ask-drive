@@ -29,12 +29,15 @@ Apple Silicon Mac (8GB〜) の単一マシン上で、Google Drive 内の共有�
 4. **Google ログインとドメイン制限**:
    - 利用には Google アカウントでのログインが必須です。
    - 事前に設定した自社ドメイン（`@company.com`）のアカウントのみアクセスを許可し、部外者のアクセスを遮断。
-5. **sudo 方式の管理者権限昇格**:
+5. **Drive 同期はサービスアカウントにも対応**:
+   - ブラウザでの認可が不要な**サービスアカウント方式**を選べます（推奨）。Google が OAuth の `redirect_uri` に課す制約（LAN の生の IP アドレスや `.local` ホスト名の拒否）を受けず、社内 DNS の整備なしに LAN のどこからでも Drive 同期を動かせます。
+   - 個人アカウントでの OAuth 連携（従来方式）も引き続き選べます。
+6. **sudo 方式の管理者権限昇格**:
    - 全員が**一般ユーザー**としてログインします。常時の管理者アカウントは存在しません。
    - 許可されたアカウントだけが**管理者パスワード**を入力して、そのセッションの間だけ管理者になれます。
    - 昇格の成功・失敗・解除はすべて**監査ログ**に記録され、誰のアカウントから昇格したか後から確認できます。
    - 一定時間（既定 30 分）で自動的に降格します。
-6. **Web 管理画面 (`/admin`、昇格中のみ)**:
+7. **Web 管理画面 (`/admin`、昇格中のみ)**:
    - バッチ状況、ナレッジカバレッジ、未回答質問、文書一覧、Drive フォルダ設定、LLM プロバイダ設定、ユーザー管理、昇格履歴、メンテナンスモード切り替え。
 
 ---
@@ -51,9 +54,9 @@ Apple Silicon Mac (8GB〜) の単一マシン上で、Google Drive 内の共有�
 ### 1. リリースアーカイブ（ZIP）の取得と展開
 GitHub Releases から最新版の ZIP をダウンロードして展開します。
 ```bash
-# 例: v0.0.13 の場合
-curl -fLO https://github.com/kh813/ask-drive/releases/download/v0.0.13/ask-drive-v0.0.13.zip
-unzip ask-drive-v0.0.13.zip -d ask-drive
+# 例: v0.0.14 の場合
+curl -fLO https://github.com/kh813/ask-drive/releases/download/v0.0.14/ask-drive-v0.0.14.zip
+unzip ask-drive-v0.0.14.zip -d ask-drive
 cd ask-drive
 ```
 
@@ -202,6 +205,8 @@ AskDrive は、全社公開マニュアルなどの Google Drive フォルダを
 
 ### ステップ 1: Google Cloud Console での事前準備（5分）
 
+> このステップの OAuth クライアントは**社員ログイン**に必須です（Drive 同期を後述のサービスアカウント方式にする場合でも、社員ログインには変わらず必要です）。Drive 同期だけを redirect_uri の制約から解放したい場合は、この後の「ステップ3・方式A」でサービスアカウントを使ってください。
+
 1. **[Google Cloud Console](https://console.cloud.google.com/)** に自社 Google Workspace 管理者アカウントでログインします。
 2. **Google Drive API の有効化**:
    - `[API とサービス]` ➔ `[ライブラリ]` を開き、**`Google Drive API`** を検索して **「有効にする」** をクリックします。
@@ -263,9 +268,23 @@ AskDrive は、全社公開マニュアルなどの Google Drive フォルダを
    - **OAuth クライアント ID / シークレット**: Google Cloud Console で取得した値を貼り付け
    - **許可 Google Workspace ドメイン**: 自社ドメイン（例: `company.com`）
    - **Google Drive フォルダ ID / URL**: 取り込み対象のマニュアルや文書が格納された共有フォルダの URL または ID
-4. **Google Drive 同期専用アカウントの認可**:
-   - 画面上部の **「Google Drive 同期専用アカウント連携」** カード内にある **「専用 Google アカウントで認可」** をクリックします。
-   - 対象フォルダの閲覧権限を持つ同期専用 Google アカウントで認可を完了します。
+4. **Google Drive 同期の設定** — **「Google Drive 同期認証」** カードで方式を選びます:
+
+   #### 方式 A: サービスアカウント（推奨・URL 依存なし）
+
+   ブラウザでの認可が不要なため、ステップ 1 で説明した redirect_uri の制約（生の IP・`.local` の拒否）を一切受けません。LAN のどの IP・ホスト名からアクセスしても Drive 同期には影響しません。
+
+   1. [Google Cloud Console の「サービスアカウント」](https://console.cloud.google.com/iam-admin/serviceaccounts)を開き、新しいサービスアカウントを作成します（ロールの付与は不要です）。
+   2. 作成したサービスアカウントの **「キー」** タブから **「鍵を追加」→「新しい鍵を作成」→ JSON** を選び、JSON ファイルをダウンロードします。
+   3. Google Drive で同期対象のフォルダを開き、サービスアカウントのメールアドレス（`...@...iam.gserviceaccount.com`。JSON ファイル内の `client_email`）を**閲覧者として共有**します。
+   4. AskDrive の管理画面で **「サービスアカウント」** タブを選び、ダウンロードした JSON ファイルの中身をそのまま貼り付けて **「保存」** → **「接続テスト」** で疎通を確認します。
+
+   #### 方式 B: OAuth（従来方式・redirect_uri の制約あり）
+
+   1. **「OAuth（専用アカウント）」** タブを選びます。
+   2. **「専用 Google アカウントで認可」** をクリックし、対象フォルダの閲覧権限を持つ同期専用 Google アカウントで認可を完了します。
+   3. この方式は、今アクセスしているブラウザの URL（ホスト名）がステップ 1 で登録したリダイレクト URI と完全に一致している必要があります。
+
 5. **同期の開始**:
    - 管理画面トップの「今すぐバッチ実行」を押すか、夜間 21:00〜07:00 の自動スケジュールにより同期・QA 生成が実行されます。
 

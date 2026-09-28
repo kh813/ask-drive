@@ -318,6 +318,21 @@ mix hex.audit
 
 ---
 
+## Phase 16 — Drive 同期のサービスアカウント対応
+
+仕様書 6.1 節に対応。OAuth 方式が抱える `redirect_uri` の制約（F-109 / F-110: 生の IP・`.local` を Google が拒否する）を、ブラウザ認可が不要なサービスアカウント方式で回避する。**社員ログインの OAuth フローは対象外**（別途対応）。
+
+- [x] 16-1 マイグレーション: `settings` に `drive_auth_mode`（既定 `oauth`）/ `drive_service_account_json`（暗号化）を追加
+- [x] 16-2 `AskDrive.Drive.ServiceAccount`: JSON キーの解析、RS256 JWT の組み立てと署名（`:public_key` / `:crypto`、追加ライブラリなし）、`token_uri` への交換、GenServer によるトークンキャッシュ（キー内容が変われば即無効化）
+- [x] 16-3 `AskDrive.Settings.Setting` の changeset にモード切り替えとサービスアカウント JSON のバリデーションを追加
+- [x] 16-4 `AskDrive.Accounts.get_valid_access_token/0` を認証方式で分岐。`drive_connected?/0` / `drive_identity/0` / `disconnect_service_account/0` を追加し、OAuth 専用だった箇所（`SyncWorker`、`ChatLive`、`AdminLive`）を両方式に対応させる
+- [x] 16-5 `AdminLive` 設定画面に認証方式の切り替えタブ、JSON キー貼り付けフォーム、接続テスト、削除ボタンを追加
+- [x] 16-6 サービスアカウントの JWT 署名を実鍵で検証するテスト（`:public_key.verify/4` で署名を実際に検証）。**ビルドゲート**
+
+**完了条件**: サービスアカウントの JSON キーを貼り付けて保存すると、LAN の IP・ホスト名に関わらず接続テストが成功し、夜間バッチが Drive 同期を完走する。
+
+---
+
 ## 進捗管理
 
 | Phase | 名称 | 状態 | 完了日 |
@@ -338,5 +353,6 @@ mix hex.audit
 | 13 | 増設後の調整 | ☐ | （将来運用） |
 | 14 | LLM マルチプロバイダ | ☐ | |
 | 15 | 認証と権限昇格 | ☐ | |
+| 16 | Drive 同期のサービスアカウント対応 | ☑ | 2026-09-28 |
 
 **Phase 7 完了時点で一度止めて実運用に出すことを勧める。** 原文検索だけでも社内で使ってもらえば、Phase 8 以降で「実際に聞かれる質問」が `question_log` に溜まった状態で生成を始められる。想定質問を当てずっぽうで作るより、実需に沿った生成ができる。

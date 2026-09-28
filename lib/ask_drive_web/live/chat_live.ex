@@ -7,7 +7,6 @@ defmodule AskDriveWeb.ChatLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    account = Accounts.get_account()
     setting = Settings.get_setting!()
     chunk_count = Repo.aggregate(Chunk, :count) || 0
     health = HealthCheck.check()
@@ -15,7 +14,7 @@ defmodule AskDriveWeb.ChatLive do
     {:ok,
      socket
      |> assign(:page_title, "AskDrive - 社内文書検索チャット")
-     |> assign(:account, account)
+     |> assign(:drive_connected?, Accounts.drive_connected?())
      |> assign(:setting, setting)
      |> assign(:chunk_count, chunk_count)
      # Answering only needs the embedding provider: generation happens in the nightly batch.
@@ -87,7 +86,7 @@ defmodule AskDriveWeb.ChatLive do
         <%!-- Status Bar --%>
         <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-4 border-b border-zinc-200 dark:border-zinc-800">
           <div class="flex flex-wrap items-center gap-2 text-xs">
-            <%= if @account do %>
+            <%= if @drive_connected? do %>
               <span class="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
                 <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
                 {format_number(@chunk_count)} チャンクを検索対象にしています
@@ -134,7 +133,7 @@ defmodule AskDriveWeb.ChatLive do
         <% end %>
 
         <%!-- Status Alert Banner --%>
-        <%= if is_nil(@account) and not @setting.maintenance_mode do %>
+        <%= if not @drive_connected? and not @setting.maintenance_mode do %>
           <div class="mb-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 flex items-start justify-between gap-3">
             <div class="flex items-start gap-3">
               <.icon name="hero-information-circle" class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
@@ -143,7 +142,7 @@ defmodule AskDriveWeb.ChatLive do
                 <p class="text-xs mt-0.5 text-amber-700 dark:text-amber-300">
                   <%= cond do %>
                     <% @admin_elevated? -> %>
-                      ドキュメントを取り込んで検索・回答を行うには、同期専用 Google アカウントを連携してください。
+                      ドキュメントを取り込んで検索・回答を行うには、管理画面で Drive 連携を設定してください。
                     <% @admin_eligible? -> %>
                       Drive を連携するには、まず管理者権限に昇格してください。
                     <% true -> %>
@@ -156,7 +155,7 @@ defmodule AskDriveWeb.ChatLive do
                   the password prompt first rather than a dead end. --%>
             <.link
               :if={@admin_elevated?}
-              href={~p"/auth/google/drive"}
+              href={~p"/admin?tab=settings"}
               class="text-xs px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium shrink-0 transition"
             >
               今すぐ連携する
