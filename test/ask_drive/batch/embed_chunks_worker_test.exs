@@ -4,6 +4,10 @@ defmodule AskDrive.Batch.EmbedChunksWorkerTest do
   alias AskDrive.Batch.EmbedChunksWorker
   alias AskDrive.Settings
 
+  # Needs a live embedding backend to produce a real vector; skipped automatically when
+  # none is configured (test/test_helper.exs).
+  @moduletag :requires_live_llm
+
   test "process_chunks_and_embed chunks text and inserts into chunks and vec_chunks" do
     {:ok, doc} =
       %Document{}

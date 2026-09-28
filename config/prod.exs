@@ -8,7 +8,6 @@ import Config
 # Production static assets cache manifest
 config :ask_drive, AskDriveWeb.Endpoint, cache_static_manifest: "priv/static/cache_manifest.json"
 
-
 # Configure Swoosh API Client
 config :swoosh, api_client: Swoosh.ApiClient.Req
 

@@ -30,7 +30,7 @@ defmodule AskDrive.Batch.Scheduler do
   }
 
   alias AskDrive.Generate.{Extraction, QA, Summary}
-  alias AskDrive.LLM.Ollama
+  alias AskDrive.LLM
   alias AskDrive.Runtime.Mode
 
   @doc """
@@ -125,7 +125,7 @@ defmodule AskDrive.Batch.Scheduler do
     Logger.info("Batch ##{batch_run.id} - [Phase 1: Sync] starting...")
 
     # Ensure all LLM models unloaded during pure sync
-    Ollama.unload_model(setting.batch_model)
+    LLM.unload_model(setting.batch_model, setting: setting)
 
     items_count =
       case SyncWorker.perform(%Oban.Job{args: %{}}) do
@@ -187,7 +187,7 @@ defmodule AskDrive.Batch.Scheduler do
     Logger.info("Batch ##{batch_run.id} - [Phase 3: Embed Chunks] starting...")
 
     # Ensure embed model is loaded, batch model unloaded
-    Ollama.unload_model(setting.batch_model)
+    LLM.unload_model(setting.batch_model, setting: setting)
 
     # Process all pending / updated documents that need chunking & embedding
     unindexed_docs =
@@ -208,7 +208,10 @@ defmodule AskDrive.Batch.Scheduler do
     duration = DateTime.diff(finished_time, start_time)
 
     # Unload embed model at phase boundary
-    Ollama.unload_model(setting.embed_model)
+    LLM.unload_model(setting.embed_model,
+      setting: setting,
+      provider: LLM.embedding_provider(setting)
+    )
 
     stat =
       record_phase_stat(
@@ -333,7 +336,7 @@ defmodule AskDrive.Batch.Scheduler do
     duration = DateTime.diff(finished_time, start_time)
 
     # Unload generation model immediately at phase boundary
-    Ollama.unload_model(setting.batch_model)
+    LLM.unload_model(setting.batch_model, setting: setting)
 
     batch_run =
       batch_run
@@ -460,7 +463,10 @@ defmodule AskDrive.Batch.Scheduler do
     duration = DateTime.diff(finished_time, start_time)
 
     # Unload embed model
-    Ollama.unload_model(setting.embed_model)
+    LLM.unload_model(setting.embed_model,
+      setting: setting,
+      provider: LLM.embedding_provider(setting)
+    )
 
     stat =
       record_phase_stat(

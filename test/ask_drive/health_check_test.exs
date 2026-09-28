@@ -5,7 +5,10 @@ defmodule AskDrive.HealthCheckTest do
     results = AskDrive.HealthCheck.check()
     assert is_map(results)
     assert Map.has_key?(results, :sqlite_vec)
-    assert Map.has_key?(results, :ollama)
+    assert Map.has_key?(results, :llm_generation)
+    assert Map.has_key?(results, :llm_embedding)
+    assert Map.has_key?(results, :generation_provider)
+    assert Map.has_key?(results, :embedding_provider)
     assert Map.has_key?(results, :pdftotext)
     assert Map.has_key?(results, :pandoc)
 

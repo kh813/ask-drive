@@ -10,26 +10,46 @@ defmodule AskDrive.Drive.OAuth do
   @userinfo_endpoint "https://www.googleapis.com/oauth2/v2/userinfo"
   @revoke_endpoint "https://oauth2.googleapis.com/revoke"
 
-  @scopes [
+  # Authorizing the Drive service account and signing a person in are different flows with
+  # different scopes, but they share one callback URI so Google Cloud Console only ever
+  # needs a single redirect entry (spec 6.9).
+  @drive_scopes [
     "https://www.googleapis.com/auth/drive.readonly",
     "https://www.googleapis.com/auth/userinfo.email"
   ]
 
-  @doc """
-  Generates the Google OAuth authorization URL.
-  """
-  def authorize_url(state, redirect_uri) do
-    client_id = get_client_id()
+  @login_scopes [
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile"
+  ]
 
-    params = %{
-      client_id: client_id,
+  @doc """
+  Scopes requested for the given flow.
+  """
+  def scopes(:login), do: @login_scopes
+  def scopes(_drive), do: @drive_scopes
+
+  @doc """
+  Generates the Google OAuth authorization URL for `:drive` (default) or `:login`.
+
+  Only the Drive flow asks for offline access: sign-in needs no refresh token, and asking
+  for one would store a long-lived credential per employee for no reason (N-605).
+  """
+  def authorize_url(state, redirect_uri, flow \\ :drive) do
+    base = %{
+      client_id: get_client_id(),
       redirect_uri: redirect_uri,
       response_type: "code",
-      scope: Enum.join(@scopes, " "),
-      access_type: "offline",
-      prompt: "consent",
+      scope: Enum.join(scopes(flow), " "),
       state: state
     }
+
+    params =
+      case flow do
+        :login -> Map.put(base, :prompt, "select_account")
+        _drive -> Map.merge(base, %{access_type: "offline", prompt: "consent"})
+      end
 
     @auth_endpoint <> "?" <> URI.encode_query(params)
   end
@@ -48,10 +68,10 @@ defmodule AskDrive.Drive.OAuth do
 
     case Req.post(@token_endpoint, form: params) do
       {:ok, %{status: 200, body: body}} ->
-        email =
+        userinfo =
           case fetch_userinfo(body["access_token"]) do
-            {:ok, userinfo} -> userinfo["email"]
-            _ -> nil
+            {:ok, info} -> info
+            _ -> %{}
           end
 
         {:ok,
@@ -60,7 +80,9 @@ defmodule AskDrive.Drive.OAuth do
            refresh_token: body["refresh_token"],
            expires_in: body["expires_in"],
            scope: body["scope"],
-           email: email
+           email: userinfo["email"],
+           name: userinfo["name"],
+           picture: userinfo["picture"]
          }}
 
       {:ok, %{status: _status, body: body}} ->

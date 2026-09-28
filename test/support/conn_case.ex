@@ -35,4 +35,48 @@ defmodule AskDriveWeb.ConnCase do
     AskDrive.DataCase.setup_sandbox(tags)
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
+
+  alias AskDrive.Accounts.User
+  alias AskDrive.Repo
+
+  @doc """
+  Inserts a signed-up user. Every field can be overridden, e.g.
+  `user_fixture(admin_eligible: true)`.
+  """
+  def user_fixture(attrs \\ %{}) do
+    attrs =
+      Enum.into(attrs, %{
+        email: "user#{System.unique_integer([:positive])}@example.com",
+        name: "Test User",
+        status: "active",
+        admin_eligible: false
+      })
+
+    {:ok, user} = %User{} |> User.changeset(attrs) |> Repo.insert()
+    user
+  end
+
+  @doc """
+  Puts `user` in the connection's session, as `AskDriveWeb.AuthController` does after a
+  successful Google sign-in. Every route that requires authentication reads this same
+  session key, so this is the one place a test needs to know its name.
+  """
+  def log_in_user(conn, user) do
+    conn
+    |> Plug.Test.init_test_session(%{})
+    |> Plug.Conn.put_session(:user_id, user.id)
+  end
+
+  @doc """
+  Like `log_in_user/2`, but the session is also elevated to administrator — the sudo-style
+  state `AskDriveWeb.UserAuth` checks before allowing anything under `/admin` (spec 6.9.1).
+  The user must be `admin_eligible` for this to mean anything to the app; callers typically
+  pass `user_fixture(admin_eligible: true)`.
+  """
+  def log_in_admin(conn, user) do
+    conn
+    |> log_in_user(user)
+    |> Plug.Conn.put_session(:admin_elevated_at, System.system_time(:second))
+    |> Plug.Conn.put_session(:admin_elevated_user_id, user.id)
+  end
 end

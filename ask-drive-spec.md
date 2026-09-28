@@ -1,21 +1,23 @@
-# AskDrive 仕様書 v0.5
+# AskDrive 仕様書 v0.6
 
-Google Drive 上の文書を知識源とし、**夜間バッチで回答データを事前生成し、営業時間中はそれを参照して即答する**完全ローカルのチャットボット。
+Google Drive 上の文書を知識源とし、**夜間バッチで回答データを事前生成し、営業時間中はそれを参照して即答する**チャットボット。推論基盤はローカル（Ollama / LM Studio）と外部 API（Gemini / Claude / OpenAI）から選択できる。
 
 | 項目 | 内容 |
 |---|---|
-| 文書バージョン | 0.5 |
+| 文書バージョン | 0.6 |
 | 更新日 | 2026-09-28 |
-| 主な変更 | アプリケーション名を **AskDrive**（内部識別子: `ask_drive` / `AskDrive`）に変更。DB を SQLite3 + sqlite-vec + FTS5 構成に統一 |
+| 主な変更 | (1) LLM プロバイダの抽象化。Ollama / LM Studio / Gemini API / Claude API / OpenAI API を選択可能にし、生成用と埋め込み用を個別に設定できるようにした。(2) 管理者アカウントと一般ユーザーアカウントを分離し、Google ログインによる認証と 2 ロールの認可を導入した |
 | 名称 | 表示名 **AskDrive** / 内部識別子 `ask_drive`・`AskDrive` |
-| 実装スタック | Elixir / Phoenix LiveView / SQLite3 + sqlite-vec + FTS5 / Ollama |
+| 実装スタック | Elixir / Phoenix LiveView / SQLite3 + sqlite-vec + FTS5 / LLM プロバイダ（既定: Ollama） |
 | 想定稼働環境 | Mac mini（初期 RAM 8GB → 将来増設） |
 
 ---
 
 ## 1. 目的と背景
 
-Google Drive に蓄積されたドキュメントに対して、自然文で質問すると根拠付きで答えが返るチャットボットを、**データを外部に一切送信せずに**運用する。Mac mini を常時稼働させ、ブラウザから社内 LAN 経由でアクセスする。
+Google Drive に蓄積されたドキュメントに対して、自然文で質問すると根拠付きで答えが返るチャットボットを運用する。Mac mini を常時稼働させ、ブラウザから社内 LAN 経由でアクセスする。
+
+**既定構成では文書本文を外部に一切送信しない**（Ollama によるローカル推論）。ただし v0.6 以降、運用者が明示的に選択した場合に限り、外部 LLM API（Gemini / Claude / OpenAI）を推論基盤として使える。これは「ローカル機の性能が足りない」「品質を優先したい」という現実的な要求に応えるための**オプトイン機能**であり、既定値は変更しない（6.8 節）。
 
 ### 1.1 v0.1 からの方針転換
 
@@ -35,10 +37,26 @@ Google Drive に蓄積されたドキュメントに対して、自然文で質�
 
 ### 1.2 設計上の最優先事項
 
-1. **完全ローカル** — 文書本文・質問・回答をインターネットに送出しない。外部通信は Drive 取得と OAuth トークン更新のみ。
-2. **昼夜の資源分離** — 営業時間中は生成モデルをロードしない。これを設計で保証する。
+1. **ローカル優先・外部送出は明示的な選択に限る** — 既定では文書本文・質問・回答をインターネットに送出しない。外部 LLM API は運用者が設定画面で明示的に有効化した場合にのみ使われ、有効化中は全画面に送信先を常時表示する。
+2. **昼夜の資源分離** — ローカル推論を使う場合、営業時間中は生成モデルをロードしない。これを設計で保証する。外部 API 利用時はメモリ制約がないため、この制約は自動的に解除される。
 3. **鮮度の保証** — 事前生成した回答が元文書より古い状態を、検知せず配信しない。
-4. **段階的スケール** — RAM 増設時、設定値の変更と再バッチのみで品質が上がる。
+4. **段階的スケール** — RAM 増設時やプロバイダ変更時、設定値の変更と再バッチのみで品質が上がる。
+5. **権限の分離と追跡** — API キーや同期対象など、システム全体に影響する設定は、パスワードで一時的に昇格したセッションだけが変更できる。誰がいつ昇格したかは記録に残る。
+
+### 1.3 v0.6 での変更
+
+| | v0.5 | v0.6 |
+|---|---|---|
+| 推論基盤 | Ollama 固定 | **Ollama / LM Studio / Gemini / Claude / OpenAI から選択** |
+| 生成と埋め込み | 同一プロバイダ | **個別に選択可能**（例: 埋め込みはローカル、生成は Claude） |
+| 埋め込み次元 | 1024 固定 | **`embedding_dim` 設定で可変**（変更時は全件再インデックス） |
+| API キー | 不要 | **AES-256-GCM で暗号化して DB に保存** |
+| 利用者の識別 | なし（LAN 内の誰でも利用可） | **Google ログイン必須** |
+| 権限 | なし（管理画面も誰でも開ける） | **sudo 方式の一時昇格**（全員一般ユーザー → 管理者パスワードで昇格） |
+| 昇格の追跡 | — | **誰がいつ昇格／失敗したかを監査ログに記録** |
+| 営業時間中の生成封鎖 | 常時 | **ローカルプロバイダ利用時のみ**（RAM 保護が目的のため） |
+
+埋め込みプロバイダを分離できることが移行コストを大きく下げる。埋め込みモデルを変えると全チャンクの再ベクトル化が必要になるため、**生成だけを外部 API に切り替え、埋め込みは `bge-m3` のまま据え置く**構成を推奨する。
 
 ---
 
@@ -48,17 +66,23 @@ Google Drive に蓄積されたドキュメントに対して、自然文で質�
 
 - Google アカウント連携（OAuth 2.0）による Drive 読み取り
 - Drive フォルダ／ファイルの取り込みと差分同期
-- Google ドキュメント／スプレッドシート／スライド、PDF、Office（docx / xlsx / pptx）、テキスト／Markdown／CSV の本文抽出
+- Google ドキュメント／スプレッドシート／スライド、PDF、Office（docx / xlsx / pptx）、HTML、テキスト／Markdown／CSV の本文抽出
 - 夜間バッチによる要約・想定質問回答・構造化データの事前生成
 - 営業時間中の段階的応答（完全一致 → 想定QA → 原文抜粋 → 未回答記録）
 - 未回答質問の記録と、翌夜バッチでの自動解消
 - 元文書の更新に連動した事前生成データの無効化
 - バッチ実行状況と未回答質問の管理画面
+- LLM プロバイダの選択（Ollama / LM Studio / Gemini API / Claude API / OpenAI API）と、生成用・埋め込み用の個別設定
+- API キーの暗号化保存と、設定画面からの変更
+- Google アカウントによる利用者ログインと、管理者パスワードによる一時的な権限昇格（sudo 方式）
+- 昇格の成功・失敗・解除の監査ログ
 
 ### 2.2 含まないもの
 
 - 営業時間中の LLM による回答生成（設定で例外的に有効化する場合を除く。6.4.5）
-- マルチテナント／権限分離（単一ユーザー・単一アカウント前提）
+- マルチテナント（単一組織・単一 Drive フォルダ前提）
+- きめ細かな権限管理（権限は一般ユーザーと昇格中の管理者の 2 段階のみ。文書単位・フォルダ単位の権限は持たない）
+- 管理者ごとの個別パスワード（管理者パスワードは 1 つを共有し、誰が使ったかは監査ログで区別する）
 - Drive 側のアクセス権（ACL）の回答への反映
 - 文書の書き込み・編集
 - 画像・動画・音声の内容理解、OCR
@@ -185,7 +209,21 @@ brew install poppler pandoc
 
 起動時に `System.find_executable/1` で存在を確認し、管理画面の「モデル状態」区画に併せて表示する。
 
-### 3.6 Ollama に求める API 要件
+### 3.6 LLM プロバイダに求める API 要件
+
+対応プロバイダは 5 種。**生成用と埋め込み用は独立して選択する。**
+
+| プロバイダ | 識別子 | 生成 | 埋め込み | 既定エンドポイント | 資格情報 |
+|---|---|---|---|---|---|
+| Ollama | `ollama` | ○ | ○ | `http://localhost:11434` | 不要 |
+| LM Studio | `lmstudio` | ○ | ○ | `http://localhost:1234/v1` | 不要（任意で API キー） |
+| Google Gemini API | `gemini` | ○ | ○ | `https://generativelanguage.googleapis.com/v1beta` | API キー |
+| Anthropic Claude API | `anthropic` | ○ | **×** | `https://api.anthropic.com` | API キー |
+| OpenAI API | `openai` | ○ | ○ | `https://api.openai.com/v1` | API キー |
+
+Claude API は埋め込みエンドポイントを提供しない。したがって `embed_provider` に `anthropic` は選択できず、UI でも選択肢に出さない。
+
+#### 3.6.1 Ollama
 
 Ollama はバージョン番号ではなく**機能で要件を定める**（リリース頻度が高く、バージョン固定が現実的でないため）。
 
@@ -199,6 +237,30 @@ Ollama はバージョン番号ではなく**機能で要件を定める**（リ
 > 旧 `POST /api/embeddings`（単数形）は単一文字列しか受け付けない。**必ず `/api/embed`（複数形）を使う。**バッチ投入できるかどうかで取り込み速度が桁で変わる。
 
 > **Ollama を Docker で動かしてはならない。** macOS の Docker は GPU パススルーに対応せず、Metal / MLX が使われないため実用速度が出ない。
+
+#### 3.6.2 LM Studio
+
+LM Studio は OpenAI 互換のローカルサーバーを提供する。GUI の «Developer» タブでサーバーを起動しておく必要がある。
+
+| 要件 | 確認方法 |
+|---|---|
+| OpenAI 互換サーバーが起動している | `GET {base_url}/models` が 200 を返す |
+| 生成モデルがロード済み | 上記の一覧に `batch_model` が含まれる |
+| 埋め込みモデルがロード済み | 埋め込みを LM Studio で行う場合のみ。`POST {base_url}/embeddings` が配列入力を受け付ける |
+
+LM Studio には Ollama の `keep_alive` に相当する API がない。モデルの常駐制御は LM Studio 側の設定（Auto-unload）に委ねるため、**相制御によるアンロードは行わない**（4.2 節の R-103 / R-104 はローカル Ollama 利用時のみ適用）。
+
+#### 3.6.3 外部 API プロバイダ（Gemini / Claude / OpenAI）
+
+| 要件 | 内容 |
+|---|---|
+| API キーの保管 | AES-256-GCM で暗号化して `settings` に保存する。平文でログに出さない |
+| タイムアウト | 生成 120 秒、埋め込み 60 秒 |
+| リトライ | 429 / 5xx は指数バックオフ（初回 1 秒・最大 3 回・ジッター付き） |
+| エンドポイントの上書き | プロキシ・Azure OpenAI・Vertex AI 互換ゲートウェイを通すため、ベース URL を設定で変更できる |
+| 疎通確認 | 管理画面の「接続テスト」ボタンから、最小のリクエストを 1 回送って確認する |
+
+外部 API を使う場合、**チャンク本文と生成された回答が外部に送信される**。この事実を設定画面と管理画面に常時表示し、有効化時には確認ダイアログを挟む（9.6 節 N-601）。
 
 ### 3.7 バージョン確認の運用
 
@@ -261,6 +323,10 @@ Ollama はバージョン番号ではなく**機能で要件を定める**（リ
 | R-103 | 営業時間相への遷移時、Ollama に `keep_alive: 0` のダミーリクエストを送り、生成モデルを明示的にアンロードする |
 | R-104 | 営業時間相の間、埋め込みモデルは `keep_alive: -1` で常駐させ、初回質問時のロード待ちをなくす |
 | R-105 | `OLLAMA_MAX_LOADED_MODELS=1` を設定し、意図しない同時常駐を OS 側でも防ぐ |
+| R-106 | **R-102 〜 R-105 はローカルプロバイダ（`ollama` / `lmstudio`）利用時のみ適用する。** 生成プロバイダが外部 API の場合、ローカル RAM を消費しないため相による生成封鎖を行わず、`check_generation_allowed/0` は常に `:ok` を返す |
+| R-107 | 埋め込みプロバイダが外部 API の場合、営業時間相での埋め込みモデル常駐（R-104）と待機相でのアンロードを行わない |
+
+相制御の目的は「8GB の RAM を生成モデルと埋め込みモデルで奪い合わせない」ことである。外部 API に切り替えた時点でこの制約は消えるため、**制約を機械的に残すと単に機能が減るだけになる**。R-106 / R-107 はそれを避けるための規定である。
 
 ---
 
@@ -286,12 +352,15 @@ Ollama はバージョン番号ではなく**機能で要件を定める**（リ
    └───┬──────────────┬───────────────────────┬─────────┘
        │              │                       │
  HTTPS │  In-Process (WAL)                    HTTP │
-┌──────▼───────┐ ┌────▼────────┐    ┌─────────▼─────────┐
-│ Google Drive │ │ SQLite3     │    │ Ollama :11434     │
-│ API v3       │ │ + sqlite-vec│    │ 昼: 埋め込みのみ     │
-│（夜間のみ）    │ │ + FTS5      │    │ 夜: 生成モデル       │
-└──────────────┘ └─────────────┘    └───────────────────┘
+┌──────▼───────┐ ┌────▼────────┐    ┌─────────▼──────────────┐
+│ Google Drive │ │ SQLite3     │    │ LLM プロバイダ            │
+│ API v3       │ │ + sqlite-vec│    │ ローカル: Ollama/LM Studio│
+│（夜間のみ）    │ │ + FTS5      │    │ 外部API : Gemini/Claude/ │
+└──────────────┘ └─────────────┘    │           OpenAI         │
+                                    └──────────────────────────┘
 ```
+
+生成用と埋め込み用は別々のプロバイダを指定できる。`AskDrive.LLM` が設定を読んで適切なアダプタへ振り分けるため、呼び出し側（`Answering` / `Generate` / `Batch`）はプロバイダを意識しない。
 
 ### 5.1 レイヤー責務
 
@@ -304,7 +373,11 @@ Ollama はバージョン番号ではなく**機能で要件を定める**（リ
 | `AskDrive.Generate` | 要約・想定QA・構造化抽出の生成 |
 | `AskDrive.Answering` | 段階的応答、キャッシュ、未回答記録 |
 | `AskDrive.Freshness` | 依存関係の追跡と無効化 |
-| `AskDrive.LLM` | Ollama クライアント、同時実行数制御 |
+| `AskDrive.LLM` | プロバイダ抽象（`AskDrive.LLM.Provider` ビヘイビア）、設定に基づくアダプタ振り分け、同時実行数制御 |
+| `AskDrive.LLM.Providers.*` | 各プロバイダのアダプタ（Ollama / LMStudio / Gemini / Anthropic / OpenAI） |
+| `AskDrive.Accounts` | 利用者アカウント、ロール、Drive 同期専用アカウントのトークン管理 |
+| `AskDriveWeb.UserAuth` | セッション管理、認証・昇格プラグ、LiveView の `on_mount` フック |
+| `AskDrive.Accounts.AdminAccess` | 管理者パスワードの検証、昇格の可否判定、ロックアウト、監査ログ |
 
 ---
 
@@ -334,16 +407,48 @@ Google は2回目以降の同意でリフレッシュトークンを返さない
 | 項目 | 既定値 | 説明 |
 |---|---|---|
 | `drive_url` | なし | 取り込み対象のフォルダ／ファイル URL |
-| `ollama_host` | `http://localhost:11434` | 推論サーバー。機材移行時はここだけ変える |
+| `google_client_id` | 環境変数 | Google OAuth クライアント ID |
+| `google_client_secret` | 環境変数 | Google OAuth クライアントシークレット（暗号化保存） |
+| `allowed_domain` | なし | ログインを許可する Google Workspace ドメイン |
 
-#### 6.2.2 モデル設定
+#### 6.2.1.1 管理者昇格の設定
 
 | 項目 | 既定値 | 説明 |
 |---|---|---|
-| `embedding_model` | `bge-m3` | **変更時は全件再インデックス** |
-| `embedding_dim` | 1024 | 埋め込み次元。モデルと一致必須 |
-| `batch_model` | `qwen3:4b` | 夜間バッチの生成モデル |
-| `batch_num_ctx` | 8192 | バッチ時のコンテキスト長 |
+| `admin_password_hash` | なし | 管理者パスワードの PBKDF2-HMAC-SHA512 ハッシュ。平文は保持しない |
+| `admin_session_minutes` | 30 | 昇格状態の有効時間（分） |
+| `admin_max_attempts` | 5 | この回数だけ連続で失敗するとロックアウトする |
+| `admin_lockout_minutes` | 15 | ロックアウトの継続時間（分） |
+
+#### 6.2.2 LLM プロバイダ設定
+
+生成用と埋め込み用を独立に設定する。詳細は 6.8 節。
+
+| 項目 | 既定値 | 説明 |
+|---|---|---|
+| `llm_provider` | `ollama` | 生成プロバイダ。`ollama` / `lmstudio` / `gemini` / `anthropic` / `openai` |
+| `batch_model` | `qwen3:4b` | 生成モデル名。プロバイダごとに意味が変わる |
+| `batch_num_ctx` | 4096 | コンテキスト長。`ollama` のみ有効 |
+| `llm_max_tokens` | 4096 | 生成トークン上限。外部 API で使用 |
+| `llm_temperature` | なし | 未設定ならプロバイダ既定値に従う |
+| `embed_provider` | `ollama` | 埋め込みプロバイダ。`anthropic` は選択不可 |
+| `embed_model` | `bge-m3` | **変更時は全件再インデックス** |
+| `embedding_dim` | 1024 | 埋め込み次元。モデルと一致必須。**変更時は仮想テーブル再作成** |
+
+#### 6.2.2.1 プロバイダ資格情報
+
+| 項目 | 既定値 | 暗号化 | 説明 |
+|---|---|---|---|
+| `ollama_host` | `http://localhost:11434` | — | 推論サーバー。機材移行時はここだけ変える |
+| `lmstudio_base_url` | `http://localhost:1234/v1` | — | LM Studio の OpenAI 互換エンドポイント |
+| `openai_api_key` | なし | ○ | OpenAI API キー |
+| `openai_base_url` | `https://api.openai.com/v1` | — | Azure / 互換ゲートウェイ向けの上書き |
+| `anthropic_api_key` | なし | ○ | Claude API キー |
+| `anthropic_base_url` | `https://api.anthropic.com` | — | 互換ゲートウェイ向けの上書き |
+| `gemini_api_key` | なし | ○ | Gemini API キー |
+| `gemini_base_url` | `https://generativelanguage.googleapis.com/v1beta` | — | 互換ゲートウェイ向けの上書き |
+
+未設定の項目は環境変数（`OLLAMA_HOST` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` など）にフォールバックする。初期セットアップスクリプトはこれらを `.env.prod` に書き込むため、**起動直後から DB に何も入っていなくても動作する**。
 
 #### 6.2.3 バッチ設定
 
@@ -371,8 +476,16 @@ Google は2回目以降の同意でリフレッシュトークンを返さない
 
 - `drive_url` は Drive／Docs の URL 形式、または素の ID として解釈できること
 - `batch_start_at < batch_deadline_at`、かつバッチ時間帯と営業時間帯が重ならないこと
-- `embedding_model` 変更時は「全チャンクと全QAを削除して再構築します」という確認を挟む
+- `embed_model` 変更時は「全チャンクと全QAを削除して再構築します」という確認を挟む
 - `batch_model` 変更時は「次回バッチで全件を再生成します」という確認を挟む
+- `llm_provider` / `embed_provider` は 3.6 節の識別子のいずれかであること。`embed_provider` に `anthropic` を指定できないこと
+- 外部 API プロバイダを選んだ場合、対応する API キーが空でないこと
+- `embedding_dim` は 64 〜 4096 の整数であること。変更時は「ベクトル仮想テーブルを再作成し、全件を再ベクトル化します」という確認を挟む
+- ベース URL は `http://` または `https://` で始まること
+
+#### 6.2.6 設定の変更権限
+
+設定の閲覧・変更は**管理者ロールに限る**（6.9 節）。一般ユーザーは設定画面に到達できない。API キーは画面に平文を返さず、保存済みかどうかのみを表示する（`設定済み（末尾4文字: ...abcd）`）。
 
 ### 6.3 夜間バッチ
 
@@ -448,6 +561,7 @@ RAM 使用量の推移（8GB / batch_model = qwen3:4b の場合）
 | `...wordprocessingml.document` | docx | `pandoc -t plain` |
 | `...presentationml.presentation` | pptx | `pandoc -t plain` |
 | `...spreadsheetml.sheet` | xlsx | `XlsxReader` で全シート走査 |
+| `text/html`, `application/xhtml+xml` | HTML | `pandoc -f html -t plain`（タグを除去） |
 | `text/plain`, `text/markdown`, `text/csv`, `application/json` | テキスト系 | そのまま |
 | `application/vnd.google-apps.folder` | フォルダ | 再帰対象。本文なし |
 | 上記以外 | — | `skipped` として理由を記録 |
@@ -642,6 +756,10 @@ document 更新
 - Tier 3 の場合は記録した旨と、翌朝の回答予定を案内
 - 「会話をリセット」で履歴を破棄
 - Drive 未接続・インデックス0件・前夜のバッチ失敗時は、状況と次にすべきことを表示
+- ヘッダにログイン中の利用者（表示名・メールアドレス）とログアウト導線を表示
+- 管理画面へのリンクは**昇格可能なアカウントの場合のみ**表示する。未昇格なら昇格画面へ誘導する
+- 昇格中はその旨と残り時間、「管理者権限を解除」の導線をヘッダに常時表示する
+- 外部 LLM API が有効な場合、送信先プロバイダ名を常時表示する（例: `外部AI: Claude API`）
 
 会話履歴は文脈補完にのみ使う。直前の質問を参照する代名詞（「それ」「その場合」）の解決は、履歴中の質問文を連結して検索に使う形で行い、LLM は使わない。
 
@@ -654,8 +772,161 @@ document 更新
 | 未回答質問 | 直近の Tier 2・3 の質問一覧、繰り返し発生している質問 |
 | 解消された質問 | 前夜のバッチで回答可能になった質問 |
 | 文書一覧 | 各文書のステータス、最終同期日時、QA件数、エラー |
-| モデル状態 | 現在の相、ロード中のモデル、Ollama 疎通状況 |
+| モデル状態 | 現在の相、ロード中のモデル、各プロバイダの疎通状況 |
 | 生成物の世代 | 生成に使ったモデル別の件数（増設後の再生成計画に使う） |
+| LLM プロバイダ | 生成／埋め込みの現在のプロバイダとモデル、API キーの設定状況、接続テスト |
+| ユーザー管理 | 登録利用者の一覧、昇格可能フラグの付与・剥奪、無効化、最終ログイン日時 |
+| 昇格履歴 | 直近 100 件の昇格・失敗・解除の監査ログ |
+| 管理者パスワード | 変更フォーム（現在のパスワードの入力が必要） |
+
+管理画面全体が**昇格中のセッション限定**である（6.9 節）。昇格可能なアカウントが未昇格で `/admin` を開いた場合は `/admin/elevate` へ、昇格できないアカウントの場合はチャット画面へ戻す。
+
+---
+
+### 6.8 LLM プロバイダ
+
+| ID | 要件 |
+|---|---|
+| F-801 | 生成用プロバイダ（`llm_provider`）と埋め込み用プロバイダ（`embed_provider`）を独立に選択できる |
+| F-802 | 対応プロバイダは `ollama` / `lmstudio` / `gemini` / `anthropic` / `openai` の 5 種とする |
+| F-803 | `embed_provider` に `anthropic` を選択できない（Claude API に埋め込みエンドポイントがないため） |
+| F-804 | 各プロバイダの API キーは AES-256-GCM で暗号化して保存する |
+| F-805 | API キーは画面・API・ログのいずれにも平文で出力しない。表示は末尾 4 文字のみ |
+| F-806 | ベース URL を設定で上書きでき、互換ゲートウェイやプロキシ経由で利用できる |
+| F-807 | 管理画面から接続テストを実行し、疎通とモデルの利用可否を確認できる |
+| F-808 | 外部 API を初めて有効化するとき、「文書本文が外部に送信される」旨の確認ダイアログを表示する |
+| F-809 | `embed_model` または `embedding_dim` の変更時は、ベクトル仮想テーブルの再作成と全件再ベクトル化を伴う確認を挟む |
+| F-810 | 生成プロバイダが外部 API の場合、相による生成封鎖（R-102）を適用しない |
+| F-811 | プロバイダ固有のエラー（認証失敗・レート制限・クォータ超過・モデル不在）を分類し、管理画面に対処法とともに表示する |
+| F-812 | 未設定時は環境変数（`OLLAMA_HOST` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` / `LMSTUDIO_BASE_URL`）にフォールバックする |
+
+**アダプタの共通インターフェース**（`AskDrive.LLM.Provider` ビヘイビア）
+
+| コールバック | 役割 |
+|---|---|
+| `generate(model, prompt, opts)` | テキスト生成。`{:ok, binary}` または `{:error, term}` |
+| `embed(model, inputs, opts)` | 複数テキストの一括ベクトル化。`{:ok, [[float]]}` |
+| `list_models(opts)` | 利用可能なモデル名の一覧（設定画面の候補表示に使う） |
+| `health(opts)` | 疎通確認。`{:ok, 説明文}` または `{:error, 理由}` |
+| `local?()` | ローカル推論か。相制御の適用可否を決める |
+| `supports_embedding?()` | 埋め込みに対応するか |
+
+`opts` は `:base_url` / `:api_key` / `:timeout` / `:system` / `:num_ctx` / `:max_tokens` / `:temperature` / `:expected_dim` を受け取る。呼び出し側は設定を読まず、`AskDrive.LLM.generate/3` と `AskDrive.LLM.embed/3` だけを使う。
+
+**推奨モデル**
+
+| プロバイダ | 生成 | 埋め込み | 次元 |
+|---|---|---|---|
+| Ollama | `qwen3:4b` | `bge-m3` | 1024 |
+| LM Studio | ロード中のモデル名 | `text-embedding-nomic-embed-text-v1.5` | 768 |
+| Gemini | `gemini-2.5-flash` | `gemini-embedding-001` | 768 / 1536 / 3072 |
+| Claude | `claude-sonnet-5` | — | — |
+| OpenAI | `gpt-5` | `text-embedding-3-small` | 1536 |
+
+### 6.9 認証と権限昇格
+
+v0.6 で利用者ログインを導入する。Drive 同期専用アカウント（6.1 節）とは**別の認可フロー**であり、両者を混同しないこと。
+
+| | 同期専用アカウント | 利用者アカウント |
+|---|---|---|
+| 目的 | Drive フォルダの読み取り | チャットの利用、管理操作 |
+| 件数 | 1 件（シングルトン） | 人数分 |
+| スコープ | `drive.readonly` + `userinfo.email` | `openid` + `email` + `profile` |
+| リフレッシュトークン | 保存する（夜間バッチで使う） | 保存しない（ログイン時のみ） |
+| テーブル | `google_accounts` | `users` |
+
+コールバック URI は**両フローで共用する**（`/auth/google/callback`）。Google Cloud Console に登録する URI を増やさずに済み、既存の設定手順を変えずにアップグレードできる。どちらのフローかはセッションに保持した `oauth_flow` で判別する。
+
+#### 6.9.1 昇格モデル（sudo 方式）
+
+**ロールは常時のものではなく、セッション単位で一時的に獲得する。** 全員が一般ユーザーとしてログインし、管理者パスワードを入力した者だけが、そのセッションの間だけ管理者になる。
+
+```
+      Google ログイン（許可ドメインのみ）
+                 │
+                 ▼
+         [ 一般ユーザー ]  ← 全員ここから始まる。チャットのみ利用可
+                 │
+                 │  users.admin_eligible = true の場合のみ
+                 │  /admin/elevate で管理者パスワードを入力
+                 ▼
+     [ 昇格中セッション ]  ← 管理画面・設定変更・Drive 連携・ユーザー管理
+                 │
+                 ├─ 「管理者権限を解除」で即座に降格
+                 └─ admin_session_minutes 経過で自動失効
+```
+
+この形を選ぶ理由は 3 つある。
+
+1. **常時管理者のアカウントを無くせる。** 普段はチャットしか触れないため、セッションの盗用や置きっぱなしの端末から設定を書き換えられるリスクが小さい。
+2. **昇格の瞬間が記録として残る。** 「いつ・誰のアカウントから・成功したか失敗したか」を `admin_elevation_logs` に残すため、事後に追跡できる。常時ロール方式では「管理者だった」ことしか分からない。
+3. **パスワードだけでは昇格できない。** 昇格には「許可ドメインの Google アカウントでログイン済み」「そのアカウントが昇格可能に指定されている」「パスワードを知っている」の 3 条件が揃う必要がある。パスワードが漏れても、昇格可能に指定されていないアカウントからは昇格できない。
+
+#### 6.9.2 要件
+
+| ID | 要件 |
+|---|---|
+| F-901 | すべての画面はログインを必須とする。未ログインの場合は `/login` へ誘導する |
+| F-902 | ログインは Google OAuth 2.0（`openid email profile`）で行い、パスワードは保持しない |
+| F-903 | `allowed_domain` が設定されている場合、そのドメインのアカウントのみログインを許可する |
+| F-904 | ログイン直後は全員が一般ユーザーである。管理者ロールは昇格によってのみ得られる |
+| F-905 | `users.admin_eligible = true` のアカウントのみ `/admin/elevate` に到達でき、昇格を試みられる |
+| F-906 | 昇格には管理者パスワードの入力を必須とする。パスワードは PBKDF2-HMAC-SHA512 でハッシュ化して保存し、平文では保持しない |
+| F-907 | 昇格状態はセッションに保持し、`admin_session_minutes`（既定 30 分）の経過で自動的に失効する |
+| F-908 | 「管理者権限を解除」で、セッションを保ったまま即座に降格できる |
+| F-909 | 昇格の成功・失敗・解除・失効をすべて `admin_elevation_logs` に記録する。記録にはアカウント、時刻、送信元 IP、User-Agent を含める |
+| F-910 | 連続した失敗が `admin_max_attempts`（既定 5 回）に達したセッションは、`admin_lockout_minutes`（既定 15 分）のあいだ昇格を試みられない |
+| F-911 | 管理画面、設定変更、バッチ手動実行、Drive 連携・解除、ユーザー管理は**昇格中のセッションに限る**。サーバー側で毎リクエスト検証する |
+| F-912 | 管理者は管理画面から、昇格可能アカウントの追加・削除ができる |
+| F-913 | 自分自身の昇格可能フラグは外せない。また昇格可能アカウントを 0 件にはできない |
+| F-914 | 管理者は管理画面から管理者パスワードを変更できる。変更には現在のパスワードの入力を要する |
+| F-915 | 初期セットアップで指定したアカウント（`ASK_DRIVE_ADMIN_EMAILS`）は、ログインのたびに昇格可能フラグが再付与される |
+| F-916 | 昇格可能アカウントが 1 件も存在しない場合、最初にログインした利用者を昇格可能にする（ブートストラップ） |
+| F-917 | 管理者パスワードが未設定の場合、昇格可能アカウントは `/admin/elevate` で初回パスワードを設定できる。この操作も監査ログに残す |
+| F-918 | `status = disabled` の利用者はログインできず、既存セッションも次のリクエストで失効する |
+| F-919 | ログイン時および昇格時にセッション ID を再生成する |
+| F-920 | CLI から昇格可能フラグと管理者パスワードを設定できる（`mix ask_drive.grant_admin <email>` / `mix ask_drive.set_admin_password`）。ロックアウト時の復旧手段とする |
+| F-921 | 管理画面に昇格履歴の一覧（直近 100 件）を表示する |
+
+#### 6.9.3 監査ログ
+
+| イベント | 記録する条件 |
+|---|---|
+| `granted` | パスワードが一致し、昇格した |
+| `denied` | パスワードが不一致、または昇格可能でないアカウントが試みた |
+| `locked_out` | 失敗回数の上限に達し、試行を拒否した |
+| `released` | 利用者が自分で降格した |
+| `expired` | 制限時間の経過により自動で降格した |
+| `password_set` | 初回パスワードを設定した |
+| `password_changed` | パスワードを変更した |
+
+ログには**パスワードそのものも、その断片も記録しない**（9.6 節 N-606）。
+
+#### 6.9.4 ブートストラップ
+
+設定画面は昇格しないと開けないが、昇格には管理者パスワードとアカウント指定が要る。この循環は初期セットアップで断ち切る。
+
+```
+scripts/initial-setup.sh（対話）
+  ├─ Google OAuth クライアント ID / シークレット
+  ├─ 許可 Google Workspace ドメイン
+  ├─ 昇格可能アカウントのメールアドレス（カンマ区切り、複数可）
+  ├─ 管理者パスワード（sudo 相当。8 文字以上）
+  ├─ 生成プロバイダ + モデル + API キー
+  └─ 埋め込みプロバイダ + モデル + 次元
+          │
+          ▼
+      .env.prod
+          │  起動時に settings のシングルトンへ初期投入（パスワードはハッシュ化して保存）
+          ▼
+  /login → Google ログイン → 一般ユーザーとして開始
+          │
+          └─ メールが ASK_DRIVE_ADMIN_EMAILS に一致 → admin_eligible = true
+                  │
+                  └─ /admin/elevate でパスワード入力 → 昇格
+```
+
+セットアップでパスワードを入力しなかった場合は F-917 の初回設定フローに落ちる。どちらの経路でも、平文のパスワードがデータベースに入ることはない。
 
 ---
 
@@ -663,7 +934,9 @@ document 更新
 
 ```
 settings (1行)
-google_accounts (1行)
+google_accounts (1行)   … Drive 同期専用
+users                   … 利用者（昇格可能フラグを持つ）
+admin_elevation_logs    … 管理者権限への昇格の監査ログ
 
 documents ──< chunks ──< qa_pairs
     │           │
@@ -677,7 +950,50 @@ batch_runs ──< batch_phase_stats
 
 ### 7.1 `settings` / `google_accounts`
 
-6.2 節および 6.1 節の通り。いずれもシングルトン。`access_token` と `refresh_token` は暗号化して保存する。
+6.2 節および 6.1 節の通り。いずれもシングルトン。`access_token`・`refresh_token`・各プロバイダの API キー・`google_client_secret` は暗号化して保存する。
+
+#### 7.1.1 `users`
+
+利用者アカウント（6.9 節）。1 人 1 行。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `email` | string | Google アカウントのメールアドレス（小文字化して unique） |
+| `name` | string | 表示名 |
+| `picture_url` | string | プロフィール画像 URL |
+| `admin_eligible` | boolean | 管理者パスワードによる昇格を許可するか |
+| `status` | string | `active` / `disabled` |
+| `last_login_at` | utc_datetime | 最終ログイン日時 |
+| `last_elevated_at` | utc_datetime | 最後に管理者へ昇格した日時 |
+
+**常時の管理者ロールは持たない。** `admin_eligible` は「昇格を試みる資格があるか」だけを表し、実際に管理者かどうかはセッション側の状態である。
+
+OAuth トークンは保持しない。ログインは認可コードの交換で本人確認を行うだけで、以後は Phoenix のセッションで識別する。
+
+```sql
+CREATE UNIQUE INDEX users_email_idx ON users (email);
+CREATE INDEX users_admin_eligible_idx ON users (admin_eligible);
+```
+
+#### 7.1.2 `admin_elevation_logs`
+
+管理者権限への昇格に関する監査ログ（6.9.3 節）。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `user_id` | integer | `users` への参照。ユーザー削除時は `NULL` |
+| `email` | string | 操作時点のメールアドレス。`user_id` が消えても誰の操作か辿れるよう非正規化して保持する |
+| `event` | string | `granted` / `denied` / `locked_out` / `released` / `expired` / `password_set` / `password_changed` |
+| `ip_address` | string | 送信元 IP |
+| `user_agent` | string | User-Agent（255 文字で切り詰め） |
+| `occurred_at` | utc_datetime | 発生日時 |
+
+```sql
+CREATE INDEX admin_elevation_logs_occurred_at_idx ON admin_elevation_logs (occurred_at);
+CREATE INDEX admin_elevation_logs_user_id_idx ON admin_elevation_logs (user_id);
+```
+
+ログは削除も改変もしない。`user_id` を `ON DELETE SET NULL` にしているのは、ユーザーを消すと監査記録まで消えてしまう事態を避けるためである。
 
 ### 7.2 `documents`
 
@@ -843,7 +1159,7 @@ CREATE INDEX question_log_resolved_at_asked_at_idx ON question_log (resolved_at,
 
 **Drive API を呼ぶのは夜間バッチの同期フェーズのみ**であり、営業時間中に外部通信は発生しない。
 
-### 8.2 Ollama API
+### 8.2 Ollama API（`llm_provider` / `embed_provider` = `ollama`）
 
 | 用途 | エンドポイント | 使用フェーズ |
 |---|---|---|
@@ -861,6 +1177,48 @@ CREATE INDEX question_log_resolved_at_asked_at_idx ON question_log (resolved_at,
 | 同時常駐の抑止 | 環境変数 `OLLAMA_MAX_LOADED_MODELS=1` |
 
 生成フェーズでは `stream: false` で一括受信する。ストリーミングの行バッファ処理が不要になり、実装が単純化する。また長文コンテキスト生成時のタイムアウトを防ぐため、HTTP クライアント（Req）の `receive_timeout` は 180 秒（3分）に設定する。
+
+### 8.3 OpenAI 互換 API（`openai` / `lmstudio`）
+
+| 用途 | エンドポイント | 要求形 |
+|---|---|---|
+| 生成 | `POST {base_url}/chat/completions` | `{model, messages: [{role: "system"|"user", content}], max_completion_tokens*, temperature?}` |
+| 埋め込み | `POST {base_url}/embeddings` | `{model, input: [...], dimensions?}` |
+| モデル一覧 | `GET {base_url}/models` | — |
+
+認証は `Authorization: Bearer <api_key>`。LM Studio は API キーを要求しないため、未設定ならヘッダを付けない。
+
+\* トークン上限のパラメータ名がプロバイダで異なる。OpenAI は `max_completion_tokens`、LM Studio は `max_tokens` を使う。`temperature` は未設定なら送らない（一部のモデルが既定値以外を拒否するため）。`dimensions` は OpenAI の `text-embedding-3-*` にのみ送る。
+
+応答は `choices[0].message.content`（生成）、`data[].embedding`（埋め込み）から取り出す。
+
+### 8.4 Anthropic Messages API（`anthropic`）
+
+| 用途 | エンドポイント |
+|---|---|
+| 生成 | `POST {base_url}/v1/messages` |
+
+ヘッダは `x-api-key: <api_key>` と `anthropic-version: 2023-06-01`。要求形は `{model, max_tokens, system, messages: [{role: "user", content}], temperature?}` で、`max_tokens` は**必須**である。応答は `content` 配列のうち `type == "text"` の要素を連結して取り出す。埋め込みエンドポイントは提供されない。
+
+### 8.5 Gemini API（`gemini`）
+
+| 用途 | エンドポイント |
+|---|---|
+| 生成 | `POST {base_url}/models/{model}:generateContent` |
+| 埋め込み（一括） | `POST {base_url}/models/{model}:batchEmbedContents` |
+| モデル一覧 | `GET {base_url}/models` |
+
+認証は `x-goog-api-key: <api_key>` ヘッダで行う（URL クエリに載せるとログやプロキシに残るため使わない）。生成の要求形は `{contents: [{role: "user", parts: [{text}]}], systemInstruction: {parts: [{text}]}, generationConfig: {maxOutputTokens, temperature}}`、応答は `candidates[0].content.parts[].text` を連結する。埋め込みは `{requests: [{model: "models/<name>", content: {parts: [{text}]}, outputDimensionality}]}` を送り、`embeddings[].values` を取り出す。
+
+### 8.6 共通のエラー分類
+
+| HTTP | 分類 | 表示 |
+|---|---|---|
+| 401 / 403 | `:unauthorized` | API キーの再設定を促す |
+| 404 | `:model_not_found` | モデル名の確認を促す |
+| 429 | `:rate_limited` | バックオフ後に再試行。3 回失敗で中止 |
+| 5xx | `:server_error` | バックオフ後に再試行 |
+| タイムアウト | `:timeout` | タイムアウト値かモデルサイズの見直しを促す |
 
 ---
 
@@ -958,13 +1316,23 @@ Tier 0+1 到達率は運用とともに上がる。未回答質問が翌夜に�
 
 | ID | 要件 |
 |---|---|
-| N-601 | 文書本文・質問・回答をインターネットに送出しない |
+| N-601 | 既定構成（ローカルプロバイダ）では文書本文・質問・回答をインターネットに送出しない。外部 LLM API は管理者が明示的に有効化した場合にのみ使い、有効化中は送信先を全画面に表示する |
 | N-602 | OAuth トークンを暗号化して保存する |
-| N-603 | クライアントシークレットは環境変数から読み、リポジトリに含めない |
+| N-603 | クライアントシークレットと API キーは平文でリポジトリに含めない。DB へは AES-256-GCM で暗号化して保存する |
 | N-604 | LAN 内アクセスを前提とし、外部公開時は別途認証を前段に置く |
 | N-605 | Drive の要求スコープを `drive.readonly` に限定する |
-| N-606 | ログに文書本文・トークン・質問文を出力しない |
+| N-606 | ログに文書本文・トークン・API キー・質問文を出力しない |
 | N-607 | 管理画面と一般利用画面を分離し、`question_log` の閲覧を管理者に限定する |
+| N-608 | すべての画面をログイン必須とし、`allowed_domain` 外のアカウントを遮断する |
+| N-609 | 設定変更・バッチ実行・Drive 連携・ユーザー管理を**昇格中のセッション**に限定し、サーバー側で毎リクエスト検証する（UI の非表示だけに依存しない） |
+| N-610 | API キーを画面に平文で返さない。表示は末尾 4 文字のみとし、フォーム送信時に空欄なら既存値を維持する |
+| N-611 | ログイン時および昇格時にセッション ID を再生成し、セッション固定攻撃を防ぐ |
+| N-612 | 外部 API 利用時、プロンプトに利用者の識別情報（メールアドレス・氏名）を含めない |
+| N-613 | 管理者パスワードは PBKDF2-HMAC-SHA512（ソルト付き・210,000 回）でハッシュ化して保存し、平文も可逆暗号も用いない |
+| N-614 | パスワードの照合は定数時間比較で行い、応答時間から正否を推測されないようにする |
+| N-615 | 昇格の試行回数を制限し、上限到達時はロックアウトする。ロックアウト自体も監査ログに残す |
+| N-616 | 昇格の成功・失敗・解除を改変不能な監査ログとして保持し、ユーザー削除後も誰の操作かを追跡できるようにする |
+| N-617 | 昇格状態はセッションに保持し、時間経過で自動失効させる。ブラウザを閉じ忘れた端末が管理者のまま残らないようにする |
 
 ---
 
@@ -984,6 +1352,19 @@ Tier 0+1 到達率は運用とともに上がる。未回答質問が翌夜に�
 | JSON 生成の失敗 | 1回再試行後、該当チャンクを `failed` | 管理画面に件数表示 |
 | バッチが2夜連続で失敗 | 回答の鮮度が落ちる旨を利用者側にも表示 | チャット画面上部に帯表示 |
 | Mac がスリープしてバッチ未実行 | 未実行を検知 | スリープ設定の確認を案内 |
+| API キー未設定 / 認証失敗 (401/403) | バッチ開始前に検知して中止 | 設定画面の該当プロバイダ欄へ誘導 |
+| 外部 API のレート制限 (429) | 指数バックオフで最大3回再試行 | 進捗に「レート制限により待機中」 |
+| 外部 API のクォータ超過 | バッチを中止し、生成済み分は保持 | プラン上限とローカルプロバイダへの切替を案内 |
+| モデル名が存在しない (404) | バッチ開始前に検知して中止 | 接続テストとモデル一覧の確認を案内 |
+| LM Studio サーバー未起動 | Ollama 未起動と同様に扱う | LM Studio の «Developer» タブでの起動を案内 |
+| 埋め込み次元が設定と不一致 | 明示的に失敗させ、書き込まない | モデルと `embedding_dim` の対応表を提示 |
+| `allowed_domain` 外のアカウントでログイン | 認可を拒否しセッションを作らない | 許可ドメインを明示して再ログインを促す |
+| 昇格可能アカウント不在 | 操作を拒否し、最後の 1 件を保護 | `mix ask_drive.grant_admin <email>` を案内 |
+| 管理者パスワード未設定 | 昇格可能アカウントに初回設定フォームを提示 | 8 文字以上のパスワード設定を促す |
+| 管理者パスワードの入力ミス | 昇格を拒否し `denied` を記録 | 残り試行回数を表示 |
+| 昇格試行のロックアウト | 一定時間すべての昇格を拒否 | 解除予定時刻を表示 |
+| 昇格の有効期限切れ | 自動的に降格し `expired` を記録 | 再度パスワード入力を求める |
+| 管理者パスワードの紛失 | — | `mix ask_drive.set_admin_password` での再設定を案内 |
 
 ---
 
@@ -997,6 +1378,10 @@ Tier 0+1 到達率は運用とともに上がる。未回答質問が翌夜に�
 6. **表の理解は限定的。** スプレッドシートはテキスト化して渡すため、複雑な集計や大きな表では精度が落ちる。
 7. **日本語キーワード検索の特性。** SQLite FTS5 の trigram トークナイザは部分一致に強いが、短文クエリ（1〜2文字）ではインデックスが効きにくいため LIKE 部分一致等のフォールバックで補う。
 8. **画像・図表の内容は失われる。**
+9. **外部 LLM API を有効にすると完全ローカル性が失われる。** 文書本文と質問がプロバイダに送信される。機密区分によっては利用できない。既定値はローカルのままである。
+10. **埋め込みモデルの変更は全件再インデックスを伴う。** 次元が変わる場合はベクトル仮想テーブルの再作成も必要で、文書量に応じて数時間〜複数夜かかる。
+11. **Drive のアクセス権は権限に反映されない。** 一般ユーザーは取り込み済みの全文書を検索できる。管理者権限は管理操作の可否のみを分ける。
+12. **管理者パスワードは全管理者で共有する 1 つの値である。** 誰が昇格したかは監査ログで分かるが、パスワード自体は個人に紐づかない。共有パスワードの運用（定期変更、退職時の変更）は運用側の責任になる。
 ---
 
 ## 12. デプロイと運用手順
@@ -1108,8 +1493,27 @@ echo "デプロイが正常に完了しました。"
 | `ASK_DRIVE_ENCRYPTION_KEY` | OAuth トークン暗号化用 256bit 鍵 | `mix ask_drive.gen.key` で生成（Base64） |
 | `GOOGLE_CLIENT_ID` | Google Cloud OAuth クライアント ID | `xxx.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | Google Cloud OAuth クライアントシークレット | `GOCSPX-xxx` |
-| `OLLAMA_HOST` | Ollama API エンドポイント | `http://localhost:11434` |
 | `DATABASE_PATH` | SQLite DB ファイルパス | `/Users/username/data/ask_drive_prod.db` |
+| `ASK_DRIVE_ALLOWED_DOMAIN` | ログインを許可する Google Workspace ドメイン | `company.com` |
+| `ASK_DRIVE_ADMIN_EMAILS` | 管理者へ昇格可能なメールアドレス（カンマ区切り） | `admin@company.com,ops@company.com` |
+| `ASK_DRIVE_ADMIN_PASSWORD` | 管理者パスワードの初期値。起動時にハッシュ化して保存し、以後この変数は参照しない | `(8 文字以上)` |
+
+**LLM プロバイダ関連**（DB の `settings` が空のときの初期値・フォールバックとして使う）
+
+| 環境変数名 | 説明 | 例 |
+|---|---|---|
+| `ASK_DRIVE_LLM_PROVIDER` | 生成プロバイダ | `ollama` / `lmstudio` / `gemini` / `anthropic` / `openai` |
+| `ASK_DRIVE_LLM_MODEL` | 生成モデル名 | `qwen3:4b` / `claude-sonnet-5` |
+| `ASK_DRIVE_EMBED_PROVIDER` | 埋め込みプロバイダ | `ollama` |
+| `ASK_DRIVE_EMBED_MODEL` | 埋め込みモデル名 | `bge-m3` |
+| `ASK_DRIVE_EMBEDDING_DIM` | 埋め込み次元 | `1024` |
+| `OLLAMA_HOST` | Ollama API エンドポイント | `http://localhost:11434` |
+| `LMSTUDIO_BASE_URL` | LM Studio の OpenAI 互換エンドポイント | `http://localhost:1234/v1` |
+| `OPENAI_API_KEY` | OpenAI API キー | `sk-...` |
+| `ANTHROPIC_API_KEY` | Claude API キー | `sk-ant-...` |
+| `GEMINI_API_KEY` | Gemini API キー | `AIza...` |
+
+環境変数は**初期値**として扱う。管理画面で値を保存すると DB の `settings` が優先され、以後は環境変数を編集しても反映されない。
 
 ### 12.5 macOS 常駐（launchd）とスリープ管理
 
@@ -1143,6 +1547,8 @@ ToDo リスト（`ask-drive-todo.md`）の全 14 フェーズ（Phase 0〜13）�
 | 11 | 未回答の循環と管理画面 | 未回答質問の優先解消ループ、AdminLive 管理UI |
 | 12 | 運用整備 | launchd 常駐、スリープ抑止（caffeinate）、本番リリーススクリプト |
 | 13 | 増設後の調整 | RAM 増設時の上位モデル（8B/14B）移行と品質測定 |
+| 14 | LLM マルチプロバイダ | 5 プロバイダの選択、API キー暗号化、埋め込み次元の可変化 |
+| 15 | 認証と権限昇格 | Google ログイン、sudo 方式の管理者昇格、監査ログ、ユーザー管理画面 |
 
 Phase 7 完了時点で「原文検索が使える社内検索」として実運用を開始し、実際の質問ログを収集しながら Phase 8 以降へ進む構成になっている。
 
@@ -1157,4 +1563,8 @@ Phase 7 完了時点で「原文検索が使える社内検索」として実運
 - Slack / メールなど Drive 以外の知識源の追加
 - スキャン PDF の OCR 対応
 - バッチ結果の日次サマリーメール通知
+- 外部 API 利用時のリアルタイム回答生成（Tier 2 の抜粋を文脈に、その場で回答文を生成する「Tier 2.5」）。ローカル推論では RAM 制約により成立しないが、外部 API なら即応できる
+- 外部 API の利用量・課金額のトラッキングと上限アラート
+- プロバイダ横断のモデル一覧取得と、設定画面でのプルダウン選択
+- 部署・グループ単位のアクセス制御（Drive ACL との連携）
 

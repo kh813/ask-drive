@@ -7,6 +7,11 @@ defmodule AskDriveWeb.AdminLiveTest do
   alias AskDrive.Repo
 
   describe "AdminLive Dashboard" do
+    setup %{conn: conn} do
+      admin = user_fixture(admin_eligible: true)
+      %{conn: log_in_admin(conn, admin)}
+    end
+
     test "renders dashboard, tabs, and document list", %{conn: conn} do
       {:ok, _doc} =
         %Document{}
@@ -53,9 +58,9 @@ defmodule AskDriveWeb.AdminLiveTest do
       render_click(view, "select_tab", %{"tab" => "settings"})
       html = render(view)
 
-      assert html =~ "システム・バッチ設定"
-      assert html =~ "batch_model"
-      assert html =~ "embed_model"
+      assert html =~ "システム・OAuth・バッチ設定"
+      assert html =~ "生成モデル名"
+      assert html =~ "埋め込みモデル名"
     end
   end
 end

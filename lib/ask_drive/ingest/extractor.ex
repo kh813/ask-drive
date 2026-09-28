@@ -60,6 +60,12 @@ defmodule AskDrive.Ingest.Extractor do
   """
   def extract_binary(binary, mime_type) when is_binary(binary) do
     cond do
+      # HTML carries markup that would otherwise pollute chunk text and embeddings, so it
+      # gets the same pandoc-to-plain-text treatment as docx/pptx rather than falling into
+      # the raw-passthrough text branch below.
+      mime_type in ["text/html", "application/xhtml+xml"] ->
+        extract_pandoc(binary, "html")
+
       # Plain Text / Markdown / CSV / JSON
       text_mime?(mime_type) ->
         format_extracted_text(binary)

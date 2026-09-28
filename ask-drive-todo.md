@@ -3,7 +3,7 @@
 対応仕様書: `ask-drive-spec.md`
 作成日: 2026-09-28
 
-全 13 フェーズ / 全 126 タスク。各フェーズは最大 10 タスクで、最終タスクは必ずビルドゲート。
+全 15 フェーズ / 全 146 タスク。各フェーズは最大 10 タスクで、最終タスクは必ずビルドゲート。
 
 ---
 
@@ -277,6 +277,45 @@ mix hex.audit
 
 **完了条件**: 上位モデルでの再生成が回り、回答品質の改善が測定値で確認できる。
 
+
+---
+
+## Phase 14 — LLM マルチプロバイダ
+
+仕様書 3.6 / 6.8 / 8.3〜8.6 節に対応。**既定値は変えない**（`ollama` + `bge-m3` + 1024 次元）。
+
+- [ ] 14-1 マイグレーション: `settings` にプロバイダ設定列を追加（`llm_provider` / `embed_provider` / `embedding_dim` / `llm_max_tokens` / `llm_temperature` / `ollama_host` / 各 `*_api_key`（暗号化）/ 各 `*_base_url`）
+- [ ] 14-2 `AskDrive.LLM.Provider` ビヘイビアを定義する（`generate/3` `embed/3` `list_models/1` `health/1` `local?/0` `supports_embedding?/0`）
+- [ ] 14-3 既存の `AskDrive.LLM.Ollama` をビヘイビア実装に整え、`base_url` を opts で受け取れるようにする
+- [ ] 14-4 `AskDrive.LLM.Providers.OpenAI` と `.LMStudio`（OpenAI 互換。`max_completion_tokens` と `max_tokens` の差、`dimensions` の送出条件に注意）
+- [ ] 14-5 `AskDrive.LLM.Providers.Anthropic`（`x-api-key` / `anthropic-version` / `max_tokens` 必須 / `content[].text` 連結。埋め込み非対応を `supports_embedding?/0` で表明）
+- [ ] 14-6 `AskDrive.LLM.Providers.Gemini`（`:generateContent` / `:batchEmbedContents`、`x-goog-api-key` ヘッダ、`outputDimensionality`）
+- [ ] 14-7 `AskDrive.LLM` ファサード（設定からプロバイダ・資格情報を解決、環境変数フォールバック、429/5xx の指数バックオフ、エラー分類）。全呼び出し元（`Answering` / `Generate.*` / `Batch.*` / `Runtime.Mode`）を差し替える
+- [ ] 14-8 `Runtime.Mode` と `HealthCheck` をプロバイダ対応にする（R-106 / R-107: リモートなら相による生成封鎖とモデル常駐制御を行わない）
+- [ ] 14-9 `AdminLive` 設定画面に LLM プロバイダ区画を追加（プロバイダ選択、モデル、API キー（末尾4文字のみ表示・空欄なら既存値維持）、接続テスト、`embedding_dim` 変更時の再インデックス確認）
+- [ ] 14-10 **ビルドゲート**
+
+**完了条件**: 設定画面で生成プロバイダを Claude API に切り替え、埋め込みを Ollama のまま維持した状態で夜間バッチが完走する。API キーが DB 上で平文でないことを確認する。
+
+---
+
+## Phase 15 — 認証と権限昇格
+
+仕様書 6.9 / 9.6 節に対応。**常時の管理者ロールは作らない。** 全員が一般ユーザーとしてログインし、管理者パスワードでセッション単位に昇格する（sudo 方式）。
+
+- [ ] 15-1 マイグレーション: `users`（`email` unique / `name` / `picture_url` / `admin_eligible` / `status` / `last_login_at` / `last_elevated_at`）と `admin_elevation_logs`（`user_id` は `ON DELETE SET NULL`、`email` を非正規化保持）
+- [ ] 15-2 マイグレーション: `settings` に `admin_password_hash` / `admin_session_minutes` / `admin_max_attempts` / `admin_lockout_minutes` を追加
+- [ ] 15-3 `AskDrive.Accounts.AdminAccess`: PBKDF2-HMAC-SHA512 でのハッシュ生成と定数時間照合、ロックアウト判定、監査ログ書き込み（N-613 / N-614 / N-615）
+- [ ] 15-4 `AskDrive.Accounts` の利用者関数（`upsert_from_oauth/1`、`list_users/0`、`set_admin_eligible/3`、`update_status/3`、最後の昇格可能アカウントを保護する検証）
+- [ ] 15-5 `AuthController` を 2 フロー対応にする（`flow=login` は `openid email profile`、`flow=drive` は `drive.readonly`。コールバック URI は共用し、セッションの `oauth_flow` で判別）
+- [ ] 15-6 `AskDriveWeb.UserAuth`（`fetch_current_user/2`、`require_authenticated_user/2`、`require_admin_session/2`、`log_in_user/3`、`log_out_user/1`、昇格状態の保持と期限切れ判定、ログイン時・昇格時のセッション ID 再生成）
+- [ ] 15-7 `/login`・`/logout`・`/admin/elevate`（パスワード入力と初回設定）・`/admin/release`（降格）と、LiveView 用 `on_mount` フック（`:mount_current_user` / `:require_authenticated` / `:require_admin_session`）、ルータの `live_session` 分離
+- [ ] 15-8 ロール決定ロジック（`ASK_DRIVE_ADMIN_EMAILS` は毎回 `admin_eligible` を再付与、昇格可能が 0 件なら初回ログイン者に付与）と `mix ask_drive.grant_admin <email>` / `mix ask_drive.set_admin_password`
+- [ ] 15-9 `ChatLive` の更新（ログイン中ユーザー表示、昇格中バッジと残り時間、昇格・解除の導線、外部 API 利用時の送信先表示）
+- [ ] 15-10 `AdminLive` に「ユーザー管理」「昇格履歴」「管理者パスワード変更」を追加。`scripts/initial-setup.sh` に昇格可能アカウントと管理者パスワードの対話入力を追加。**ビルドゲート**
+
+**完了条件**: 一般ユーザーでログインすると `/admin` に到達できない。昇格可能アカウントはパスワード入力で管理画面に入れ、その成功・失敗が昇格履歴に残る。制限時間の経過で自動的に降格する。
+
 ---
 
 ## 進捗管理
@@ -297,5 +336,7 @@ mix hex.audit
 | 11 | 未回答の循環と管理画面 | ☑ | 2026-09-28 |
 | 12 | 運用整備 | ☑ | 2026-09-28 |
 | 13 | 増設後の調整 | ☐ | （将来運用） |
+| 14 | LLM マルチプロバイダ | ☐ | |
+| 15 | 認証と権限昇格 | ☐ | |
 
 **Phase 7 完了時点で一度止めて実運用に出すことを勧める。** 原文検索だけでも社内で使ってもらえば、Phase 8 以降で「実際に聞かれる質問」が `question_log` に溜まった状態で生成を始められる。想定質問を当てずっぽうで作るより、実需に沿った生成ができる。

@@ -3,7 +3,8 @@ defmodule AskDrive.Generate.Summary do
   Generates document and section summaries using LLM for overview and quick inspection.
   (Rule: Summaries are not used as ground-truth evidence for QA retrieval).
   """
-  alias AskDrive.LLM.{Ollama, Semaphore}
+  alias AskDrive.LLM
+  alias AskDrive.LLM.Semaphore
 
   @system_prompt """
   あなたは社内ドキュメントの要約を作成するAIアシスタントです。
@@ -25,7 +26,7 @@ defmodule AskDrive.Generate.Summary do
         """
 
         Semaphore.run(fn ->
-          case Ollama.generate(model, prompt, system: @system_prompt, num_ctx: num_ctx) do
+          case LLM.generate(model, prompt, system: @system_prompt, num_ctx: num_ctx) do
             {:ok, response} ->
               {:ok, String.trim(response)}
 

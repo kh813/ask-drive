@@ -12,7 +12,8 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
   alias AskDrive.{Documents, Repo, Settings, Vector}
   alias AskDrive.Documents.{Chunk, Document}
   alias AskDrive.Ingest.{Chunker, Extractor}
-  alias AskDrive.LLM.{Ollama, Semaphore}
+  alias AskDrive.LLM
+  alias AskDrive.LLM.Semaphore
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"document_id" => document_id}}) do
@@ -54,7 +55,7 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
       # Concurrency-controlled embedding via Ollama
       embed_result =
         Semaphore.run(fn ->
-          Ollama.embed(setting.embed_model, chunk_texts)
+          LLM.embed(setting.embed_model, chunk_texts, setting: setting)
         end)
 
       case embed_result do

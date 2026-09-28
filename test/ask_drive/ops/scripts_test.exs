@@ -34,6 +34,7 @@ defmodule AskDrive.Ops.ScriptsTest do
     test "handles tags with or without leading v" do
       for tag <- ["v0.0.8", "0.0.8", "v1.2.3"] do
         sample_json = ~s|{"tag_name": "#{tag}"}|
+
         command =
           "echo '#{sample_json}' | grep '\"tag_name\":' | sed -E 's/.*\"tag_name\": *\"v?([^\"]+)\".*/\\1/'"
 

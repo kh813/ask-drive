@@ -6,17 +6,23 @@ defmodule AskDriveWeb.AdminLive do
   - Coverage statistics (total chunks, active QAs, stale QAs, unindexed chunks)
   - Unanswered questions and recently resolved questions
   - Synced documents list with statuses and Drive links
-  - Ollama runtime model status and manual batch trigger
-  - Settings management (batch hours, thresholds, models)
+  - Provider status and manual batch trigger
+  - Settings management (LLM providers and credentials, batch hours, thresholds, models)
+  - User management (elevation eligibility and deactivation) and the elevation audit log
+
+  Every action here requires an elevated session; the router and `AskDriveWeb.UserAuth`
+  enforce that before this module is reached (spec 6.9 F-911).
   """
   use AskDriveWeb, :live_view
   require Logger
   import Ecto.Query, warn: false
 
+  alias AskDrive.Accounts.{AdminAccess, AdminElevationLog}
   alias AskDrive.Batch.{BatchRun, Scheduler}
   alias AskDrive.Documents.{Chunk, Document}
+  alias AskDrive.LLM
   alias AskDrive.QA.QAPair
-  alias AskDrive.{Accounts, Documents, HealthCheck, QA, Repo, Settings}
+  alias AskDrive.{Accounts, Documents, HealthCheck, QA, Repo, Settings, Vector}
   alias AskDrive.Runtime.Mode
 
   @impl true
@@ -35,6 +41,8 @@ defmodule AskDriveWeb.AdminLive do
      |> assign(:setting, setting)
      |> assign(:form, form)
      |> assign(:trigger_batch_loading, false)
+     |> assign(:connection_test, %{})
+     |> assign(:password_form, to_form(%{}, as: :admin_password))
      |> load_dashboard_data()}
   end
 
@@ -70,13 +78,32 @@ defmodule AskDriveWeb.AdminLive do
 
   @impl true
   def handle_event("save_settings", %{"setting" => setting_params}, socket) do
+    # `vec0` fixes the vector width at CREATE time, so a new embedding model or dimension
+    # means dropping and rebuilding the index before anything can be re-embedded (F-809).
+    reindex? = Settings.reindex_required?(socket.assigns.setting, setting_params)
+
     case Settings.update_setting(socket.assigns.setting, setting_params) do
       {:ok, updated} ->
+        message =
+          if reindex? do
+            case Vector.rebuild_index(updated.embedding_dim) do
+              {:ok, _dim} ->
+                "設定を保存し、ベクトルインデックスを再構築しました。次回の夜間バッチで全チャンクを再ベクトル化します。"
+
+              {:error, reason} ->
+                Logger.error("Vector index rebuild failed: #{inspect(reason)}")
+                "設定は保存しましたが、ベクトルインデックスの再構築に失敗しました。ログを確認してください。"
+            end
+          else
+            "設定を保存しました。"
+          end
+
         {:noreply,
          socket
          |> assign(:setting, updated)
          |> assign(:form, to_form(Settings.change_setting(updated)))
-         |> put_flash(:info, "設定を保存しました。")}
+         |> put_flash(:info, message)
+         |> load_dashboard_data()}
 
       {:error, changeset} ->
         {:noreply,
@@ -84,6 +111,111 @@ defmodule AskDriveWeb.AdminLive do
          |> assign(:form, to_form(changeset))
          |> put_flash(:error, "設定の保存に失敗しました。入力内容を確認してください。")}
     end
+  end
+
+  @impl true
+  def handle_event("test_connection", %{"role" => role}, socket) do
+    role_atom = if role == "embedding", do: :embedding, else: :generation
+    result = LLM.connection_test(role_atom, socket.assigns.setting)
+
+    {:noreply,
+     assign(socket, :connection_test, Map.put(socket.assigns.connection_test, role_atom, result))}
+  end
+
+  @impl true
+  def handle_event("set_admin_eligible", %{"id" => id, "eligible" => eligible}, socket) do
+    socket.assigns.current_user
+    |> Accounts.set_admin_eligible(Accounts.get_user(id), eligible == "true")
+    |> handle_user_change(socket)
+  end
+
+  @impl true
+  def handle_event("change_admin_password", %{"admin_password" => params}, socket) do
+    %{"current" => current, "new" => new_password, "confirmation" => confirmation} =
+      Map.merge(%{"current" => "", "new" => "", "confirmation" => ""}, params)
+
+    context = %{ip_address: nil, user_agent: nil}
+
+    result =
+      if new_password != confirmation do
+        {:error, :mismatch}
+      else
+        AdminAccess.change_password(socket.assigns.current_user, current, new_password, context)
+      end
+
+    case result do
+      {:ok, updated} ->
+        {:noreply,
+         socket
+         |> assign(:setting, updated)
+         |> put_flash(:info, "管理者パスワードを変更しました。")
+         |> load_dashboard_data()}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, password_error_message(reason))}
+    end
+  end
+
+  @impl true
+  def handle_event("set_user_status", %{"id" => id, "status" => status}, socket) do
+    socket.assigns.current_user
+    |> Accounts.update_user_status(Accounts.get_user(id), status)
+    |> handle_user_change(socket)
+  end
+
+  defp event_class("granted"),
+    do: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+
+  defp event_class(event) when event in ["denied", "locked_out"],
+    do: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+
+  defp event_class(event) when event in ["password_set", "password_changed"],
+    do: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300"
+
+  defp event_class(_), do: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+
+  defp password_error_message(:mismatch), do: "新しいパスワードが一致しません。"
+  defp password_error_message(:invalid_password), do: "現在の管理者パスワードが違います。"
+
+  defp password_error_message(:too_short),
+    do: "パスワードは #{AdminAccess.min_password_length()} 文字以上にしてください。"
+
+  defp password_error_message(:surrounding_whitespace), do: "パスワードの前後に空白を含めないでください。"
+  defp password_error_message(_), do: "管理者パスワードを変更できませんでした。"
+
+  defp handle_user_change({:ok, user}, socket) do
+    {:noreply,
+     socket
+     |> put_flash(:info, "#{user.email} を更新しました。")
+     |> load_dashboard_data()}
+  end
+
+  defp handle_user_change({:error, :cannot_modify_self}, socket) do
+    {:noreply, put_flash(socket, :error, "自分自身の権限や状態は変更できません。")}
+  end
+
+  defp handle_user_change({:error, :last_admin}, socket) do
+    {:noreply,
+     put_flash(
+       socket,
+       :error,
+       "昇格可能なアカウントを 0 件にはできません。先に別のアカウントに昇格を許可してください。"
+     )}
+  end
+
+  defp handle_user_change({:error, _changeset}, socket) do
+    {:noreply, put_flash(socket, :error, "ユーザーの更新に失敗しました。")}
+  end
+
+  # `<.input type="select">` wants {label, value} pairs; the identifiers themselves are too
+  # terse to show to an operator.
+  # Secrets are never echoed back into the form; the admin only needs to know whether one
+  # is stored (N-610).
+  defp secret_state(value) when is_binary(value) and value != "", do: "設定済み"
+  defp secret_state(_), do: "未設定"
+
+  defp provider_options(providers) do
+    Enum.map(providers, fn provider -> {LLM.label(provider), provider} end)
   end
 
   defp load_dashboard_data(socket) do
@@ -113,8 +245,15 @@ defmodule AskDriveWeb.AdminLive do
     health = HealthCheck.check()
     current_mode = Mode.current_mode()
     account = Accounts.get_account()
+    setting = socket.assigns[:setting]
+    users = Accounts.list_users()
 
     socket
+    |> assign(:users, users)
+    |> assign(:elevation_logs, AdminAccess.list_elevation_logs(100))
+    |> assign(:admin_password_set?, AdminAccess.password_set?(setting))
+    |> assign(:generation_provider, LLM.generation_provider(setting))
+    |> assign(:embedding_provider, LLM.embedding_provider(setting))
     |> assign(:latest_run, latest_run)
     |> assign(:total_chunks, total_chunks)
     |> assign(:active_qas, active_qas)
@@ -131,8 +270,14 @@ defmodule AskDriveWeb.AdminLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
-      <div class="max-w-6xl mx-auto space-y-6 pb-12">
+    <Layouts.app
+      flash={@flash}
+      current_user={@current_user}
+      admin_elevated?={@admin_elevated?}
+      admin_elevation_expires_at={@admin_elevation_expires_at}
+      wide
+    >
+      <div class="space-y-6 pb-12">
         <%!-- Header Bar --%>
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
           <div>
@@ -143,18 +288,11 @@ defmodule AskDriveWeb.AdminLive do
               </span>
             </div>
             <p class="text-xs text-zinc-500 mt-1">
-              AskDrive の夜間バッチ、ナレッジカバレッジ、未回答質問、システム設定を一元管理します。
+              AskDrive の夜間バッチ、ナレッジカバレッジ、未回答質問、LLM プロバイダ、ユーザーを一元管理します。
             </p>
           </div>
 
           <div class="flex items-center gap-3">
-            <.link
-              navigate={~p"/"}
-              class="text-xs px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium flex items-center gap-1.5 transition"
-            >
-              <.icon name="hero-chat-bubble-left-right" class="w-4 h-4" /> チャット画面へ
-            </.link>
-
             <button
               id="trigger-batch-btn"
               phx-click="trigger_batch"
@@ -216,6 +354,32 @@ defmodule AskDriveWeb.AdminLive do
             ]}
           >
             ドキュメント一覧 ({length(@documents)})
+          </button>
+          <button
+            phx-click="select_tab"
+            phx-value-tab="users"
+            class={[
+              "pb-3 border-b-2 transition",
+              if(@current_tab == "users",
+                do: "border-indigo-600 text-indigo-600 dark:text-indigo-400 font-semibold",
+                else: "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+              )
+            ]}
+          >
+            ユーザー管理 ({length(@users)})
+          </button>
+          <button
+            phx-click="select_tab"
+            phx-value-tab="audit"
+            class={[
+              "pb-3 border-b-2 transition",
+              if(@current_tab == "audit",
+                do: "border-indigo-600 text-indigo-600 dark:text-indigo-400 font-semibold",
+                else: "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+              )
+            ]}
+          >
+            昇格履歴
           </button>
           <button
             phx-click="select_tab"
@@ -353,7 +517,7 @@ defmodule AskDriveWeb.AdminLive do
               <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <.icon name="hero-server" class="w-5 h-5 text-indigo-600" /> システム・推論基盤ステータス
               </h2>
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-xs">
                 <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
                   <span class="text-zinc-400 block">SQLite sqlite-vec</span>
                   <span class="font-semibold text-emerald-600 mt-1 block">
@@ -367,14 +531,34 @@ defmodule AskDriveWeb.AdminLive do
                 </div>
 
                 <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
-                  <span class="text-zinc-400 block">Ollama (推論サーバー)</span>
+                  <span class="text-zinc-400 block">
+                    回答生成 ({LLM.label(@generation_provider)})
+                  </span>
                   <span class="font-semibold text-emerald-600 mt-1 block">
-                    <%= case @health.ollama do %>
-                      <% {:ok, v} -> %>
-                        接続中 (v{v})
+                    <%= case @health.llm_generation do %>
+                      <% {:ok, info} -> %>
+                        接続中 ({info})
                       <% {:error, err} -> %>
                         <span class="text-red-600">未接続: {err}</span>
                     <% end %>
+                  </span>
+                  <span class="text-[10px] text-zinc-400 mt-0.5 block">{@setting.batch_model}</span>
+                </div>
+
+                <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
+                  <span class="text-zinc-400 block">
+                    埋め込み ({LLM.label(@embedding_provider)})
+                  </span>
+                  <span class="font-semibold text-emerald-600 mt-1 block">
+                    <%= case @health.llm_embedding do %>
+                      <% {:ok, info} -> %>
+                        接続中 ({info})
+                      <% {:error, err} -> %>
+                        <span class="text-red-600">未接続: {err}</span>
+                    <% end %>
+                  </span>
+                  <span class="text-[10px] text-zinc-400 mt-0.5 block">
+                    {@setting.embed_model} / {@setting.embedding_dim} 次元
                   </span>
                 </div>
 
@@ -550,10 +734,306 @@ defmodule AskDriveWeb.AdminLive do
           </div>
         <% end %>
 
-        <%!-- Tab 4: Settings Management --%>
+        <%!-- Tab 4: User Management --%>
+        <%= if @current_tab == "users" do %>
+          <div class="space-y-6">
+            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                    <.icon name="hero-users" class="w-5 h-5 text-indigo-600" /> 登録ユーザー
+                  </h2>
+                  <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                    利用者は初回ログイン時に自動登録され、全員が一般ユーザーとして開始します。<strong>「昇格可」</strong>に指定されたアカウントだけが、管理者パスワードを入力して一時的に管理者になれます。
+                  </p>
+                </div>
+                <span class="text-xs text-zinc-500 shrink-0">合計 {length(@users)} 名</span>
+              </div>
+
+              <%= if Accounts.configured_admin_emails() != [] do %>
+                <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800 text-xs text-zinc-600 dark:text-zinc-400">
+                  <span class="font-medium text-zinc-700 dark:text-zinc-300">
+                    環境変数で昇格可に固定されているアドレス:
+                  </span>
+                  <span class="font-mono text-[11px] ml-1">
+                    {Enum.join(Accounts.configured_admin_emails(), ", ")}
+                  </span>
+                  <p class="text-[11px] text-zinc-400 mt-1">
+                    これらはログインのたびに昇格可フラグが再付与されます。画面から外しても元に戻ります。
+                  </p>
+                </div>
+              <% end %>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                  <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                    <tr>
+                      <th class="py-3 px-2">ユーザー</th>
+                      <th class="py-3 px-2">管理者への昇格</th>
+                      <th class="py-3 px-2">状態</th>
+                      <th class="py-3 px-2">最終ログイン / 最終昇格</th>
+                      <th class="py-3 px-2 text-right">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                    <%= for user <- @users do %>
+                      <tr
+                        id={"user-row-#{user.id}"}
+                        class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition"
+                      >
+                        <td class="py-3 px-2">
+                          <div class="font-medium text-zinc-900 dark:text-zinc-100">
+                            {user.name || "—"}
+                            <span
+                              :if={user.id == @current_user.id}
+                              class="text-[10px] text-indigo-600 dark:text-indigo-400 ml-1"
+                            >
+                              (自分)
+                            </span>
+                          </div>
+                          <div class="text-[11px] text-zinc-400 font-mono">{user.email}</div>
+                        </td>
+                        <td class="py-3 px-2">
+                          <span class={[
+                            "px-2 py-0.5 rounded-full text-[10px] font-medium",
+                            if(user.admin_eligible,
+                              do:
+                                "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300",
+                              else: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                            )
+                          ]}>
+                            {if user.admin_eligible, do: "昇格可", else: "不可"}
+                          </span>
+                        </td>
+                        <td class="py-3 px-2">
+                          <span class={[
+                            "px-2 py-0.5 rounded-full text-[10px] font-medium",
+                            if(user.status == "active",
+                              do:
+                                "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+                              else: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+                            )
+                          ]}>
+                            {if user.status == "active", do: "有効", else: "無効"}
+                          </span>
+                        </td>
+                        <td class="py-3 px-2 text-zinc-400">
+                          <div>
+                            {if user.last_login_at,
+                              do: Calendar.strftime(user.last_login_at, "%Y-%m-%d %H:%M"),
+                              else: "—"}
+                          </div>
+                          <div class="text-[10px]">
+                            昇格: {if user.last_elevated_at,
+                              do: Calendar.strftime(user.last_elevated_at, "%Y-%m-%d %H:%M"),
+                              else: "—"}
+                          </div>
+                        </td>
+                        <td class="py-3 px-2">
+                          <%!-- Self-modification and last-admin removal are rejected server
+                                side too; hiding the buttons just avoids a pointless error. --%>
+                          <div
+                            :if={user.id != @current_user.id}
+                            class="flex items-center justify-end gap-2"
+                          >
+                            <button
+                              id={"toggle-eligible-#{user.id}"}
+                              phx-click="set_admin_eligible"
+                              phx-value-id={user.id}
+                              phx-value-eligible={to_string(not user.admin_eligible)}
+                              data-confirm={
+                                if(user.admin_eligible,
+                                  do: "#{user.email} から管理者への昇格資格を外しますか？",
+                                  else:
+                                    "#{user.email} に管理者への昇格を許可しますか？管理者パスワードを知っていれば設定と API キーを変更できるようになります。"
+                                )
+                              }
+                              class="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[11px] font-medium transition"
+                            >
+                              {if user.admin_eligible, do: "昇格を禁止", else: "昇格を許可"}
+                            </button>
+                            <button
+                              id={"toggle-status-#{user.id}"}
+                              phx-click="set_user_status"
+                              phx-value-id={user.id}
+                              phx-value-status={
+                                if user.status == "active", do: "disabled", else: "active"
+                              }
+                              data-confirm={
+                                if(user.status == "active",
+                                  do: "#{user.email} を無効化しますか？ログインできなくなります。",
+                                  else: "#{user.email} を再度有効化しますか？"
+                                )
+                              }
+                              class={[
+                                "px-2.5 py-1 rounded-lg text-[11px] font-medium transition",
+                                if(user.status == "active",
+                                  do:
+                                    "bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300",
+                                  else:
+                                    "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                )
+                              ]}
+                            >
+                              {if user.status == "active", do: "無効化", else: "有効化"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        <% end %>
+
+        <%!-- Tab 5: Elevation Audit Log --%>
+        <%= if @current_tab == "audit" do %>
+          <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+            <div>
+              <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                <.icon name="hero-clipboard-document-list" class="w-5 h-5 text-indigo-600" />
+                管理者権限の昇格履歴
+              </h2>
+              <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                どのアカウントから、いつ管理者権限へ昇格したかの記録です（直近 100 件）。失敗・解除・期限切れも残ります。この記録は削除も編集もできません。
+              </p>
+            </div>
+
+            <%= if @elevation_logs == [] do %>
+              <p class="text-xs text-zinc-500 py-8 text-center">昇格の記録はまだありません。</p>
+            <% else %>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                  <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                    <tr>
+                      <th class="py-3 px-2">日時</th>
+                      <th class="py-3 px-2">アカウント</th>
+                      <th class="py-3 px-2">イベント</th>
+                      <th class="py-3 px-2">送信元 IP</th>
+                      <th class="py-3 px-2">User-Agent</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                    <%= for log <- @elevation_logs do %>
+                      <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
+                        <td class="py-2.5 px-2 font-mono text-[11px] whitespace-nowrap">
+                          {Calendar.strftime(log.occurred_at, "%Y-%m-%d %H:%M:%S")}
+                        </td>
+                        <td class="py-2.5 px-2 font-mono text-[11px] text-zinc-900 dark:text-zinc-100">
+                          {log.email}
+                        </td>
+                        <td class="py-2.5 px-2">
+                          <span class={[
+                            "px-2 py-0.5 rounded-full text-[10px] font-medium",
+                            event_class(log.event)
+                          ]}>
+                            {AdminElevationLog.label(log.event)}
+                          </span>
+                        </td>
+                        <td class="py-2.5 px-2 font-mono text-[11px]">{log.ip_address || "—"}</td>
+                        <td
+                          class="py-2.5 px-2 text-[10px] text-zinc-400 max-w-xs truncate"
+                          title={log.user_agent}
+                        >
+                          {log.user_agent || "—"}
+                        </td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+
+        <%!-- Tab 6: Settings Management --%>
         <%= if @current_tab == "settings" do %>
           <div class="space-y-6">
-            <%!-- Card 1: Google Drive Sync Account Connection --%>
+            <%!-- Card 1: Administrator password --%>
+            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+              <div>
+                <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-shield-check" class="w-5 h-5 text-indigo-600" /> 管理者パスワード
+                </h2>
+                <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  管理画面へ昇格する際に入力するパスワードです。昇格可能なアカウント全員で共有します。退職者が出たときや漏洩が疑われるときは変更してください。
+                </p>
+              </div>
+
+              <.form
+                for={@password_form}
+                id="admin-password-form"
+                phx-submit="change_admin_password"
+                class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end"
+              >
+                <.input
+                  field={@password_form[:current]}
+                  type="password"
+                  value=""
+                  label="現在のパスワード"
+                  autocomplete="current-password"
+                />
+                <.input
+                  field={@password_form[:new]}
+                  type="password"
+                  value=""
+                  label={"新しいパスワード（#{AdminAccess.min_password_length()} 文字以上）"}
+                  autocomplete="new-password"
+                />
+                <div class="flex items-end gap-3">
+                  <div class="flex-1">
+                    <.input
+                      field={@password_form[:confirmation]}
+                      type="password"
+                      value=""
+                      label="確認"
+                      autocomplete="new-password"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    id="change-admin-password-btn"
+                    class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition whitespace-nowrap"
+                  >
+                    変更
+                  </button>
+                </div>
+              </.form>
+
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-zinc-200/60 dark:border-zinc-800">
+                <.input
+                  field={@form[:admin_session_minutes]}
+                  type="number"
+                  label="昇格の有効時間 (分)"
+                  min="1"
+                  max="480"
+                  form="settings-form"
+                />
+                <.input
+                  field={@form[:admin_max_attempts]}
+                  type="number"
+                  label="ロックまでの失敗回数"
+                  min="1"
+                  max="50"
+                  form="settings-form"
+                />
+                <.input
+                  field={@form[:admin_lockout_minutes]}
+                  type="number"
+                  label="ロックアウト時間 (分)"
+                  min="1"
+                  max="1440"
+                  form="settings-form"
+                />
+              </div>
+              <p class="text-[11px] text-zinc-400">
+                上記 3 項目は下の「設定を保存」で反映されます。
+              </p>
+            </div>
+
+            <%!-- Card 2: Google Drive Sync Account Connection --%>
             <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
               <div class="flex items-center justify-between">
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -572,13 +1052,13 @@ defmodule AskDriveWeb.AdminLive do
               </div>
 
               <p class="text-xs text-zinc-500 leading-relaxed">
-                全社公開マニュアル等の Google Drive フォルダにアクセス可能な <strong>システム管理用アカウント（または専用同期アカウント）</strong> で連携してください。<br />
-                ※ 一般ユーザーがチャット画面で質問する際は、各自の通常アカウントで利用します。
+                全社公開マニュアル等の Google Drive フォルダにアクセス可能な <strong>システム管理用アカウント（または専用同期アカウント）</strong>
+                で連携してください。<br /> ※ 一般ユーザーがチャット画面で質問する際は、各自の通常アカウントで利用します。
               </p>
 
               <div class="flex flex-wrap items-center gap-3 pt-2">
                 <.link
-                  href={~p"/auth/google?#{[return_to: "/admin?tab=settings"]}"}
+                  href={~p"/auth/google/drive?#{[return_to: "/admin?tab=settings"]}"}
                   class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                 >
                   <.icon name="hero-arrow-path-rounded-square" class="w-4 h-4" />
@@ -596,7 +1076,87 @@ defmodule AskDriveWeb.AdminLive do
               </div>
             </div>
 
-            <%!-- Card 2: System Settings Form --%>
+            <%!-- Card 3: LLM Provider Settings --%>
+            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-5">
+              <div>
+                <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-cpu-chip" class="w-5 h-5 text-indigo-600" /> LLM プロバイダ
+                </h2>
+                <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  回答生成と埋め込みで別々のプロバイダを選べます。埋め込みをローカルのまま据え置くと再インデックスが不要なため、まず生成だけを切り替える構成をおすすめします。
+                </p>
+              </div>
+
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <%= for {role, label, provider, model} <- [
+                      {:generation, "回答生成", @generation_provider, @setting.batch_model},
+                      {:embedding, "埋め込み", @embedding_provider, @setting.embed_model}
+                    ] do %>
+                  <div class="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800 space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">{label}</span>
+                      <span class={[
+                        "text-[10px] px-2 py-0.5 rounded-full font-medium",
+                        if(LLM.local?(provider),
+                          do:
+                            "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+                          else: "bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+                        )
+                      ]}>
+                        {if LLM.local?(provider), do: "ローカル", else: "外部 API"}
+                      </span>
+                    </div>
+                    <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      {LLM.label(provider)}
+                    </div>
+                    <div class="text-[11px] font-mono text-zinc-500 truncate">{model}</div>
+                    <div class="text-[11px] text-zinc-400 truncate">
+                      {LLM.base_url(provider, @setting)}
+                    </div>
+                    <div :if={LLM.requires_api_key?(provider)} class="text-[11px] text-zinc-500">
+                      API キー: {LLM.masked_api_key(provider, @setting)}
+                    </div>
+
+                    <div class="pt-1 flex items-center gap-2">
+                      <button
+                        type="button"
+                        id={"test-#{role}-btn"}
+                        phx-click="test_connection"
+                        phx-value-role={role}
+                        class="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[11px] font-medium transition"
+                      >
+                        接続テスト
+                      </button>
+                    </div>
+
+                    <%= case Map.get(@connection_test, role) do %>
+                      <% {:ok, message} -> %>
+                        <p class="text-[11px] text-emerald-600 dark:text-emerald-400">{message}</p>
+                      <% {:error, message} -> %>
+                        <p class="text-[11px] text-red-600 dark:text-red-400">{message}</p>
+                      <% _ -> %>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
+
+              <div
+                :if={not LLM.local?(@generation_provider) or not LLM.local?(@embedding_provider)}
+                class="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 text-xs leading-relaxed flex items-start gap-2"
+              >
+                <.icon name="hero-exclamation-triangle" class="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  外部 API が有効です。<strong>文書本文と質問がプロバイダに送信されます。</strong>
+                  機密文書を扱う場合は Ollama または LM Studio に戻してください。
+                </span>
+              </div>
+
+              <p class="text-[11px] text-zinc-400">
+                値の変更は下の「システム・OAuth・バッチ設定」フォームから行います。
+              </p>
+            </div>
+
+            <%!-- Card 4: System Settings Form --%>
             <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-6">
               <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-indigo-600" /> システム・OAuth・バッチ設定
@@ -618,7 +1178,8 @@ defmodule AskDriveWeb.AdminLive do
                     <.input
                       field={@form[:google_client_secret]}
                       type="password"
-                      label="OAuth クライアント シークレット (Client Secret)"
+                      value=""
+                      label={"OAuth クライアント シークレット（#{secret_state(@setting.google_client_secret)}）"}
                       placeholder="例: GOCSPX-xxxxxxxxxxxx"
                     />
                   </div>
@@ -630,6 +1191,140 @@ defmodule AskDriveWeb.AdminLive do
                     <div class="p-2 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono text-[11px] text-indigo-600 dark:text-indigo-400 select-all">
                       http://localhost:4000/auth/google/callback（リモートホスト経由の場合はホスト名/IPに置換）
                     </div>
+                  </div>
+                </div>
+
+                <%!-- LLM Provider Selection --%>
+                <div class="space-y-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800">
+                  <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                    <.icon name="hero-cpu-chip" class="w-4 h-4 text-indigo-500" /> LLM プロバイダとモデル
+                  </h3>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <.input
+                      field={@form[:llm_provider]}
+                      type="select"
+                      label="回答生成プロバイダ"
+                      options={provider_options(LLM.generation_providers())}
+                    />
+                    <.input field={@form[:batch_model]} type="text" label="生成モデル名" />
+                    <.input
+                      field={@form[:llm_max_tokens]}
+                      type="number"
+                      label="生成トークン上限 (外部 API)"
+                      min="1"
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <.input
+                      field={@form[:embed_provider]}
+                      type="select"
+                      label="埋め込みプロバイダ"
+                      options={provider_options(LLM.embedding_providers())}
+                    />
+                    <.input field={@form[:embed_model]} type="text" label="埋め込みモデル名" />
+                    <.input
+                      field={@form[:embedding_dim]}
+                      type="number"
+                      label="埋め込み次元"
+                      min="64"
+                      max="4096"
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <.input
+                      field={@form[:batch_num_ctx]}
+                      type="number"
+                      label="コンテキスト長 (num_ctx / Ollama のみ)"
+                    />
+                    <.input
+                      field={@form[:llm_temperature]}
+                      type="number"
+                      step="0.1"
+                      min="0.0"
+                      max="2.0"
+                      label="temperature (空欄でプロバイダ既定値)"
+                    />
+                  </div>
+
+                  <p class="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
+                    <.icon name="hero-exclamation-triangle" class="w-3.5 h-3.5 inline" />
+                    埋め込みモデルまたは次元を変更すると、ベクトル仮想テーブルを再作成し、既存のベクトルをすべて破棄します。次回の夜間バッチで全チャンクを再ベクトル化するまで Tier 1 / Tier 2 は機能しません。
+                  </p>
+                </div>
+
+                <%!-- Provider Endpoints and API Keys --%>
+                <div class="space-y-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800">
+                  <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                    <.icon name="hero-key" class="w-4 h-4 text-indigo-500" /> プロバイダ接続情報
+                  </h3>
+                  <p class="text-[11px] text-zinc-500">
+                    API キーは暗号化して保存されます。空欄のまま保存すると既存の値を維持します。使用しないプロバイダの欄は空のままで構いません。
+                  </p>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <.input
+                      field={@form[:ollama_host]}
+                      type="text"
+                      label="Ollama エンドポイント"
+                      placeholder={LLM.default_base_url("ollama")}
+                    />
+                    <.input
+                      field={@form[:lmstudio_base_url]}
+                      type="text"
+                      label="LM Studio エンドポイント"
+                      placeholder={LLM.default_base_url("lmstudio")}
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <.input
+                      field={@form[:anthropic_api_key]}
+                      type="password"
+                      value=""
+                      label={"Anthropic Claude API キー（#{LLM.masked_api_key("anthropic", @setting)}）"}
+                      placeholder="sk-ant-..."
+                    />
+                    <.input
+                      field={@form[:anthropic_base_url]}
+                      type="text"
+                      label="Anthropic ベース URL"
+                      placeholder={LLM.default_base_url("anthropic")}
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <.input
+                      field={@form[:gemini_api_key]}
+                      type="password"
+                      value=""
+                      label={"Google Gemini API キー（#{LLM.masked_api_key("gemini", @setting)}）"}
+                      placeholder="AIza..."
+                    />
+                    <.input
+                      field={@form[:gemini_base_url]}
+                      type="text"
+                      label="Gemini ベース URL"
+                      placeholder={LLM.default_base_url("gemini")}
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <.input
+                      field={@form[:openai_api_key]}
+                      type="password"
+                      value=""
+                      label={"OpenAI API キー（#{LLM.masked_api_key("openai", @setting)}）"}
+                      placeholder="sk-..."
+                    />
+                    <.input
+                      field={@form[:openai_base_url]}
+                      type="text"
+                      label="OpenAI ベース URL"
+                      placeholder={LLM.default_base_url("openai")}
+                    />
                   </div>
                 </div>
 
@@ -665,19 +1360,6 @@ defmodule AskDriveWeb.AdminLive do
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <.input
-                    field={@form[:batch_model]}
-                    type="text"
-                    label="夜間生成モデル (batch_model: qwen3:4b)"
-                  />
-                  <.input
-                    field={@form[:embed_model]}
-                    type="text"
-                    label="埋め込みモデル (embed_model: bge-m3)"
-                  />
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <.input
                     field={@form[:batch_start_hour]}
                     type="number"
                     label="バッチ開始時刻 (時: 0〜23)"
@@ -693,18 +1375,11 @@ defmodule AskDriveWeb.AdminLive do
                   />
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <.input
-                    field={@form[:batch_num_ctx]}
-                    type="number"
-                    label="バッチ生成コンテキスト長 (num_ctx)"
-                  />
-                  <.input
-                    field={@form[:maintenance_message]}
-                    type="text"
-                    label="メンテナンス告知メッセージ"
-                  />
-                </div>
+                <.input
+                  field={@form[:maintenance_message]}
+                  type="text"
+                  label="メンテナンス告知メッセージ"
+                />
 
                 <div class="pt-2 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3">
                   <.input
@@ -727,6 +1402,8 @@ defmodule AskDriveWeb.AdminLive do
                 <div class="pt-4 flex justify-end">
                   <button
                     type="submit"
+                    id="save-settings-btn"
+                    data-confirm="設定を保存します。埋め込みモデルまたは次元を変更した場合、ベクトルインデックスを再作成し全件の再ベクトル化が必要になります。続行しますか？"
                     class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                   >
                     設定を保存

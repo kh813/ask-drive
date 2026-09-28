@@ -1,0 +1,75 @@
+<Layouts.flash_group flash={@flash} />
+
+<main class="min-h-screen flex items-center justify-center px-4 py-12 bg-zinc-50 dark:bg-zinc-950">
+  <div class="w-full max-w-md space-y-6">
+    <div class="text-center space-y-3">
+      <div class="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xl shadow-sm mx-auto">
+        AD
+      </div>
+      <div>
+        <h1 class="font-bold text-2xl text-zinc-900 dark:text-zinc-100">AskDrive</h1>
+        <p class="text-sm text-zinc-500 mt-1">社内文書ナレッジ回答ボット</p>
+      </div>
+    </div>
+
+    <div class="p-8 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-6">
+      <div class="space-y-1.5 text-center">
+        <h2 class="font-semibold text-base text-zinc-900 dark:text-zinc-100">ログイン</h2>
+        <p class="text-xs text-zinc-500 leading-relaxed">
+          <%= if @allowed_domain do %>
+            <span class="font-medium text-zinc-700 dark:text-zinc-300">@{@allowed_domain}</span>
+            の Google アカウントでログインしてください。
+          <% else %>
+            Google アカウントでログインしてください。
+          <% end %>
+        </p>
+      </div>
+
+      <%= if @oauth_configured? do %>
+        <a
+          id="google-login-btn"
+          href={~p"/auth/google"}
+          class="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
+        >
+          <.icon name="hero-arrow-right-on-rectangle" class="w-4 h-4" /> Google でログイン
+        </a>
+      <% else %>
+        <div class="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 space-y-2">
+          <p class="font-medium text-sm flex items-center gap-1.5">
+            <.icon name="hero-exclamation-triangle" class="w-4 h-4" /> OAuth が未設定です
+          </p>
+          <p class="text-xs leading-relaxed">
+            <code
+              class="font-mono text-[11px] bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded"
+              phx-no-curly-interpolation
+            >.env.prod</code>
+            に
+            <code
+              class="font-mono text-[11px] bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded"
+              phx-no-curly-interpolation
+            >GOOGLE_CLIENT_ID</code>
+            /
+            <code
+              class="font-mono text-[11px] bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded"
+              phx-no-curly-interpolation
+            >GOOGLE_CLIENT_SECRET</code>
+            /
+            <code
+              class="font-mono text-[11px] bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded"
+              phx-no-curly-interpolation
+            >ASK_DRIVE_ADMIN_EMAILS</code>
+            を設定し、<code
+              class="font-mono text-[11px] bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded"
+              phx-no-curly-interpolation
+            >./app.sh restart</code>
+            で再起動してください。
+          </p>
+        </div>
+      <% end %>
+
+      <p class="text-[11px] text-zinc-400 text-center leading-relaxed">
+        初回ログイン時に自動で登録されます。管理者権限は初期セットアップで指定したアドレス、または管理画面から付与されます。
+      </p>
+    </div>
+  </div>
+</main>

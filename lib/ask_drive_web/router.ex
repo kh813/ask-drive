@@ -1,6 +1,8 @@
 defmodule AskDriveWeb.Router do
   use AskDriveWeb, :router
 
+  import AskDriveWeb.UserAuth
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -8,20 +10,63 @@ defmodule AskDriveWeb.Router do
     plug :put_root_layout, html: {AskDriveWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug :fetch_current_user
   end
 
   pipeline :api do
     plug :accepts, ["json"]
   end
 
+  # --- Public: sign-in only (spec 6.9) --------------------------------------
   scope "/", AskDriveWeb do
     pipe_through :browser
 
-    live "/", ChatLive
-    live "/admin", AdminLive
-
+    get "/login", AuthController, :login
     get "/auth/google", AuthController, :request
     get "/auth/google/callback", AuthController, :callback
+    get "/logout", AuthController, :logout
+    delete "/logout", AuthController, :logout
+  end
+
+  # --- Signed in ------------------------------------------------------------
+  scope "/", AskDriveWeb do
+    pipe_through [:browser, :require_authenticated_user]
+
+    live_session :authenticated,
+      on_mount: [{AskDriveWeb.UserAuth, :require_authenticated}] do
+      live "/", ChatLive
+    end
+  end
+
+  # --- Elevation prompt: signed in and allowed to try, but not yet elevated --
+  scope "/", AskDriveWeb do
+    pipe_through [:browser, :require_authenticated_user, :require_admin_eligible]
+
+    get "/admin/elevate", AdminAccessController, :new
+    post "/admin/elevate", AdminAccessController, :create
+    post "/admin/password", AdminAccessController, :set_password
+  end
+
+  # Releasing rights must work for anyone signed in, even after the elevation lapsed.
+  scope "/", AskDriveWeb do
+    pipe_through [:browser, :require_authenticated_user]
+
+    delete "/admin/elevate", AdminAccessController, :delete
+    get "/admin/release", AdminAccessController, :delete
+  end
+
+  # --- Elevated sessions only (spec 6.9 F-911) ------------------------------
+  scope "/", AskDriveWeb do
+    pipe_through [:browser, :require_admin_session]
+
+    live_session :admin,
+      on_mount: [{AskDriveWeb.UserAuth, :require_admin_session}] do
+      live "/admin", AdminLive
+    end
+
+    # Authorizing and revoking the Drive sync account changes what the whole system reads,
+    # so it needs the same elevated session as the settings screen.
+    get "/auth/google/drive", AuthController, :request_drive
     get "/auth/google/disconnect", AuthController, :disconnect
     delete "/auth/google", AuthController, :disconnect
   end
@@ -35,9 +80,6 @@ defmodule AskDriveWeb.Router do
   if Application.compile_env(:ask_drive, :dev_routes) do
     # If you want to use the LiveDashboard in production, you should put
     # it behind authentication and allow only admins to access it.
-    # If your application does not have an admins-only section yet,
-    # you can use Plug.BasicAuth to set up some basic authentication
-    # as long as you are also using SSL (which you should anyway).
     import Phoenix.LiveDashboard.Router
 
     scope "/dev" do

@@ -10,7 +10,8 @@ defmodule AskDrive.Batch.EmbedQuestionsWorker do
   require Logger
   alias AskDrive.QA.QAPair
   alias AskDrive.{Repo, Settings, Vector}
-  alias AskDrive.LLM.{Ollama, Semaphore}
+  alias AskDrive.LLM
+  alias AskDrive.LLM.Semaphore
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"qa_pair_id" => qa_pair_id}}) do
@@ -31,7 +32,7 @@ defmodule AskDrive.Batch.EmbedQuestionsWorker do
 
     embed_result =
       Semaphore.run(fn ->
-        Ollama.embed(setting.embed_model, questions)
+        LLM.embed(setting.embed_model, questions, setting: setting)
       end)
 
     case embed_result do
@@ -68,7 +69,7 @@ defmodule AskDrive.Batch.EmbedQuestionsWorker do
 
     embed_result =
       Semaphore.run(fn ->
-        Ollama.embed(setting.embed_model, [qa.question])
+        LLM.embed(setting.embed_model, [qa.question], setting: setting)
       end)
 
     case embed_result do

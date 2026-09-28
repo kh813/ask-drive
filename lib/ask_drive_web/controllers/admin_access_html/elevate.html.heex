@@ -1,0 +1,99 @@
+<Layouts.app flash={@flash} current_user={@current_user}>
+  <div class="max-w-md mx-auto space-y-6 py-8">
+    <div class="text-center space-y-2">
+      <div class="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-sm">
+        <.icon name="hero-shield-check" class="w-6 h-6" />
+      </div>
+      <h1 class="font-bold text-xl text-zinc-900 dark:text-zinc-100">管理者権限への昇格</h1>
+      <p class="text-xs text-zinc-500 leading-relaxed">
+        {@current_user.email} として昇格します。<br /> 昇格した記録は監査ログに残ります。
+      </p>
+    </div>
+
+    <div
+      :if={@error_message}
+      class="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-red-700 dark:text-red-300 text-xs flex items-start gap-2"
+    >
+      <.icon name="hero-exclamation-circle" class="w-4 h-4 shrink-0 mt-0.5" />
+      <span>{@error_message}</span>
+    </div>
+
+    <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-5">
+      <%= cond do %>
+        <% @locked_until -> %>
+          <div class="text-center space-y-2 py-4">
+            <.icon name="hero-lock-closed" class="w-8 h-8 text-red-500 mx-auto" />
+            <p class="font-medium text-sm text-zinc-900 dark:text-zinc-100">
+              一時的にロックされています
+            </p>
+            <p class="text-xs text-zinc-500">
+              {Calendar.strftime(@locked_until, "%H:%M")} 以降に再度お試しください。
+            </p>
+          </div>
+        <% not @password_set? -> %>
+          <%!-- First run: an eligible account sets the shared password here (F-917). --%>
+          <div class="space-y-1">
+            <h2 class="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
+              管理者パスワードの初回設定
+            </h2>
+            <p class="text-xs text-zinc-500 leading-relaxed">
+              まだ管理者パスワードが設定されていません。以後、管理画面に入るたびにこのパスワードの入力を求めます。
+            </p>
+          </div>
+
+          <.form :let={f} for={%{}} as={:admin} action={~p"/admin/password"} class="space-y-4">
+            <.input
+              field={f[:password]}
+              type="password"
+              label={"新しい管理者パスワード（#{@min_length} 文字以上）"}
+              required
+              autocomplete="new-password"
+            />
+            <.input
+              field={f[:confirmation]}
+              type="password"
+              label="確認のためもう一度入力"
+              required
+              autocomplete="new-password"
+            />
+            <button
+              type="submit"
+              id="set-admin-password-btn"
+              class="w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
+            >
+              パスワードを設定
+            </button>
+          </.form>
+        <% true -> %>
+          <.form :let={f} for={%{}} as={:admin} action={~p"/admin/elevate"} class="space-y-4">
+            <.input
+              field={f[:password]}
+              type="password"
+              label="管理者パスワード"
+              required
+              autocomplete="current-password"
+            />
+            <button
+              type="submit"
+              id="elevate-btn"
+              class="w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
+            >
+              管理者として続行
+            </button>
+            <p class="text-[11px] text-zinc-400 text-center">
+              残り試行回数: {@attempts_remaining} 回
+            </p>
+          </.form>
+      <% end %>
+    </div>
+
+    <p class="text-center">
+      <.link
+        navigate={~p"/"}
+        class="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition"
+      >
+        チャットに戻る
+      </.link>
+    </p>
+  </div>
+</Layouts.app>

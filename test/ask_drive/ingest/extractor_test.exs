@@ -19,6 +19,23 @@ defmodule AskDrive.Ingest.ExtractorTest do
     assert json_res.text == json
   end
 
+  test "routes text/html through pandoc instead of passing raw markup through" do
+    html = "<html><body><h1>タイトル</h1><p>本文です。</p></body></html>"
+
+    case Extractor.extract_binary(html, "text/html") do
+      {:ok, result} ->
+        # Cleanly extracted: tags gone, text content kept.
+        refute result.text =~ "<"
+        assert result.text =~ "タイトル"
+        assert result.text =~ "本文です"
+
+      {:skipped, reason} ->
+        # No pandoc in this environment — still proves html no longer falls into the
+        # raw-passthrough text branch (which would have returned {:ok, ...} with tags intact).
+        assert reason =~ "pandoc"
+    end
+  end
+
   test "returns skipped for unsupported MIME types" do
     assert {:skipped, reason} = Extractor.extract_binary(<<0, 1, 2, 3>>, "video/mp4")
     assert reason =~ "Unsupported MIME type"

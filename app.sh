@@ -41,6 +41,9 @@ AskDrive 管理スクリプト
   setup              初回セットアップを実行 (依存ツール確認、DB初期化、ビルド)
   deploy             最新コードを取得し、マイグレーションと再ビルド・再起動を実行
   update [options]   Git/Release から自己アップデート (--yes, --ver <version>)
+  repair-ollama      .runtime の Ollama を再インストール (llama-server 欠落の修復)
+  admin grant <mail> 指定メールアドレスに管理者への昇格を許可 (ロックアウト時の復旧)
+  admin password     管理者パスワードを再設定 (対話入力)
 
 サービス管理 (launchd 常駐デーモン):
   service install    launchd 常駐サービスを登録 (OS 起動時自動起動)
@@ -197,6 +200,65 @@ cmd_setup() {
     echo -e "${RED}scripts/initial-setup.sh が見つかりません。${NC}"
     exit 1
   fi
+}
+
+# .runtime の Ollama には ollama 本体だけでなく推論ランナー llama-server と
+# ggml/llama の dylib 群が必要。旧セットアップは本体のみを配置していたため、
+# モデルのロード時に "llama-server binary not found" で失敗する。
+cmd_repair_ollama() {
+  echo -e "${YELLOW}.runtime の Ollama を再インストールします...${NC}"
+  mkdir -p "${RUNTIME_BIN}"
+
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+  trap 'rm -rf "${tmp_dir}"' RETURN
+
+  echo "Ollama スタンドアロン配布物 (約 160MB) を取得中..."
+  if ! curl -fL --retry 3 -o "${tmp_dir}/ollama-darwin.tgz" "https://ollama.com/download/ollama-darwin.tgz"; then
+    echo -e "${RED}ダウンロードに失敗しました。${NC}"
+    exit 1
+  fi
+
+  if ! tar -xzf "${tmp_dir}/ollama-darwin.tgz" -C "${RUNTIME_BIN}"; then
+    echo -e "${RED}展開に失敗しました。${NC}"
+    exit 1
+  fi
+
+  chmod +x "${RUNTIME_BIN}/ollama" "${RUNTIME_BIN}/llama-server" 2>/dev/null || true
+
+  if [[ ! -x "${RUNTIME_BIN}/llama-server" ]]; then
+    echo -e "${RED}llama-server を配置できませんでした。${NC}"
+    exit 1
+  fi
+
+  echo -e "${GREEN}ollama と llama-server を ${RUNTIME_BIN} に再インストールしました。${NC}"
+  echo "稼働中の Ollama があれば再起動してください: ./app.sh restart"
+}
+
+cmd_admin() {
+  local sub="${1:-}"
+  shift || true
+
+  load_env
+  cd "${SCRIPT_DIR}"
+
+  case "${sub}" in
+    grant)
+      local email="${1:-}"
+      if [[ -z "${email}" ]]; then
+        echo -e "${RED}使用方法: ./app.sh admin grant <email>${NC}"
+        exit 1
+      fi
+      MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.grant_admin "${email}"
+      ;;
+    password)
+      MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.set_admin_password
+      ;;
+    *)
+      echo -e "${RED}使用方法: ./app.sh admin grant <email> | ./app.sh admin password${NC}"
+      exit 1
+      ;;
+  esac
 }
 
 cmd_deploy() {
@@ -456,6 +518,12 @@ case "${COMMAND}" in
     ;;
   update)
     cmd_update "$@"
+    ;;
+  repair-ollama)
+    cmd_repair_ollama "$@"
+    ;;
+  admin)
+    cmd_admin "$@"
     ;;
   service)
     SUB_COMMAND="${1:-}"

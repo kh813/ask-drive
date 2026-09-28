@@ -16,7 +16,7 @@ defmodule AskDrive.Answering do
   alias AskDrive.Retrieval
   alias AskDrive.Settings
   alias AskDrive.Vector
-  alias AskDrive.LLM.Ollama
+  alias AskDrive.LLM
 
   @doc """
   Processes a user question and returns a structured response map with tier information and sources.
@@ -51,7 +51,7 @@ defmodule AskDrive.Answering do
     else
       # Not found in Tier 0. Generate query embedding for Tier 1 / Tier 2
       embedding =
-        case Ollama.embed(setting.embed_model, [trimmed]) do
+        case LLM.embed(setting.embed_model, [trimmed], setting: setting) do
           {:ok, [vec | _]} -> vec
           _ -> nil
         end

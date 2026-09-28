@@ -2,6 +2,10 @@ defmodule AskDriveWeb.ChatLiveTest do
   use AskDriveWeb.ConnCase
   import Phoenix.LiveViewTest
 
+  setup %{conn: conn} do
+    %{conn: log_in_user(conn, user_fixture())}
+  end
+
   test "renders chat page and submits question", %{conn: conn} do
     {:ok, view, html} = live(conn, ~p"/")
     assert html =~ "AskDrive"

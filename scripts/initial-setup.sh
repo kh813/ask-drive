@@ -56,22 +56,52 @@ else
 fi
 
 # (B) Ollama の確認・インストール
-if ! command -v ollama >/dev/null 2>&1; then
-  echo "ollama が見つかりません。スタンドアロンバイナリを取得中..."
-  TMP_DIR="$(mktemp -d)"
-  curl -fL -o "${TMP_DIR}/Ollama-darwin.zip" "https://ollama.com/download/Ollama-darwin.zip"
-  unzip -q -o "${TMP_DIR}/Ollama-darwin.zip" -d "${TMP_DIR}"
-  OLLAMA_BIN_SRC="$(find "${TMP_DIR}" -type f -name ollama | head -n 1)"
-  if [[ -n "${OLLAMA_BIN_SRC}" && -f "${OLLAMA_BIN_SRC}" ]]; then
-    cp "${OLLAMA_BIN_SRC}" "${RUNTIME_BIN}/ollama"
-    chmod +x "${RUNTIME_BIN}/ollama"
-    echo -e "${GREEN}ollama を ${RUNTIME_BIN}/ollama にインストールしました。${NC}"
-  else
-    echo -e "${RED}ollama バイナリの展開に失敗しました。${NC}"
+#
+# ollama は単体のバイナリではなく、推論ランナー llama-server と ggml/llama の dylib 群を
+# 同じディレクトリに必要とする。ollama 本体だけを配置すると、モデルのロード時に
+#   "error starting llama-server: llama-server binary not found"
+# で失敗する。そのため .app の zip から ollama を 1 個だけ抜き出すのではなく、
+# 公式のスタンドアロン tarball を丸ごと RUNTIME_BIN へ展開する。
+install_ollama_runtime() {
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+  echo "Ollama スタンドアロン配布物 (約 160MB) を取得中..."
+
+  if ! curl -fL --retry 3 -o "${tmp_dir}/ollama-darwin.tgz" "https://ollama.com/download/ollama-darwin.tgz"; then
+    echo -e "${RED}Ollama のダウンロードに失敗しました。${NC}"
+    rm -rf "${tmp_dir}"
+    return 1
   fi
-  rm -rf "${TMP_DIR}"
+
+  # tarball は ollama / llama-server / 各種 dylib がフラットに並んだ構成。
+  # dylib は実行ファイルからの相対パスで解決されるため、同一ディレクトリへ展開する。
+  if ! tar -xzf "${tmp_dir}/ollama-darwin.tgz" -C "${RUNTIME_BIN}"; then
+    echo -e "${RED}Ollama の展開に失敗しました。${NC}"
+    rm -rf "${tmp_dir}"
+    return 1
+  fi
+
+  chmod +x "${RUNTIME_BIN}/ollama" "${RUNTIME_BIN}/llama-server" 2>/dev/null || true
+  rm -rf "${tmp_dir}"
+
+  if [[ ! -x "${RUNTIME_BIN}/llama-server" ]]; then
+    echo -e "${RED}llama-server が見つかりません。Ollama のインストールが不完全です。${NC}"
+    return 1
+  fi
+
+  echo -e "${GREEN}ollama と llama-server を ${RUNTIME_BIN} にインストールしました。${NC}"
+}
+
+OLLAMA_PATH="$(command -v ollama || true)"
+if [[ -z "${OLLAMA_PATH}" ]]; then
+  echo "ollama が見つかりません。"
+  install_ollama_runtime
+elif [[ "${OLLAMA_PATH}" == "${RUNTIME_BIN}/ollama" && ! -x "${RUNTIME_BIN}/llama-server" ]]; then
+  # 旧バージョンのセットアップが ollama 本体だけを配置した状態。ランナーを補って修復する。
+  echo -e "${YELLOW}ollama はありますが推論ランナー (llama-server) が欠落しています。再インストールします。${NC}"
+  install_ollama_runtime
 else
-  echo "ollama: OK ($(command -v ollama))"
+  echo "ollama: OK (${OLLAMA_PATH})"
 fi
 
 # (C) Homebrew / Poppler (pdftotext) / Erlang & Elixir の確認・インストール
@@ -131,29 +161,8 @@ else
   echo "sqlite-vec: OK (${VEC_EXT})"
 fi
 
-# 3. Ollama モデルの確認とダウンロード
-echo -e "\n${YELLOW}[3/7] Ollama サービスとモデルの確認中...${NC}"
-OLLAMA_PID=""
-if ! curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
-  echo "Ollama サーバーを一時起動中..."
-  ollama serve > "${SCRIPT_DIR}/log/ollama_setup.log" 2>&1 &
-  OLLAMA_PID=$!
-  sleep 3
-fi
-
-echo "モデル bge-m3 を確認・ダウンロード中..."
-ollama pull bge-m3 || true
-
-echo "モデル qwen3:4b を確認・ダウンロード中..."
-ollama pull qwen3:4b || ollama pull qwen2.5:3b || true
-
-if [[ -n "${OLLAMA_PID}" ]]; then
-  echo "一時起動した Ollama サーバーを停止中..."
-  kill -TERM "${OLLAMA_PID}" 2>/dev/null || true
-fi
-
-# 4. .env.prod の生成確認
-echo -e "\n${YELLOW}[4/7] 環境設定ファイルの確認中...${NC}"
+# 3. .env.prod の生成と初期設定の入力
+echo -e "\n${YELLOW}[3/7] 環境設定ファイルの確認中...${NC}"
 if [[ ! -f "${SCRIPT_DIR}/.env.prod" ]]; then
   echo ".env.prod を新規作成中..."
   if command -v openssl >/dev/null 2>&1; then
@@ -164,6 +173,135 @@ if [[ ! -f "${SCRIPT_DIR}/.env.prod" ]]; then
     ENCRYPTION_KEY="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
   fi
 
+  # 値は .env.prod への初期値。保存後は管理画面の設定が優先されるため、
+  # ここで空欄にしても後からすべて変更できる。
+  cat << 'BANNER'
+
+--------------------------------------------------------------------
+ 初期設定
+   ここで入力する内容はすべて後から管理画面で変更できます。
+   空欄で Enter を押すと既定値を使います。
+--------------------------------------------------------------------
+BANNER
+
+  echo -e "\n${BLUE}[LLM プロバイダの選択]${NC}"
+  echo "  1) ollama    - ローカル推論（既定・完全ローカル、追加費用なし）"
+  echo "  2) lmstudio  - LM Studio のローカルサーバー（OpenAI 互換）"
+  echo "  3) gemini    - Google Gemini API"
+  echo "  4) anthropic - Anthropic Claude API"
+  echo "  5) openai    - OpenAI API"
+  echo -e "  ${YELLOW}※ 3〜5 を選ぶと、文書本文と質問が外部 API に送信されます。${NC}"
+
+  provider_from_choice() {
+    case "$1" in
+      2) echo "lmstudio" ;;
+      3) echo "gemini" ;;
+      4) echo "anthropic" ;;
+      5) echo "openai" ;;
+      *) echo "ollama" ;;
+    esac
+  }
+
+  default_gen_model_for() {
+    case "$1" in
+      gemini) echo "gemini-2.5-flash" ;;
+      anthropic) echo "claude-sonnet-5" ;;
+      openai) echo "gpt-5" ;;
+      lmstudio) echo "" ;;
+      *) echo "qwen3:4b" ;;
+    esac
+  }
+
+  default_embed_model_for() {
+    case "$1" in
+      gemini) echo "gemini-embedding-001" ;;
+      openai) echo "text-embedding-3-small" ;;
+      lmstudio) echo "text-embedding-nomic-embed-text-v1.5" ;;
+      *) echo "bge-m3" ;;
+    esac
+  }
+
+  default_embed_dim_for() {
+    case "$1" in
+      gemini) echo "768" ;;
+      openai) echo "1536" ;;
+      lmstudio) echo "768" ;;
+      *) echo "1024" ;;
+    esac
+  }
+
+  read -r -p "回答生成に使うプロバイダ [1-5] (既定: 1): " GEN_CHOICE
+  LLM_PROVIDER="$(provider_from_choice "${GEN_CHOICE:-1}")"
+  DEFAULT_GEN_MODEL="$(default_gen_model_for "${LLM_PROVIDER}")"
+  read -r -p "生成モデル名 (既定: ${DEFAULT_GEN_MODEL:-ロード中のモデル}): " LLM_MODEL
+  LLM_MODEL="${LLM_MODEL:-${DEFAULT_GEN_MODEL}}"
+
+  echo ""
+  echo "  ※ 埋め込みは Claude API 非対応のため選択肢から除外されます。"
+  echo "  ※ 埋め込みを変更すると全ドキュメントの再インデックスが必要です。ローカルのままを推奨します。"
+  read -r -p "埋め込みに使うプロバイダ [1,2,3,5] (既定: 1): " EMB_CHOICE
+  EMBED_PROVIDER="$(provider_from_choice "${EMB_CHOICE:-1}")"
+  if [[ "${EMBED_PROVIDER}" == "anthropic" ]]; then
+    echo -e "${YELLOW}Claude API は埋め込みに対応していません。ollama を使用します。${NC}"
+    EMBED_PROVIDER="ollama"
+  fi
+  DEFAULT_EMBED_MODEL="$(default_embed_model_for "${EMBED_PROVIDER}")"
+  read -r -p "埋め込みモデル名 (既定: ${DEFAULT_EMBED_MODEL}): " EMBED_MODEL
+  EMBED_MODEL="${EMBED_MODEL:-${DEFAULT_EMBED_MODEL}}"
+  DEFAULT_EMBED_DIM="$(default_embed_dim_for "${EMBED_PROVIDER}")"
+  read -r -p "埋め込み次元 (既定: ${DEFAULT_EMBED_DIM}): " EMBED_DIM
+  EMBED_DIM="${EMBED_DIM:-${DEFAULT_EMBED_DIM}}"
+
+  # API キーは入力中に画面へ出さない。
+  ANTHROPIC_KEY=""
+  GEMINI_KEY=""
+  OPENAI_KEY=""
+  for needed in "${LLM_PROVIDER}" "${EMBED_PROVIDER}"; do
+    case "${needed}" in
+      anthropic)
+        if [[ -z "${ANTHROPIC_KEY}" ]]; then
+          read -r -s -p "Anthropic API キー: " ANTHROPIC_KEY; echo ""
+        fi
+        ;;
+      gemini)
+        if [[ -z "${GEMINI_KEY}" ]]; then
+          read -r -s -p "Google Gemini API キー: " GEMINI_KEY; echo ""
+        fi
+        ;;
+      openai)
+        if [[ -z "${OPENAI_KEY}" ]]; then
+          read -r -s -p "OpenAI API キー: " OPENAI_KEY; echo ""
+        fi
+        ;;
+    esac
+  done
+
+  echo -e "\n${BLUE}[Google 連携とアクセス制御]${NC}"
+  read -r -p "Google OAuth クライアント ID (後から設定可): " GOOGLE_ID
+  read -r -s -p "Google OAuth クライアント シークレット (後から設定可): " GOOGLE_SECRET; echo ""
+  read -r -p "許可する Google Workspace ドメイン (例: company.com): " ALLOWED_DOMAIN
+  read -r -p "管理者へ昇格できるアカウント（カンマ区切り、複数可）: " ADMIN_EMAILS
+
+  # 管理者パスワードは sudo 相当。未入力なら初回昇格時に画面から設定させる。
+  ADMIN_PASSWORD=""
+  while true; do
+    read -r -s -p "管理者パスワード（管理画面へ昇格する際に入力・8文字以上・空欄可）: " ADMIN_PASSWORD; echo ""
+    if [[ -z "${ADMIN_PASSWORD}" ]]; then
+      echo -e "${YELLOW}未設定のまま進みます。初回の昇格時にブラウザから設定できます。${NC}"
+      break
+    fi
+    if [[ "${#ADMIN_PASSWORD}" -lt 8 ]]; then
+      echo -e "${RED}8 文字以上にしてください。${NC}"
+      continue
+    fi
+    read -r -s -p "管理者パスワード（確認）: " ADMIN_PASSWORD_CONFIRM; echo ""
+    if [[ "${ADMIN_PASSWORD}" != "${ADMIN_PASSWORD_CONFIRM}" ]]; then
+      echo -e "${RED}一致しません。もう一度入力してください。${NC}"
+      continue
+    fi
+    break
+  done
+
   cat << EOF > "${SCRIPT_DIR}/.env.prod"
 MIX_ENV=prod
 PHX_SERVER=true
@@ -172,9 +310,67 @@ PHX_HOST=localhost
 SECRET_KEY_BASE=${SECRET_KEY}
 ASK_DRIVE_ENCRYPTION_KEY=${ENCRYPTION_KEY}
 DATABASE_PATH=${SCRIPT_DIR}/ask_drive_prod.db
+
+# --- Google 連携とアクセス制御 ---
+GOOGLE_CLIENT_ID=${GOOGLE_ID}
+GOOGLE_CLIENT_SECRET=${GOOGLE_SECRET}
+ASK_DRIVE_ALLOWED_DOMAIN=${ALLOWED_DOMAIN}
+ASK_DRIVE_ADMIN_EMAILS=${ADMIN_EMAILS}
+# 起動時にハッシュ化して DB へ保存される。保存後この値は参照されない。
+ASK_DRIVE_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+
+# --- LLM プロバイダ ---
+ASK_DRIVE_LLM_PROVIDER=${LLM_PROVIDER}
+ASK_DRIVE_LLM_MODEL=${LLM_MODEL}
+ASK_DRIVE_EMBED_PROVIDER=${EMBED_PROVIDER}
+ASK_DRIVE_EMBED_MODEL=${EMBED_MODEL}
+ASK_DRIVE_EMBEDDING_DIM=${EMBED_DIM}
 OLLAMA_HOST=http://localhost:11434
+LMSTUDIO_BASE_URL=http://localhost:1234/v1
+ANTHROPIC_API_KEY=${ANTHROPIC_KEY}
+GEMINI_API_KEY=${GEMINI_KEY}
+OPENAI_API_KEY=${OPENAI_KEY}
 EOF
-  echo -e "${GREEN}.env.prod を生成しました。${NC}"
+  chmod 600 "${SCRIPT_DIR}/.env.prod"
+  echo -e "${GREEN}.env.prod を生成しました（パーミッション 600）。${NC}"
+fi
+
+# 生成した .env.prod を以降の手順（モデル取得・マイグレーション）でも使う。
+set -a
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/.env.prod"
+set +a
+
+# 4. Ollama モデルの確認とダウンロード
+# 生成・埋め込みのどちらも外部 API を使う構成なら、数 GB のモデルを落とす意味がない。
+if [[ "${ASK_DRIVE_LLM_PROVIDER:-ollama}" == "ollama" || "${ASK_DRIVE_EMBED_PROVIDER:-ollama}" == "ollama" ]]; then
+  echo -e "\n${YELLOW}[4/7] Ollama サービスとモデルの確認中...${NC}"
+  OLLAMA_PID=""
+  if ! curl -s "${OLLAMA_HOST:-http://localhost:11434}/api/tags" >/dev/null 2>&1; then
+    echo "Ollama サーバーを一時起動中..."
+    ollama serve > "${SCRIPT_DIR}/log/ollama_setup.log" 2>&1 &
+    OLLAMA_PID=$!
+    sleep 3
+  fi
+
+  if [[ "${ASK_DRIVE_EMBED_PROVIDER:-ollama}" == "ollama" ]]; then
+    EMBED_PULL="${ASK_DRIVE_EMBED_MODEL:-bge-m3}"
+    echo "埋め込みモデル ${EMBED_PULL} を確認・ダウンロード中..."
+    ollama pull "${EMBED_PULL}" || true
+  fi
+
+  if [[ "${ASK_DRIVE_LLM_PROVIDER:-ollama}" == "ollama" ]]; then
+    GEN_PULL="${ASK_DRIVE_LLM_MODEL:-qwen3:4b}"
+    echo "生成モデル ${GEN_PULL} を確認・ダウンロード中..."
+    ollama pull "${GEN_PULL}" || ollama pull qwen2.5:3b || true
+  fi
+
+  if [[ -n "${OLLAMA_PID}" ]]; then
+    echo "一時起動した Ollama サーバーを停止中..."
+    kill -TERM "${OLLAMA_PID}" 2>/dev/null || true
+  fi
+else
+  echo -e "\n${YELLOW}[4/7] 生成・埋め込みともに外部 API のため、Ollama モデルの取得をスキップします。${NC}"
 fi
 
 # 5. Elixir 依存関係の取得とコンパイル
@@ -186,12 +382,6 @@ mix deps.get
 
 # 6. データベースマイグレーション
 echo -e "\n${YELLOW}[6/7] データベースマイグレーションの実行中...${NC}"
-if [[ -f "${SCRIPT_DIR}/.env.prod" ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source "${SCRIPT_DIR}/.env.prod"
-  set +a
-fi
 MIX_ENV=prod mix ecto.create || true
 MIX_ENV=prod mix ecto.migrate
 

@@ -1,7 +1,8 @@
 defmodule AskDriveWeb.ChatLive do
   use AskDriveWeb, :live_view
 
-  alias AskDrive.{Accounts, Answering, HealthCheck, Repo, Settings}
+  alias AskDrive.{Accounts, Answering, HealthCheck, LLM, Repo, Settings}
+  alias AskDrive.Accounts.User
   alias AskDrive.Documents.Chunk
 
   @impl true
@@ -17,7 +18,10 @@ defmodule AskDriveWeb.ChatLive do
      |> assign(:account, account)
      |> assign(:setting, setting)
      |> assign(:chunk_count, chunk_count)
-     |> assign(:ollama_ok?, match?({:ok, _}, health.ollama))
+     # Answering only needs the embedding provider: generation happens in the nightly batch.
+     |> assign(:embedding_ok?, match?({:ok, _}, health.llm_embedding))
+     |> assign(:embedding_provider_label, LLM.label(LLM.embedding_provider(setting)))
+     |> assign(:admin_eligible?, User.admin_eligible?(socket.assigns.current_user))
      |> assign(:messages, [])
      |> assign(:loading, false)
      |> assign(:form, to_form(%{"question" => ""}))}
@@ -73,67 +77,43 @@ defmodule AskDriveWeb.ChatLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
-      <div class="max-w-4xl mx-auto flex flex-col h-[calc(100vh-8rem)]">
-        <%!-- Header Bar --%>
-        <div class="flex items-center justify-between pb-4 mb-4 border-b border-zinc-200 dark:border-zinc-800">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
-              AD
-            </div>
-            <div>
-              <h1 class="font-bold text-lg text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                AskDrive
-                <span class="text-xs px-2 py-0.5 rounded-full font-normal bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/50">
-                  v0.5 完全ローカル
-                </span>
-              </h1>
-              <p class="text-xs text-zinc-500">
-                <%= if @account do %>
-                  <span class="text-emerald-600 dark:text-emerald-400">● 接続中:</span> {@account.email} ({format_number(
-                    @chunk_count
-                  )} チャンク)
-                <% else %>
-                  <span class="text-amber-600 dark:text-amber-400">● 未接続:</span> Google アカウント未連携
-                <% end %>
-              </p>
-            </div>
+    <Layouts.app
+      flash={@flash}
+      current_user={@current_user}
+      admin_elevated?={@admin_elevated?}
+      admin_elevation_expires_at={@admin_elevation_expires_at}
+    >
+      <div class="flex flex-col h-[calc(100vh-7rem)]">
+        <%!-- Status Bar --%>
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-4 border-b border-zinc-200 dark:border-zinc-800">
+          <div class="flex flex-wrap items-center gap-2 text-xs">
+            <%= if @account do %>
+              <span class="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                {format_number(@chunk_count)} チャンクを検索対象にしています
+              </span>
+            <% else %>
+              <span class="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-current"></span> Google Drive 未連携
+              </span>
+            <% end %>
+
+            <%= if not @embedding_ok? do %>
+              <span class="px-2 py-0.5 rounded-md bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300 border border-red-200 dark:border-red-800">
+                {@embedding_provider_label} に接続できません
+              </span>
+            <% end %>
           </div>
 
-          <div class="flex items-center gap-2">
-            <%= if not @ollama_ok? do %>
-              <div class="text-xs bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300 px-2.5 py-1 rounded-md border border-red-200 dark:border-red-800">
-                Ollama 未接続
-              </div>
-            <% end %>
-
-            <%= if @messages != [] do %>
-              <button
-                id="reset-chat-btn"
-                phx-click="reset_chat"
-                class="text-xs px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 flex items-center gap-1 transition"
-              >
-                <.icon name="hero-trash" class="w-3.5 h-3.5" /> 会話をリセット
-              </button>
-            <% end %>
-
-            <%= if is_nil(@account) do %>
-              <.link
-                href={~p"/auth/google"}
-                class="text-xs px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm transition"
-              >
-                Google 連携
-              </.link>
-            <% end %>
-
-            <.link
-              navigate={~p"/admin"}
-              class="text-xs px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 flex items-center gap-1 transition"
-              title="管理ダッシュボード"
+          <%= if @messages != [] do %>
+            <button
+              id="reset-chat-btn"
+              phx-click="reset_chat"
+              class="text-xs px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 flex items-center gap-1 transition"
             >
-              <.icon name="hero-cog-6-tooth" class="w-3.5 h-3.5" /> 管理
-            </.link>
-          </div>
+              <.icon name="hero-trash" class="w-3.5 h-3.5" /> 会話をリセット
+            </button>
+          <% end %>
         </div>
 
         <%!-- Maintenance Mode Alert --%>
@@ -155,26 +135,38 @@ defmodule AskDriveWeb.ChatLive do
 
         <%!-- Status Alert Banner --%>
         <%= if is_nil(@account) and not @setting.maintenance_mode do %>
-          <div class="mb-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 flex items-start justify-between">
+          <div class="mb-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 flex items-start justify-between gap-3">
             <div class="flex items-start gap-3">
               <.icon name="hero-information-circle" class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
               <div>
                 <p class="font-medium text-sm">Google Drive が連携されていません</p>
                 <p class="text-xs mt-0.5 text-amber-700 dark:text-amber-300">
-                  ドキュメントを取り込んで検索・回答を行うには、Google アカウントを連携してください。
-                  <%= if @setting.allowed_domain do %>
-                    <span class="block mt-1 font-semibold text-amber-900 dark:text-amber-200">
-                      許可ドメイン: @{@setting.allowed_domain}
-                    </span>
+                  <%= cond do %>
+                    <% @admin_elevated? -> %>
+                      ドキュメントを取り込んで検索・回答を行うには、同期専用 Google アカウントを連携してください。
+                    <% @admin_eligible? -> %>
+                      Drive を連携するには、まず管理者権限に昇格してください。
+                    <% true -> %>
+                      まだドキュメントが取り込まれていません。管理者に Drive 連携を依頼してください。
                   <% end %>
                 </p>
               </div>
             </div>
+            <%!-- Connecting Drive needs an elevated session; an eligible user gets sent to
+                  the password prompt first rather than a dead end. --%>
             <.link
-              href={~p"/auth/google"}
+              :if={@admin_elevated?}
+              href={~p"/auth/google/drive"}
               class="text-xs px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium shrink-0 transition"
             >
               今すぐ連携する
+            </.link>
+            <.link
+              :if={not @admin_elevated? and @admin_eligible?}
+              href={~p"/admin/elevate"}
+              class="text-xs px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium shrink-0 transition"
+            >
+              管理者として操作
             </.link>
           </div>
         <% end %>

@@ -4,7 +4,8 @@ defmodule AskDrive.Generate.QA do
   Parses JSON outputs, detects hallucinations, and prevents duplicates.
   """
   alias AskDrive.Documents.Chunk
-  alias AskDrive.LLM.{Ollama, Semaphore}
+  alias AskDrive.LLM
+  alias AskDrive.LLM.Semaphore
 
   @system_prompt """
   あなたは社内ナレッジの想定質問回答（QA）を生成するAIアシスタントです。
@@ -49,7 +50,7 @@ defmodule AskDrive.Generate.QA do
     # Call LLM with semaphore control
     llm_result =
       Semaphore.run(fn ->
-        Ollama.generate(model, prompt, system: @system_prompt, num_ctx: num_ctx)
+        LLM.generate(model, prompt, system: @system_prompt, num_ctx: num_ctx)
       end)
 
     case llm_result do
@@ -91,7 +92,7 @@ defmodule AskDrive.Generate.QA do
 
     llm_result =
       Semaphore.run(fn ->
-        Ollama.generate(model, retry_prompt, system: @system_prompt, num_ctx: num_ctx)
+        LLM.generate(model, retry_prompt, system: @system_prompt, num_ctx: num_ctx)
       end)
 
     case llm_result do

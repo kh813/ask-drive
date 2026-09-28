@@ -6,11 +6,16 @@ defmodule AskDrive.Runtime.Mode do
   - `:daytime` (07:00 - 19:00 default): Embedding model kept resident (`keep_alive: -1`), text generation disabled.
   - `:standby` (19:00 - 02:00 default): All models unloaded (`keep_alive: 0`), text generation disabled.
   - `:night_batch` (02:00 - 06:30 default): Generation enabled, models swapped per pipeline phase with strict single-model residency.
+
+  The whole mechanism exists to stop the generation and embedding models from competing for
+  8GB of RAM. A provider running off-machine consumes none of it, so when generation is
+  served by a remote API the phase no longer gates it (R-106), and residency control is
+  skipped for a remote embedding provider too (R-107).
   """
   use GenServer
   require Logger
 
-  alias AskDrive.LLM.Ollama
+  alias AskDrive.LLM
   alias AskDrive.Settings
 
   @valid_modes [:daytime, :standby, :night_batch]
@@ -88,18 +93,16 @@ defmodule AskDrive.Runtime.Mode do
   @impl true
   def handle_call(:check_generation_allowed, _from, state) do
     setting = Settings.get_setting()
-    allow_daytime = setting && setting.daytime_llm_enabled
 
-    case state.mode do
-      :night_batch ->
-        {:reply, :ok, state}
+    allowed? =
+      state.mode == :night_batch or
+        (setting && setting.daytime_llm_enabled) or
+        not LLM.local_generation?(setting)
 
-      _other ->
-        if allow_daytime do
-          {:reply, :ok, state}
-        else
-          {:reply, {:error, :generation_disabled}, state}
-        end
+    if allowed? do
+      {:reply, :ok, state}
+    else
+      {:reply, {:error, :generation_disabled}, state}
     end
   end
 
@@ -179,14 +182,15 @@ defmodule AskDrive.Runtime.Mode do
     setting = Settings.get_setting()
 
     if setting do
-      # 1. Unload generation model to guarantee RAM headroom (R-103)
-      Ollama.unload_model(setting.batch_model)
+      # 1. Unload generation model to guarantee RAM headroom (R-103). A no-op for remote
+      #    providers, which hold no local memory (R-106).
+      LLM.unload_model(setting.batch_model, setting: setting)
 
-      # 2. Pre-warm and keep embedding model resident (R-104)
-      # Calling embed with keep_alive: -1
+      # 2. Pre-warm and keep the embedding model resident so the first question of the day
+      #    does not pay the load time (R-104). Also a no-op for remote providers (R-107).
       Task.start(fn ->
         try do
-          Ollama.embed(setting.embed_model, ["prewarm"])
+          LLM.prewarm_embedding(setting.embed_model, setting: setting)
         rescue
           _ -> :ok
         end
@@ -201,8 +205,12 @@ defmodule AskDrive.Runtime.Mode do
 
     if setting do
       # Unload both generation and embedding models
-      Ollama.unload_model(setting.batch_model)
-      Ollama.unload_model(setting.embed_model)
+      LLM.unload_model(setting.batch_model, setting: setting)
+
+      LLM.unload_model(setting.embed_model,
+        setting: setting,
+        provider: LLM.embedding_provider(setting)
+      )
     end
 
     :ok

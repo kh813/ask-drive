@@ -2,7 +2,8 @@ defmodule AskDrive.Generate.Extraction do
   @moduledoc """
   Extracts structured key-value pairs (dates, monetary amounts, model numbers, identifiers) from text.
   """
-  alias AskDrive.LLM.{Ollama, Semaphore}
+  alias AskDrive.LLM
+  alias AskDrive.LLM.Semaphore
 
   @system_prompt """
   あなたは文書から重要項目（日付・金額・数値・型番・担当者など）を抽出するAIです。
@@ -31,7 +32,7 @@ defmodule AskDrive.Generate.Extraction do
         """
 
         Semaphore.run(fn ->
-          case Ollama.generate(model, prompt, system: @system_prompt, num_ctx: num_ctx) do
+          case LLM.generate(model, prompt, system: @system_prompt, num_ctx: num_ctx) do
             {:ok, response} ->
               case parse_json(response) do
                 {:ok, items} -> {:ok, items}
