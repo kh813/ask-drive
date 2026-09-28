@@ -102,6 +102,15 @@ defmodule AskDrive.Ops.ScriptsTest do
   end
 
   describe "Environment variable loading and deploy fallback regression tests" do
+    test "deploy.sh restarts the launchd service when registered, else starts in the foreground" do
+      deploy_content = File.read!(@deploy_sh)
+      assert deploy_content =~ ~s(launchctl list "${SERVICE_NAME}")
+      assert deploy_content =~ ~s("${SCRIPT_DIR}/app.sh" service restart)
+      # The foreground start must not run first (it blocks the deploy for a daemonised install)
+      refute deploy_content =~
+               ~s("${SCRIPT_DIR}/app.sh" restart || "${SCRIPT_DIR}/app.sh" service restart)
+    end
+
     test "deploy.sh sources .env.prod and falls back to initial-setup.sh if not prepared" do
       deploy_content = File.read!(@deploy_sh)
       assert deploy_content =~ ~s(source "${SCRIPT_DIR}/.env.prod")

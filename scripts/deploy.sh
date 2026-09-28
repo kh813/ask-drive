@@ -49,7 +49,19 @@ MIX_ENV=prod mix assets.deploy
 MIX_ENV=prod mix release --overwrite
 
 # 5. サービスの再起動
+# launchd の常駐サービスとして登録されていれば、そのサービスを再起動する（停止中なら起動）。
+# 以前は無条件に `app.sh restart`（フォアグラウンド起動）を先に実行していたため、常駐運用でも
+# デプロイ端末にアプリが居座り、Ctrl+C でアプリごと止まっていた。
+# 登録されていなければ、従来どおりフォアグラウンドで起動する（稼働中の手動起動プロセスは先に止める）。
+SERVICE_NAME="com.askdrive.server"
 echo -e "\n${YELLOW}[4/4] サービスの再起動中...${NC}"
-"${SCRIPT_DIR}/app.sh" restart || "${SCRIPT_DIR}/app.sh" service restart || true
+if launchctl list "${SERVICE_NAME}" >/dev/null 2>&1; then
+  echo "launchd サービス (${SERVICE_NAME}) を再起動します..."
+  "${SCRIPT_DIR}/app.sh" service restart
+  "${SCRIPT_DIR}/app.sh" service status || true
+else
+  echo "launchd サービスは未登録のため、フォアグラウンドで起動します（Ctrl+C で停止します）..."
+  "${SCRIPT_DIR}/app.sh" restart
+fi
 
 echo -e "\n${GREEN}=== デプロイが完了しました ===${NC}"
