@@ -211,16 +211,16 @@ mix hex.audit
 
 ## Phase 10 — Tier 0 / 1 と鮮度管理
 
-- [ ] 10-1 質問文の正規化（全角半角・空白・記号・英字小文字化）と `answer_cache` による Tier 0
-- [ ] 10-2 `qa_pairs` へのベクトル検索による Tier 1（閾値 `tier1_threshold`）
-- [ ] 10-3 Tier 0 → 1 → 2 → 3 の判定順の実装とテスト
-- [ ] 10-4 回答への生成日時・根拠文書・Drive リンクの必須表示
-- [ ] 10-5 `AskDrive.Freshness`: チャンクのハッシュ変化から依存生成物を辿る
-- [ ] 10-6 ハッシュ変化時に `qa_pairs` / `doc_summaries` / `extractions` を `stale` にする
-- [ ] 10-7 `stale` に依存する `answer_cache` エントリを即座に破棄する
-- [ ] 10-8 文書削除時は `stale` ではなく生成物ごと削除する
-- [ ] 10-9 `stale` を Tier 1 から除外し、Tier 2 へフォールバックさせる（`serve_stale_qa` が有効な場合のみ警告付きで返す）
-- [ ] 10-10 **ビルドゲート**
+- [x] 10-1 質問文の正規化（全角半角・空白・記号・英字小文字化）と `answer_cache` による Tier 0
+- [x] 10-2 `qa_pairs` へのベクトル検索による Tier 1（閾値 `tier1_threshold`）
+- [x] 10-3 Tier 0 → 1 → 2 → 3 の判定順の実装とテスト
+- [x] 10-4 回答への生成日時・根拠文書・Drive リンクの必須表示
+- [x] 10-5 `AskDrive.Freshness`: チャンクのハッシュ変化から依存生成物を辿る
+- [x] 10-6 ハッシュ変化時に `qa_pairs` / `doc_summaries` / `extractions` を `stale` にする
+- [x] 10-7 `stale` に依存する `answer_cache` エントリを即座に破棄する
+- [x] 10-8 文書削除時は `stale` ではなく生成物ごと削除する
+- [x] 10-9 `stale` を Tier 1 から除外し、Tier 2 へフォールバックさせる（`serve_stale_qa` が有効な場合のみ警告付きで返す）
+- [x] 10-10 **ビルドゲート**
 
 **完了条件**: Drive 上の文書を更新して同期すると、その文書由来の QA が `stale` になり、Tier 1 に出なくなる。
 

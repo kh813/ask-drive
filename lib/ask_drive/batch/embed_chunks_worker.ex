@@ -71,6 +71,9 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
 
   defp save_chunks_transaction(doc, chunks_data, embeddings, hash) do
     Repo.transaction(fn ->
+      # Invalidate previous QAs, summaries, extractions and answer_cache entries
+      AskDrive.Freshness.invalidate_document(doc)
+
       # 1. Remove old chunks and old vec_chunks entries
       old_chunk_ids =
         Repo.all(from c in Chunk, where: c.document_id == ^doc.id, select: c.id)

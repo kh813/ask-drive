@@ -49,6 +49,7 @@ defmodule AskDriveWeb.ChatLive do
         id: System.unique_integer([:positive]),
         role: :assistant,
         tier: result.tier,
+        content: result.answer,
         answer: result.answer,
         chunks: result.chunks,
         qa_pair: result.qa_pair,
@@ -198,7 +199,45 @@ defmodule AskDriveWeb.ChatLive do
                       </span>
                     </div>
 
-                    <%!-- Message Content / Explanation --%>
+                    <%!-- Tier 0 / Tier 1 Direct Answer --%>
+                    <%= if msg.tier in [0, 1] do %>
+                      <div class="space-y-2">
+                        <div class="text-zinc-900 dark:text-zinc-100 font-medium text-sm leading-relaxed whitespace-pre-wrap">
+                          {msg.content}
+                        </div>
+
+                        <%= if msg.qa_pair do %>
+                          <div class="pt-2 border-t border-zinc-200/50 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-500">
+                            <div class="flex items-center gap-2">
+                              <%= if msg.qa_pair.document do %>
+                                <span class="text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1">
+                                  <.icon name="hero-document-text" class="w-3.5 h-3.5" />
+                                  {msg.qa_pair.document.name}
+                                </span>
+                                <%= if msg.qa_pair.document.web_view_link do %>
+                                  <.link
+                                    href={msg.qa_pair.document.web_view_link}
+                                    target="_blank"
+                                    class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center gap-0.5"
+                                  >
+                                    Drive で開く
+                                    <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
+                                  </.link>
+                                <% end %>
+                              <% end %>
+                            </div>
+
+                            <%= if msg.qa_pair.generated_at do %>
+                              <span class="text-zinc-400">
+                                生成日時: {Calendar.strftime(msg.qa_pair.generated_at, "%Y-%m-%d %H:%M")}
+                              </span>
+                            <% end %>
+                          </div>
+                        <% end %>
+                      </div>
+                    <% end %>
+
+                    <%!-- Message Content / Explanation for Tier 3 --%>
                     <%= if msg.tier == 3 do %>
                       <div class="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed space-y-1">
                         <p>この質問に関する明確な記載を現在のインデックスから特定できませんでした。</p>
@@ -213,7 +252,7 @@ defmodule AskDriveWeb.ChatLive do
                       <div class="space-y-3">
                         <p class="text-xs text-zinc-500">以下のドキュメントセクションが関連しています:</p>
                         <div class="space-y-2">
-                          <%= for {chunk, idx} <- Enum.with_index(msg.chunks, 1) do %>
+                          <%= for chunk <- msg.chunks do %>
                             <div class="p-3 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200/70 dark:border-zinc-800 space-y-1.5">
                               <div class="flex items-center justify-between text-xs font-medium">
                                 <span class="text-indigo-600 dark:text-indigo-400 flex items-center gap-1 truncate max-w-md">
