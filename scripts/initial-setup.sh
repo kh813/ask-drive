@@ -277,6 +277,12 @@ BANNER
   done
 
   echo -e "\n${BLUE}[Google 連携とアクセス制御]${NC}"
+  echo "  ※ Google Cloud Console の「承認済みのリダイレクト URI」には、実際にブラウザでアクセスする"
+  echo "    URL のホスト名をそのまま登録してください（同じ稼働機でも localhost と LAN の"
+  echo "    IP/ホスト名は別々に登録が必要です）。"
+  echo "  ※ Google は生の IP アドレスと .local(mDNS)ホスト名を拒否します。localhost 以外で"
+  echo "    LAN からアクセスさせる場合は、公開 TLD (.com 等) を持つホスト名を用意し、社内 DNS"
+  echo "    または各端末の hosts ファイルで LAN の IP に解決させてください。詳細は README 参照。"
   read -r -p "Google OAuth クライアント ID (後から設定可): " GOOGLE_ID
   read -r -s -p "Google OAuth クライアント シークレット (後から設定可): " GOOGLE_SECRET; echo ""
   read -r -p "許可する Google Workspace ドメイン (例: company.com): " ALLOWED_DOMAIN

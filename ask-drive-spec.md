@@ -395,7 +395,8 @@ LM Studio には Ollama の `keep_alive` に相当する API がない。モデ�
 | F-106 | 再認可が必要な状態を検知し、管理画面に再接続を促す表示を出す |
 | F-107 | 「接続を解除」で Google 側のトークンを revoke し、ローカルの資格情報を削除する |
 | F-108 | **夜間バッチ開始時にトークンの有効性を事前確認し、無効なら即座に管理者へ通知する**（無人実行のため、朝まで気づかない事態を避ける） |
-| F-109 | OAuth の `redirect_uri` は、設定ファイルの固定ホスト名ではなく**実際にアクセスされたリクエストのホスト・ポート**から組み立てる。管理者が `localhost` で初期設定し、利用者が LAN の IP・ホスト名でアクセスする構成を成立させるための要件（1台のマシンに複数のアクセス経路があり得るため）。Google Cloud Console 側には、実際にアクセスされ得る全てのホスト・IP のリダイレクト URI を登録する必要がある |
+| F-109 | OAuth の `redirect_uri` は、設定ファイルの固定ホスト名ではなく**実際にアクセスされたリクエストのホスト・ポート**から組み立てる。管理者が `localhost` で初期設定し、利用者が LAN 経由でアクセスする構成を成立させるための要件（1台のマシンに複数のアクセス経路があり得るため）。Google Cloud Console 側には、実際にアクセスされ得る全てのホストのリダイレクト URI を登録する必要がある |
+| F-110 | **Google は生の IP アドレス（`192.168.x.x` 等）と `.local`（mDNS）ホスト名を `redirect_uri` として拒否する**（`Error 400: invalid_request` / `device_id and device_name are required for private IP`）。`localhost` を除き、LAN 内アクセスには公開 TLD（`.com` 等）を持つホスト名が必須。社内 DNS または各端末の `hosts` ファイルで、そのホスト名を稼働機の LAN IP に解決させればよく、実際にインターネット上へ公開する必要はない |
 
 Google は2回目以降の同意でリフレッシュトークンを返さないことがある。返らなかった場合は既存の値を温存し、上書きで消さないこと。
 
@@ -1489,7 +1490,7 @@ echo "デプロイが正常に完了しました。"
 |---|---|---|
 | `PHX_SERVER` | Phoenix HTTP サーバの起動フラグ | `true` |
 | `PORT` | 待ち受けポート番号（社内 LAN 向け） | `4000` |
-| `PHX_HOST` | ホスト名または LAN 内 IP | `ask-drive.local` または `192.168.x.x` |
+| `PHX_HOST` | Endpoint の既定ホスト名（`url()` ヘルパー等が使う静的な値）。OAuth の `redirect_uri` はリクエストごとに実アクセス先から組み立てるため、この値には依存しない（F-109） | `localhost`（既定のままでよい） |
 | `SECRET_KEY_BASE` | Phoenix セッション署名鍵 | `mix phx.gen.secret` で生成 |
 | `ASK_DRIVE_ENCRYPTION_KEY` | OAuth トークン暗号化用 256bit 鍵 | `mix ask_drive.gen.key` で生成（Base64） |
 | `GOOGLE_CLIENT_ID` | Google Cloud OAuth クライアント ID | `xxx.apps.googleusercontent.com` |
