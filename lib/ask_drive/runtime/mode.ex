@@ -48,7 +48,9 @@ defmodule AskDrive.Runtime.Mode do
   Returns `:ok` or `{:error, :generation_disabled}`.
   """
   def check_generation_allowed do
-    GenServer.call(__MODULE__, :check_generation_allowed)
+    # The caller's app settings (read here, in the caller's process): one app may generate
+    # on a cloud API in the daytime while another is local (spec 6.11)
+    GenServer.call(__MODULE__, {:check_generation_allowed, Settings.get_setting()})
   end
 
   @doc """
@@ -112,9 +114,7 @@ defmodule AskDrive.Runtime.Mode do
   end
 
   @impl true
-  def handle_call(:check_generation_allowed, _from, state) do
-    setting = Settings.get_setting()
-
+  def handle_call({:check_generation_allowed, setting}, _from, state) do
     allowed? =
       state.mode == :night_batch or
         (setting && setting.daytime_llm_enabled) or
@@ -146,7 +146,7 @@ defmodule AskDrive.Runtime.Mode do
   # night window rests in `:standby`. (The clock used to switch into `:night_batch` itself
   # and then refused to ever leave it, so the mode stuck there until a restart.)
   defp follow_clock(state, reason) do
-    if state.mode == :night_batch and AskDrive.Batch.Scheduler.running?() do
+    if state.mode == :night_batch and AskDrive.Batch.Scheduler.running_anywhere?() do
       state
     else
       target = resting_mode(calculate_current_mode())
@@ -166,24 +166,43 @@ defmodule AskDrive.Runtime.Mode do
   # The nightly batch (spec 6.3) had no trigger at all: nothing ever called run_batch/1
   # except the admin button. Start it from the clock once per night window. "Once" is read
   # from batch_runs, so a restart inside the window doesn't start a second one.
+  # Every app gets its nightly run, one after another in a single task: there is one local
+  # model, and run_batch refuses to start while any app's batch is running (spec 6.11).
   defp maybe_start_nightly_batch do
-    if Application.get_env(:ask_drive, :auto_nightly_batch, true) and nightly_due?() do
-      Logger.info("Night window reached: starting the nightly batch")
-      Task.start(fn -> AskDrive.Batch.Scheduler.run_batch(trigger: "auto") end)
+    if Application.get_env(:ask_drive, :auto_nightly_batch, true) and
+         not AskDrive.Batch.Scheduler.running_anywhere?() do
+      due =
+        Enum.filter(AskDrive.Apps.list(), fn app ->
+          AskDrive.Apps.with_app(app, &nightly_due?/0)
+        end)
+
+      if due != [] do
+        Logger.info(
+          "Night window reached: nightly batch for #{Enum.map_join(due, ", ", & &1.slug)}"
+        )
+
+        Task.start(fn ->
+          for app <- due do
+            AskDrive.Apps.with_app(app, fn ->
+              AskDrive.Batch.Scheduler.run_batch(trigger: "auto")
+            end)
+          end
+        end)
+      end
     end
   rescue
     e -> Logger.error("Could not start the nightly batch: #{Exception.message(e)}")
   end
 
   @doc """
-  Whether the nightly batch should start now: inside the night window, nothing running, and
-  no automatic batch has run in this window yet (one aborted by a restart doesn't count, and
+  Whether the current app's nightly batch should start now: inside the night window,
+  nothing running anywhere, and no automatic batch of this app has run in this window yet (one aborted by a restart doesn't count, and
   neither does a manual run: running a batch by hand in the evening must not cancel the
   night's automatic one, as happened on 2026-09-28).
   """
   def nightly_due?(now \\ AskDrive.Clock.local_now()) do
     calculate_current_mode(now) == :night_batch and
-      not AskDrive.Batch.Scheduler.running?() and
+      not AskDrive.Batch.Scheduler.running_anywhere?() and
       not AskDrive.Batch.Scheduler.ran_since?(night_window_start_utc(now))
   end
 
@@ -192,7 +211,7 @@ defmodule AskDrive.Runtime.Mode do
   in local time, or yesterday's if that is still in the future.
   """
   def night_window_start_utc(now \\ AskDrive.Clock.local_now()) do
-    setting = Settings.get_setting()
+    setting = Settings.platform_setting()
     start_h = (setting && setting.batch_start_hour) || 0
     today_start = NaiveDateTime.new!(NaiveDateTime.to_date(now), Time.new!(start_h, 0, 0))
 
@@ -213,7 +232,8 @@ defmodule AskDrive.Runtime.Mode do
   def calculate_current_mode(now \\ AskDrive.Clock.local_now()) do
     # Local wall-clock hour: batch hours are office hours, not UTC (see AskDrive.Clock)
     hour = now.hour
-    setting = Settings.get_setting()
+    # The nightly window is platform-wide (spec 6.11)
+    setting = Settings.platform_setting()
 
     # Same defaults as the settings schema (00:00-07:00)
     batch_start = (setting && setting.batch_start_hour) || 0

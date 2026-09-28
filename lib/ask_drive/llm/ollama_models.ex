@@ -40,8 +40,34 @@ defmodule AskDrive.LLM.OllamaModels do
     :ok
   end
 
-  @doc "Starts pulls for every required model that isn't installed. Returns what it started."
-  def ensure_required(setting \\ Settings.get_setting!()) do
+  @doc "Models every app needs, `[{app, role, model}]` (spec 6.11: one Ollama for all apps)."
+  def required_all do
+    AskDrive.Apps.each(fn app ->
+      Enum.map(required(Settings.get_setting!()), fn {role, model} -> {app, role, model} end)
+    end)
+    |> Enum.flat_map(fn {_app, rows} -> rows end)
+  end
+
+  @doc """
+  Starts pulls for every required model that isn't installed — of the given settings' app,
+  or of all apps when called with `:all` (boot). Returns what it started.
+  """
+  def ensure_required(setting \\ Settings.get_setting!())
+
+  def ensure_required(:all) do
+    with {:ok, names} <- installed(Settings.platform_setting!()) do
+      missing =
+        required_all()
+        |> Enum.map(fn {_app, _role, model} -> model end)
+        |> Enum.uniq()
+        |> Enum.reject(&installed?(&1, names))
+
+      Enum.each(missing, &pull_async/1)
+      {:ok, missing}
+    end
+  end
+
+  def ensure_required(setting) do
     case installed(setting) do
       {:ok, names} ->
         missing =
@@ -131,7 +157,7 @@ defmodule AskDrive.LLM.OllamaModels do
 
   @impl true
   def handle_info(:ensure_required, state) do
-    case ensure_required() do
+    case ensure_required(:all) do
       {:ok, []} ->
         Logger.info("OllamaModels: all required models are installed")
 

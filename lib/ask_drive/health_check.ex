@@ -21,7 +21,8 @@ defmodule AskDrive.HealthCheck do
   def check do
     # Two provider probes with their own socket timeouts can outlast the default 5s call
     # timeout; a slow health check must not crash the LiveView that asked for it.
-    GenServer.call(__MODULE__, :check, 30_000)
+    # The checks run in this server's process, so tell it which app's providers to probe
+    GenServer.call(__MODULE__, {:check, AskDrive.Apps.current()}, 30_000)
   catch
     :exit, _reason -> unavailable_results()
   end
@@ -54,8 +55,8 @@ defmodule AskDrive.HealthCheck do
   end
 
   @impl true
-  def handle_call(:check, _from, state) do
-    results = perform_checks()
+  def handle_call({:check, app}, _from, state) do
+    results = if app, do: AskDrive.Apps.with_app(app, &perform_checks/0), else: perform_checks()
     {:reply, results, %{state | results: results}}
   end
 
@@ -165,15 +166,23 @@ defmodule AskDrive.HealthCheck do
   defp abort_interrupted_batches do
     import Ecto.Query
 
-    {count, _} =
-      AskDrive.Repo.update_all(
-        from(b in AskDrive.Batch.BatchRun, where: b.status == "running"),
-        set: [
-          status: "aborted",
-          finished_at: DateTime.utc_now() |> DateTime.truncate(:second),
-          error: "アプリの再起動によりバッチが中断されました"
-        ]
-      )
+    # every app's database: a restart interrupts whichever app's batch was running
+    count =
+      AskDrive.Apps.each(fn _app ->
+        {n, _} =
+          AskDrive.Repo.update_all(
+            from(b in AskDrive.Batch.BatchRun, where: b.status == "running"),
+            set: [
+              status: "aborted",
+              finished_at: DateTime.utc_now() |> DateTime.truncate(:second),
+              error: "アプリの再起動によりバッチが中断されました"
+            ]
+          )
+
+        n
+      end)
+      |> Enum.map(fn {_app, n} -> n end)
+      |> Enum.sum()
 
     if count > 0, do: Logger.warning("  [!] 中断されたバッチ #{count} 件を aborted に更新しました")
   rescue

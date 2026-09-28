@@ -13,7 +13,7 @@ defmodule AskDriveWeb.ChatLive do
 
     {:ok,
      socket
-     |> assign(:page_title, "AskDrive - 社内文書検索チャット")
+     |> assign(:page_title, "AskDrive for #{socket.assigns.app.name}")
      |> assign(:drive_connected?, Accounts.drive_connected?())
      |> assign(:setting, setting)
      |> assign(:chunk_count, chunk_count)
@@ -54,7 +54,8 @@ defmodule AskDriveWeb.ChatLive do
        |> assign(:messages, socket.assigns.messages ++ [user_msg])
        |> assign(:loading, true)
        |> assign(:form, to_form(%{"question" => ""}))
-       |> start_async(:answer, fn -> Answering.ask(trimmed) end)}
+       # bind: the task must search this app's database, not the platform's (spec 6.11)
+       |> start_async(:answer, AskDrive.Apps.bind(fn -> Answering.ask(trimmed) end))}
     end
   end
 
@@ -92,11 +93,15 @@ defmodule AskDriveWeb.ChatLive do
         lv = self()
         id = assistant_msg.id
 
-        start_async(socket, {:summary, id}, fn ->
-          ChatSummary.generate(result.question, result.chunks, fn event ->
-            send(lv, {:summary_delta, id, event})
+        start_async(
+          socket,
+          {:summary, id},
+          AskDrive.Apps.bind(fn ->
+            ChatSummary.generate(result.question, result.chunks, fn event ->
+              send(lv, {:summary_delta, id, event})
+            end)
           end)
-        end)
+        )
       else
         socket
       end
@@ -161,6 +166,8 @@ defmodule AskDriveWeb.ChatLive do
       current_user={@current_user}
       admin_elevated?={@admin_elevated?}
       admin_elevation_expires_at={@admin_elevation_expires_at}
+      app={@app}
+      apps={@apps}
     >
       <div class="flex flex-col h-[calc(100vh-7rem)]">
         <%!-- Status Bar --%>
@@ -235,7 +242,7 @@ defmodule AskDriveWeb.ChatLive do
                   the password prompt first rather than a dead end. --%>
             <.link
               :if={@admin_elevated?}
-              href={~p"/admin?tab=settings"}
+              href={@base_path <> "/admin?tab=settings"}
               class="text-xs px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium shrink-0 transition"
             >
               今すぐ連携する

@@ -19,6 +19,10 @@ config :ask_drive, auto_nightly_batch: false
 # Don't try to pull Ollama models from a test run.
 config :ask_drive, auto_pull_models: false
 
+# Apps (spec 6.11): the boot step writes to the platform DB, which is sandboxed in tests;
+# app databases created by tests use a plain pool (the SQL sandbox can't own dynamic repos).
+config :ask_drive, apps_boot: false, app_repo_opts: [pool: DBConnection.ConnectionPool]
+
 # Disable Oban queues in test
 config :ask_drive, Oban, testing: :manual
 

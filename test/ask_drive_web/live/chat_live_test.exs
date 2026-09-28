@@ -7,7 +7,7 @@ defmodule AskDriveWeb.ChatLiveTest do
   end
 
   test "renders chat page and submits question", %{conn: conn} do
-    {:ok, view, html} = live(conn, ~p"/")
+    {:ok, view, html} = live(conn, ~p"/it-support")
     assert html =~ "AskDrive"
     assert html =~ "chat-form"
 
@@ -21,7 +21,7 @@ defmodule AskDriveWeb.ChatLiveTest do
   end
 
   test "answers asynchronously: question first, then the answer bubble", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/")
+    {:ok, view, _html} = live(conn, ~p"/it-support")
 
     view
     |> form("#chat-form", %{"question" => "USBメモリの利用ルールは？"})
@@ -62,7 +62,7 @@ defmodule AskDriveWeb.ChatLiveTest do
       })
       |> AskDrive.Repo.insert()
 
-    {:ok, view, _html} = live(conn, ~p"/")
+    {:ok, view, _html} = live(conn, ~p"/it-support")
 
     view
     |> form("#chat-form", %{"question" => "USBメモリの利用ルールは？"})
@@ -77,7 +77,7 @@ defmodule AskDriveWeb.ChatLiveTest do
   end
 
   test "resets chat history", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/")
+    {:ok, view, _html} = live(conn, ~p"/it-support")
 
     view
     |> form("#chat-form", %{"question" => "質問1"})
@@ -93,7 +93,7 @@ defmodule AskDriveWeb.ChatLiveTest do
   end
 
   test "signed-out visitors can chat and see the admin login link" do
-    {:ok, view, _html} = live(build_conn(), ~p"/")
+    {:ok, view, _html} = live(build_conn(), ~p"/it-support")
     assert has_element?(view, "#chat-form")
     assert has_element?(view, "#admin-login-link")
     refute has_element?(view, "#logout-link")
@@ -138,7 +138,7 @@ defmodule AskDriveWeb.ChatLiveTest do
       })
       |> AskDrive.Repo.insert()
 
-    {:ok, view, _html} = live(conn, ~p"/")
+    {:ok, view, _html} = live(conn, ~p"/it-support")
 
     view
     |> form("#chat-form", %{"question" => "USBメモリの利用ルールは？"})
@@ -193,7 +193,7 @@ defmodule AskDriveWeb.ChatLiveTest do
       })
       |> AskDrive.Repo.insert()
 
-    {:ok, view, _html} = live(conn, ~p"/")
+    {:ok, view, _html} = live(conn, ~p"/it-support")
 
     view
     |> form("#chat-form", %{"question" => "PCの持ち出しルールは？"})

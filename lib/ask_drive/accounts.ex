@@ -204,18 +204,23 @@ defmodule AskDrive.Accounts do
   end
 
   # --- Users (spec 6.9) -----------------------------------------------------
+  #
+  # Users are platform-wide (spec 6.11): whichever app a process is serving, they live in the
+  # platform database, so every query in this section goes through `on_platform/1`.
+
+  defp on_platform(fun), do: AskDrive.Apps.platform(fun)
 
   @doc """
   Fetches a user by id, or nil.
   """
   def get_user(nil), do: nil
-  def get_user(id), do: Repo.get(User, id)
+  def get_user(id), do: on_platform(fn -> Repo.get(User, id) end)
 
   @doc """
   Fetches a user by email address (case-insensitive), or nil.
   """
   def get_user_by_email(email) when is_binary(email) do
-    Repo.get_by(User, email: User.normalize_email(email))
+    on_platform(fn -> Repo.get_by(User, email: User.normalize_email(email)) end)
   end
 
   def get_user_by_email(_), do: nil
@@ -224,18 +229,22 @@ defmodule AskDrive.Accounts do
   All users, elevation-eligible accounts first and then alphabetically by email.
   """
   def list_users do
-    Repo.all(from u in User, order_by: [desc: u.admin_eligible, asc: u.email])
+    on_platform(fn ->
+      Repo.all(from u in User, order_by: [desc: u.admin_eligible, asc: u.email])
+    end)
   end
 
   @doc """
   Number of accounts that can still elevate to administrator.
   """
   def count_eligible_admins do
-    Repo.one(
-      from u in User,
-        where: u.admin_eligible == true and u.status == "active",
-        select: count(u.id)
-    ) || 0
+    on_platform(fn ->
+      Repo.one(
+        from u in User,
+          where: u.admin_eligible == true and u.status == "active",
+          select: count(u.id)
+      )
+    end) || 0
   end
 
   @doc """
@@ -275,8 +284,8 @@ defmodule AskDrive.Accounts do
       }
 
       case existing do
-        nil -> %User{} |> User.changeset(params) |> Repo.insert()
-        user -> user |> User.changeset(params) |> Repo.update()
+        nil -> on_platform(fn -> %User{} |> User.changeset(params) |> Repo.insert() end)
+        user -> on_platform(fn -> user |> User.changeset(params) |> Repo.update() end)
       end
     end
   end
@@ -302,7 +311,7 @@ defmodule AskDrive.Accounts do
   def set_admin_eligible(%User{} = actor, %User{} = user, eligible) when is_boolean(eligible) do
     with :ok <- ensure_not_self(actor, user),
          :ok <- ensure_eligible_remains(user, eligible, user.status) do
-      user |> User.changeset(%{admin_eligible: eligible}) |> Repo.update()
+      on_platform(fn -> user |> User.changeset(%{admin_eligible: eligible}) |> Repo.update() end)
     end
   end
 
@@ -313,7 +322,7 @@ defmodule AskDrive.Accounts do
   def update_user_status(%User{} = actor, %User{} = user, status) do
     with :ok <- ensure_not_self(actor, user),
          :ok <- ensure_eligible_remains(user, user.admin_eligible, status) do
-      user |> User.changeset(%{status: status}) |> Repo.update()
+      on_platform(fn -> user |> User.changeset(%{status: status}) |> Repo.update() end)
     end
   end
 
@@ -329,14 +338,18 @@ defmodule AskDrive.Accounts do
 
     case get_user_by_email(email) do
       nil ->
-        %User{}
-        |> User.changeset(%{email: email, admin_eligible: true, status: "active"})
-        |> Repo.insert()
+        on_platform(fn ->
+          %User{}
+          |> User.changeset(%{email: email, admin_eligible: true, status: "active"})
+          |> Repo.insert()
+        end)
 
       user ->
-        user
-        |> User.changeset(%{admin_eligible: true, status: "active"})
-        |> Repo.update()
+        on_platform(fn ->
+          user
+          |> User.changeset(%{admin_eligible: true, status: "active"})
+          |> Repo.update()
+        end)
     end
   end
 

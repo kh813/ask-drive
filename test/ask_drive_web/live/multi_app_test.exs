@@ -1,0 +1,126 @@
+defmodule AskDriveWeb.MultiAppTest do
+  use AskDriveWeb.ConnCase, async: false
+  import Phoenix.LiveViewTest
+  import AskDrive.AppsHelper
+  import Ecto.Query
+
+  alias AskDrive.{Apps, Repo}
+  alias AskDrive.Batch.BatchRun
+  alias AskDrive.Documents.{Chunk, Document}
+
+  setup do
+    System.put_env("ASK_DRIVE_DISABLE_AUTH", "true")
+    on_exit(fn -> System.delete_env("ASK_DRIVE_DISABLE_AUTH") end)
+    %{hr: create_app!("hr", "HR")}
+  end
+
+  defp add_doc!(app, name, text) do
+    Apps.with_app(app, fn ->
+      {:ok, doc} =
+        %Document{}
+        |> Document.changeset(%{
+          drive_file_id: name,
+          name: name,
+          mime_type: "text/plain",
+          status: "indexed"
+        })
+        |> Repo.insert()
+
+      %Chunk{}
+      |> Chunk.changeset(%{document_id: doc.id, position: 0, content_hash: name, content: text})
+      |> Repo.insert!()
+    end)
+  end
+
+  test "the portal lists every app with its URL", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/")
+    assert has_element?(view, "#app-card-it-support", "AskDrive for IT-Support")
+    assert has_element?(view, "#app-card-hr", "AskDrive for HR")
+  end
+
+  test "each app's chat answers only from its own documents", %{conn: conn, hr: hr} do
+    add_doc!(hr, "就業規則", "有給休暇は入社6か月後に10日付与する。")
+    add_doc!(Apps.primary(), "USB規程", "USBメモリは会社貸与品のみ利用できる。")
+
+    {:ok, _} =
+      Apps.with_app(hr, fn ->
+        AskDrive.Settings.update_setting(AskDrive.Settings.get_setting!(), %{
+          chat_summary_enabled: false
+        })
+      end)
+
+    {:ok, _} =
+      AskDrive.Settings.update_setting(AskDrive.Settings.get_setting!(), %{
+        chat_summary_enabled: false
+      })
+
+    {:ok, view, html} = live(conn, "/hr")
+    assert html =~ "for HR"
+    view |> form("#chat-form", %{"question" => "有給休暇は何日？"}) |> render_submit()
+    html = render_async(view, 20_000)
+    assert html =~ "就業規則"
+    refute html =~ "USB規程"
+
+    {:ok, view, _html} = live(conn, "/it-support")
+    view |> form("#chat-form", %{"question" => "有給休暇は何日？"}) |> render_submit()
+    html = render_async(view, 20_000)
+    refute html =~ "就業規則"
+  end
+
+  test "the chat header offers the other apps", %{conn: conn} do
+    {:ok, view, _html} = live(conn, "/hr")
+    assert has_element?(view, "#app-switcher a[href='/it-support']", "AskDrive for IT-Support")
+  end
+
+  test "platform admin creates an app; its admin page shows only app settings", %{conn: conn} do
+    {:ok, view, html} = live(conn, ~p"/admin")
+    assert html =~ "全体管理"
+    assert has_element?(view, "#app-row-hr")
+
+    view
+    |> form("#new-app-form", app: %{name: "Legal", slug: "legal", description: "法務の相談窓口"})
+    |> render_submit()
+
+    assert has_element?(view, "#app-row-legal")
+    legal = Apps.get_by_slug("legal")
+    on_exit(fn -> Apps.Repos.stop_app_repo("legal") end)
+    assert File.exists?(legal.db_path)
+
+    {:ok, _view, html} = live(conn, "/legal/admin?tab=settings")
+    assert html =~ "管理: AskDrive for Legal"
+    assert html =~ "Google Drive"
+    refute html =~ "HTTPS（SSL 証明書）"
+    refute html =~ "管理者パスワード"
+
+    {:ok, _view, html} = live(conn, ~p"/admin?tab=settings")
+    assert html =~ "HTTPS（SSL 証明書）"
+    refute html =~ "サービスアカウントの JSON キー"
+  end
+
+  test "an app's manual batch is recorded in that app only", %{conn: conn, hr: hr} do
+    {:ok, view, _html} = live(conn, "/hr/admin")
+    view |> element("#trigger-ingest-btn") |> render_click()
+
+    run =
+      Enum.find_value(1..50, fn _ ->
+        Process.sleep(100)
+        Apps.with_app(hr, fn -> Repo.one(from b in BatchRun, limit: 1) end)
+      end)
+
+    assert run.kind == "ingest_only"
+    refute Repo.exists?(BatchRun)
+
+    Enum.find_value(1..50, fn _ ->
+      Process.sleep(100)
+      Apps.with_app(hr, fn -> Repo.get(BatchRun, run.id).status != "running" end)
+    end)
+  end
+
+  test "requests always start (and end) in the platform database", %{hr: hr} do
+    Apps.put_current(hr)
+    conn = Phoenix.ConnTest.build_conn() |> AskDriveWeb.Plugs.ResetApp.call([])
+    assert Repo.get_dynamic_repo() == Repo
+    assert Apps.current() == nil
+    assert conn.private[:before_send] != []
+  end
+end

@@ -48,9 +48,25 @@ defmodule AskDriveWeb.AdminLive do
       |> allow_upload(:ssl_chain, accept: :any, max_entries: 1, max_file_size: 500_000)
       |> assign(:ssl_check, nil)
 
+    # One LiveView, two scopes (spec 6.11): /admin administers the platform (apps, users,
+    # SSL, Ollama, the nightly window); /:app/admin administers one app (its batch, documents,
+    # questions, Drive and AI settings). AppScope has already selected the app's database.
+    scope = socket.assigns.live_action || :app
+
+    socket =
+      socket
+      |> assign(:scope, scope)
+      |> assign_new(:app, fn -> nil end)
+      |> assign_new(:apps, fn -> AskDrive.Apps.list() end)
+      |> assign_new(:base_path, fn -> "" end)
+      |> assign(
+        :app_form,
+        to_form(AskDrive.Apps.App.changeset(%AskDrive.Apps.App{}, %{}), as: :app)
+      )
+
     {:ok,
      socket
-     |> assign(:current_tab, "overview")
+     |> assign(:current_tab, default_tab(scope))
      |> assign(:setting, setting)
      |> assign(:form, form)
      |> assign(:trigger_batch_loading, false)
@@ -62,9 +78,23 @@ defmodule AskDriveWeb.AdminLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    tab = params["tab"] || "overview"
+    tabs = Enum.map(tabs(socket.assigns.scope), &elem(&1, 0))
+    tab = if params["tab"] in tabs, do: params["tab"], else: default_tab(socket.assigns.scope)
     {:noreply, assign(socket, :current_tab, tab)}
   end
+
+  defp tabs(:platform),
+    do: [{"apps", "窓口（アプリ）"}, {"users", "ユーザー管理"}, {"audit", "昇格ログ"}, {"settings", "全体設定"}]
+
+  defp tabs(:app),
+    do: [
+      {"overview", "概要・バッチ状況"},
+      {"questions", "未回答・解消質問"},
+      {"documents", "ドキュメント一覧"},
+      {"settings", "設定"}
+    ]
+
+  defp default_tab(scope), do: scope |> tabs() |> hd() |> elem(0)
 
   @impl true
   def handle_info({:ollama_pulls, pulls}, socket) do
@@ -82,6 +112,72 @@ defmodule AskDriveWeb.AdminLive do
   @impl true
   def handle_info(:tick, socket) do
     {:noreply, load_dashboard_data(socket)}
+  end
+
+  # --- Apps (platform scope, spec 6.11) ---------------------------------------
+
+  @impl true
+  def handle_event("create_app", %{"app" => params}, socket) do
+    case AskDrive.Apps.create(params) do
+      {:ok, app} ->
+        {:noreply,
+         socket
+         |> assign(:apps, AskDrive.Apps.list())
+         |> assign(
+           :app_form,
+           to_form(AskDrive.Apps.App.changeset(%AskDrive.Apps.App{}, %{}), as: :app)
+         )
+         |> put_flash(
+           :info,
+           "窓口「#{app.name}」（/#{app.slug}）を作成しました。窓口の管理画面で Google Drive と AI を設定してください。"
+         )
+         |> load_dashboard_data()}
+
+      {:error, %Ecto.Changeset{} = cs} ->
+        {:noreply, assign(socket, :app_form, to_form(Map.put(cs, :action, :insert), as: :app))}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "窓口を作成できませんでした: #{inspect(reason)}")}
+    end
+  end
+
+  def handle_event(
+        "update_app",
+        %{"id" => id, "name" => name, "description" => description},
+        socket
+      ) do
+    app = AskDrive.Apps.get!(String.to_integer(id))
+
+    case AskDrive.Apps.update(app, %{name: name, description: description}) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:apps, AskDrive.Apps.list())
+         |> put_flash(:info, "窓口を更新しました。")
+         |> load_dashboard_data()}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "窓口名を入力してください。")}
+    end
+  end
+
+  def handle_event("delete_app", %{"id" => id}, socket) do
+    app = AskDrive.Apps.get!(String.to_integer(id))
+
+    case AskDrive.Apps.delete(app) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:apps, AskDrive.Apps.list())
+         |> put_flash(:info, "窓口「#{app.name}」を削除しました（データベースファイルは名前を変えて残しています）。")
+         |> load_dashboard_data()}
+
+      {:error, :primary} ->
+        {:noreply, put_flash(socket, :error, "最初の窓口は削除できません。")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "削除できませんでした: #{inspect(reason)}")}
+    end
   end
 
   @impl true
@@ -166,7 +262,7 @@ defmodule AskDriveWeb.AdminLive do
 
   @impl true
   def handle_event("select_tab", %{"tab" => tab}, socket) do
-    {:noreply, push_patch(socket, to: ~p"/admin?tab=#{tab}")}
+    {:noreply, push_patch(socket, to: "#{socket.assigns.base_path}/admin?tab=#{tab}")}
   end
 
   @impl true
@@ -177,7 +273,8 @@ defmodule AskDriveWeb.AdminLive do
       {:noreply, put_flash(socket, :error, "バッチが実行中です。終了してから実行してください。")}
     else
       Logger.info("AdminLive: Triggering manual batch run (ingest_only: #{ingest_only?})...")
-      Task.start(fn -> Scheduler.run_batch(ingest_only: ingest_only?) end)
+      # bind: run the batch against this app's database (spec 6.11)
+      Task.start(AskDrive.Apps.bind(fn -> Scheduler.run_batch(ingest_only: ingest_only?) end))
 
       message =
         if ingest_only?,
@@ -446,6 +543,10 @@ defmodule AskDriveWeb.AdminLive do
     users = Accounts.list_users()
 
     socket
+    |> assign(
+      :app_summaries,
+      if(socket.assigns[:scope] == :platform, do: app_summaries(), else: %{})
+    )
     |> assign_ollama_models()
     |> assign(:users, users)
     |> assign(:elevation_logs, AdminAccess.list_elevation_logs(100))
@@ -477,6 +578,8 @@ defmodule AskDriveWeb.AdminLive do
       current_user={@current_user}
       admin_elevated?={@admin_elevated?}
       admin_elevation_expires_at={@admin_elevation_expires_at}
+      app={@app}
+      apps={@apps}
       wide
     >
       <div class="space-y-6 pb-12">
@@ -484,14 +587,18 @@ defmodule AskDriveWeb.AdminLive do
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
           <div>
             <div class="flex items-center gap-2">
-              <h1 class="font-bold text-2xl text-zinc-900 dark:text-zinc-100">管理ダッシュボード</h1>
+              <h1 class="font-bold text-2xl text-zinc-900 dark:text-zinc-100">
+                {if @scope == :app, do: "管理: AskDrive for #{@app.name}", else: "全体管理"}
+              </h1>
             </div>
             <p class="text-xs text-zinc-500 mt-1">
-              AskDrive の夜間バッチ、ナレッジカバレッジ、未回答質問、LLM プロバイダ、ユーザーを一元管理します。
+              {if @scope == :app,
+                do: "この窓口の夜間バッチ、ドキュメント、未回答質問、Google Drive と AI の設定を管理します。",
+                else: "窓口（アプリ）の追加・管理、ユーザー、HTTPS、ローカルモデル、夜間バッチの時間帯など、AskDrive 全体の設定を管理します。"}
             </p>
           </div>
 
-          <div class="flex flex-wrap items-center gap-2">
+          <div :if={@scope == :app} class="flex flex-wrap items-center gap-2">
             <%!-- Ingest only (spec 6.3.8 F-331): sync + indexing, no QA generation, so the
                   local model stays free for chat. The safe default for daytime runs. --%>
             <button
@@ -521,90 +628,22 @@ defmodule AskDriveWeb.AdminLive do
           </div>
         </div>
 
-        <%!-- Tab Navigation --%>
+        <%!-- Tab Navigation (per scope, spec 6.11) --%>
         <div class="flex border-b border-zinc-200 dark:border-zinc-800 gap-6 text-sm font-medium">
           <button
+            :for={{tab, label} <- tabs(@scope)}
             phx-click="select_tab"
-            phx-value-tab="overview"
+            phx-value-tab={tab}
+            id={"tab-#{tab}"}
             class={[
               "pb-3 border-b-2 transition",
-              if(@current_tab == "overview",
-                do: "border-indigo-600 text-indigo-600 dark:text-indigo-400 font-semibold",
+              if(@current_tab == tab,
+                do: "border-indigo-600 text-indigo-600 dark:text-indigo-400",
                 else: "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
               )
             ]}
           >
-            概要・バッチ状況
-          </button>
-          <button
-            phx-click="select_tab"
-            phx-value-tab="questions"
-            class={[
-              "pb-3 border-b-2 transition flex items-center gap-2",
-              if(@current_tab == "questions",
-                do: "border-indigo-600 text-indigo-600 dark:text-indigo-400 font-semibold",
-                else: "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-              )
-            ]}
-          >
-            未回答・解消質問
-            <%= if @unresolved_questions != [] do %>
-              <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-bold">
-                {length(@unresolved_questions)}
-              </span>
-            <% end %>
-          </button>
-          <button
-            phx-click="select_tab"
-            phx-value-tab="documents"
-            class={[
-              "pb-3 border-b-2 transition",
-              if(@current_tab == "documents",
-                do: "border-indigo-600 text-indigo-600 dark:text-indigo-400 font-semibold",
-                else: "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-              )
-            ]}
-          >
-            ドキュメント一覧 ({length(@documents)})
-          </button>
-          <button
-            phx-click="select_tab"
-            phx-value-tab="users"
-            class={[
-              "pb-3 border-b-2 transition",
-              if(@current_tab == "users",
-                do: "border-indigo-600 text-indigo-600 dark:text-indigo-400 font-semibold",
-                else: "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-              )
-            ]}
-          >
-            ユーザー管理 ({length(@users)})
-          </button>
-          <button
-            phx-click="select_tab"
-            phx-value-tab="audit"
-            class={[
-              "pb-3 border-b-2 transition",
-              if(@current_tab == "audit",
-                do: "border-indigo-600 text-indigo-600 dark:text-indigo-400 font-semibold",
-                else: "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-              )
-            ]}
-          >
-            昇格履歴
-          </button>
-          <button
-            phx-click="select_tab"
-            phx-value-tab="settings"
-            class={[
-              "pb-3 border-b-2 transition",
-              if(@current_tab == "settings",
-                do: "border-indigo-600 text-indigo-600 dark:text-indigo-400 font-semibold",
-                else: "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-              )
-            ]}
-          >
-            設定
+            {label}
           </button>
         </div>
 
@@ -1177,6 +1216,119 @@ defmodule AskDriveWeb.AdminLive do
           </div>
         <% end %>
 
+        <%!-- Platform: apps (spec 6.11) --%>
+        <%= if @current_tab == "apps" do %>
+          <div class="space-y-6">
+            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+              <div>
+                <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-squares-2x2" class="w-5 h-5 text-indigo-600" /> 窓口（アプリ）
+                </h2>
+                <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  窓口ごとに Google Drive のフォルダ、Gemini などの API キー（費用負担を分けられます）、検索インデックス、QA、質問ログ、夜間バッチの履歴が分かれます。データは窓口ごとに別のデータベースに保存され、混ざりません。
+                </p>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table
+                  id="apps-table"
+                  class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400"
+                >
+                  <thead class="text-[11px] text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                    <tr>
+                      <th class="py-2 px-2">窓口名 / 説明</th>
+                      <th class="py-2 px-2">URL</th>
+                      <th class="py-2 px-2 text-right">文書 / チャンク</th>
+                      <th class="py-2 px-2">Drive</th>
+                      <th class="py-2 px-2">直近のバッチ</th>
+                      <th class="py-2 px-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                    <tr :for={app <- @apps} id={"app-row-#{app.slug}"}>
+                      <td class="py-2 px-2">
+                        <form :if={app.id} phx-submit="update_app" class="space-y-1">
+                          <input type="hidden" name="app_id" value={app.id} />
+                          <input
+                            type="text"
+                            name="name"
+                            value={app.name}
+                            class="w-44 px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-medium"
+                          />
+                          <input
+                            type="text"
+                            name="description"
+                            value={app.description}
+                            placeholder="説明（ポータルに表示）"
+                            class="w-full px-2 py-1 rounded border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[11px]"
+                          />
+                          <button type="submit" class="text-[11px] underline text-indigo-600">保存</button>
+                        </form>
+                        <span :if={is_nil(app.id)} class="font-medium">{app.name}</span>
+                      </td>
+                      <td class="py-2 px-2 font-mono whitespace-nowrap">
+                        <a href={"/" <> app.slug} class="text-indigo-600 underline">/{app.slug}</a>
+                        <a href={"/" <> app.slug <> "/admin"} class="ml-2 text-zinc-500 underline">管理</a>
+                      </td>
+                      <% sum = Map.get(@app_summaries, app.slug, %{}) %>
+                      <td class="py-2 px-2 text-right font-mono">
+                        {sum[:docs] || 0} / {sum[:chunks] || 0}
+                      </td>
+                      <td class="py-2 px-2">{if sum[:drive?], do: "設定済み", else: "未設定"}</td>
+                      <td class="py-2 px-2 whitespace-nowrap">
+                        <%= if run = sum[:last_run] do %>
+                          {AskDrive.Clock.format(run.started_at, "%m/%d %H:%M")} {status_label(
+                            run.status
+                          )}
+                        <% else %>
+                          —
+                        <% end %>
+                      </td>
+                      <td class="py-2 px-2 text-right">
+                        <button
+                          :if={not app.primary and app.id}
+                          type="button"
+                          phx-click="delete_app"
+                          phx-value-id={app.id}
+                          data-confirm={"窓口「#{app.name}」を削除します。チャット・管理画面が使えなくなります（データベースファイルは名前を変えて残します）。続行しますか？"}
+                          class="text-[11px] text-red-600 underline"
+                        >
+                          削除
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-3">
+              <h3 class="font-semibold text-sm text-zinc-900 dark:text-zinc-100">窓口を追加</h3>
+              <.form
+                for={@app_form}
+                id="new-app-form"
+                phx-submit="create_app"
+                class="grid grid-cols-1 sm:grid-cols-3 gap-3"
+              >
+                <.input field={@app_form[:name]} type="text" label="窓口名（例: HR）" />
+                <.input field={@app_form[:slug]} type="text" label="URL 名（例: hr → /hr）" />
+                <.input field={@app_form[:description]} type="text" label="説明（任意）" />
+                <div class="sm:col-span-3">
+                  <button
+                    type="submit"
+                    class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium"
+                  >
+                    窓口を作成
+                  </button>
+                  <span class="ml-2 text-[11px] text-zinc-500">
+                    AI の設定は最初の窓口から引き継ぎます。Google Drive と API キーは、作成後に窓口の管理画面で設定してください。
+                  </span>
+                </div>
+              </.form>
+            </div>
+          </div>
+        <% end %>
+
         <%!-- Tab 4: User Management --%>
         <%= if @current_tab == "users" do %>
           <div class="space-y-6">
@@ -1395,7 +1547,10 @@ defmodule AskDriveWeb.AdminLive do
         <%= if @current_tab == "settings" do %>
           <div class="space-y-6">
             <%!-- Card 1: Administrator password --%>
-            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+            <div
+              :if={@scope == :platform}
+              class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
+            >
               <div>
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                   <.icon name="hero-shield-check" class="w-5 h-5 text-indigo-600" /> 管理者パスワード
@@ -1477,7 +1632,10 @@ defmodule AskDriveWeb.AdminLive do
             </div>
 
             <%!-- Card 2: Google Drive Sync Authentication --%>
-            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+            <div
+              :if={@scope == :app}
+              class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
+            >
               <div class="flex items-center justify-between">
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                   <.icon name="hero-cloud-arrow-down" class="w-5 h-5 text-indigo-600" />
@@ -1628,7 +1786,9 @@ defmodule AskDriveWeb.AdminLive do
 
                 <div class="flex flex-wrap items-center gap-3 pt-2">
                   <.link
-                    href={~p"/auth/google/drive?#{[return_to: "/admin?tab=settings"]}"}
+                    href={
+                      ~p"/auth/google/drive?#{[return_to: @base_path <> "/admin?tab=settings", app: @app && @app.slug]}"
+                    }
                     class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                   >
                     <.icon name="hero-arrow-path-rounded-square" class="w-4 h-4" />
@@ -1637,7 +1797,9 @@ defmodule AskDriveWeb.AdminLive do
 
                   <%= if @account do %>
                     <.link
-                      href={~p"/auth/google/disconnect?#{[return_to: "/admin?tab=settings"]}"}
+                      href={
+                        ~p"/auth/google/disconnect?#{[return_to: @base_path <> "/admin?tab=settings", app: @app && @app.slug]}"
+                      }
                       class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 font-medium text-xs transition"
                     >
                       <.icon name="hero-x-circle" class="w-4 h-4" /> 連携解除
@@ -1658,7 +1820,10 @@ defmodule AskDriveWeb.AdminLive do
             </div>
 
             <%!-- Card 3: LLM Provider Settings --%>
-            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-5">
+            <div
+              :if={@scope == :app}
+              class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-5"
+            >
               <div>
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                   <.icon name="hero-cpu-chip" class="w-5 h-5 text-indigo-600" /> LLM プロバイダ
@@ -1745,7 +1910,10 @@ defmodule AskDriveWeb.AdminLive do
 
               <.form for={@form} id="settings-form" phx-submit="save_settings" class="space-y-5">
                 <%!-- Google Cloud OAuth Credentials --%>
-                <div class="space-y-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800">
+                <div
+                  :if={@scope == :platform}
+                  class="space-y-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
+                >
                   <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                     <.icon name="hero-key" class="w-4 h-4 text-indigo-500" /> Google Cloud OAuth 認証情報
                   </h3>
@@ -1776,7 +1944,10 @@ defmodule AskDriveWeb.AdminLive do
                 </div>
 
                 <%!-- LLM Provider Selection --%>
-                <div class="space-y-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800">
+                <div
+                  :if={@scope == :app}
+                  class="space-y-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
+                >
                   <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                     <.icon name="hero-cpu-chip" class="w-4 h-4 text-indigo-500" /> LLM プロバイダとモデル
                   </h3>
@@ -1893,7 +2064,10 @@ defmodule AskDriveWeb.AdminLive do
                 </div>
 
                 <%!-- Provider Endpoints and API Keys --%>
-                <div class="space-y-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800">
+                <div
+                  :if={@scope == :app}
+                  class="space-y-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
+                >
                   <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                     <.icon name="hero-key" class="w-4 h-4 text-indigo-500" /> プロバイダ接続情報
                   </h3>
@@ -1965,8 +2139,9 @@ defmodule AskDriveWeb.AdminLive do
                   </div>
                 </div>
 
-                <%!-- Drive & Domain Settings --%>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <%!-- Drive & Domain Settings: per app (folder, threshold, chat) vs platform
+                      (allowed domain, nightly window) — spec 6.11 --%>
+                <div :if={@scope == :app} class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <.input
                     field={@form[:drive_folder_id]}
                     type="text"
@@ -1981,11 +2156,13 @@ defmodule AskDriveWeb.AdminLive do
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <.input
+                    :if={@scope == :platform}
                     field={@form[:allowed_domain]}
                     type="text"
                     label="許可 Google Workspace ドメイン (例: company.com)"
                   />
                   <.input
+                    :if={@scope == :app}
                     field={@form[:tier1_threshold]}
                     type="number"
                     step="0.01"
@@ -1995,7 +2172,7 @@ defmodule AskDriveWeb.AdminLive do
                   />
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div :if={@scope == :platform} class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <.input
                     field={@form[:batch_start_hour]}
                     type="number"
@@ -2020,12 +2197,16 @@ defmodule AskDriveWeb.AdminLive do
                 </div>
 
                 <.input
+                  :if={@scope == :app}
                   field={@form[:maintenance_message]}
                   type="text"
                   label="メンテナンス告知メッセージ"
                 />
 
-                <div class="pt-2 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3">
+                <div
+                  :if={@scope == :app}
+                  class="pt-2 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3"
+                >
                   <.input
                     field={@form[:maintenance_mode]}
                     type="checkbox"
@@ -2179,6 +2360,7 @@ defmodule AskDriveWeb.AdminLive do
 
             <%!-- HTTPS / SSL certificate (spec 6.10) --%>
             <div
+              :if={@scope == :platform}
               id="ssl-settings"
               class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
             >
@@ -2469,9 +2651,18 @@ defmodule AskDriveWeb.AdminLive do
     setting = socket.assigns[:setting] || Settings.get_setting!()
     installed = OllamaModels.installed(setting)
 
+    # the platform screen covers every app's models (one Ollama for all, spec 6.11)
+    required =
+      if socket.assigns[:scope] == :platform,
+        do:
+          Enum.map(OllamaModels.required_all(), fn {app, role, model} ->
+            {"#{app.name}: #{role}", model}
+          end),
+        else: OllamaModels.required(setting)
+
     socket
     |> assign(:ollama_installed, installed)
-    |> assign(:ollama_required, OllamaModels.required(setting))
+    |> assign(:ollama_required, required)
     |> assign(:ollama_pulls, OllamaModels.pulls())
   end
 
@@ -2505,4 +2696,19 @@ defmodule AskDriveWeb.AdminLive do
     do: :persistent_term.put({__MODULE__, :ssl_result}, "前回の証明書の適用に失敗しました: #{message}")
 
   defp last_ssl_result, do: :persistent_term.get({__MODULE__, :ssl_result}, nil)
+
+  # Per-app figures for the platform's 窓口 tab
+  defp app_summaries do
+    AskDrive.Apps.each(fn _app ->
+      last = Scheduler.list_runs(1) |> List.first()
+
+      %{
+        docs: Repo.aggregate(Document, :count, :id) || 0,
+        chunks: Repo.aggregate(Chunk, :count, :id) || 0,
+        drive?: Accounts.drive_connected?(),
+        last_run: last
+      }
+    end)
+    |> Map.new(fn {app, summary} -> {app.slug, summary} end)
+  end
 end

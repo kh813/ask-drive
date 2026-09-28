@@ -38,6 +38,8 @@ npm-debug.log
 # Database files
 *.db
 *.db-*
+# databases of deleted apps, kept renamed (spec 6.11)
+*.db.deleted-*
 
 # Logs and environment files
 /log/

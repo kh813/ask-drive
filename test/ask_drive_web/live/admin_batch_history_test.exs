@@ -36,7 +36,7 @@ defmodule AskDriveWeb.AdminBatchHistoryTest do
       chunks: 186
     })
 
-    {:ok, view, html} = live(conn, ~p"/admin")
+    {:ok, view, html} = live(conn, ~p"/it-support/admin")
 
     assert html =~ "夜間バッチの自動実行と履歴"
     assert has_element?(view, "#batch-run-#{manual.id}", "中断（再起動）")
@@ -71,7 +71,7 @@ defmodule AskDriveWeb.AdminBatchHistoryTest do
     conn: conn
   } do
     run = run!(~N[2026-09-28 13:29:00], %{status: "aborted"})
-    {:ok, view, _html} = live(conn, ~p"/admin")
+    {:ok, view, _html} = live(conn, ~p"/it-support/admin")
     assert has_element?(view, "#batch-run-#{run.id}", "—（中断）")
   end
 

@@ -28,15 +28,15 @@ defmodule AskDriveWeb.Router do
     delete "/logout", AuthController, :logout
   end
 
-  # --- Chat: open to everyone for now -------------------------------------
+  # --- Portal: the list of apps (spec 6.11) --------------------------------
   # Temporary (Phase 17): employee Google login is still blocked, so general users chat
   # without signing in. Admin screens below still require login + elevation.
   scope "/", AskDriveWeb do
     pipe_through :browser
 
-    live_session :chat,
+    live_session :portal,
       on_mount: [{AskDriveWeb.UserAuth, :mount_current_user}] do
-      live "/", ChatLive
+      live "/", PortalLive
     end
   end
 
@@ -61,9 +61,10 @@ defmodule AskDriveWeb.Router do
   scope "/", AskDriveWeb do
     pipe_through [:browser, :require_admin_session]
 
+    # Platform administration: apps, users, SSL, Ollama, the nightly window (spec 6.11)
     live_session :admin,
       on_mount: [{AskDriveWeb.UserAuth, :require_admin_session}] do
-      live "/admin", AdminLive
+      live "/admin", AdminLive, :platform
     end
 
     # Authorizing and revoking the Drive sync account changes what the whole system reads,
@@ -89,6 +90,26 @@ defmodule AskDriveWeb.Router do
 
       live_dashboard "/dashboard", metrics: AskDriveWeb.Telemetry
       forward "/mailbox", Plug.Swoosh.MailboxPreview
+    end
+  end
+
+  # --- Apps (spec 6.11) — last, so the "/:app" catch-all can't shadow any route above ---
+  # Reserved slugs (AskDrive.Apps.App.reserved_slugs/0) keep apps from claiming those paths.
+  scope "/", AskDriveWeb do
+    pipe_through [:browser, :require_admin_session]
+
+    live_session :app_admin,
+      on_mount: [{AskDriveWeb.UserAuth, :require_admin_session}, {AskDriveWeb.AppScope, :app}] do
+      live "/:app/admin", AdminLive, :app
+    end
+  end
+
+  scope "/", AskDriveWeb do
+    pipe_through :browser
+
+    live_session :app_chat,
+      on_mount: [{AskDriveWeb.UserAuth, :mount_current_user}, {AskDriveWeb.AppScope, :app}] do
+      live "/:app", ChatLive
     end
   end
 end

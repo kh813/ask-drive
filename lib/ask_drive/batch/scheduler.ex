@@ -41,6 +41,11 @@ defmodule AskDrive.Batch.Scheduler do
     Repo.exists?(from b in BatchRun, where: b.status == "running")
   end
 
+  @doc "Whether any app's batch is running (they share one local model; spec 6.11)."
+  def running_anywhere? do
+    AskDrive.Apps.each(fn _app -> running?() end) |> Enum.any?(fn {_app, r} -> r end)
+  end
+
   @doc """
   Whether an automatic full batch has run at or after `since` (UTC). Manual runs don't count
   (F-330). A batch cut off by a restart ("aborted", e.g. a deploy during the night) doesn't
@@ -66,8 +71,9 @@ defmodule AskDrive.Batch.Scheduler do
   It also stays out of `:night_batch`, so the embedding model stays resident for chat.
   """
   def run_batch(opts \\ []) do
-    # The nightly cron and a manual run could otherwise overlap and fight over the model.
-    if running?() do
+    # The nightly cron and a manual run — in this app or another — could otherwise overlap
+    # and fight over the one local model.
+    if running_anywhere?() do
       Logger.warning("Batch requested while another is running; skipped")
       {:error, :already_running}
     else
@@ -111,7 +117,8 @@ defmodule AskDrive.Batch.Scheduler do
   state: :running | :done | :due | :missed, run: run | nil, next_start: local}`.
   """
   def auto_status(now \\ AskDrive.Clock.local_now()) do
-    setting = Settings.get_setting!()
+    # the window is platform-wide; the runs are this app's
+    setting = Settings.platform_setting!()
     start_h = setting.batch_start_hour || 0
     end_h = setting.batch_end_hour || 7
     window_start = Mode.night_window_start_utc(now)
@@ -138,7 +145,7 @@ defmodule AskDrive.Batch.Scheduler do
     # :missed means last night's window closed without a (non-aborted) full batch.
     state =
       cond do
-        running?() -> :running
+        running_anywhere?() -> :running
         tonight -> :done
         in_window? -> :due
         true -> :missed
@@ -180,7 +187,8 @@ defmodule AskDrive.Batch.Scheduler do
     # generation model, and the daytime mode keeps the embedding model resident for chat)
     unless ingest_only?, do: Mode.set_mode(:night_batch)
 
-    deadline = calculate_deadline(setting)
+    # the cut-off hour is platform-wide (spec 6.11)
+    deadline = calculate_deadline(Settings.platform_setting!())
     Logger.info("Starting Night Batch ##{batch_run.id}. Deadline: #{inspect(deadline)}")
 
     # Start caffeinate process to prevent macOS sleep during nightly batch (12-6)

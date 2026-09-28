@@ -20,6 +20,8 @@ defmodule AskDrive.Application do
         {DNSCluster, query: Application.get_env(:ask_drive, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: AskDrive.PubSub},
         {Oban, Application.fetch_env!(:ask_drive, Oban)},
+        # One database per app (spec 6.11): started and migrated before anything serves them
+        AskDrive.Apps.Repos,
         AskDrive.LLM.Semaphore,
         AskDrive.Drive.ServiceAccount,
         AskDrive.HealthCheck,

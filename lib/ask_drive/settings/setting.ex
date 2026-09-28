@@ -268,26 +268,31 @@ defmodule AskDrive.Settings.Setting do
   # paste here (missing client_email/private_key, broken JSON) beats discovering it during
   # the nightly sync, hours after anyone was watching (spec 10 章).
   defp validate_drive_service_account(changeset) do
-    if get_field(changeset, :drive_auth_mode) == "service_account" do
-      json = get_field(changeset, :drive_service_account_json)
+    json = get_field(changeset, :drive_service_account_json)
 
-      cond do
-        blank?(json) ->
-          add_error(
-            changeset,
-            :drive_service_account_json,
-            "Drive 認証方式にサービスアカウントを選んだため、JSON キーが必要です"
-          )
+    cond do
+      get_field(changeset, :drive_auth_mode) != "service_account" ->
+        changeset
 
-        match?({:error, _}, ServiceAccount.parse(json)) ->
-          {:error, reason} = ServiceAccount.parse(json)
-          add_error(changeset, :drive_service_account_json, reason)
+      # A key is required when a save sets (or clears) the key in service-account mode, not
+      # for every save afterwards: a new app starts in this mode without a key (spec 6.11)
+      # and must still be able to save its other settings.
+      blank?(json) and Map.has_key?(changeset.changes, :drive_service_account_json) ->
+        add_error(
+          changeset,
+          :drive_service_account_json,
+          "Drive 認証方式にサービスアカウントを選んだため、JSON キーが必要です"
+        )
 
-        true ->
-          changeset
-      end
-    else
-      changeset
+      blank?(json) ->
+        changeset
+
+      match?({:error, _}, ServiceAccount.parse(json)) ->
+        {:error, reason} = ServiceAccount.parse(json)
+        add_error(changeset, :drive_service_account_json, reason)
+
+      true ->
+        changeset
     end
   end
 

@@ -23,9 +23,9 @@ defmodule AskDriveWeb.AdminLiveTest do
         })
         |> Repo.insert()
 
-      {:ok, view, html} = live(conn, ~p"/admin")
+      {:ok, view, html} = live(conn, ~p"/it-support/admin")
 
-      assert html =~ "管理ダッシュボード"
+      assert html =~ "管理: AskDrive for IT-Support"
       assert html =~ "概要・バッチ状況"
       assert html =~ "未回答・解消質問"
       assert html =~ "ドキュメント一覧"
@@ -48,7 +48,7 @@ defmodule AskDriveWeb.AdminLiveTest do
         })
         |> Repo.insert()
 
-      {:ok, view, _html} = live(conn, ~p"/admin?tab=questions")
+      {:ok, view, _html} = live(conn, ~p"/it-support/admin?tab=questions")
       html = render(view)
 
       assert html =~ "未回答質問"

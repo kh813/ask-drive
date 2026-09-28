@@ -37,8 +37,12 @@ defmodule AskDriveWeb.AuthController do
   @doc """
   Starts the Drive sync account authorization flow (administrators only).
   """
-  def request_drive(conn, params),
-    do: start_oauth(conn, :drive, params["return_to"] || "/admin?tab=settings")
+  def request_drive(conn, params) do
+    # The callback URL is shared by every app, so remember which app is authorizing (6.11)
+    conn
+    |> put_session(:oauth_app, params["app"])
+    |> start_oauth(:drive, params["return_to"] || "/admin?tab=settings")
+  end
 
   defp start_oauth(conn, flow, return_to) do
     if OAuth.get_client_id() == "" do
@@ -106,11 +110,18 @@ defmodule AskDriveWeb.AuthController do
   Revokes and forgets the Drive sync account (administrators only).
   """
   def disconnect(conn, params) do
-    Accounts.disconnect_account()
+    in_app(params["app"], &Accounts.disconnect_account/0)
 
     conn
     |> put_flash(:info, "Google アカウントの連携を解除しました。")
     |> redirect(to: params["return_to"] || ~p"/admin?tab=settings")
+  end
+
+  # Runs `fun` in the named app's database (the Drive sync account is per app, spec 6.11);
+  # without an app — or an unknown one — in the primary app, as before apps existed.
+  defp in_app(slug, fun) do
+    app = AskDrive.Apps.get_by_slug(slug || "") || AskDrive.Apps.primary()
+    AskDrive.Apps.with_app(app, fun)
   end
 
   # --- Flow completion ------------------------------------------------------
@@ -125,7 +136,8 @@ defmodule AskDriveWeb.AuthController do
         "アクセス拒否: 許可されたドメイン (@#{allowed_domain()}) のアカウントのみ連携できます。"
       )
     else
-      {:ok, account} = Accounts.save_tokens(tokens)
+      {:ok, account} =
+        in_app(get_session(conn, :oauth_app), fn -> Accounts.save_tokens(tokens) end)
 
       conn
       |> clear_oauth_session()
@@ -179,6 +191,7 @@ defmodule AskDriveWeb.AuthController do
     |> delete_session(:oauth_state)
     |> delete_session(:oauth_flow)
     |> delete_session(:oauth_return_to)
+    |> delete_session(:oauth_app)
   end
 
   defp fallback_path(conn, flow) when flow in [:drive, "drive"] do

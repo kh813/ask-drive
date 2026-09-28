@@ -14,7 +14,7 @@ defmodule AskDrive.Accounts.AdminAccess do
   require Logger
 
   alias AskDrive.Accounts.{AdminElevationLog, User}
-  alias AskDrive.Repo
+  alias AskDrive.PlatformRepo
   alias AskDrive.Settings
 
   @digest :sha512
@@ -93,7 +93,7 @@ defmodule AskDrive.Accounts.AdminAccess do
   Every outcome is written to the audit log before returning.
   """
   def elevate(%User{} = user, password, context \\ %{}) do
-    setting = Settings.get_setting!()
+    setting = Settings.platform_setting!()
 
     cond do
       not User.admin_eligible?(user) ->
@@ -164,7 +164,7 @@ defmodule AskDrive.Accounts.AdminAccess do
     window_start = DateTime.add(DateTime.utc_now(), -lockout_minutes * 60, :second)
 
     failures =
-      Repo.all(
+      PlatformRepo.all(
         from l in AdminElevationLog,
           where:
             l.email == ^user.email and l.event == "denied" and l.occurred_at >= ^window_start,
@@ -189,7 +189,7 @@ defmodule AskDrive.Accounts.AdminAccess do
     window_start = DateTime.add(DateTime.utc_now(), -lockout_minutes * 60, :second)
 
     failures =
-      Repo.one(
+      PlatformRepo.one(
         from l in AdminElevationLog,
           where:
             l.email == ^user.email and l.event == "denied" and l.occurred_at >= ^window_start,
@@ -205,7 +205,7 @@ defmodule AskDrive.Accounts.AdminAccess do
   Sets the first administrator password. Refuses if one already exists (F-917).
   """
   def set_initial_password(%User{} = user, password, context \\ %{}) do
-    setting = Settings.get_setting!()
+    setting = Settings.platform_setting!()
 
     cond do
       password_set?(setting) -> {:error, :already_set}
@@ -218,7 +218,7 @@ defmodule AskDrive.Accounts.AdminAccess do
   Changes the administrator password. The current password must be supplied (F-914).
   """
   def change_password(%User{} = user, current_password, new_password, context \\ %{}) do
-    setting = Settings.get_setting!()
+    setting = Settings.platform_setting!()
 
     if password_matches?(setting.admin_password_hash, current_password) do
       store_password(setting, new_password, user, "password_changed", context)
@@ -232,12 +232,12 @@ defmodule AskDrive.Accounts.AdminAccess do
   Sets the password with no current-password check. Only for the CLI recovery path (F-920).
   """
   def force_set_password(password) do
-    setting = Settings.get_setting!()
+    setting = Settings.platform_setting!()
 
     with :ok <- validate_password(password) do
       setting
       |> Ecto.Changeset.change(admin_password_hash: hash_password(password))
-      |> Repo.update()
+      |> PlatformRepo.update()
     end
   end
 
@@ -246,7 +246,7 @@ defmodule AskDrive.Accounts.AdminAccess do
          {:ok, updated} <-
            setting
            |> Ecto.Changeset.change(admin_password_hash: hash_password(password))
-           |> Repo.update() do
+           |> PlatformRepo.update() do
       log(user, event, context)
       {:ok, updated}
     end
@@ -275,7 +275,7 @@ defmodule AskDrive.Accounts.AdminAccess do
   Most recent audit entries, newest first.
   """
   def list_elevation_logs(limit \\ 100) do
-    Repo.all(
+    PlatformRepo.all(
       from l in AdminElevationLog,
         order_by: [desc: l.occurred_at, desc: l.id],
         limit: ^limit,
@@ -296,7 +296,7 @@ defmodule AskDrive.Accounts.AdminAccess do
       user_agent: context[:user_agent],
       occurred_at: DateTime.utc_now() |> DateTime.truncate(:second)
     })
-    |> Repo.insert()
+    |> PlatformRepo.insert()
     |> case do
       {:ok, entry} ->
         {:ok, entry}
@@ -311,7 +311,7 @@ defmodule AskDrive.Accounts.AdminAccess do
   defp touch_elevated_at(user) do
     user
     |> User.changeset(%{last_elevated_at: DateTime.utc_now() |> DateTime.truncate(:second)})
-    |> Repo.update()
+    |> PlatformRepo.update()
   end
 
   defp stored_hash(setting) do
@@ -324,7 +324,7 @@ defmodule AskDrive.Accounts.AdminAccess do
   defp resolve_setting(%{__struct__: _} = setting), do: setting
 
   defp resolve_setting(_) do
-    Settings.get_setting()
+    Settings.platform_setting()
   rescue
     _ -> nil
   end

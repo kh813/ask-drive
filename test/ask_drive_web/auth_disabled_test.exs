@@ -21,7 +21,7 @@ defmodule AskDriveWeb.AuthDisabledTest do
   } do
     Application.put_env(:ask_drive, :auth_disabled_by_default, true)
     {:ok, _view, html} = live(conn, ~p"/admin")
-    assert html =~ "管理ダッシュボード"
+    assert html =~ "全体管理"
   end
 
   test "ASK_DRIVE_DISABLE_AUTH=false restores login even when the default is on", %{
@@ -47,7 +47,7 @@ defmodule AskDriveWeb.AuthDisabledTest do
   test "GET /admin succeeds with no session at all once the flag is set", %{conn: conn} do
     System.put_env("ASK_DRIVE_DISABLE_AUTH", "true")
     {:ok, _view, html} = live(conn, ~p"/admin")
-    assert html =~ "管理ダッシュボード"
+    assert html =~ "全体管理"
   end
 
   test "GET /auth/google/drive is reachable with no session once the flag is set", %{

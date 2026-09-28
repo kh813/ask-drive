@@ -48,6 +48,14 @@ defmodule AskDrive.Settings do
   end
 
   @doc """
+  The platform's settings (the primary app's row in the platform database), whichever app
+  the calling process serves. For platform-wide values: Google sign-in credentials, allowed
+  domain, administrator password and sessions, the nightly batch window (spec 6.11).
+  """
+  def platform_setting!, do: AskDrive.Apps.platform(&get_setting!/0)
+  def platform_setting, do: AskDrive.Apps.platform(&get_setting/0)
+
+  @doc """
   Gets the singleton setting record (nullable).
   """
   def get_setting do

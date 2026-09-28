@@ -36,6 +36,9 @@ defmodule AskDriveWeb.Layouts do
 
   attr :wide, :boolean, default: false, doc: "use the wider content column (admin screens)"
 
+  attr :app, :any, default: nil, doc: "the AskDrive app this page serves (spec 6.11), or nil"
+  attr :apps, :list, default: [], doc: "all apps, for the app switcher"
+
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -51,20 +54,57 @@ defmodule AskDriveWeb.Layouts do
           <span class="font-bold text-sm text-zinc-900 dark:text-zinc-100">AskDrive</span>
         </.link>
 
+        <%!-- App switcher (spec 6.11): which desk this is, and a way to the others. Switching
+              is plain navigation to the other app's URL — a fresh page, nothing carried over. --%>
+        <details :if={@app} id="app-switcher" class="relative">
+          <summary class="list-none cursor-pointer flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40">
+            for {@app.name}
+            <.icon :if={length(@apps) > 1} name="hero-chevron-down" class="w-3.5 h-3.5" />
+          </summary>
+          <div
+            :if={length(@apps) > 1}
+            class="absolute left-0 mt-1 w-64 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg p-1 z-50"
+          >
+            <p class="px-3 py-1.5 text-[11px] text-zinc-400">ほかの窓口</p>
+            <a
+              :for={other <- @apps}
+              :if={other.slug != @app.slug}
+              href={"/" <> other.slug}
+              class="block px-3 py-2 rounded-lg text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              AskDrive for {other.name}
+            </a>
+            <a
+              href="/"
+              class="block px-3 py-2 rounded-lg text-xs text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              窓口の一覧
+            </a>
+          </div>
+        </details>
+
         <nav :if={@current_user} class="flex items-center gap-1 text-xs font-medium">
           <.link
-            navigate={~p"/"}
+            href={if @app, do: "/" <> @app.slug, else: "/"}
             class="px-2.5 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
           >
-            チャット
+            {if @app, do: "チャット", else: "窓口一覧"}
           </.link>
           <.link
-            :if={@admin_elevated?}
-            navigate={~p"/admin"}
+            :if={@admin_elevated? and @app}
+            href={"/" <> @app.slug <> "/admin"}
             id="admin-nav-link"
             class="px-2.5 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
           >
             管理
+          </.link>
+          <.link
+            :if={@admin_elevated?}
+            href={~p"/admin"}
+            id="platform-admin-nav-link"
+            class="px-2.5 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+          >
+            全体管理
           </.link>
           <%!-- Eligible but not elevated: the way in is the password prompt, not /admin. --%>
           <.link
