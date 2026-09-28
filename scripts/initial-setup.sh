@@ -156,8 +156,13 @@ fi
 echo -e "\n${YELLOW}[4/7] 環境設定ファイルの確認中...${NC}"
 if [[ ! -f "${SCRIPT_DIR}/.env.prod" ]]; then
   echo ".env.prod を新規作成中..."
-  SECRET_KEY="$(mix phx.gen.secret)"
-  ENCRYPTION_KEY="$(mix ask_drive.gen.key)"
+  if command -v openssl >/dev/null 2>&1; then
+    SECRET_KEY="$(openssl rand -base64 48 | tr -d '\n')"
+    ENCRYPTION_KEY="$(openssl rand -base64 32 | tr -d '\n')"
+  else
+    SECRET_KEY="$(head -c 48 /dev/urandom | base64 | tr -d '\n')"
+    ENCRYPTION_KEY="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+  fi
 
   cat << EOF > "${SCRIPT_DIR}/.env.prod"
 MIX_ENV=prod
@@ -175,10 +180,18 @@ fi
 # 5. Elixir 依存関係の取得とコンパイル
 echo -e "\n${YELLOW}[5/7] Elixir 依存関係の取得中...${NC}"
 cd "${SCRIPT_DIR}"
+mix local.hex --force || true
+mix local.rebar --force || true
 mix deps.get
 
 # 6. データベースマイグレーション
 echo -e "\n${YELLOW}[6/7] データベースマイグレーションの実行中...${NC}"
+if [[ -f "${SCRIPT_DIR}/.env.prod" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${SCRIPT_DIR}/.env.prod"
+  set +a
+fi
 MIX_ENV=prod mix ecto.create || true
 MIX_ENV=prod mix ecto.migrate
 
