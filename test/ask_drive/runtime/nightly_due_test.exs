@@ -44,4 +44,16 @@ defmodule AskDrive.Runtime.NightlyDueTest do
     refute Mode.nightly_due?(~N[2026-09-29 03:00:00])
     assert Mode.nightly_due?(~N[2026-09-30 00:01:00])
   end
+
+  test "a run starting at 06:43 gets until 08:00 (deadline separate from the start window)" do
+    setting = AskDrive.Settings.get_setting!()
+    assert setting.batch_end_hour == 7
+    assert setting.batch_deadline_hour == 8
+
+    assert AskDrive.Batch.Scheduler.calculate_deadline(setting, ~N[2026-09-29 06:43:00]) ==
+             Clock.local_to_utc(~N[2026-09-29 08:00:00])
+
+    assert Mode.nightly_due?(~N[2026-09-29 06:43:00])
+    refute Mode.nightly_due?(~N[2026-09-29 07:10:00])
+  end
 end

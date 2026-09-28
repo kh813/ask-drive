@@ -578,7 +578,7 @@ defmodule AskDriveWeb.AdminLive do
                 <span class="text-xs text-zinc-500">
                   夜間枠: 毎日 {pad2(elem(@auto_status.window, 0))}:00〜翌 {pad2(
                     elem(@auto_status.window, 1)
-                  )}:00（この PC のローカル時刻）
+                  )}:00・打ち切り {pad2(@auto_status.deadline_hour)}:00（この PC のローカル時刻）
                 </span>
               </div>
 
@@ -1926,14 +1926,21 @@ defmodule AskDriveWeb.AdminLive do
                   <.input
                     field={@form[:batch_start_hour]}
                     type="number"
-                    label="バッチ開始時刻 (時: 0〜23)"
+                    label="自動実行の開始時刻 (時: 0〜23。既定 0)"
                     min="0"
                     max="23"
                   />
                   <.input
                     field={@form[:batch_end_hour]}
                     type="number"
-                    label="バッチ締切時刻 (時: 0〜23)"
+                    label="自動実行を開始できる最終時刻 (時: 0〜23。既定 7)"
+                    min="0"
+                    max="23"
+                  />
+                  <.input
+                    field={@form[:batch_deadline_hour]}
+                    type="number"
+                    label="バッチの打ち切り時刻 (時: 0〜23。既定 8。実行中のバッチはこの時刻で QA 生成を止める)"
                     min="0"
                     max="23"
                   />

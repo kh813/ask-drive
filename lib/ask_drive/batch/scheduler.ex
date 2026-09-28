@@ -146,6 +146,7 @@ defmodule AskDrive.Batch.Scheduler do
 
     %{
       window: {start_h, end_h},
+      deadline_hour: setting.batch_deadline_hour || 8,
       window_start: AskDrive.Clock.to_local(window_start),
       in_window?: in_window?,
       state: state,
@@ -704,10 +705,11 @@ defmodule AskDrive.Batch.Scheduler do
 
   # --- Helpers ---
 
-  # The next batch_end_hour:00 in local time (it used to be UTC: "07:00" meant 16:00 JST).
-  defp calculate_deadline(setting) do
-    now = AskDrive.Clock.local_now()
-    end_hour = setting.batch_end_hour || 7
+  # The next batch_deadline_hour:00 in local time (spec F-339; default 08:00). The automatic
+  # run may start until batch_end_hour (07:00), and gets until the deadline to finish.
+  # (It used to be batch_end_hour in UTC: "07:00" meant 16:00 JST.)
+  def calculate_deadline(setting, now \\ AskDrive.Clock.local_now()) do
+    end_hour = setting.batch_deadline_hour || 8
     today_deadline = NaiveDateTime.new!(NaiveDateTime.to_date(now), Time.new!(end_hour, 0, 0))
 
     deadline =

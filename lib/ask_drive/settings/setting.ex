@@ -24,6 +24,8 @@ defmodule AskDrive.Settings.Setting do
     field :drive_folder_name, :string
     field :batch_start_hour, :integer, default: 0
     field :batch_end_hour, :integer, default: 7
+    # Cut-off for a running batch (spec F-339); batch_end_hour only bounds the start
+    field :batch_deadline_hour, :integer, default: 8
     field :batch_model, :string, default: "qwen3:4b"
     field :embed_model, :string, default: "bge-m3"
     field :batch_num_ctx, :integer, default: 4096
@@ -122,6 +124,7 @@ defmodule AskDrive.Settings.Setting do
         :google_client_secret,
         :batch_start_hour,
         :batch_end_hour,
+        :batch_deadline_hour,
         :batch_model,
         :embed_model,
         :batch_num_ctx,
@@ -164,6 +167,10 @@ defmodule AskDrive.Settings.Setting do
     ])
     |> validate_number(:batch_start_hour, greater_than_or_equal_to: 0, less_than_or_equal_to: 23)
     |> validate_number(:batch_end_hour, greater_than_or_equal_to: 0, less_than_or_equal_to: 23)
+    |> validate_number(:batch_deadline_hour,
+      greater_than_or_equal_to: 0,
+      less_than_or_equal_to: 23
+    )
     |> validate_number(:tier1_threshold,
       greater_than_or_equal_to: 0.5,
       less_than_or_equal_to: 1.0
