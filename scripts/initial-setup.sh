@@ -15,6 +15,10 @@ mkdir -p "${RUNTIME_BIN}" "${SCRIPT_DIR}/tmp/pids" "${SCRIPT_DIR}/log"
 # PATH の優先順位設定
 export PATH="${RUNTIME_BIN}:${RUNTIME_BREW}/bin:/opt/homebrew/bin:/usr/local/bin:${HOME}/.local/bin:${HOME}/.asdf/shims:${HOME}/.asdf/bin:${HOME}/.local/share/mise/shims:${HOME}/.local/share/mise/bin:${PATH}"
 
+# macOS / Linux (Ubuntu/Debian) の差異はここに集約 (OS 判定、sed -i、各ツールの取得)
+# shellcheck source=scripts/lib/platform.sh
+source "${SCRIPT_DIR}/scripts/lib/platform.sh"
+
 # 色設定
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -24,33 +28,32 @@ NC='\033[0m'
 
 echo -e "${GREEN}=== AskDrive 初期セットアップを開始します ===${NC}"
 ARCH="$(uname -m)"
-echo "検出アーキテクチャ: ${ARCH}"
+echo "検出 OS / アーキテクチャ: ${ASKDRIVE_OS} / ${ASKDRIVE_ARCH}"
+
+if [[ "${ASKDRIVE_OS}" == "unknown" ]]; then
+  echo -e "${RED}対応していない OS です（macOS または Linux に対応）。${NC}"
+  exit 1
+fi
 
 # 1. 依存ツールの確認 & ローカルインストール
 echo -e "\n${YELLOW}[1/7] 依存ツールの確認および自動セットアップ中...${NC}"
 
+# Linux: pdftotext・zstd などのシステムパッケージ（初回のみ sudo）
+if is_linux; then
+  ensure_linux_packages || {
+    echo -e "${RED}システムパッケージのインストールに失敗しました。${NC}"
+    exit 1
+  }
+fi
+
 # (A) Pandoc の確認・インストール
 if ! command -v pandoc >/dev/null 2>&1; then
   echo "pandoc が見つかりません。スタンドアロンバイナリを取得中..."
-  PANDOC_VER="3.6.3"
-  if [[ "${ARCH}" == "arm64" ]]; then
-    PANDOC_ZIP="pandoc-${PANDOC_VER}-arm64-macOS.zip"
-  else
-    PANDOC_ZIP="pandoc-${PANDOC_VER}-x86_64-macOS.zip"
-  fi
-  PANDOC_URL="https://github.com/jgm/pandoc/releases/download/${PANDOC_VER}/${PANDOC_ZIP}"
-  TMP_DIR="$(mktemp -d)"
-  curl -fL -o "${TMP_DIR}/${PANDOC_ZIP}" "${PANDOC_URL}"
-  unzip -q -o "${TMP_DIR}/${PANDOC_ZIP}" -d "${TMP_DIR}"
-  PANDOC_BIN_SRC="$(find "${TMP_DIR}" -type f -name pandoc | head -n 1)"
-  if [[ -n "${PANDOC_BIN_SRC}" && -f "${PANDOC_BIN_SRC}" ]]; then
-    cp "${PANDOC_BIN_SRC}" "${RUNTIME_BIN}/pandoc"
-    chmod +x "${RUNTIME_BIN}/pandoc"
+  if install_pandoc; then
     echo -e "${GREEN}pandoc を ${RUNTIME_BIN}/pandoc にインストールしました。${NC}"
   else
-    echo -e "${RED}pandoc バイナリの展開に失敗しました。${NC}"
+    echo -e "${RED}pandoc の取得に失敗しました。${NC}"
   fi
-  rm -rf "${TMP_DIR}"
 else
   echo "pandoc: OK ($(command -v pandoc))"
 fi
@@ -62,49 +65,33 @@ fi
 #   "error starting llama-server: llama-server binary not found"
 # で失敗する。そのため .app の zip から ollama を 1 個だけ抜き出すのではなく、
 # 公式のスタンドアロン tarball を丸ごと RUNTIME_BIN へ展開する。
-install_ollama_runtime() {
-  local tmp_dir
-  tmp_dir="$(mktemp -d)"
-  echo "Ollama スタンドアロン配布物 (約 160MB) を取得中..."
-
-  if ! curl -fL --retry 3 -o "${tmp_dir}/ollama-darwin.tgz" "https://ollama.com/download/ollama-darwin.tgz"; then
-    echo -e "${RED}Ollama のダウンロードに失敗しました。${NC}"
-    rm -rf "${tmp_dir}"
-    return 1
-  fi
-
-  # tarball は ollama / llama-server / 各種 dylib がフラットに並んだ構成。
-  # dylib は実行ファイルからの相対パスで解決されるため、同一ディレクトリへ展開する。
-  if ! tar -xzf "${tmp_dir}/ollama-darwin.tgz" -C "${RUNTIME_BIN}"; then
-    echo -e "${RED}Ollama の展開に失敗しました。${NC}"
-    rm -rf "${tmp_dir}"
-    return 1
-  fi
-
-  chmod +x "${RUNTIME_BIN}/ollama" "${RUNTIME_BIN}/llama-server" 2>/dev/null || true
-  rm -rf "${tmp_dir}"
-
-  if [[ ! -x "${RUNTIME_BIN}/llama-server" ]]; then
-    echo -e "${RED}llama-server が見つかりません。Ollama のインストールが不完全です。${NC}"
-    return 1
-  fi
-
-  echo -e "${GREEN}ollama と llama-server を ${RUNTIME_BIN} にインストールしました。${NC}"
-}
-
+# install_ollama_runtime / ollama_runtime_complete は scripts/lib/platform.sh
 OLLAMA_PATH="$(command -v ollama || true)"
 if [[ -z "${OLLAMA_PATH}" ]]; then
-  echo "ollama が見つかりません。"
-  install_ollama_runtime
-elif [[ "${OLLAMA_PATH}" == "${RUNTIME_BIN}/ollama" && ! -x "${RUNTIME_BIN}/llama-server" ]]; then
+  echo "ollama が見つかりません。Ollama スタンドアロン配布物を取得中..."
+  if install_ollama_runtime; then
+    echo -e "${GREEN}ollama と推論ランナーを ${RUNTIME_DIR} に配置しました。${NC}"
+  else
+    echo -e "${RED}Ollama のインストールに失敗しました。${NC}"
+  fi
+elif [[ "${OLLAMA_PATH}" == "${RUNTIME_BIN}/ollama" ]] && ! ollama_runtime_complete; then
   # 旧バージョンのセットアップが ollama 本体だけを配置した状態。ランナーを補って修復する。
-  echo -e "${YELLOW}ollama はありますが推論ランナー (llama-server) が欠落しています。再インストールします。${NC}"
-  install_ollama_runtime
+  echo -e "${YELLOW}ollama はありますが推論ランナーが欠落しています。再インストールします。${NC}"
+  install_ollama_runtime || echo -e "${RED}Ollama の再インストールに失敗しました。${NC}"
 else
   echo "ollama: OK (${OLLAMA_PATH})"
 fi
 
-# (C) Homebrew / Poppler (pdftotext) / Erlang & Elixir の確認・インストール
+# (C) Poppler (pdftotext) / Erlang & Elixir の確認・インストール
+#   macOS: Homebrew（ユーザー領域 .runtime/homebrew に導入可）
+#   Linux: pdftotext は ensure_linux_packages（apt）、Erlang/Elixir は .runtime へ（hex.pm のビルド）
+if is_linux; then
+  install_beam_linux || {
+    echo -e "${RED}Erlang/Elixir のインストールに失敗しました。${NC}"
+    exit 1
+  }
+fi
+
 NEED_BREW_PACKAGES=()
 if ! command -v pdftotext >/dev/null 2>&1; then
   NEED_BREW_PACKAGES+=("poppler")
@@ -116,7 +103,7 @@ if ! command -v elixir >/dev/null 2>&1 || ! command -v mix >/dev/null 2>&1; then
   NEED_BREW_PACKAGES+=("elixir")
 fi
 
-if [[ ${#NEED_BREW_PACKAGES[@]} -gt 0 ]]; then
+if is_macos && [[ ${#NEED_BREW_PACKAGES[@]} -gt 0 ]]; then
   echo "不足しているパッケージを検出しました: ${NEED_BREW_PACKAGES[*]}"
   
   # Homebrew がない場合はユーザー領域 (.runtime/homebrew) にセットアップ
@@ -140,23 +127,15 @@ echo "mix: $(command -v mix || echo '未検出')"
 
 # 2. sqlite-vec 拡張ライブラリの確認
 echo -e "\n${YELLOW}[2/7] sqlite-vec 拡張ライブラリの確認中...${NC}"
-VEC_EXT="${SCRIPT_DIR}/priv/sqlite_vec/vec0.dylib"
+VEC_EXT="${SCRIPT_DIR}/priv/sqlite_vec/$(sqlite_vec_filename)"
 if [[ ! -f "${VEC_EXT}" ]]; then
-  echo "sqlite-vec (vec0.dylib) をダウンロードして配置中..."
-  mkdir -p "${SCRIPT_DIR}/priv/sqlite_vec"
-  TMP_DIR="$(mktemp -d)"
-  if [[ "${ARCH}" == "arm64" ]]; then
-    VEC_URL="https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-0.1.9-loadable-macos-aarch64.tar.gz"
+  echo "sqlite-vec ($(sqlite_vec_filename)) をダウンロードして配置中..."
+  if install_sqlite_vec "${SCRIPT_DIR}/priv/sqlite_vec"; then
+    echo -e "${GREEN}sqlite-vec ($(sqlite_vec_filename)) を配置しました。${NC}"
   else
-    VEC_URL="https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-0.1.9-loadable-macos-x86_64.tar.gz"
+    echo -e "${RED}sqlite-vec の取得に失敗しました。${NC}"
+    exit 1
   fi
-  curl -fL -o "${TMP_DIR}/sqlite-vec.tar.gz" "${VEC_URL}"
-  tar -xzf "${TMP_DIR}/sqlite-vec.tar.gz" -C "${TMP_DIR}"
-  if [[ -f "${TMP_DIR}/vec0.dylib" ]]; then
-    cp "${TMP_DIR}/vec0.dylib" "${VEC_EXT}"
-  fi
-  rm -rf "${TMP_DIR}"
-  echo -e "${GREEN}sqlite-vec (vec0.dylib) を配置しました。${NC}"
 else
   echo "sqlite-vec: OK (${VEC_EXT})"
 fi

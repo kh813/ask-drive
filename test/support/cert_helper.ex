@@ -2,7 +2,10 @@ defmodule AskDrive.CertHelper do
   @moduledoc "Generates throwaway CA / server certificates with openssl for SSL tests."
 
   def tmp_dir do
-    dir = Path.join(System.tmp_dir!(), "askdrive_cert_#{System.unique_integer([:positive])}")
+    # unique_integer restarts per VM, so add randomness and clear leftovers of earlier runs
+    suffix = "#{System.unique_integer([:positive])}_#{:rand.uniform(1_000_000_000)}"
+    dir = Path.join(System.tmp_dir!(), "askdrive_cert_#{suffix}")
+    File.rm_rf!(dir)
     File.mkdir_p!(dir)
     dir
   end

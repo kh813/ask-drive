@@ -7,10 +7,11 @@ defmodule AskDrive.Ops.ScriptsTest do
   @deploy_sh Path.join([@root_dir, "scripts", "deploy.sh"])
   @runtime_exs Path.join([@root_dir, "config", "runtime.exs"])
   @release_yml Path.join([@root_dir, ".github", "workflows", "release.yml"])
+  @platform_sh Path.join([@root_dir, "scripts", "lib", "platform.sh"])
 
   describe "Script syntax validation" do
-    test "app.sh, initial-setup.sh, and deploy.sh have valid bash syntax" do
-      for script <- [@app_sh, @initial_setup_sh, @deploy_sh] do
+    test "app.sh, initial-setup.sh, deploy.sh and platform.sh have valid bash syntax" do
+      for script <- [@app_sh, @initial_setup_sh, @deploy_sh, @platform_sh] do
         assert File.exists?(script), "Script does not exist: #{script}"
         {output, exit_code} = System.cmd("bash", ["-n", script], stderr_to_stdout: true)
         assert exit_code == 0, "Bash syntax error in #{Path.basename(script)}:\n#{output}"
@@ -53,17 +54,27 @@ defmodule AskDrive.Ops.ScriptsTest do
   end
 
   describe "External binary URL and archive naming regression tests" do
-    test "initial-setup.sh uses correct archive format (.zip) for pandoc" do
-      setup_content = File.read!(@initial_setup_sh)
-      assert setup_content =~ "pandoc-${PANDOC_VER}-arm64-macOS.zip"
-      assert setup_content =~ "pandoc-${PANDOC_VER}-x86_64-macOS.zip"
-      refute setup_content =~ "pandoc-${PANDOC_VER}-macOS-${ARCH}.tar.gz"
+    test "pandoc assets: .zip on macOS, .tar.gz on Linux (amd64 / arm64)" do
+      platform = File.read!(@platform_sh)
+      assert platform =~ "pandoc-${ver}-arm64-macOS.zip"
+      assert platform =~ "pandoc-${ver}-x86_64-macOS.zip"
+      assert platform =~ "pandoc-${ver}-linux-amd64.tar.gz"
+      assert platform =~ "pandoc-${ver}-linux-arm64.tar.gz"
     end
 
-    test "initial-setup.sh uses correct sqlite-vec URL without extra v prefix in filename" do
-      setup_content = File.read!(@initial_setup_sh)
-      assert setup_content =~ "sqlite-vec-0.1.9-loadable-macos-aarch64.tar.gz"
-      refute setup_content =~ "sqlite-vec-v0.1.9-loadable-macos-aarch64.tar.gz"
+    test "sqlite-vec URL has no extra v prefix in the file name, for macOS and Linux" do
+      platform = File.read!(@platform_sh)
+      assert platform =~ "download/v${ver}/sqlite-vec-${ver}-loadable-${os}-${arch}.tar.gz"
+
+      assert run_platform("is_macos; echo ok") =~ "ok" or
+               run_platform("is_linux; echo ok") =~ "ok"
+    end
+
+    test "Ollama: flat .tgz into .runtime/bin on macOS, .tar.zst (bin/ + lib/ollama) on Linux" do
+      platform = File.read!(@platform_sh)
+      assert platform =~ "https://ollama.com/download/ollama-darwin.tgz"
+      assert platform =~ "https://ollama.com/download/ollama-linux-${arch}.tar.zst"
+      assert platform =~ ~s(-d "${RUNTIME_DIR}/lib/ollama")
     end
 
     test "release.yml packaging uses correct sqlite-vec URL and extracts vec0.dylib cleanly" do
@@ -102,9 +113,9 @@ defmodule AskDrive.Ops.ScriptsTest do
   end
 
   describe "Environment variable loading and deploy fallback regression tests" do
-    test "deploy.sh restarts the launchd service when registered, else starts in the foreground" do
+    test "deploy.sh restarts the service (launchd or systemd) when registered, else starts in the foreground" do
       deploy_content = File.read!(@deploy_sh)
-      assert deploy_content =~ ~s(launchctl list "${SERVICE_NAME}")
+      assert deploy_content =~ ~s("${SCRIPT_DIR}/app.sh" service registered)
       assert deploy_content =~ ~s("${SCRIPT_DIR}/app.sh" service restart)
       # The foreground start must not run first (it blocks the deploy for a daemonised install)
       refute deploy_content =~
@@ -151,5 +162,61 @@ defmodule AskDrive.Ops.ScriptsTest do
       assert app_content =~ "ollama serve"
       assert app_content =~ "curl -s \"${ollama_host}/api/tags\""
     end
+  end
+
+  describe "platform.sh (macOS / Linux)" do
+    test "detects the OS and architecture of this machine" do
+      out = run_platform(~s|echo "$ASKDRIVE_OS $ASKDRIVE_ARCH $(sqlite_vec_filename)"|)
+      [os, arch, vec] = String.split(String.trim(out))
+      assert os in ["macos", "linux"]
+      assert arch in ["arm64", "x86_64"]
+      assert vec == if(os == "macos", do: "vec0.dylib", else: "vec0.so")
+    end
+
+    test "sed_inplace edits in place with this machine's sed (BSD or GNU), leaving no backup" do
+      dir = Path.join(System.tmp_dir!(), "askdrive_sed_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(dir)
+      file = Path.join(dir, "f.txt")
+      File.write!(file, "PORT=4000\n")
+
+      run_platform(~s(sed_inplace 's/PORT=4000/PORT=4080/' "#{file}"))
+
+      assert File.read!(file) == "PORT=4080\n"
+      assert File.ls!(dir) == ["f.txt"]
+      File.rm_rf!(dir)
+    end
+
+    test "the systemd unit runs app.sh start as the given user, with .runtime on PATH" do
+      unit = run_platform(~s(systemd_unit_content /opt/askdrive askdrive askdrive /home/askdrive))
+      assert unit =~ "ExecStart=/opt/askdrive/app.sh start"
+      assert unit =~ "User=askdrive"
+      assert unit =~ "WorkingDirectory=/opt/askdrive"
+      assert unit =~ "/opt/askdrive/.runtime/otp/bin"
+      assert unit =~ "Restart=on-failure"
+      assert unit =~ "WantedBy=multi-user.target"
+    end
+
+    test "the sudoers rule allows only start/stop/restart of the askdrive unit" do
+      rule =
+        run_platform(~s(systemd_sudoers_content askdrive /usr/bin/systemctl askdrive.service))
+
+      assert rule =~
+               "askdrive ALL=(root) NOPASSWD: /usr/bin/systemctl start askdrive.service, /usr/bin/systemctl stop askdrive.service, /usr/bin/systemctl restart askdrive.service"
+
+      refute rule =~ "ALL=(ALL)"
+    end
+  end
+
+  defp run_platform(snippet) do
+    script = """
+    set -euo pipefail
+    RUNTIME_DIR="$(mktemp -d)"
+    RUNTIME_BIN="${RUNTIME_DIR}/bin"
+    source "#{@platform_sh}"
+    #{snippet}
+    """
+
+    {out, 0} = System.cmd("bash", ["-c", script], stderr_to_stdout: true)
+    out
   end
 end

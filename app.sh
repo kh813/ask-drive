@@ -12,9 +12,17 @@ RUNTIME_BREW="${RUNTIME_DIR}/homebrew"
 # PATH の優先順位設定
 export PATH="${RUNTIME_BIN}:${RUNTIME_BREW}/bin:/opt/homebrew/bin:/usr/local/bin:${HOME}/.local/bin:${HOME}/.asdf/shims:${HOME}/.asdf/bin:${HOME}/.local/share/mise/shims:${HOME}/.local/share/mise/bin:${PATH}"
 
+# macOS / Linux の差異（OS 判定、sed -i、Ollama・sqlite-vec の取得等）は platform.sh に集約
+# shellcheck source=scripts/lib/platform.sh
+source "${SCRIPT_DIR}/scripts/lib/platform.sh"
+
 APP_NAME="ask_drive"
+# 常駐サービス: macOS は launchd (ユーザーエージェント)、Linux は systemd (システムサービス)
 SERVICE_NAME="com.askdrive.server"
 PLIST_FILE="${HOME}/Library/LaunchAgents/${SERVICE_NAME}.plist"
+SYSTEMD_UNIT="askdrive.service"
+SYSTEMD_UNIT_FILE="/etc/systemd/system/${SYSTEMD_UNIT}"
+SUDOERS_FILE="/etc/sudoers.d/askdrive"
 PID_FILE="${SCRIPT_DIR}/tmp/pids/app.pid"
 ENV_FILE="${SCRIPT_DIR}/.env.prod"
 
@@ -49,13 +57,13 @@ AskDrive 管理スクリプト
                      Drive 同期をサービスアカウント認証に設定 (Web 管理画面を使わずに設定)
                      --subject: ドメイン全体の委任でなりすます社内ユーザー (社内限定の共有ドライブ用)
 
-サービス管理 (launchd 常駐デーモン):
-  service install    launchd 常駐サービスを登録 (OS 起動時自動起動)
-  service uninstall  launchd 常駐サービスを解除
-  service start      launchd サービスを開始
-  service stop       launchd サービスを停止
-  service restart    launchd サービスを再起動
-  service status     launchd サービスの稼働状況・ログ確認
+サービス管理 (macOS: launchd / Linux: systemd):
+  service install    常駐サービスを登録 (OS 起動時に自動起動。Linux は sudo が必要)
+  service uninstall  常駐サービスを解除 (Linux は sudo が必要)
+  service start      サービスを開始
+  service stop       サービスを停止
+  service restart    サービスを再起動
+  service status     サービスの稼働状況・ログ確認
 
 ヘルプ:
   --help, -h         このヘルプメッセージを表示
@@ -97,23 +105,18 @@ ensure_dirs() {
 # (scripts/initial-setup.sh の install_ollama_runtime と同じ手順)。
 repair_ollama_runtime() {
   [[ "$(command -v ollama || true)" == "${RUNTIME_BIN}/ollama" ]] || return 0
-  [[ -x "${RUNTIME_BIN}/llama-server" ]] && return 0
+  ollama_runtime_complete && return 0
 
-  echo -e "${YELLOW}ollama の推論ランナー (llama-server) が欠落しています。Ollama を再取得します (約 160MB)...${NC}"
-  local tmp_dir
-  tmp_dir="$(mktemp -d)"
-  if curl -fL --retry 3 -o "${tmp_dir}/ollama-darwin.tgz" "https://ollama.com/download/ollama-darwin.tgz" &&
-    tar -xzf "${tmp_dir}/ollama-darwin.tgz" -C "${RUNTIME_BIN}"; then
-    chmod +x "${RUNTIME_BIN}/ollama" "${RUNTIME_BIN}/llama-server" 2>/dev/null || true
+  echo -e "${YELLOW}ollama の推論ランナーが欠落しています。Ollama を再取得します...${NC}"
+  if install_ollama_runtime; then
     # 欠落した状態で起動済みの ollama serve は古いバイナリのままなので止めて起動し直させる。
     # cmd_start は PATH 経由で起動するため、argv は "ollama serve" になる。
     pkill -f "^(${RUNTIME_BIN}/)?ollama serve" 2>/dev/null || true
     sleep 1
-    echo -e "${GREEN}ollama と llama-server を ${RUNTIME_BIN} に配置しました。${NC}"
+    echo -e "${GREEN}ollama と推論ランナーを ${RUNTIME_DIR} に配置しました。${NC}"
   else
     echo -e "${RED}Ollama の再取得に失敗しました。ローカル推論は動作しません。${NC}"
   fi
-  rm -rf "${tmp_dir}"
 }
 
 # ollama serve は起動直後(特に再取得した直後の初回起動)に数秒〜十数秒応答しないことがある。
@@ -223,20 +226,36 @@ cmd_status() {
     echo -e "${YELLOW}停止中${NC}"
   fi
 
-  # 3. launchd サービス状態
-  echo -n "launchd サービス (${SERVICE_NAME}): "
-  if launchctl list "${SERVICE_NAME}" > /dev/null 2>&1; then
-    local status_code
-    status_code="$(launchctl list "${SERVICE_NAME}" | awk '/"LastExitStatus"/ {print $3}' | tr -d ';')"
-    local pid
-    pid="$(launchctl list "${SERVICE_NAME}" | awk '/"PID"/ {print $3}' | tr -d ';')"
-    if [[ -n "${pid}" && "${pid}" != "0" ]]; then
-      echo -e "${GREEN}常駐稼働中 (PID: ${pid})${NC}"
+  # 3. 常駐サービスの状態（macOS: launchd / Linux: systemd）
+  if is_linux; then
+    echo -n "systemd サービス (${SYSTEMD_UNIT}): "
+    if systemd_registered; then
+      local state pid
+      state="$(systemctl is-active "${SYSTEMD_UNIT}" 2>/dev/null || true)"
+      pid="$(systemctl show -p MainPID --value "${SYSTEMD_UNIT}" 2>/dev/null || echo 0)"
+      if [[ "${state}" == "active" ]]; then
+        echo -e "${GREEN}常駐稼働中 (PID: ${pid})${NC}"
+      else
+        echo -e "${YELLOW}登録済み (${state:-停止中})${NC}"
+      fi
     else
-      echo -e "${YELLOW}登録済み (停止中 / 最終終了コード: ${status_code:-0})${NC}"
+      echo -e "${BLUE}未登録${NC}"
     fi
   else
-    echo -e "${BLUE}未登録${NC}"
+    echo -n "launchd サービス (${SERVICE_NAME}): "
+    if launchctl list "${SERVICE_NAME}" > /dev/null 2>&1; then
+      local status_code
+      status_code="$(launchctl list "${SERVICE_NAME}" | awk '/"LastExitStatus"/ {print $3}' | tr -d ';')"
+      local pid
+      pid="$(launchctl list "${SERVICE_NAME}" | awk '/"PID"/ {print $3}' | tr -d ';')"
+      if [[ -n "${pid}" && "${pid}" != "0" ]]; then
+        echo -e "${GREEN}常駐稼働中 (PID: ${pid})${NC}"
+      else
+        echo -e "${YELLOW}登録済み (停止中 / 最終終了コード: ${status_code:-0})${NC}"
+      fi
+    else
+      echo -e "${BLUE}未登録${NC}"
+    fi
   fi
 
   # 5. 初回セットアップ（spec 6.12）: 未完了ならセットアップコードを表示する
@@ -272,32 +291,13 @@ cmd_setup() {
 # モデルのロード時に "llama-server binary not found" で失敗する。
 cmd_repair_ollama() {
   echo -e "${YELLOW}.runtime の Ollama を再インストールします...${NC}"
-  mkdir -p "${RUNTIME_BIN}"
-
-  local tmp_dir
-  tmp_dir="$(mktemp -d)"
-  trap 'rm -rf "${tmp_dir}"' RETURN
-
-  echo "Ollama スタンドアロン配布物 (約 160MB) を取得中..."
-  if ! curl -fL --retry 3 -o "${tmp_dir}/ollama-darwin.tgz" "https://ollama.com/download/ollama-darwin.tgz"; then
-    echo -e "${RED}ダウンロードに失敗しました。${NC}"
+  if ! install_ollama_runtime; then
+    echo -e "${RED}Ollama の再インストールに失敗しました。${NC}"
     exit 1
   fi
-
-  if ! tar -xzf "${tmp_dir}/ollama-darwin.tgz" -C "${RUNTIME_BIN}"; then
-    echo -e "${RED}展開に失敗しました。${NC}"
-    exit 1
-  fi
-
-  chmod +x "${RUNTIME_BIN}/ollama" "${RUNTIME_BIN}/llama-server" 2>/dev/null || true
-
-  if [[ ! -x "${RUNTIME_BIN}/llama-server" ]]; then
-    echo -e "${RED}llama-server を配置できませんでした。${NC}"
-    exit 1
-  fi
-
-  echo -e "${GREEN}ollama と llama-server を ${RUNTIME_BIN} に再インストールしました。${NC}"
+  echo -e "${GREEN}ollama と推論ランナーを ${RUNTIME_DIR} に再インストールしました。${NC}"
   echo "稼働中の Ollama があれば再起動してください: ./app.sh restart"
+  cmd_deploy
 }
 
 cmd_admin() {
@@ -490,7 +490,7 @@ cmd_update() {
 
 # --- launchd サービス管理 ---
 
-service_install() {
+launchd_install() {
   ensure_dirs
   echo -e "${GREEN}==> launchd サービスを生成・登録します: ${PLIST_FILE}${NC}"
   
@@ -547,7 +547,7 @@ EOF
   echo -e "${GREEN}launchd サービス (${SERVICE_NAME}) を登録・有効化しました。${NC}"
 }
 
-service_uninstall() {
+launchd_uninstall() {
   echo -e "${YELLOW}==> launchd サービスを解除します...${NC}"
   if [[ -f "${PLIST_FILE}" ]]; then
     launchctl unload -w "${PLIST_FILE}" 2>/dev/null || true
@@ -558,30 +558,120 @@ service_uninstall() {
   fi
 }
 
-service_start() {
+launchd_start() {
   echo -e "${GREEN}==> launchd サービスを開始します...${NC}"
   if [[ ! -f "${PLIST_FILE}" ]]; then
     echo -e "${YELLOW}サービスが登録されていません。service install を先に実行します。${NC}"
-    service_install
+    launchd_install
   fi
   launchctl start "${SERVICE_NAME}"
   echo -e "${GREEN}開始コマンドを送信しました。${NC}"
 }
 
-service_stop() {
+launchd_stop() {
   echo -e "${YELLOW}==> launchd サービスを停止します...${NC}"
   launchctl stop "${SERVICE_NAME}" || true
   echo -e "${GREEN}停止コマンドを送信しました。${NC}"
 }
 
-service_restart() {
+launchd_restart() {
   echo -e "${GREEN}==> launchd サービスを再起動します...${NC}"
   launchctl kickstart -k "gui/$(id -u)/${SERVICE_NAME}" 2>/dev/null || {
-    service_stop
+    launchd_stop
     sleep 2
-    service_start
+    launchd_start
   }
   echo -e "${GREEN}再起動完了しました。${NC}"
+}
+
+
+# --- systemd サービス管理 (Linux) ---
+#
+# システムサービス (/etc/systemd/system/askdrive.service) として、このスクリプトを実行している
+# 一般ユーザーの権限で動かす。登録（install）と解除（uninstall）には sudo が必要。
+# 登録時に /etc/sudoers.d/askdrive を置き、このユーザーが askdrive サービスの
+# start / stop / restart だけをパスワードなしで実行できるようにする。これにより、以降の
+# ./app.sh deploy（再起動を含む）は管理者の介在なしに実行できる。
+
+systemd_registered() {
+  systemctl list-unit-files "${SYSTEMD_UNIT}" --no-legend 2>/dev/null | grep -q "${SYSTEMD_UNIT}"
+}
+
+systemd_install() {
+  ensure_dirs
+  local user group systemctl_bin unit_tmp sudoers_tmp
+  user="$(id -un)"
+  group="$(id -gn)"
+  systemctl_bin="$(command -v systemctl)"
+  unit_tmp="$(mktemp)"
+  sudoers_tmp="$(mktemp)"
+
+  echo -e "${GREEN}==> systemd サービスを登録します: ${SYSTEMD_UNIT_FILE}（sudo が必要です）${NC}"
+
+  systemd_unit_content "${SCRIPT_DIR}" "${user}" "${group}" "${HOME}" > "${unit_tmp}"
+  systemd_sudoers_content "${user}" "${systemctl_bin}" "${SYSTEMD_UNIT}" > "${sudoers_tmp}"
+
+  if ! sudo visudo -cf "${sudoers_tmp}" >/dev/null; then
+    echo -e "${RED}sudoers の検証に失敗しました。登録を中止します。${NC}"
+    rm -f "${unit_tmp}" "${sudoers_tmp}"
+    return 1
+  fi
+
+  sudo install -m 0644 "${unit_tmp}" "${SYSTEMD_UNIT_FILE}"
+  sudo install -m 0440 "${sudoers_tmp}" "${SUDOERS_FILE}"
+  rm -f "${unit_tmp}" "${sudoers_tmp}"
+
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now "${SYSTEMD_UNIT}"
+  echo -e "${GREEN}systemd サービス (${SYSTEMD_UNIT}) を登録・起動しました。サーバー起動時に自動で開始します。${NC}"
+}
+
+systemd_uninstall() {
+  echo -e "${YELLOW}==> systemd サービスを解除します（sudo が必要です）...${NC}"
+  if systemd_registered; then
+    sudo systemctl disable --now "${SYSTEMD_UNIT}" || true
+  fi
+  sudo rm -f "${SYSTEMD_UNIT_FILE}" "${SUDOERS_FILE}"
+  sudo systemctl daemon-reload
+  echo -e "${GREEN}サービスを解除しました。${NC}"
+}
+
+# start / stop / restart は sudoers で許可済み（-n: パスワードを求めず、未許可なら即失敗）
+systemd_ctl() {
+  local action="$1"
+  if ! systemd_registered; then
+    echo -e "${YELLOW}サービスが登録されていません。./app.sh service install を先に実行してください。${NC}"
+    return 1
+  fi
+  sudo -n "$(command -v systemctl)" "${action}" "${SYSTEMD_UNIT}" || {
+    echo -e "${RED}systemctl ${action} に失敗しました（sudo の許可設定がない場合は ./app.sh service install をやり直してください）。${NC}"
+    return 1
+  }
+}
+
+# --- 常駐サービス（OS ごとに launchd / systemd へ振り分け）---
+
+service_install() { if is_linux; then systemd_install; else launchd_install; fi; }
+service_uninstall() { if is_linux; then systemd_uninstall; else launchd_uninstall; fi; }
+service_start() { if is_linux; then systemd_ctl start; else launchd_start; fi; }
+service_stop() { if is_linux; then systemd_ctl stop; else launchd_stop; fi; }
+
+service_restart() {
+  if is_linux; then
+    echo -e "${GREEN}==> systemd サービスを再起動します...${NC}"
+    systemd_ctl restart && echo -e "${GREEN}再起動しました。${NC}"
+  else
+    launchd_restart
+  fi
+}
+
+# デプロイ等から使う: 常駐サービスとして登録済みか
+service_registered() {
+  if is_linux; then
+    systemd_registered
+  else
+    launchctl list "${SERVICE_NAME}" >/dev/null 2>&1
+  fi
 }
 
 service_status() {
@@ -654,9 +744,13 @@ case "${COMMAND}" in
       status)
         service_status "$@"
         ;;
+      registered)
+        # 終了コードで返す（scripts/deploy.sh が使う）: 0 = 常駐サービスとして登録済み
+        service_registered
+        ;;
       *)
         echo -e "${RED}未知の service サブコマンド: '${SUB_COMMAND}'${NC}"
-        echo "利用可能: install, uninstall, start, stop, restart, status"
+        echo "利用可能: install, uninstall, start, stop, restart, status, registered"
         exit 1
         ;;
     esac

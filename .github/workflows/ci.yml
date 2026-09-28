@@ -1,0 +1,133 @@
+name: CI (Linux x64)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: mix test on Ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '28'
+          elixir-version: '1.19'
+
+      - name: System packages
+        run: sudo apt-get update -y && sudo apt-get install -y poppler-utils zstd
+
+      - name: sqlite-vec (Linux .so)
+        run: |
+          RUNTIME_DIR="$(mktemp -d)"; RUNTIME_BIN="${RUNTIME_DIR}/bin"
+          source scripts/lib/platform.sh
+          install_sqlite_vec priv/sqlite_vec
+          ls -l priv/sqlite_vec
+
+      - name: Shell scripts syntax
+        run: for f in app.sh scripts/*.sh scripts/lib/*.sh; do bash -n "$f"; done
+
+      - run: mix deps.get
+      - run: mix compile --warnings-as-errors
+      - run: mix test
+
+  runtime:
+    name: Linux runtime install + systemd unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ensure_linux_packages / install_* into .runtime
+        run: |
+          export RUNTIME_DIR="$PWD/.runtime" RUNTIME_BIN="$PWD/.runtime/bin"
+          source scripts/lib/platform.sh
+          echo "detected: ${ASKDRIVE_OS} ${ASKDRIVE_ARCH}"
+          test "${ASKDRIVE_OS}" = linux
+          ensure_linux_packages
+          install_beam_linux
+          install_pandoc
+          install_ollama_runtime
+          ollama_runtime_complete
+          install_sqlite_vec priv/sqlite_vec
+
+      - name: Installed binaries run
+        run: |
+          export PATH="$PWD/.runtime/elixir/bin:$PWD/.runtime/otp/bin:$PWD/.runtime/bin:$PATH"
+          erl -noshell -eval 'io:format("OTP ~s~n",[erlang:system_info(otp_release)]), halt().'
+          elixir --version
+          pandoc --version | head -1
+          ollama --version || true
+          test -f priv/sqlite_vec/vec0.so
+          file priv/sqlite_vec/vec0.so
+
+      - name: sed_inplace uses GNU sed
+        run: |
+          RUNTIME_DIR="$(mktemp -d)"; RUNTIME_BIN="${RUNTIME_DIR}/bin"
+          source scripts/lib/platform.sh
+          echo 'A=1' > /tmp/s.txt && sed_inplace 's/A=1/A=2/' /tmp/s.txt && grep -qx 'A=2' /tmp/s.txt
+          test ! -e "/tmp/s.txt''"
+
+      - name: systemd unit and sudoers validate
+        run: |
+          RUNTIME_DIR="$(mktemp -d)"; RUNTIME_BIN="${RUNTIME_DIR}/bin"
+          source scripts/lib/platform.sh
+          systemd_unit_content "$PWD" "$(id -un)" "$(id -gn)" "$HOME" > /tmp/askdrive.service
+          cat /tmp/askdrive.service
+          systemd-analyze verify /tmp/askdrive.service
+          systemd_sudoers_content "$(id -un)" "$(command -v systemctl)" askdrive.service > /tmp/askdrive.sudoers
+          sudo visudo -cf /tmp/askdrive.sudoers
+
+      - name: Build the prod release with the installed BEAM (same steps as deploy.sh)
+        run: |
+          export PATH="$PWD/.runtime/elixir/bin:$PWD/.runtime/otp/bin:$PWD/.runtime/bin:$PATH"
+          cat > .env.prod <<ENVEOF
+          MIX_ENV=prod
+          PHX_SERVER=true
+          PORT=4000
+          PHX_HOST=localhost
+          SECRET_KEY_BASE=$(openssl rand -base64 48 | tr -d '\n')
+          ASK_DRIVE_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr -d '\n')
+          DATABASE_PATH=$PWD/ask_drive_prod.db
+          ENVEOF
+          set -a; source .env.prod; set +a
+          mix local.hex --force && mix local.rebar --force
+          mix deps.get
+          MIX_ENV=prod mix ecto.create
+          MIX_ENV=prod mix ecto.migrate
+          MIX_ENV=prod mix assets.deploy
+          MIX_ENV=prod mix release --overwrite
+
+      - name: app.sh service install (systemd) and HTTPS answers
+        run: |
+          ./app.sh service install
+          systemctl status askdrive.service --no-pager || true
+          for i in $(seq 1 120); do
+            code="$(curl -sk -o /dev/null -w '%{http_code}' https://localhost:4443/ || true)"
+            [ "$code" != "000" ] && break
+            sleep 1
+          done
+          echo "HTTPS status: $code"
+          test "$code" != "000"
+          curl -s -o /dev/null -w 'HTTP 4080 -> %{http_code} %{redirect_url}\n' http://localhost:4080/
+          systemctl is-active askdrive.service
+          sudo cat /etc/sudoers.d/askdrive
+          ./app.sh status
+
+      - name: deploy.sh restarts the registered systemd service
+        run: |
+          before="$(systemctl show -p MainPID --value askdrive.service)"
+          ./scripts/deploy.sh
+          after="$(systemctl show -p MainPID --value askdrive.service)"
+          echo "MainPID $before -> $after"
+          test "$before" != "$after"
+          systemctl is-active askdrive.service
+
+      - name: Logs on failure
+        if: failure()
+        run: |
+          tail -n 100 log/*.log || true
+          sudo journalctl -u askdrive.service --no-pager -n 100 || true
