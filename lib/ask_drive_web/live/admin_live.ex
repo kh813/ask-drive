@@ -2420,15 +2420,15 @@ defmodule AskDriveWeb.AdminLive do
                   <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                     <label class="space-y-1">
                       <span class="block font-medium">証明書（PEM・必須）</span>
-                      <.live_file_input upload={@uploads.ssl_cert} class="text-xs" />
+                      <.live_file_input upload={@uploads.ssl_cert} class={ssl_file_input_class()} />
                     </label>
                     <label class="space-y-1">
                       <span class="block font-medium">秘密鍵（PEM・必須）</span>
-                      <.live_file_input upload={@uploads.ssl_key} class="text-xs" />
+                      <.live_file_input upload={@uploads.ssl_key} class={ssl_file_input_class()} />
                     </label>
                     <label class="space-y-1">
                       <span class="block font-medium">中間証明書（PEM・任意）</span>
-                      <.live_file_input upload={@uploads.ssl_chain} class="text-xs" />
+                      <.live_file_input upload={@uploads.ssl_chain} class={ssl_file_input_class()} />
                     </label>
                   </div>
                   <div
@@ -2710,5 +2710,18 @@ defmodule AskDriveWeb.AdminLive do
       }
     end)
     |> Map.new(fn {app, summary} -> {app.slug, summary} end)
+  end
+
+  # File pickers styled as buttons: the browser's default "ファイルを選択" looked like plain
+  # text on a white card, so it wasn't obvious it could be clicked.
+  defp ssl_file_input_class do
+    [
+      "block w-full text-xs text-zinc-600 dark:text-zinc-300 cursor-pointer",
+      "rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-1.5",
+      "hover:border-indigo-400 dark:hover:border-indigo-500 transition",
+      "file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border-0 file:cursor-pointer",
+      "file:bg-indigo-600 file:text-white file:text-xs file:font-medium",
+      "hover:file:bg-indigo-700"
+    ]
   end
 end
