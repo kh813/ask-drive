@@ -123,12 +123,12 @@ defmodule AskDrive.Ingest.Extractor do
         with_temp_file(binary, ".pdf", fn temp_path ->
           case System.cmd(path, ["-layout", temp_path, "-"], stderr_to_stdout: true) do
             {output, 0} ->
-              output |> TextCleaner.clean() |> format_extracted_text()
+              output |> clean_pdf_pages() |> format_extracted_text()
 
             {output, code} ->
               # Exit code 0 or check if output exists
               if byte_size(String.trim(output)) > 0 do
-                output |> TextCleaner.clean() |> format_extracted_text()
+                output |> clean_pdf_pages() |> format_extracted_text()
               else
                 {:error, "pdftotext failed (exit #{code}): #{output}"}
               end
@@ -157,6 +157,15 @@ defmodule AskDrive.Ingest.Extractor do
           end
         end)
     end
+  end
+
+  # pdftotext ends every page with a form feed. Clean each page on its own and keep the
+  # form feeds (on their own line) so the chunker can tell which page a chunk is on (F-411).
+  defp clean_pdf_pages(output) do
+    output
+    |> String.split("\f")
+    |> Enum.map(&TextCleaner.clean/1)
+    |> Enum.join("\n\f\n")
   end
 
   defp format_extracted_text(raw_text) when is_binary(raw_text) do

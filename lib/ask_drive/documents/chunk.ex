@@ -9,6 +9,7 @@ defmodule AskDrive.Documents.Chunk do
     field :content, :string
     field :content_hash, :string
     field :token_estimate, :integer
+    field :page, :integer
     field :embedding, :binary
     field :reference_count, :integer, default: 0
 
@@ -27,6 +28,7 @@ defmodule AskDrive.Documents.Chunk do
       :heading,
       :content,
       :content_hash,
+      :page,
       :token_estimate,
       :embedding,
       :reference_count

@@ -131,4 +131,23 @@ defmodule AskDrive.Batch.IncrementalIndexTest do
                  "md5Checksum" => "def"
              })
   end
+
+  test "an indexed file from an older pipeline version is re-indexed once (F-337)" do
+    file = %{
+      "id" => "ver_doc",
+      "name" => "b.pdf",
+      "mimeType" => "application/pdf",
+      "modifiedTime" => "2026-09-01T00:00:00Z",
+      "md5Checksum" => "abc"
+    }
+
+    {:created, doc} = Documents.upsert_document_from_drive(file)
+    {:ok, doc} = Documents.mark_indexed(doc, "h")
+    assert doc.index_version == Documents.current_index_version()
+    assert {:unchanged, _} = Documents.upsert_document_from_drive(file)
+
+    {:ok, _} = doc |> Document.changeset(%{index_version: 1}) |> Repo.update()
+    assert {:updated, updated} = Documents.upsert_document_from_drive(file)
+    assert updated.status == "pending"
+  end
 end

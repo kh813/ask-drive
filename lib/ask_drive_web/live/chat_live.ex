@@ -319,14 +319,26 @@ defmodule AskDriveWeb.ChatLive do
                                 <span class="text-indigo-600 dark:text-indigo-400 flex items-center gap-1 truncate max-w-md">
                                   <.icon name="hero-document-text" class="w-4 h-4 shrink-0" />
                                   {(chunk.document && chunk.document.name) || "ドキュメント"}
+                                  <span
+                                    :if={chunk.page}
+                                    class="ml-1 px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-[10px] font-semibold text-indigo-700 dark:text-indigo-300"
+                                  >
+                                    p.{chunk.page}
+                                  </span>
                                 </span>
                                 <%= if chunk.document && chunk.document.web_view_link do %>
                                   <.link
-                                    href={chunk.document.web_view_link}
+                                    href={drive_link(chunk)}
                                     target="_blank"
-                                    class="text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center gap-0.5 transition"
+                                    title={
+                                      chunk.page &&
+                                        "p.#{chunk.page} を開きます。Drive のビューアがページ指定に対応していない場合は、ビューアのページ欄で #{chunk.page} を指定してください"
+                                    }
+                                    class="text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center gap-0.5 transition shrink-0"
                                   >
-                                    Drive で開く
+                                    {if chunk.page,
+                                      do: "Drive で開く（p.#{chunk.page}）",
+                                      else: "Drive で開く"}
                                     <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
                                   </.link>
                                 <% end %>
@@ -452,4 +464,13 @@ defmodule AskDriveWeb.ChatLive do
     |> Enum.map(&(&1 |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()))
     |> Enum.intersperse("<br>")
   end
+
+  # Drive's viewer is asked to open at the chunk's page. The fragment is not a documented
+  # Drive feature: where it's ignored the file simply opens at the top, and the page badge
+  # and tooltip tell the reader where to go (spec F-411).
+  defp drive_link(%{document: %{web_view_link: link}, page: page})
+       when is_binary(link) and is_integer(page),
+       do: link <> "#page=#{page}"
+
+  defp drive_link(%{document: %{web_view_link: link}}), do: link
 end

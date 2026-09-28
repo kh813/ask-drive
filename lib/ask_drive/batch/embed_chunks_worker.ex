@@ -206,14 +206,19 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
       # 2. Document-level artifacts (summaries) describe the whole text: stale on any change.
       if changed?, do: Freshness.invalidate_document_level(doc)
 
-      # 3. Reused chunks: only position/heading can differ.
+      # 3. Reused chunks: only position/heading/page can differ.
       # 4. New chunks: insert with their fresh embeddings, in plan order.
       {_rest, counts} =
         Enum.reduce(plan, {embeddings, %{new: 0, reused: 0}}, fn
           {:reuse, chunk, data}, {embs, counts} ->
-            if chunk.position != data.position or chunk.heading != data.heading do
+            if chunk.position != data.position or chunk.heading != data.heading or
+                 chunk.page != data[:page] do
               chunk
-              |> Chunk.changeset(%{position: data.position, heading: data.heading})
+              |> Chunk.changeset(%{
+                position: data.position,
+                heading: data.heading,
+                page: data[:page]
+              })
               |> Repo.update!()
             end
 

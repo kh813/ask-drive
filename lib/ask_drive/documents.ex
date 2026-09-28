@@ -26,6 +26,16 @@ defmodule AskDrive.Documents do
   end
 
   @doc """
+  Version of the extraction/chunking pipeline (spec F-337). Bump it when a change must reach
+  documents already indexed — sync then re-indexes them once even though Drive reports them
+  unchanged. Unchanged chunks are still reused (F-336), so this re-embeds little.
+
+    * 1: initial
+    * 2: PDF chunks carry their page number (F-411)
+  """
+  def current_index_version, do: 2
+
+  @doc """
   Upserts a document from Google Drive file metadata.
   Returns `{:created, doc}`, `{:updated, doc}`, or `{:unchanged, doc}`.
 
@@ -59,7 +69,8 @@ defmodule AskDrive.Documents do
         {:created, doc}
 
       %Document{} = existing ->
-        if existing.status in ["indexed", "skipped"] and same_content?(existing, attrs) do
+        if existing.status in ["indexed", "skipped"] and same_content?(existing, attrs) and
+             existing.index_version >= current_index_version() do
           {:ok, doc} = existing |> Document.changeset(attrs) |> Repo.update()
           {:unchanged, doc}
         else
@@ -136,6 +147,7 @@ defmodule AskDrive.Documents do
     |> Document.changeset(%{
       status: "indexed",
       content_hash: content_hash,
+      index_version: current_index_version(),
       error: nil,
       synced_at: DateTime.utc_now()
     })

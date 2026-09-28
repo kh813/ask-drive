@@ -40,7 +40,8 @@ defmodule AskDriveWeb.ChatLiveTest do
         drive_file_id: "chat_hl_doc",
         name: "sme_guideline.pdf",
         mime_type: "application/pdf",
-        status: "indexed"
+        status: "indexed",
+        web_view_link: "https://drive.google.com/file/d/abc/view?usp=drivesdk"
       })
       |> AskDrive.Repo.insert()
 
@@ -50,7 +51,8 @@ defmodule AskDriveWeb.ChatLiveTest do
         document_id: doc.id,
         position: 0,
         content_hash: "c",
-        content: "[文書: sme_guideline.pdf]\nじ じ\nメールやウェブ閲覧に利用せず、USB メモリ、外付け HDD も接続を禁止する。"
+        content: "[文書: sme_guideline.pdf]\nじ じ\nメールやウェブ閲覧に利用せず、USB メモリ、外付け HDD も接続を禁止する。",
+        page: 33
       })
       |> AskDrive.Repo.insert()
 
@@ -64,6 +66,8 @@ defmodule AskDriveWeb.ChatLiveTest do
     assert html =~ "関連しそうな箇所"
     assert html =~ ~r{<mark[^>]*>USB メモリ</mark>}
     refute html =~ "じ じ"
+    assert html =~ "p.33"
+    assert html =~ "https://drive.google.com/file/d/abc/view?usp=drivesdk#page=33"
   end
 
   test "resets chat history", %{conn: conn} do

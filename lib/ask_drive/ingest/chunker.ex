@@ -24,6 +24,10 @@ defmodule AskDrive.Ingest.Chunker do
     max_size = Keyword.get(opts, :max_size, @default_max_size)
     overlap_size = Keyword.get(opts, :overlap_size, @default_overlap_size)
 
+    # PDF text carries a form feed per page break (F-411). Chunk the text without them and
+    # remember where each page starts, to stamp every chunk with its page afterwards.
+    {text, page_starts} = strip_page_breaks(text)
+
     sections = split_sections(text)
 
     {raw_chunks, _pos} =
@@ -39,7 +43,8 @@ defmodule AskDrive.Ingest.Chunker do
               heading: heading,
               content: formatted_content,
               token_estimate: estimate_tokens(formatted_content),
-              content_hash: Extractor.content_hash(formatted_content)
+              content_hash: Extractor.content_hash(formatted_content),
+              body: chunk_text
             }
           end)
           |> Enum.filter(fn c -> String.length(c.content) >= @min_chunk_size end)
@@ -53,7 +58,66 @@ defmodule AskDrive.Ingest.Chunker do
         {acc_chunks ++ indexed_chunks, pos + length(indexed_chunks)}
       end)
 
-    raw_chunks
+    assign_pages(raw_chunks, text, page_starts)
+  end
+
+  defp strip_page_breaks(text) do
+    if String.contains?(text, "\f") do
+      pages = String.split(text, "\f")
+
+      {starts, _} =
+        pages
+        |> Enum.with_index(1)
+        |> Enum.map_reduce(0, fn {page_text, n}, offset ->
+          {{offset, n}, offset + byte_size(page_text) + 1}
+        end)
+
+      {Enum.join(pages, "\n"), starts}
+    else
+      {text, []}
+    end
+  end
+
+  # Finds each chunk's opening words in the page-joined text (searching forward from the
+  # previous chunk, since chunks come in document order) and maps the byte offset to a page.
+  defp assign_pages(chunks, _text, []),
+    do: Enum.map(chunks, &(&1 |> Map.delete(:body) |> Map.put(:page, nil)))
+
+  defp assign_pages(chunks, text, page_starts) do
+    {with_pages, _} =
+      Enum.map_reduce(chunks, {0, 1}, fn chunk, {cursor, last_page} ->
+        {offset, page} =
+          case locate(text, chunk.body, cursor) do
+            nil -> {cursor, last_page}
+            offset -> {offset, page_at(page_starts, offset)}
+          end
+
+        {chunk |> Map.delete(:body) |> Map.put(:page, page), {offset, page}}
+      end)
+
+    with_pages
+  end
+
+  defp locate(text, body, cursor) do
+    body = String.trim(body)
+
+    Enum.find_value([24, 12, 6], fn len ->
+      needle = String.slice(body, 0, len)
+
+      if needle != "" do
+        case :binary.match(text, needle, scope: {cursor, byte_size(text) - cursor}) do
+          {pos, _} -> pos
+          :nomatch -> nil
+        end
+      end
+    end)
+  end
+
+  defp page_at(page_starts, offset) do
+    page_starts
+    |> Enum.take_while(fn {start, _n} -> start <= offset end)
+    |> List.last()
+    |> elem(1)
   end
 
   # Splits text into sections based on markdown headers or major section dividers
