@@ -34,6 +34,12 @@ defmodule AskDriveWeb.ChatLiveTest do
   end
 
   test "Tier 2 excerpts highlight the question's terms", %{conn: conn} do
+    # Summary off: this covers the excerpt-only view
+    {:ok, _} =
+      AskDrive.Settings.update_setting(AskDrive.Settings.get_setting!(), %{
+        chat_summary_enabled: false
+      })
+
     {:ok, doc} =
       %AskDrive.Documents.Document{}
       |> AskDrive.Documents.Document.changeset(%{
@@ -97,5 +103,53 @@ defmodule AskDriveWeb.ChatLiveTest do
     |> render_submit()
 
     assert render(view) =~ "ゲストの質問"
+  end
+
+  test "Tier 2 shows a streamed AI summary whose citations link to the sources", %{conn: conn} do
+    {server, url} = AskDrive.StubOllama.start!(self())
+    on_exit(fn -> Process.exit(server, :normal) end)
+    AskDrive.StubOllama.put_generate_pieces(["外部記憶媒体の接続は", "禁止されています [1]。"])
+
+    {:ok, _} =
+      AskDrive.Settings.update_setting(AskDrive.Settings.get_setting!(), %{
+        ollama_host: url,
+        llm_provider: "ollama",
+        embed_provider: "ollama"
+      })
+
+    {:ok, doc} =
+      %AskDrive.Documents.Document{}
+      |> AskDrive.Documents.Document.changeset(%{
+        drive_file_id: "sum_doc",
+        name: "guide.pdf",
+        mime_type: "application/pdf",
+        status: "indexed"
+      })
+      |> AskDrive.Repo.insert()
+
+    {:ok, _} =
+      %AskDrive.Documents.Chunk{}
+      |> AskDrive.Documents.Chunk.changeset(%{
+        document_id: doc.id,
+        position: 0,
+        content_hash: "s",
+        content: "USB メモリ、外付け HDD も接続を禁止する。",
+        page: 5
+      })
+      |> AskDrive.Repo.insert()
+
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    view
+    |> form("#chat-form", %{"question" => "USBメモリの利用ルールは？"})
+    |> render_submit()
+
+    render_async(view, 20_000)
+    html = render_async(view, 20_000)
+
+    assert html =~ "AI による要約"
+    assert html =~ "外部記憶媒体の接続は禁止されています"
+    assert html =~ ~r{<a href="#src-\d+-1"[^>]*>\[1\]</a>}
+    assert html =~ ~r{id="src-\d+-1"}
   end
 end

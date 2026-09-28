@@ -1,7 +1,7 @@
 defmodule AskDrive.StubOllama do
   @moduledoc """
-  A minimal stand-in for Ollama's /api/embed, for tests that need embeddings without a live
-  model. Each input gets a vector whose first element is the input's length; every request's
+  A minimal stand-in for Ollama's /api/embed and streaming /api/generate, for tests that
+  need a model without a live one. Each input gets a vector whose first element is the input's length; every request's
   batch size is sent to the owning test process as `{:stub_embed, n}`.
   """
   use Plug.Router
@@ -26,9 +26,30 @@ defmodule AskDrive.StubOllama do
     |> send_resp(200, Jason.encode!(%{embeddings: embeddings}))
   end
 
+  # Streams NDJSON like Ollama: the pieces set with put_generate_pieces/1, then done.
+  post "/api/generate" do
+    if pid = :persistent_term.get({__MODULE__, :owner}, nil),
+      do: send(pid, {:stub_generate, conn.body_params})
+
+    pieces = :persistent_term.get({__MODULE__, :pieces}, ["要約です。"])
+    conn = conn |> put_resp_content_type("application/x-ndjson") |> send_chunked(200)
+
+    conn =
+      Enum.reduce(pieces, conn, fn piece, conn ->
+        {:ok, conn} = chunk(conn, Jason.encode!(%{response: piece, done: false}) <> "\n")
+        conn
+      end)
+
+    {:ok, conn} = chunk(conn, Jason.encode!(%{response: "", done: true}) <> "\n")
+    conn
+  end
+
   match _ do
     send_resp(conn, 404, "")
   end
+
+  @doc "Sets what /api/generate streams back."
+  def put_generate_pieces(pieces), do: :persistent_term.put({__MODULE__, :pieces}, pieces)
 
   @doc "Starts the stub on a free port and returns its base URL."
   def start!(owner, dim \\ 1024) do

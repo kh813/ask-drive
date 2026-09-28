@@ -1,7 +1,7 @@
 defmodule AskDriveWeb.ChatLive do
   use AskDriveWeb, :live_view
 
-  alias AskDrive.{Accounts, Answering, HealthCheck, LLM, Repo, Settings, Snippet}
+  alias AskDrive.{Accounts, Answering, ChatSummary, HealthCheck, LLM, Repo, Settings, Snippet}
   alias AskDrive.Accounts.User
   alias AskDrive.Documents.Chunk
 
@@ -21,6 +21,7 @@ defmodule AskDriveWeb.ChatLive do
      |> assign(:embedding_ok?, match?({:ok, _}, health.llm_embedding))
      |> assign(:embedding_provider_label, LLM.label(LLM.embedding_provider(setting)))
      |> assign(:admin_eligible?, User.admin_eligible?(socket.assigns.current_user))
+     |> assign(:summary_local?, summary_local?(setting))
      |> assign(:messages, [])
      |> assign(:loading, false)
      |> assign(:form, to_form(%{"question" => ""}))}
@@ -64,6 +65,8 @@ defmodule AskDriveWeb.ChatLive do
 
   @impl true
   def handle_async(:answer, {:ok, result}, socket) do
+    summarise? = result.tier == 2 and result.chunks != [] and ChatSummary.enabled?()
+
     assistant_msg = %{
       id: System.unique_integer([:positive]),
       role: :assistant,
@@ -74,13 +77,47 @@ defmodule AskDriveWeb.ChatLive do
       qa_pair: result.qa_pair,
       question: result.question,
       index_empty?: Map.get(result, :index_empty?, false),
+      # Live AI summary of the excerpts (spec 6.4.4): shown above them, streamed in
+      summary: if(summarise?, do: %{status: :running, text: ""}),
       inserted_at: DateTime.utc_now()
     }
 
-    {:noreply,
-     socket
-     |> assign(:messages, socket.assigns.messages ++ [assistant_msg])
-     |> assign(:loading, false)}
+    socket =
+      socket
+      |> assign(:messages, socket.assigns.messages ++ [assistant_msg])
+      |> assign(:loading, false)
+
+    socket =
+      if summarise? do
+        lv = self()
+        id = assistant_msg.id
+
+        start_async(socket, {:summary, id}, fn ->
+          ChatSummary.generate(result.question, result.chunks, fn delta ->
+            send(lv, {:summary_delta, id, delta})
+          end)
+        end)
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_async({:summary, id}, {:ok, {:ok, text}}, socket) do
+    {:noreply, update_summary(socket, id, &%{&1 | status: :done, text: text})}
+  end
+
+  def handle_async({:summary, id}, {:ok, {:error, reason}}, socket) do
+    require Logger
+    Logger.warning("ChatLive: summary failed: #{inspect(reason)}")
+    {:noreply, update_summary(socket, id, &Map.merge(&1, %{status: :failed, error: reason}))}
+  end
+
+  def handle_async({:summary, id}, {:exit, reason}, socket) do
+    require Logger
+    Logger.error("ChatLive: summary crashed: #{inspect(reason)}")
+    {:noreply, update_summary(socket, id, &Map.merge(&1, %{status: :failed, error: reason}))}
   end
 
   def handle_async(:answer, {:exit, reason}, socket) do
@@ -91,6 +128,21 @@ defmodule AskDriveWeb.ChatLive do
      socket
      |> assign(:loading, false)
      |> put_flash(:error, "回答の検索中にエラーが発生しました。しばらくしてからもう一度お試しください。")}
+  end
+
+  @impl true
+  def handle_info({:summary_delta, id, delta}, socket) do
+    {:noreply, update_summary(socket, id, &%{&1 | text: &1.text <> delta})}
+  end
+
+  defp update_summary(socket, id, fun) do
+    messages =
+      Enum.map(socket.assigns.messages, fn
+        %{id: ^id, summary: %{} = summary} = msg -> %{msg | summary: fun.(summary)}
+        msg -> msg
+      end)
+
+    assign(socket, :messages, messages)
   end
 
   @impl true
@@ -224,7 +276,7 @@ defmodule AskDriveWeb.ChatLive do
                         <% 2 -> %>
                           <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/50">
                             <.icon name="hero-document-magnifying-glass" class="w-3.5 h-3.5" />
-                            関連しそうな箇所（原文抜粋）
+                            {if msg[:summary], do: "AI 要約と引用元", else: "関連しそうな箇所（原文抜粋）"}
                           </span>
                         <% 3 -> %>
                           <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50">
@@ -309,14 +361,56 @@ defmodule AskDriveWeb.ChatLive do
                     <%!-- Tier 2 Excerpt Sources --%>
                     <%= if msg.tier == 2 and msg.chunks != [] do %>
                       <div class="space-y-3">
+                        <%!-- AI summary grounded in the excerpts below (spec 6.4.4) --%>
+                        <div
+                          :if={msg[:summary]}
+                          id={"summary-#{msg.id}"}
+                          class="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-900/60 space-y-2"
+                        >
+                          <div class="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+                            <.icon name="hero-sparkles" class="w-4 h-4" /> AI による要約
+                            <span class="font-normal text-[10px] text-indigo-500/80">
+                              （下の引用元の抜粋だけを根拠に生成）
+                            </span>
+                          </div>
+                          <%= case msg.summary do %>
+                            <% %{status: :failed} -> %>
+                              <p class="text-xs text-zinc-500">
+                                要約を作成できませんでした。下の引用元の抜粋をご確認ください。
+                              </p>
+                            <% %{status: :running, text: ""} -> %>
+                              <p class="text-xs text-zinc-500 flex items-center gap-1.5">
+                                <.icon name="hero-arrow-path" class="w-3.5 h-3.5 animate-spin" />
+                                要約を作成しています…{if @summary_local?,
+                                  do: "（ローカルの生成 AI では数十秒かかることがあります）"}
+                              </p>
+                            <% summary -> %>
+                              <div class="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed">
+                                {summary_html(summary.text, msg.id, length(msg.chunks))}<span
+                                  :if={summary.status == :running}
+                                  class="inline-block w-1.5 h-3.5 ml-0.5 bg-indigo-400 animate-pulse align-middle"
+                                ></span>
+                              </div>
+                              <p :if={summary.status == :done} class="text-[10px] text-zinc-400">
+                                生成 AI の要約は誤りを含むことがあります。重要な判断の前に、必ず引用元をご確認ください。
+                              </p>
+                          <% end %>
+                        </div>
+
                         <p class="text-xs text-zinc-500">
-                          関連しそうな箇所です（原文の抜粋。質問の語を<mark class="bg-yellow-200 dark:bg-yellow-700/60 text-inherit rounded px-0.5">ハイライト</mark>しています）:
+                          {if msg[:summary], do: "引用元", else: "関連しそうな箇所です"}（原文の抜粋。質問の語を<mark class="bg-yellow-200 dark:bg-yellow-700/60 text-inherit rounded px-0.5">ハイライト</mark>しています）:
                         </p>
                         <div class="space-y-2">
-                          <%= for chunk <- msg.chunks do %>
-                            <div class="p-3 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200/70 dark:border-zinc-800 space-y-1.5">
+                          <%= for {chunk, n} <- Enum.with_index(msg.chunks, 1) do %>
+                            <div
+                              id={"src-#{msg.id}-#{n}"}
+                              class="p-3 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200/70 dark:border-zinc-800 space-y-1.5 scroll-mt-4 target:ring-2 target:ring-indigo-400"
+                            >
                               <div class="flex items-center justify-between text-xs font-medium">
                                 <span class="text-indigo-600 dark:text-indigo-400 flex items-center gap-1 truncate max-w-md">
+                                  <span class="shrink-0 px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-bold">
+                                    [{n}]
+                                  </span>
                                   <.icon name="hero-document-text" class="w-4 h-4 shrink-0" />
                                   {(chunk.document && chunk.document.name) || "ドキュメント"}
                                   <span
@@ -473,4 +567,30 @@ defmodule AskDriveWeb.ChatLive do
        do: link <> "#page=#{page}"
 
   defp drive_link(%{document: %{web_view_link: link}}), do: link
+
+  # The summary as HTML: escaped text, line breaks as <br>, and each citation "[n]" that
+  # refers to an excerpt turned into a link to that excerpt's card.
+  defp summary_html(text, msg_id, source_count) do
+    text
+    |> escape_lines()
+    |> Enum.map(fn
+      "<br>" ->
+        "<br>"
+
+      line ->
+        Regex.replace(~r/\[(\d+)\]/, line, fn whole, n ->
+          if String.to_integer(n) in 1..source_count//1 do
+            ~s(<a href="#src-#{msg_id}-#{n}" class="inline-block px-1 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-[11px] font-semibold no-underline hover:bg-indigo-200">[#{n}]</a>)
+          else
+            whole
+          end
+        end)
+    end)
+    |> Phoenix.HTML.raw()
+  end
+
+  defp summary_local?(setting) do
+    {provider, _model} = ChatSummary.provider_and_model(setting)
+    LLM.local?(provider)
+  end
 end

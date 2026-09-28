@@ -131,6 +131,31 @@ defmodule AskDrive.LLM do
   end
 
   @doc """
+  Like `generate/3`, but calls `on_delta.(text)` as the answer is written, for providers
+  that can stream (Ollama). Others generate the whole answer and deliver it in one call, so
+  callers need not care which provider is configured.
+  """
+  def generate_stream(model, prompt, opts, on_delta) when is_function(on_delta, 1) do
+    setting = resolve_setting(Keyword.get(opts, :setting))
+    provider = Keyword.get(opts, :provider) || generation_provider(setting)
+    mod = module(provider)
+    gen_opts = generation_opts(provider, setting, opts)
+
+    with :ok <- check_api_key(provider, setting) do
+      Code.ensure_loaded(mod)
+
+      if function_exported?(mod, :generate_stream, 4) do
+        mod.generate_stream(model, prompt, gen_opts, on_delta)
+      else
+        with {:ok, text} <- mod.generate(model, prompt, gen_opts) do
+          on_delta.(text)
+          {:ok, text}
+        end
+      end
+    end
+  end
+
+  @doc """
   Embeds a list of texts with the configured embedding provider.
 
   The returned vectors are validated against `settings.embedding_dim`: writing a

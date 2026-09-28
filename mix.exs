@@ -4,7 +4,7 @@ defmodule AskDrive.MixProject do
   def project do
     [
       app: :ask_drive,
-      version: "0.0.34",
+      version: "0.0.35",
       elixir: "~> 1.17",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,

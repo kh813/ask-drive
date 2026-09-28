@@ -46,9 +46,11 @@ defmodule AskDrive.Snippet do
     segments(text, 0, String.length(text), hit_ranges(text, question))
   end
 
-  # The chunker prefixes each chunk with "[文書: name]" for embedding context; the chat
-  # card already shows the document name, so drop it along with the layout debris.
-  defp display_text(content) do
+  @doc """
+  The chunk text as a reader should see it: without the "[文書: name]" prefix the chunker
+  adds for embedding context (the card shows the name), and without PDF layout debris.
+  """
+  def display_text(content) do
     (content || "")
     |> String.replace(~r/^\s*\[文書:[^\]]*\]\s*/u, "")
     |> TextCleaner.clean()

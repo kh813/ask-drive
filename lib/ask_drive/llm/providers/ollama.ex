@@ -67,6 +67,89 @@ defmodule AskDrive.LLM.Providers.Ollama do
     end
   end
 
+  @doc """
+  Streams a completion from `/api/generate`, calling `on_delta.(text)` for each piece as it
+  arrives, and returns `{:ok, full_text}`. Used for the chat summary (spec 6.4.4), where a
+  local model takes tens of seconds and showing text as it is written matters.
+
+  `think: false` keeps reasoning models (qwen3) from spending the budget on a hidden
+  chain of thought before the answer.
+  """
+  def generate_stream(model, prompt, opts, on_delta) when is_function(on_delta, 1) do
+    payload =
+      %{
+        model: model,
+        prompt: prompt,
+        stream: true,
+        think: false,
+        options: %{num_ctx: Keyword.get(opts, :num_ctx, 4096)}
+      }
+      |> maybe_put(:system, Keyword.get(opts, :system))
+      |> put_keep_alive(opts)
+
+    collect = fn {:data, data}, {req, resp} ->
+      buffer = Req.Response.get_private(resp, :buffer, "") <> data
+
+      if resp.status == 200 do
+        {lines, rest} = split_lines(buffer)
+
+        text =
+          Enum.map_join(lines, fn line ->
+            case Jason.decode(line) do
+              {:ok, %{"response" => piece}} when is_binary(piece) and piece != "" ->
+                on_delta.(piece)
+                piece
+
+              _ ->
+                ""
+            end
+          end)
+
+        acc = Req.Response.get_private(resp, :text, "") <> text
+
+        {:cont,
+         {req,
+          resp |> Req.Response.put_private(:buffer, rest) |> Req.Response.put_private(:text, acc)}}
+      else
+        {:cont, {req, Req.Response.put_private(resp, :buffer, buffer)}}
+      end
+    end
+
+    case Req.post(base_url(opts) <> "/api/generate",
+           json: payload,
+           into: collect,
+           receive_timeout: Keyword.get(opts, :timeout, @generate_timeout),
+           retry: false
+         ) do
+      {:ok, %{status: 200} = resp} ->
+        {:ok, Req.Response.get_private(resp, :text, "")}
+
+      {:ok, %{status: status} = resp} ->
+        body = Req.Response.get_private(resp, :buffer, "")
+
+        decoded =
+          case Jason.decode(body),
+            do: (
+              {:ok, map} -> map
+              _ -> body
+            )
+
+        {:error, HTTP.classify(status, decoded)}
+
+      {:error, %{__struct__: Req.TransportError, reason: :timeout}} ->
+        {:error, {:timeout, "receive timeout"}}
+
+      {:error, reason} ->
+        {:error, {:network, reason}}
+    end
+  end
+
+  defp split_lines(buffer) do
+    parts = String.split(buffer, "\n")
+    {complete, [rest]} = Enum.split(parts, -1)
+    {Enum.reject(complete, &(&1 == "")), rest}
+  end
+
   @impl true
   def list_models(opts \\ []) do
     case HTTP.get_json(base_url(opts) <> "/api/tags", [], 5_000, retry: false) do

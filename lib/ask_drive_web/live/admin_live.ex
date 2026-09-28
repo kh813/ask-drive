@@ -1552,6 +1552,27 @@ defmodule AskDriveWeb.AdminLive do
                     />
                   </div>
 
+                  <%!-- Chat answers can use their own (fast, cloud) provider while the
+                        nightly batch keeps generating locally (spec F-415). --%>
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <.input
+                      field={@form[:chat_summary_provider]}
+                      type="select"
+                      label="チャット要約プロバイダ"
+                      prompt="回答生成と同じ"
+                      options={provider_options(LLM.generation_providers())}
+                    />
+                    <.input
+                      field={@form[:chat_summary_model]}
+                      type="text"
+                      label="チャット要約モデル名"
+                      placeholder="空欄なら生成モデル名"
+                    />
+                    <p class="text-[11px] text-zinc-500 leading-relaxed sm:pt-6">
+                      夜間バッチ（QA 生成）は上の回答生成プロバイダ、チャットの要約はこちらを使います。クラウドを選ぶと、質問と検索された抜粋が API 提供元に送信されます。
+                    </p>
+                  </div>
+
                   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <.input
                       field={@form[:embed_provider]}
@@ -1732,6 +1753,11 @@ defmodule AskDriveWeb.AdminLive do
                     field={@form[:daytime_llm_enabled]}
                     type="checkbox"
                     label="営業時間中のLLM生成を例外的に許可する (RAM消費に注意)"
+                  />
+                  <.input
+                    field={@form[:chat_summary_enabled]}
+                    type="checkbox"
+                    label="チャットで検索結果の AI 要約を表示する（回答生成プロバイダを使用。クラウドの場合は抜粋が社外に送信されます）"
                   />
                 </div>
 

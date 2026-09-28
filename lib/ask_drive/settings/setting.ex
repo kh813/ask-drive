@@ -30,6 +30,10 @@ defmodule AskDrive.Settings.Setting do
     field :similarity_threshold, :float, default: 0.65
     field :serve_stale_qa, :boolean, default: false
     field :daytime_llm_enabled, :boolean, default: false
+    field :chat_summary_enabled, :boolean, default: true
+    # nil = same as llm_provider / batch_model (spec F-415)
+    field :chat_summary_provider, :string
+    field :chat_summary_model, :string
     field :allowed_domain, :string
     field :google_client_id, :string
     field :google_client_secret, Binary
@@ -116,6 +120,9 @@ defmodule AskDrive.Settings.Setting do
         :similarity_threshold,
         :serve_stale_qa,
         :daytime_llm_enabled,
+        :chat_summary_enabled,
+        :chat_summary_provider,
+        :chat_summary_model,
         :allowed_domain,
         :maintenance_mode,
         :maintenance_message,
@@ -175,6 +182,7 @@ defmodule AskDrive.Settings.Setting do
     |> validate_inclusion(:drive_auth_mode, @drive_auth_modes, message: "は対応していない認証方式です")
     |> validate_base_urls()
     |> validate_api_keys()
+    |> validate_chat_summary_provider()
     |> validate_drive_service_account()
     |> update_change(:drive_impersonate_email, &(&1 && String.trim(&1)))
     |> validate_format(:drive_impersonate_email, ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/,
@@ -251,6 +259,29 @@ defmodule AskDrive.Settings.Setting do
       end
     else
       changeset
+    end
+  end
+
+  # The chat summary may run on its own provider; when it does, it needs that provider's key
+  # and an explicit model name (the batch model belongs to the other provider).
+  defp validate_chat_summary_provider(changeset) do
+    provider = get_field(changeset, :chat_summary_provider)
+
+    if blank?(provider) do
+      changeset
+    else
+      changeset
+      |> validate_inclusion(:chat_summary_provider, @generation_providers,
+        message: "は対応していないプロバイダです"
+      )
+      |> validate_api_key(:chat_summary_provider, "チャット要約プロバイダ")
+      |> then(fn cs ->
+        if provider != get_field(cs, :llm_provider) and blank?(get_field(cs, :chat_summary_model)) do
+          add_error(cs, :chat_summary_model, "チャット要約プロバイダを回答生成と別にする場合は、モデル名を指定してください")
+        else
+          cs
+        end
+      end)
     end
   end
 
