@@ -21,12 +21,24 @@ defmodule AskDriveWeb.AuthController do
 
       case OAuth.exchange_code(code, redirect_uri) do
         {:ok, tokens} ->
-          {:ok, account} = Accounts.save_tokens(tokens)
+          setting = AskDrive.Settings.get_setting!()
+          email = tokens["email"] || ""
+          allowed_domain = setting.allowed_domain
 
-          conn
-          |> delete_session(:oauth_state)
-          |> put_flash(:info, "Google アカウント (#{account.email || "Drive"}) と連携しました。")
-          |> redirect(to: ~p"/")
+          if allowed_domain && allowed_domain != "" &&
+               not String.ends_with?(email, "@" <> allowed_domain) do
+            conn
+            |> delete_session(:oauth_state)
+            |> put_flash(:error, "アクセス拒否: 許可されたドメイン (@#{allowed_domain}) のアカウントのみログイン可能です。")
+            |> redirect(to: ~p"/")
+          else
+            {:ok, account} = Accounts.save_tokens(tokens)
+
+            conn
+            |> delete_session(:oauth_state)
+            |> put_flash(:info, "Google アカウント (#{account.email || "Drive"}) と連携しました。")
+            |> redirect(to: ~p"/")
+          end
 
         {:error, reason} ->
           conn

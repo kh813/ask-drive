@@ -33,6 +33,7 @@ AskDrive 管理スクリプト
   status             アプリケーションおよび依存サービスの稼働状態を確認
   setup              初回セットアップを実行 (依存ツール確認、DB初期化、ビルド)
   deploy             最新コードを取得し、マイグレーションと再ビルド・再起動を実行
+  update [options]   Git/Release から自己アップデート (--yes, --ver <version>)
 
 サービス管理 (launchd 常駐デーモン):
   service install    launchd 常駐サービスを登録 (OS 起動時自動起動)
@@ -190,6 +191,76 @@ cmd_deploy() {
   fi
 }
 
+cmd_update() {
+  local auto_yes="false"
+  local target_ver=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --yes|-y)
+        auto_yes="true"
+        shift
+        ;;
+      --ver|-v)
+        target_ver="${2:-}"
+        shift 2 || true
+        ;;
+      *)
+        echo -e "${RED}未知の update オプション: '$1'${NC}"
+        echo "使用方法: ./app.sh update [--yes] [--ver <version>]"
+        exit 1
+        ;;
+    esac
+  done
+
+  echo -e "${BLUE}=== AskDrive 自己アップデート ===${NC}"
+  cd "${SCRIPT_DIR}"
+
+  if [[ -n "${target_ver}" ]]; then
+    echo "指定バージョン: ${target_ver}"
+    if [[ "${auto_yes}" != "true" ]]; then
+      read -rp "バージョン ${target_ver} に切り替えてアップデート/ロールバックを実行しますか？ (y/N): " answer
+      if [[ "${answer}" != "y" && "${answer}" != "Y" ]]; then
+        echo "アップデートを中止しました。"
+        return 0
+      fi
+    fi
+
+    echo -e "${YELLOW}==> バージョン ${target_ver} をチェックアウト中...${NC}"
+    git fetch --tags --all || true
+    git checkout "${target_ver}"
+  else
+    echo "最新バージョンへの更新を確認中..."
+    git fetch origin || true
+    local local_hash upstream_hash
+    local_hash="$(git rev-parse HEAD 2>/dev/null || echo "")"
+    upstream_hash="$(git rev-parse '@{u}' 2>/dev/null || echo "")"
+
+    if [[ -n "${local_hash}" && -n "${upstream_hash}" && "${local_hash}" == "${upstream_hash}" ]]; then
+      echo -e "${GREEN}既に最新のバージョンです (${local_hash:0:7})。${NC}"
+      if [[ "${auto_yes}" != "true" ]]; then
+        read -rp "再ビルドとマイグレーションを再実行しますか？ (y/N): " answer
+        if [[ "${answer}" != "y" && "${answer}" != "Y" ]]; then
+          return 0
+        fi
+      fi
+    else
+      if [[ "${auto_yes}" != "true" ]]; then
+        read -rp "最新コードを取得してアップデートを実行しますか？ (y/N): " answer
+        if [[ "${answer}" != "y" && "${answer}" != "Y" ]]; then
+          echo "アップデートを中止しました。"
+          return 0
+        fi
+      fi
+      echo -e "${YELLOW}==> 最新コードを取得中 (git pull)...${NC}"
+      git pull --rebase origin "$(git branch --show-current)"
+    fi
+  fi
+
+  # デプロイスクリプトの実行
+  cmd_deploy
+}
+
 # --- launchd サービス管理 ---
 
 service_install() {
@@ -318,6 +389,9 @@ case "${COMMAND}" in
     ;;
   deploy)
     cmd_deploy "$@"
+    ;;
+  update)
+    cmd_update "$@"
     ;;
   service)
     SUB_COMMAND="${1:-}"

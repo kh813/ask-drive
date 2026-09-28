@@ -13,6 +13,9 @@ defmodule AskDrive.Settings.Setting do
     field :similarity_threshold, :float, default: 0.65
     field :serve_stale_qa, :boolean, default: false
     field :daytime_llm_enabled, :boolean, default: false
+    field :allowed_domain, :string
+    field :maintenance_mode, :boolean, default: false
+    field :maintenance_message, :string
 
     timestamps(type: :utc_datetime)
   end
@@ -30,7 +33,10 @@ defmodule AskDrive.Settings.Setting do
       :batch_num_ctx,
       :similarity_threshold,
       :serve_stale_qa,
-      :daytime_llm_enabled
+      :daytime_llm_enabled,
+      :allowed_domain,
+      :maintenance_mode,
+      :maintenance_message
     ])
     |> validate_required([
       :batch_start_hour,

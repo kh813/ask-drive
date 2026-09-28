@@ -560,6 +560,35 @@ defmodule AskDriveWeb.AdminLive do
             <.form for={@form} id="settings-form" phx-submit="save_settings" class="space-y-4">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <.input
+                  field={@form[:drive_folder_id]}
+                  type="text"
+                  label="Google Drive フォルダ ID / URL (drive_folder_id)"
+                />
+                <.input
+                  field={@form[:drive_folder_name]}
+                  type="text"
+                  label="Drive フォルダ表示名 (drive_folder_name)"
+                />
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <.input
+                  field={@form[:allowed_domain]}
+                  type="text"
+                  label="許可 Google Workspace ドメイン (例: company.com)"
+                />
+                <.input
+                  field={@form[:similarity_threshold]}
+                  type="number"
+                  step="0.01"
+                  min="0.0"
+                  max="1.0"
+                  label="Tier 1 類似度閾値 (0.0〜1.0)"
+                />
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <.input
                   field={@form[:batch_model]}
                   type="text"
                   label="夜間生成モデル (batch_model: qwen3:4b)"
@@ -590,21 +619,23 @@ defmodule AskDriveWeb.AdminLive do
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <.input
-                  field={@form[:similarity_threshold]}
-                  type="number"
-                  step="0.01"
-                  min="0.0"
-                  max="1.0"
-                  label="Tier 1 類似度閾値 (0.0〜1.0)"
-                />
-                <.input
                   field={@form[:batch_num_ctx]}
                   type="number"
                   label="バッチ生成コンテキスト長 (num_ctx)"
                 />
+                <.input
+                  field={@form[:maintenance_message]}
+                  type="text"
+                  label="メンテナンス告知メッセージ"
+                />
               </div>
 
               <div class="pt-2 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3">
+                <.input
+                  field={@form[:maintenance_mode]}
+                  type="checkbox"
+                  label="メンテナンスモード（チャット画面を停止し告知を表示する）"
+                />
                 <.input
                   field={@form[:serve_stale_qa]}
                   type="checkbox"

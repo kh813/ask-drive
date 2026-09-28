@@ -136,8 +136,25 @@ defmodule AskDriveWeb.ChatLive do
           </div>
         </div>
 
+        <%!-- Maintenance Mode Alert --%>
+        <%= if @setting.maintenance_mode do %>
+          <div class="mb-6 p-6 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-center space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-900/60 text-amber-600 flex items-center justify-center mx-auto">
+              <.icon name="hero-wrench-screwdriver" class="w-6 h-6" />
+            </div>
+            <div>
+              <h2 class="font-bold text-base text-amber-900 dark:text-amber-100">
+                現在システムメンテナンス中です
+              </h2>
+              <p class="text-xs text-amber-700 dark:text-amber-300 mt-1 max-w-md mx-auto">
+                {@setting.maintenance_message || "データベースの更新またはアップデート作業を行っています。完了までしばらくお待ちください。"}
+              </p>
+            </div>
+          </div>
+        <% end %>
+
         <%!-- Status Alert Banner --%>
-        <%= if is_nil(@account) do %>
+        <%= if is_nil(@account) and not @setting.maintenance_mode do %>
           <div class="mb-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 flex items-start justify-between">
             <div class="flex items-start gap-3">
               <.icon name="hero-information-circle" class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
@@ -145,6 +162,11 @@ defmodule AskDriveWeb.ChatLive do
                 <p class="font-medium text-sm">Google Drive が連携されていません</p>
                 <p class="text-xs mt-0.5 text-amber-700 dark:text-amber-300">
                   ドキュメントを取り込んで検索・回答を行うには、Google アカウントを連携してください。
+                  <%= if @setting.allowed_domain do %>
+                    <span class="block mt-1 font-semibold text-amber-900 dark:text-amber-200">
+                      許可ドメイン: @{@setting.allowed_domain}
+                    </span>
+                  <% end %>
                 </p>
               </div>
             </div>

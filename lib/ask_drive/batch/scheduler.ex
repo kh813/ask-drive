@@ -61,6 +61,17 @@ defmodule AskDrive.Batch.Scheduler do
     deadline = calculate_deadline(setting)
     Logger.info("Starting Night Batch ##{batch_run.id}. Deadline: #{inspect(deadline)}")
 
+    # Start caffeinate process to prevent macOS sleep during nightly batch (12-6)
+    caffeinate_port =
+      if System.find_executable("caffeinate") do
+        Port.open({:spawn_executable, System.find_executable("caffeinate")}, [
+          :binary,
+          args: ["-s"]
+        ])
+      else
+        nil
+      end
+
     try do
       # --- Phase 1: Sync ---
       {_p1_stat, batch_run} = run_phase_1_sync(batch_run, setting)
@@ -84,6 +95,8 @@ defmodule AskDrive.Batch.Scheduler do
       # Restore daytime or standby mode according to clock
       Mode.sync_with_clock()
 
+      if caffeinate_port, do: Port.close(caffeinate_port)
+
       {:ok, batch_run}
     rescue
       e ->
@@ -98,6 +111,7 @@ defmodule AskDrive.Batch.Scheduler do
         |> Repo.update()
 
         Mode.sync_with_clock()
+        if caffeinate_port, do: Port.close(caffeinate_port)
         {:error, e}
     end
   end
