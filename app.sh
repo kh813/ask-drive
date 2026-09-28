@@ -190,6 +190,12 @@ cmd_setup() {
 }
 
 cmd_deploy() {
+  if ! command -v mix >/dev/null 2>&1; then
+    echo -e "${YELLOW}mix が見つからないため、初期セットアップ (setup) を実行します...${NC}"
+    cmd_setup
+    return 0
+  fi
+
   if [[ -f "${SCRIPT_DIR}/scripts/deploy.sh" ]]; then
     bash "${SCRIPT_DIR}/scripts/deploy.sh"
   else

@@ -19,6 +19,13 @@ NC='\033[0m'
 echo -e "${GREEN}=== AskDrive デプロイ処理を開始します ===${NC}"
 cd "${SCRIPT_DIR}"
 
+# mix の存在確認 (未インストール時は初回セットアップを実行)
+if ! command -v mix >/dev/null 2>&1; then
+  echo -e "${YELLOW}mix が見つかりません。初回セットアップ (scripts/initial-setup.sh) を自動実行します...${NC}"
+  bash "${SCRIPT_DIR}/scripts/initial-setup.sh"
+  exit 0
+fi
+
 # 1. 依存関係の更新
 echo -e "\n${YELLOW}[1/4] 依存関係の取得中...${NC}"
 mix deps.get
