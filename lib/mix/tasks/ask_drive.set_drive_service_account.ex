@@ -6,7 +6,8 @@ defmodule Mix.Tasks.AskDrive.SetDriveServiceAccount do
   the admin web UI.
 
       mix ask_drive.set_drive_service_account /path/to/service-account-key.json
-      mix ask_drive.set_drive_service_account          # no file yet: paste the JSON instead
+      mix ask_drive.set_drive_service_account          # auto-detects a conventional filename,
+                                                        # or falls back to pasting the JSON
 
   This is the recovery path for a chicken-and-egg problem: the settings screen that
   configures Drive sync sits behind Google sign-in and administrator elevation, but if
@@ -24,6 +25,12 @@ defmodule Mix.Tasks.AskDrive.SetDriveServiceAccount do
   JSON). Before this will actually work, share the target Drive folder with the service
   account's email address (the `client_email` field) as you would with any other Google user.
 
+  When called with no argument, this also looks for a handful of conventional filenames
+  (`credential.json`, `credentials.json`, `service-account.json`, `service-account-key.json`)
+  in the current directory before falling back to the paste prompt — so simply saving the
+  downloaded key under one of those names and re-running the same command with no argument
+  picks it up automatically.
+
   This switches `drive_auth_mode` to `"service_account"`. The existing OAuth connection (if
   any) is left in place and can be switched back to from the admin screen at any time.
   """
@@ -32,12 +39,29 @@ defmodule Mix.Tasks.AskDrive.SetDriveServiceAccount do
   alias AskDrive.Drive.ServiceAccount
   alias AskDrive.Settings
 
+  @conventional_filenames ~w(
+    credential.json
+    credentials.json
+    service-account.json
+    service-account-key.json
+  )
+
   @impl Mix.Task
   def run(args) do
     AskDrive.CliTask.run(fn -> run_task(args) end)
   end
 
-  defp run_task([]), do: run_pasted()
+  defp run_task([]) do
+    case find_conventional_file() do
+      {:ok, path} ->
+        Mix.shell().info("#{path} を検出しました。このファイルを使用します。\n")
+        apply_json(File.read!(path))
+
+      :none ->
+        run_pasted()
+    end
+  end
+
   defp run_task(["-"]), do: run_pasted()
 
   defp run_task([path]) do
@@ -58,6 +82,19 @@ defmodule Mix.Tasks.AskDrive.SetDriveServiceAccount do
       mix ask_drive.set_drive_service_account <path-to-key.json>
       mix ask_drive.set_drive_service_account            # JSON を対話的に貼り付ける
     """)
+  end
+
+  # Looks for one of the conventional filenames in the current directory (where `mix` is
+  # invoked from — the AskDrive install root, since app.sh always `cd`s there first).
+  # Ambiguous when more than one candidate exists: guessing wrong here means silently
+  # syncing from the wrong Drive folder, so that case asks for an explicit path instead of
+  # picking one.
+  defp find_conventional_file do
+    case Enum.filter(@conventional_filenames, &File.exists?/1) do
+      [path] -> {:ok, path}
+      [] -> :none
+      multiple -> Mix.raise("複数の候補が見つかりました: #{Enum.join(multiple, ", ")}\nパスを明示的に指定してください。")
+    end
   end
 
   defp run_pasted do

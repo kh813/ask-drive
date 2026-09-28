@@ -54,9 +54,9 @@ Apple Silicon Mac (8GB〜) の単一マシン上で、Google Drive 内の共有�
 ### 1. リリースアーカイブ（ZIP）の取得と展開
 GitHub Releases から最新版の ZIP をダウンロードして展開します。
 ```bash
-# 例: v0.0.17 の場合
-curl -fLO https://github.com/kh813/ask-drive/releases/download/v0.0.17/ask-drive-v0.0.17.zip
-unzip ask-drive-v0.0.17.zip -d ask-drive
+# 例: v0.0.18 の場合
+curl -fLO https://github.com/kh813/ask-drive/releases/download/v0.0.18/ask-drive-v0.0.18.zip
+unzip ask-drive-v0.0.18.zip -d ask-drive
 cd ask-drive
 ```
 
@@ -158,17 +158,25 @@ Anthropic API キー: ********
 
 Drive 同期の設定は本来 Web 管理画面（ログイン + 管理者昇格が必要）から行いますが、社員ログインの OAuth がまだ通っていない、あるいは管理者パスワードが未設定などの理由でそこに到達できない場合は、**サービスアカウント方式**（後述の「ステップ3・方式A」参照）を CLI から直接設定できます。Web 側の認証状態に一切依存しません。
 
-JSON ファイルが手元にある場合:
+JSON ファイルが手元にある場合、パスを直接指定できます:
 
 ```bash
 ./app.sh drive service-account /path/to/service-account-key.json
 ```
 
-JSON ファイルをまだ AskDrive 稼働機に置いていない場合は、パスを省略すると Google Cloud Console からダウンロードした JSON の中身をその場に貼り付けて設定できます（貼り付け後、空行または Ctrl+D で確定）:
+**AskDrive のインストールディレクトリ（`ask-drive/` 直下）に決まった名前で置いておけば、パスを省略しても自動で読み込まれます。** 次のいずれかの名前を使ってください:
+
+- `credential.json`
+- `credentials.json`
+- `service-account.json`
+- `service-account-key.json`
 
 ```bash
+# ask-drive/credential.json を配置済みなら、パス指定なしでそのまま検出されます
 ./app.sh drive service-account
 ```
+
+該当するファイルが1つも無い場合は、Google Cloud Console からダウンロードした JSON の中身をその場に貼り付けて設定できます（貼り付け後、空行または Ctrl+D で確定）。複数の候補ファイルが同時に存在する場合は、誤って別プロジェクトのフォルダに同期してしまう事故を避けるため自動選択せず、パスを明示するよう案内されます。
 
 > サービスアカウントの秘密鍵は Google が発行するものなので、値を1つずつ質問して新規に作ることはできません。ここでの「対話的」入力は、Google からダウンロードした JSON の**貼り付け**を指します。
 

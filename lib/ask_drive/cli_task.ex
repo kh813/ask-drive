@@ -20,10 +20,18 @@ defmodule AskDrive.CliTask do
   Starts the application without binding the HTTP port, then runs `fun`.
   """
   def run(fun) when is_function(fun, 0) do
-    # Merge rather than replace: config/runtime.exs has already set host/port/secret_key_base
-    # by the time this runs, and a bare `put_env(..., server: false)` would wipe them out.
-    existing = Application.get_env(:ask_drive, AskDriveWeb.Endpoint, [])
-    Application.put_env(:ask_drive, AskDriveWeb.Endpoint, Keyword.put(existing, :server, false))
+    # config/runtime.exs turns the Endpoint's `server` on with a plain
+    # `if System.get_env("PHX_SERVER") do ...` — note that this is truthy for *any* non-nil
+    # string, so even PHX_SERVER=false would still enable it. Overriding the resulting
+    # `:server` config with `Application.put_env/3` does not hold up: `app.start` reloads
+    # runtime.exs internally as part of its own requirements regardless of whether
+    # "loadconfig" already ran once in this invocation, which reapplies `server: true` and
+    # clobbers the override before the supervisor tree starts (confirmed by reproducing the
+    # exact port-bind crash this exists to avoid, twice, with two different override
+    # strategies). Removing the env var itself is what actually survives every reload: with
+    # nothing to key off, that `if` never fires, however many times it runs.
+    System.delete_env("PHX_SERVER")
+
     Mix.Task.run("app.start")
     fun.()
   end
