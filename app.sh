@@ -106,6 +106,22 @@ repair_ollama_runtime() {
   rm -rf "${tmp_dir}"
 }
 
+# ollama serve は起動直後(特に再取得した直後の初回起動)に数秒〜十数秒応答しないことがある。
+# 固定の sleep で済ませると AskDrive の起動時ヘルスチェックやモデルのプリウォームが
+# タイムアウトするため、/api/version が応答するまで最大 60 秒待つ。
+wait_for_ollama() {
+  local host="$1" i
+  for ((i = 0; i < 60; i++)); do
+    if curl -s --max-time 2 "${host}/api/version" >/dev/null 2>&1; then
+      echo "Ollama の応答を確認しました (${i} 秒)。"
+      return 0
+    fi
+    sleep 1
+  done
+  echo -e "${YELLOW}Ollama が 60 秒以内に応答しませんでした。${SCRIPT_DIR}/log/ollama.log を確認してください:${NC}"
+  tail -n 20 "${SCRIPT_DIR}/log/ollama.log" 2>/dev/null || true
+}
+
 # --- アプリケーション制御 ---
 
 cmd_start() {
@@ -127,7 +143,7 @@ cmd_start() {
     if command -v ollama >/dev/null 2>&1; then
       echo "Ollama サービスが停止しているため、バックグラウンド起動します..."
       ollama serve > "${SCRIPT_DIR}/log/ollama.log" 2>&1 &
-      sleep 2
+      wait_for_ollama "${ollama_host}"
     fi
   fi
 
