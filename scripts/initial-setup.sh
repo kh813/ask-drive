@@ -33,19 +33,24 @@ echo -e "\n${YELLOW}[1/7] 依存ツールの確認および自動セットアッ
 if ! command -v pandoc >/dev/null 2>&1; then
   echo "pandoc が見つかりません。スタンドアロンバイナリを取得中..."
   PANDOC_VER="3.6.3"
-  PANDOC_TAR="pandoc-${PANDOC_VER}-macOS-${ARCH}.tar.gz"
   if [[ "${ARCH}" == "arm64" ]]; then
-    PANDOC_URL="https://github.com/jgm/pandoc/releases/download/${PANDOC_VER}/pandoc-${PANDOC_VER}-macOS-arm64.tar.gz"
+    PANDOC_ZIP="pandoc-${PANDOC_VER}-arm64-macOS.zip"
   else
-    PANDOC_URL="https://github.com/jgm/pandoc/releases/download/${PANDOC_VER}/pandoc-${PANDOC_VER}-macOS-x86_64.tar.gz"
+    PANDOC_ZIP="pandoc-${PANDOC_VER}-x86_64-macOS.zip"
   fi
+  PANDOC_URL="https://github.com/jgm/pandoc/releases/download/${PANDOC_VER}/${PANDOC_ZIP}"
   TMP_DIR="$(mktemp -d)"
-  curl -fL -o "${TMP_DIR}/${PANDOC_TAR}" "${PANDOC_URL}"
-  tar -xzf "${TMP_DIR}/${PANDOC_TAR}" -C "${TMP_DIR}"
-  cp "${TMP_DIR}/pandoc-${PANDOC_VER}/bin/pandoc" "${RUNTIME_BIN}/pandoc"
-  chmod +x "${RUNTIME_BIN}/pandoc"
+  curl -fL -o "${TMP_DIR}/${PANDOC_ZIP}" "${PANDOC_URL}"
+  unzip -q -o "${TMP_DIR}/${PANDOC_ZIP}" -d "${TMP_DIR}"
+  PANDOC_BIN_SRC="$(find "${TMP_DIR}" -type f -name pandoc | head -n 1)"
+  if [[ -n "${PANDOC_BIN_SRC}" && -f "${PANDOC_BIN_SRC}" ]]; then
+    cp "${PANDOC_BIN_SRC}" "${RUNTIME_BIN}/pandoc"
+    chmod +x "${RUNTIME_BIN}/pandoc"
+    echo -e "${GREEN}pandoc を ${RUNTIME_BIN}/pandoc にインストールしました。${NC}"
+  else
+    echo -e "${RED}pandoc バイナリの展開に失敗しました。${NC}"
+  fi
   rm -rf "${TMP_DIR}"
-  echo -e "${GREEN}pandoc を ${RUNTIME_BIN}/pandoc にインストールしました。${NC}"
 else
   echo "pandoc: OK ($(command -v pandoc))"
 fi
@@ -56,14 +61,15 @@ if ! command -v ollama >/dev/null 2>&1; then
   TMP_DIR="$(mktemp -d)"
   curl -fL -o "${TMP_DIR}/Ollama-darwin.zip" "https://ollama.com/download/Ollama-darwin.zip"
   unzip -q -o "${TMP_DIR}/Ollama-darwin.zip" -d "${TMP_DIR}"
-  if [[ -f "${TMP_DIR}/Ollama.app/Contents/Resources/ollama" ]]; then
-    cp "${TMP_DIR}/Ollama.app/Contents/Resources/ollama" "${RUNTIME_BIN}/ollama"
-  elif [[ -f "${TMP_DIR}/ollama" ]]; then
-    cp "${TMP_DIR}/ollama" "${RUNTIME_BIN}/ollama"
+  OLLAMA_BIN_SRC="$(find "${TMP_DIR}" -type f -name ollama | head -n 1)"
+  if [[ -n "${OLLAMA_BIN_SRC}" && -f "${OLLAMA_BIN_SRC}" ]]; then
+    cp "${OLLAMA_BIN_SRC}" "${RUNTIME_BIN}/ollama"
+    chmod +x "${RUNTIME_BIN}/ollama"
+    echo -e "${GREEN}ollama を ${RUNTIME_BIN}/ollama にインストールしました。${NC}"
+  else
+    echo -e "${RED}ollama バイナリの展開に失敗しました。${NC}"
   fi
-  chmod +x "${RUNTIME_BIN}/ollama"
   rm -rf "${TMP_DIR}"
-  echo -e "${GREEN}ollama を ${RUNTIME_BIN}/ollama にインストールしました。${NC}"
 else
   echo "ollama: OK ($(command -v ollama))"
 fi
