@@ -99,4 +99,57 @@ defmodule AskDrive.AnsweringTiersTest do
       assert response.index_empty?
     end
   end
+
+  describe "Tier 1 threshold" do
+    setup do
+      {server, url} = AskDrive.StubOllama.start!(self())
+      on_exit(fn -> Process.exit(server, :normal) end)
+
+      {:ok, _} =
+        Settings.update_setting(Settings.get_setting!(), %{
+          ollama_host: url,
+          embed_provider: "ollama"
+        })
+
+      {:ok, doc} =
+        %Document{}
+        |> Document.changeset(%{drive_file_id: "t1_doc", name: "規程", mime_type: "text/plain"})
+        |> Repo.insert()
+
+      {:ok, qa} =
+        %QAPair{}
+        |> QAPair.changeset(%{
+          document_id: doc.id,
+          question: "USBメモリは使えますか？",
+          answer: "会社貸与品のみ使えます。",
+          status: "active",
+          source_hash: "h",
+          generated_by: "test"
+        })
+        |> Repo.insert()
+
+      # The stub embeds every query as [len, 0, 0, ...]; this QA vector [1, 0.75, 0, ...]
+      # therefore sits at cosine similarity 1 / sqrt(1 + 0.75^2) = 0.8 from any question.
+      vec = [1.0, 0.75 | List.duplicate(0.0, 1022)]
+
+      Repo.query!("INSERT INTO vec_qa_pairs(qa_pair_id, question_embedding) VALUES (?, ?)", [
+        qa.id,
+        AskDrive.Vector.to_json(vec)
+      ])
+
+      %{qa: qa}
+    end
+
+    test "a 0.8 match does not answer from QA at the default 0.90" do
+      assert Settings.get_setting!().tier1_threshold == 0.9
+      refute Answering.ask("USBメモリの利用ルールは？").tier == 1
+    end
+
+    test "lowering the threshold lets the same match answer from QA", %{qa: qa} do
+      {:ok, _} = Settings.update_setting(Settings.get_setting!(), %{tier1_threshold: 0.75})
+      response = Answering.ask("USBメモリの利用ルールは？")
+      assert response.tier == 1
+      assert response.qa_pair.id == qa.id
+    end
+  end
 end

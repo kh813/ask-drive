@@ -1744,12 +1744,12 @@ defmodule AskDriveWeb.AdminLive do
                     label="許可 Google Workspace ドメイン (例: company.com)"
                   />
                   <.input
-                    field={@form[:similarity_threshold]}
+                    field={@form[:tier1_threshold]}
                     type="number"
                     step="0.01"
-                    min="0.0"
+                    min="0.5"
                     max="1.0"
-                    label="Tier 1 類似度閾値 (0.0〜1.0)"
+                    label="QA 即答（Tier 1）の類似度しきい値（既定 0.90。下げるほど生成済み QA で即答しやすく、上げるほど要約・抜粋に回る）"
                   />
                 </div>
 

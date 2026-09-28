@@ -27,7 +27,10 @@ defmodule AskDrive.Settings.Setting do
     field :batch_model, :string, default: "qwen3:4b"
     field :embed_model, :string, default: "bge-m3"
     field :batch_num_ctx, :integer, default: 4096
+    # Legacy: was (mis)used as the Tier 1 cut-off; superseded by tier1_threshold
     field :similarity_threshold, :float, default: 0.65
+    # Tier 1 (pre-generated QA) cosine-similarity cut-off, spec 6.4.1
+    field :tier1_threshold, :float, default: 0.9
     field :serve_stale_qa, :boolean, default: false
     field :daytime_llm_enabled, :boolean, default: false
     field :chat_summary_enabled, :boolean, default: true
@@ -123,6 +126,7 @@ defmodule AskDrive.Settings.Setting do
         :embed_model,
         :batch_num_ctx,
         :similarity_threshold,
+        :tier1_threshold,
         :serve_stale_qa,
         :daytime_llm_enabled,
         :chat_summary_enabled,
@@ -160,6 +164,10 @@ defmodule AskDrive.Settings.Setting do
     ])
     |> validate_number(:batch_start_hour, greater_than_or_equal_to: 0, less_than_or_equal_to: 23)
     |> validate_number(:batch_end_hour, greater_than_or_equal_to: 0, less_than_or_equal_to: 23)
+    |> validate_number(:tier1_threshold,
+      greater_than_or_equal_to: 0.5,
+      less_than_or_equal_to: 1.0
+    )
     |> validate_number(:similarity_threshold,
       greater_than_or_equal_to: 0.0,
       less_than_or_equal_to: 1.0

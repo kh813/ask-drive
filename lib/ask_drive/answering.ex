@@ -77,7 +77,10 @@ defmodule AskDrive.Answering do
         end
 
       # --- Tier 1: Vector Search on Hypothetical QA pairs ---
-      tier1_threshold = Map.get(setting, :tier1_threshold, setting.similarity_threshold || 0.90)
+      # Its own setting (default 0.90). This used to read a field that didn't exist and fall
+      # back to similarity_threshold (0.65), answering loosely related questions with a
+      # canned QA instead of letting them reach the excerpts and the AI summary.
+      tier1_threshold = setting.tier1_threshold || 0.90
 
       tier1_match =
         if embedding do
