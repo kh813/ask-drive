@@ -79,11 +79,13 @@ defmodule AskDrive.Documents do
   Deletes documents whose drive_file_id is no longer present in current_drive_ids.
   Returns number of deleted documents.
   """
-  def delete_missing_documents(current_drive_ids) when is_list(current_drive_ids) do
+  def delete_missing_documents(current_drive_ids, on_delete \\ fn _doc -> :ok end)
+      when is_list(current_drive_ids) do
     missing_docs = Repo.all(from d in Document, where: d.drive_file_id not in ^current_drive_ids)
 
     Enum.each(missing_docs, fn doc ->
       AskDrive.Freshness.delete_document_completely(doc)
+      on_delete.(doc)
     end)
 
     length(missing_docs)

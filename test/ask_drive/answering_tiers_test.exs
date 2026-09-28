@@ -99,5 +99,4 @@ defmodule AskDrive.AnsweringTiersTest do
       assert response.index_empty?
     end
   end
-
 end

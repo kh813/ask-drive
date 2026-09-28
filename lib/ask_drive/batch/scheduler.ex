@@ -128,7 +128,7 @@ defmodule AskDrive.Batch.Scheduler do
     LLM.unload_model(setting.batch_model, setting: setting)
 
     items_count =
-      case SyncWorker.perform(%Oban.Job{args: %{}}) do
+      case SyncWorker.perform(%Oban.Job{args: %{"batch_run_id" => batch_run.id}}) do
         {:ok, %{total_drive_files: count}} -> count
         {:ok, _} -> 1
         _ -> 0
@@ -196,13 +196,24 @@ defmodule AskDrive.Batch.Scheduler do
           where: d.status in ["pending", "processing"]
       )
 
-    items_count =
-      Enum.reduce(unindexed_docs, 0, fn doc, acc ->
-        case EmbedChunksWorker.perform(%Oban.Job{args: %{"document_id" => doc.id}}) do
-          {:ok, _} -> acc + 1
-          _ -> acc
+    Logger.info(
+      "Batch ##{batch_run.id} - [Phase 3] #{length(unindexed_docs)} document(s) to index"
+    )
+
+    {items_count, chunk_total} =
+      Enum.reduce(unindexed_docs, {0, 0}, fn doc, {ok, chunks} ->
+        args = %{"document_id" => doc.id, "batch_run_id" => batch_run.id}
+
+        case EmbedChunksWorker.perform(%Oban.Job{args: args}) do
+          {:ok, {:indexed, n}} -> {ok + 1, chunks + n}
+          {:ok, _} -> {ok + 1, chunks}
+          _ -> {ok, chunks}
         end
       end)
+
+    Logger.info(
+      "Batch ##{batch_run.id} - [Phase 3] indexed #{items_count}/#{length(unindexed_docs)} document(s), #{chunk_total} chunk(s)"
+    )
 
     finished_time = DateTime.utc_now()
     duration = DateTime.diff(finished_time, start_time)

@@ -15,6 +15,7 @@ defmodule AskDrive.Batch.BatchRun do
     field :error, :string
 
     has_many :phase_stats, AskDrive.Batch.BatchPhaseStat, on_delete: :delete_all
+    has_many :item_logs, AskDrive.Batch.ItemLog, on_delete: :delete_all
 
     timestamps(type: :utc_datetime)
   end

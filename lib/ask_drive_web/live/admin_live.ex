@@ -18,7 +18,7 @@ defmodule AskDriveWeb.AdminLive do
   import Ecto.Query, warn: false
 
   alias AskDrive.Accounts.{AdminAccess, AdminElevationLog}
-  alias AskDrive.Batch.{BatchRun, Scheduler}
+  alias AskDrive.Batch.{BatchRun, ItemLog, Scheduler}
   alias AskDrive.Documents.{Chunk, Document}
   alias AskDrive.Drive.{Client, ServiceAccount}
   alias AskDrive.LLM
@@ -309,6 +309,8 @@ defmodule AskDriveWeb.AdminLive do
           preload: [:phase_stats]
       )
 
+    item_logs = if latest_run, do: ItemLog.list_for_run(latest_run.id), else: []
+
     # 2. Coverage Stats
     total_chunks = Repo.aggregate(Chunk, :count, :id) || 0
     active_qas = Repo.one(from q in QAPair, where: q.status == "active", select: count(q.id)) || 0
@@ -336,6 +338,7 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:generation_provider, LLM.generation_provider(setting))
     |> assign(:embedding_provider, LLM.embedding_provider(setting))
     |> assign(:latest_run, latest_run)
+    |> assign(:item_logs, item_logs)
     |> assign(:total_chunks, total_chunks)
     |> assign(:active_qas, active_qas)
     |> assign(:stale_qas, stale_qas)
@@ -537,7 +540,7 @@ defmodule AskDriveWeb.AdminLive do
               </div>
 
               <%= if @latest_run do %>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs text-zinc-600 dark:text-zinc-400">
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 text-xs text-zinc-600 dark:text-zinc-400">
                   <div>
                     <span class="text-zinc-400 block">開始日時</span>
                     <span class="font-mono text-zinc-800 dark:text-zinc-200">
@@ -553,7 +556,19 @@ defmodule AskDriveWeb.AdminLive do
                     </span>
                   </div>
                   <div>
-                    <span class="text-zinc-400 block">処理チャンク / 生成QA</span>
+                    <span class="text-zinc-400 block">取り込み（成功文書 / チャンク）</span>
+                    <span class="font-mono text-zinc-800 dark:text-zinc-200">
+                      {count_logs(@item_logs, "embed_chunks", "indexed")} 件 / {sum_chunks(@item_logs)} 件
+                      <span
+                        :if={count_logs(@item_logs, "failed") > 0}
+                        class="text-red-600 dark:text-red-400"
+                      >
+                        （失敗 {count_logs(@item_logs, "failed")} 件）
+                      </span>
+                    </span>
+                  </div>
+                  <div>
+                    <span class="text-zinc-400 block">QA 生成（対象チャンク / 生成QA）</span>
                     <span class="font-mono text-zinc-800 dark:text-zinc-200">
                       {@latest_run.chunks_processed} 件 / {@latest_run.qa_generated} 件
                     </span>
@@ -584,6 +599,68 @@ defmodule AskDriveWeb.AdminLive do
                       </div>
                     <% end %>
                   </div>
+                </div>
+
+                <%!-- Per-file log (spec 6.3.5): what happened to each Drive file, and why --%>
+                <div class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-2">
+                  <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                    ファイル別ログ（{length(@item_logs)} 件・失敗を先頭に表示）
+                  </h3>
+                  <%= if @item_logs == [] do %>
+                    <p class="text-xs text-zinc-500">
+                      このバッチのファイル別ログはありません（v0.0.27 より前に実行したバッチには記録されていません）。
+                    </p>
+                  <% else %>
+                    <div class="overflow-x-auto max-h-[28rem] overflow-y-auto">
+                      <table
+                        id="batch-item-logs"
+                        class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400"
+                      >
+                        <thead class="text-[11px] text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 bg-white dark:bg-zinc-900">
+                          <tr>
+                            <th class="py-2 px-2">フェーズ</th>
+                            <th class="py-2 px-2">結果</th>
+                            <th class="py-2 px-2">ファイル</th>
+                            <th class="py-2 px-2 text-right">チャンク</th>
+                            <th class="py-2 px-2 text-right">時間</th>
+                            <th class="py-2 px-2">詳細</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                          <tr :for={log <- @item_logs}>
+                            <td class="py-2 px-2 whitespace-nowrap">{phase_label(log.phase)}</td>
+                            <td class="py-2 px-2 whitespace-nowrap">
+                              <span class={[
+                                "px-2 py-0.5 rounded-full text-[10px] font-medium",
+                                item_status_class(log.status)
+                              ]}>
+                                {item_status_label(log.status)}
+                              </span>
+                            </td>
+                            <td class="py-2 px-2">
+                              <span class="text-zinc-900 dark:text-zinc-100">{log.name}</span>
+                              <span
+                                :if={log.mime_type}
+                                class="block font-mono text-[10px] text-zinc-400"
+                              >
+                                {log.mime_type}
+                              </span>
+                            </td>
+                            <td class="py-2 px-2 text-right font-mono">{log.chunks || "—"}</td>
+                            <td class="py-2 px-2 text-right font-mono whitespace-nowrap">
+                              {if log.duration_ms, do: "#{log.duration_ms}ms", else: "—"}
+                            </td>
+                            <td class={[
+                              "py-2 px-2 break-all",
+                              log.status == "failed" && "text-red-600 dark:text-red-400"
+                            ]}>
+                              {log.message}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  <% end %>
                 </div>
               <% else %>
                 <p class="text-xs text-zinc-500">夜間バッチの実行履歴はまだありません。</p>
@@ -1690,4 +1767,41 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   defp service_account_client_id(_setting), do: nil
+
+  defp count_logs(logs, status), do: Enum.count(logs, &(&1.status == status))
+
+  defp count_logs(logs, phase, status),
+    do: Enum.count(logs, &(&1.phase == phase and &1.status == status))
+
+  defp sum_chunks(logs) do
+    logs
+    |> Enum.filter(&(&1.phase == "embed_chunks" and &1.status == "indexed"))
+    |> Enum.map(&(&1.chunks || 0))
+    |> Enum.sum()
+  end
+
+  defp phase_label("sync"), do: "同期"
+  defp phase_label("embed_chunks"), do: "取り込み"
+  defp phase_label(other), do: other
+
+  defp item_status_label("created"), do: "新規"
+  defp item_status_label("updated"), do: "更新"
+  defp item_status_label("unchanged"), do: "変更なし"
+  defp item_status_label("deleted"), do: "削除"
+  defp item_status_label("indexed"), do: "取り込み完了"
+  defp item_status_label("empty"), do: "本文なし"
+  defp item_status_label("skipped"), do: "対象外"
+  defp item_status_label("failed"), do: "失敗"
+  defp item_status_label(other), do: other
+
+  defp item_status_class("failed"),
+    do: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+
+  defp item_status_class(status) when status in ["indexed", "created", "updated"],
+    do: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+
+  defp item_status_class(status) when status in ["empty", "skipped", "deleted"],
+    do: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+
+  defp item_status_class(_), do: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
 end

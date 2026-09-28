@@ -10,14 +10,79 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
   require Logger
 
   alias AskDrive.{Documents, Repo, Settings, Vector}
+  alias AskDrive.Batch.ItemLog
   alias AskDrive.Documents.{Chunk, Document}
   alias AskDrive.Ingest.{Chunker, Extractor}
   alias AskDrive.LLM
   alias AskDrive.LLM.Semaphore
 
   @impl Oban.Worker
-  def perform(%Oban.Job{args: %{"document_id" => document_id}}) do
+  def perform(%Oban.Job{args: %{"document_id" => document_id} = args}) do
     doc = Documents.get_document!(document_id)
+    started = System.monotonic_time(:millisecond)
+
+    result =
+      try do
+        index_document(doc)
+      rescue
+        e ->
+          Logger.error(
+            "EmbedChunksWorker: crashed on #{doc.name}: #{Exception.format(:error, e, __STACKTRACE__)}"
+          )
+
+          Documents.mark_failed(doc, Exception.message(e))
+          {:error, {:exception, Exception.message(e)}}
+      end
+
+    log_outcome(args["batch_run_id"], doc, result, System.monotonic_time(:millisecond) - started)
+    result
+  end
+
+  defp log_outcome(run_id, doc, result, duration_ms) do
+    {status, chunks, message} =
+      case result do
+        {:ok, {:indexed, n}} ->
+          {"indexed", n, nil}
+
+        {:ok, :unchanged} ->
+          {"unchanged", nil, "内容に変更がないため再取り込みを省略しました"}
+
+        {:ok, :empty_content} ->
+          {"empty", 0, "本文が空でした（抽出できるテキストがありません）"}
+
+        {:ok, :skipped} ->
+          {"skipped", nil, Documents.get_document!(doc.id).error}
+
+        {:error, {:embedding, reason}} ->
+          {"failed", nil, "埋め込みに失敗: " <> ItemLog.describe_reason(reason)}
+
+        {:error, {:exception, msg}} ->
+          {"failed", nil, "処理中に例外: " <> msg}
+
+        {:error, reason} ->
+          {"failed", nil, "本文の取得・抽出に失敗: " <> ItemLog.describe_reason(reason)}
+      end
+
+    Logger.info(
+      "EmbedChunksWorker: #{status} #{doc.name} (#{doc.mime_type}, #{duration_ms}ms" <>
+        if(chunks, do: ", #{chunks} chunks", else: "") <>
+        if(message, do: ") — #{message}", else: ")")
+    )
+
+    ItemLog.record(run_id, %{
+      phase: "embed_chunks",
+      document_id: doc.id,
+      drive_file_id: doc.drive_file_id,
+      name: doc.path || doc.name,
+      mime_type: doc.mime_type,
+      status: status,
+      chunks: chunks,
+      message: message,
+      duration_ms: duration_ms
+    })
+  end
+
+  defp index_document(doc) do
     setting = Settings.get_setting!()
 
     Logger.info("EmbedChunksWorker: Processing document #{doc.name} (id: #{doc.id})...")
@@ -60,12 +125,13 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
 
       case embed_result do
         {:ok, embeddings} ->
-          save_chunks_transaction(doc, chunks_data, embeddings, hash)
+          {:ok, :ok} = save_chunks_transaction(doc, chunks_data, embeddings, hash)
+          {:ok, {:indexed, length(chunks_data)}}
 
         {:error, reason} ->
           Logger.error("EmbedChunksWorker: Embedding failed for #{doc.name}: #{inspect(reason)}")
           Documents.mark_failed(doc, "Embedding failed: #{inspect(reason)}")
-          {:error, reason}
+          {:error, {:embedding, reason}}
       end
     end
   end
