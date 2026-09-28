@@ -54,9 +54,9 @@ Apple Silicon Mac (8GB〜) の単一マシン上で、Google Drive 内の共有�
 ### 1. リリースアーカイブ（ZIP）の取得と展開
 GitHub Releases から最新版の ZIP をダウンロードして展開します。
 ```bash
-# 例: v0.0.14 の場合
-curl -fLO https://github.com/kh813/ask-drive/releases/download/v0.0.14/ask-drive-v0.0.14.zip
-unzip ask-drive-v0.0.14.zip -d ask-drive
+# 例: v0.0.15 の場合
+curl -fLO https://github.com/kh813/ask-drive/releases/download/v0.0.15/ask-drive-v0.0.15.zip
+unzip ask-drive-v0.0.15.zip -d ask-drive
 cd ask-drive
 ```
 
@@ -153,6 +153,16 @@ Anthropic API キー: ********
 # 管理者パスワードを再設定（対話入力・画面に表示されません）
 ./app.sh admin password
 ```
+
+### Web 管理画面を使わずに Drive 同期を設定する
+
+Drive 同期の設定は本来 Web 管理画面（ログイン + 管理者昇格が必要）から行いますが、社員ログインの OAuth がまだ通っていない、あるいは管理者パスワードが未設定などの理由でそこに到達できない場合は、**サービスアカウント方式**（後述の「ステップ3・方式A」参照）を CLI から直接設定できます。Web 側の認証状態に一切依存しません。
+
+```bash
+./app.sh drive service-account /path/to/service-account-key.json
+```
+
+JSON キーの妥当性（`client_email` / `private_key` の有無）をその場で検証し、暗号化して保存します。実行後は表示されたサービスアカウントのメールアドレスを、同期対象の Google Drive フォルダに閲覧者として共有してください。
 
 ---
 

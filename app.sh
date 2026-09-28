@@ -44,6 +44,8 @@ AskDrive 管理スクリプト
   repair-ollama      .runtime の Ollama を再インストール (llama-server 欠落の修復)
   admin grant <mail> 指定メールアドレスに管理者への昇格を許可 (ロックアウト時の復旧)
   admin password     管理者パスワードを再設定 (対話入力)
+  drive service-account <key.json>
+                     Drive 同期をサービスアカウント認証に設定 (Web 管理画面を使わずに設定)
 
 サービス管理 (launchd 常駐デーモン):
   service install    launchd 常駐サービスを登録 (OS 起動時自動起動)
@@ -256,6 +258,32 @@ cmd_admin() {
       ;;
     *)
       echo -e "${RED}使用方法: ./app.sh admin grant <email> | ./app.sh admin password${NC}"
+      exit 1
+      ;;
+  esac
+}
+
+# Drive 同期の認証設定は管理画面（ログイン + 昇格が必要）からだけでなく、
+# CLI からも直接できるようにする。初回セットアップ直後や、社員ログインの
+# OAuth がまだ通っていない状況でも Drive 同期だけは先に設定できる。
+cmd_drive() {
+  local sub="${1:-}"
+  shift || true
+
+  load_env
+  cd "${SCRIPT_DIR}"
+
+  case "${sub}" in
+    service-account)
+      local key_path="${1:-}"
+      if [[ -z "${key_path}" ]]; then
+        echo -e "${RED}使用方法: ./app.sh drive service-account <path-to-key.json>${NC}"
+        exit 1
+      fi
+      MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.set_drive_service_account "${key_path}"
+      ;;
+    *)
+      echo -e "${RED}使用方法: ./app.sh drive service-account <path-to-key.json>${NC}"
       exit 1
       ;;
   esac
@@ -524,6 +552,9 @@ case "${COMMAND}" in
     ;;
   admin)
     cmd_admin "$@"
+    ;;
+  drive)
+    cmd_drive "$@"
     ;;
   service)
     SUB_COMMAND="${1:-}"
