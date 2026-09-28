@@ -45,6 +45,8 @@ defmodule AskDrive.Settings.Setting do
     field :chat_summary_provider, :string
     field :chat_summary_model, :string
     field :allowed_domain, :string
+    # first-access web setup (spec 6.12); set by AskDrive.Setup, not cast from forms
+    field :setup_completed_at, :utc_datetime
     field :google_client_id, :string
     field :google_client_secret, Binary
     field :maintenance_mode, :boolean, default: false
@@ -206,6 +208,12 @@ defmodule AskDrive.Settings.Setting do
     |> validate_base_urls()
     |> validate_api_keys()
     |> validate_chat_summary_provider()
+    |> update_change(:allowed_domain, &normalize_domain/1)
+    |> validate_format(
+      :allowed_domain,
+      ~r/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/,
+      message: "はドメイン名（例: company.com）で入力してください"
+    )
     |> validate_batch_llm_mode()
     |> validate_drive_service_account()
     |> update_change(:drive_impersonate_email, &(&1 && String.trim(&1)))
@@ -318,6 +326,12 @@ defmodule AskDrive.Settings.Setting do
   end
 
   def cloud_providers, do: @cloud_providers
+
+  # "@Company.com " -> "company.com"
+  def normalize_domain(nil), do: nil
+
+  def normalize_domain(domain) when is_binary(domain),
+    do: domain |> String.trim() |> String.trim_leading("@") |> String.downcase()
 
   # The chat summary may run on its own provider; when it does, it needs that provider's key
   # and an explicit model name (the batch model belongs to the other provider).

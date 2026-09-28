@@ -23,6 +23,10 @@ config :ask_drive, auto_pull_models: false
 # app databases created by tests use a plain pool (the SQL sandbox can't own dynamic repos).
 config :ask_drive, apps_boot: false, app_repo_opts: [pool: DBConnection.ConnectionPool]
 
+# First-access setup (spec 6.12) would redirect every test request to /setup; its own tests
+# switch it back on.
+config :ask_drive, setup_check: false
+
 # Disable Oban queues in test
 config :ask_drive, Oban, testing: :manual
 

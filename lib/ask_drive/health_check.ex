@@ -49,6 +49,8 @@ defmodule AskDrive.HealthCheck do
   @impl true
   def handle_info(:run_startup_check, state) do
     abort_interrupted_batches()
+    # first-access setup: print the setup code if it's still needed (spec 6.12)
+    AskDrive.Setup.prepare()
     results = perform_checks()
     log_results(results)
     {:noreply, %{state | status: :ready, results: results}}

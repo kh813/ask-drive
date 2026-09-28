@@ -200,6 +200,7 @@ cmd_restart() {
 }
 
 cmd_status() {
+  load_env
   echo -e "${BLUE}=== AskDrive システムステータス ===${NC}"
   
   # 1. Ollama の確認
@@ -236,6 +237,14 @@ cmd_status() {
     fi
   else
     echo -e "${BLUE}未登録${NC}"
+  fi
+
+  # 5. 初回セットアップ（spec 6.12）: 未完了ならセットアップコードを表示する
+  local setup_code_file
+  setup_code_file="$(dirname "${DATABASE_PATH:-${SCRIPT_DIR}/ask_drive_prod.db}")/setup_code"
+  if [[ -f "${setup_code_file}" ]]; then
+    echo -e "${YELLOW}初回セットアップ: 未完了です。ブラウザで AskDrive を開き、次のセットアップコードを入力してください。${NC}"
+    echo -e "  セットアップコード: ${GREEN}$(cat "${setup_code_file}")${NC}"
   fi
 
   # 4. HTTP(S) ヘルスチェック。既定は HTTPS（4443）。ASK_DRIVE_SSL=false のときは HTTP（PORT）

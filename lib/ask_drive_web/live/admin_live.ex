@@ -384,20 +384,21 @@ defmodule AskDriveWeb.AdminLive do
       }
       |> then(&if(json == "", do: &1, else: Map.put(&1, :drive_service_account_json, json)))
 
-    case Settings.update_setting(socket.assigns.setting, attrs) do
-      {:ok, updated} ->
-        {:noreply,
-         socket
-         |> assign(:setting, updated)
-         |> assign(:form, to_form(Settings.change_setting(updated)))
-         |> assign(:service_account_test, nil)
-         |> put_flash(:info, "サービスアカウントの認証情報を保存しました。")}
+    # Delegation acts as a user of the organization's Workspace, so the address must be in
+    # the domain set on the platform (spec 6.12)
+    domain = Settings.platform_setting!().allowed_domain
+    subject = String.trim(params["drive_impersonate_email"] || "")
 
-      {:error, changeset} ->
-        {:noreply,
-         socket
-         |> assign(:form, to_form(changeset))
-         |> put_flash(:error, "保存に失敗しました。JSON キーの内容を確認してください。")}
+    if domain not in [nil, ""] and subject != "" and
+         not String.ends_with?(String.downcase(subject), "@" <> domain) do
+      {:noreply,
+       put_flash(
+         socket,
+         :error,
+         "なりすますユーザーは組織のドメイン（@#{domain}）のアドレスを指定してください。"
+       )}
+    else
+      save_service_account(socket, attrs)
     end
   end
 
@@ -1641,6 +1642,67 @@ defmodule AskDriveWeb.AdminLive do
         <%!-- Tab 6: Settings Management --%>
         <%= if @current_tab == "settings" do %>
           <div class="space-y-6">
+            <%!-- Organization (Google Workspace), platform-wide: spec 6.12 --%>
+            <div
+              :if={@scope == :platform}
+              id="org-settings"
+              class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
+            >
+              <div>
+                <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-building-office-2" class="w-5 h-5 text-indigo-600" />
+                  組織（Google Workspace）
+                </h2>
+                <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  Google ログイン（SSO）と Google Drive の連携では、このドメインのアカウントだけを受け付けます。ドメイン全体の委任で「なりすますユーザー」を指定する場合も、このドメインのアドレスである必要があります。
+                </p>
+              </div>
+              <.form for={@form} id="org-form" phx-submit="save_settings" class="space-y-4">
+                <.input
+                  field={@form[:allowed_domain]}
+                  type="text"
+                  label="Google Workspace ドメイン（例: company.com）"
+                  placeholder="company.com"
+                />
+                <div class="space-y-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800">
+                  <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                    <.icon name="hero-key" class="w-4 h-4 text-indigo-500" />
+                    Google ログイン（OAuth）の認証情報（任意・あとで設定可）
+                  </h3>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <.input
+                      field={@form[:google_client_id]}
+                      type="text"
+                      label="OAuth クライアント ID (Client ID)"
+                      placeholder="例: xxxxxxxx.apps.googleusercontent.com"
+                    />
+                    <.input
+                      field={@form[:google_client_secret]}
+                      type="password"
+                      value=""
+                      label={"OAuth クライアント シークレット（#{secret_state(@setting.google_client_secret)}）"}
+                      placeholder="例: GOCSPX-xxxxxxxxxxxx"
+                    />
+                  </div>
+                  <p class="text-xs text-zinc-500">
+                    Google Cloud Console に登録する「承認済みのリダイレクト URI」:
+                    <span class="font-mono text-indigo-600 dark:text-indigo-400 select-all">
+                      https://&lt;ホスト名&gt;:{AskDrive.SSL.https_port()}/auth/google/callback
+                    </span>
+                  </p>
+                </div>
+                <div class="flex justify-end">
+                  <button
+                    type="submit"
+                    id="save-org-btn"
+                    class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                  >
+                    保存
+                  </button>
+                </div>
+              </.form>
+            </div>
+
             <%!-- Card 1: Administrator password --%>
             <div
               :if={@scope == :platform}
@@ -2000,44 +2062,11 @@ defmodule AskDriveWeb.AdminLive do
             <%!-- Card 4: System Settings Form --%>
             <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-6">
               <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-indigo-600" /> システム・OAuth・バッチ設定
+                <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-indigo-600" />
+                {if @scope == :platform, do: "夜間バッチの時間帯", else: "AI・Drive・チャットの設定"}
               </h2>
 
               <.form for={@form} id="settings-form" phx-submit="save_settings" class="space-y-5">
-                <%!-- Google Cloud OAuth Credentials --%>
-                <div
-                  :if={@scope == :platform}
-                  class="space-y-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
-                >
-                  <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                    <.icon name="hero-key" class="w-4 h-4 text-indigo-500" /> Google Cloud OAuth 認証情報
-                  </h3>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <.input
-                      field={@form[:google_client_id]}
-                      type="text"
-                      label="OAuth クライアント ID (Client ID)"
-                      placeholder="例: xxxxxxxx.apps.googleusercontent.com"
-                    />
-                    <.input
-                      field={@form[:google_client_secret]}
-                      type="password"
-                      value=""
-                      label={"OAuth クライアント シークレット（#{secret_state(@setting.google_client_secret)}）"}
-                      placeholder="例: GOCSPX-xxxxxxxxxxxx"
-                    />
-                  </div>
-
-                  <div class="text-xs text-zinc-500 space-y-1 pt-1">
-                    <p class="font-medium text-zinc-700 dark:text-zinc-300">
-                      Google Cloud Console に登録する「承認済みのリダイレクト URI」:
-                    </p>
-                    <div class="p-2 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono text-[11px] text-indigo-600 dark:text-indigo-400 select-all">
-                      http://localhost:4000/auth/google/callback（リモートホスト経由の場合はホスト名/IPに置換）
-                    </div>
-                  </div>
-                </div>
-
                 <%!-- LLM Provider Selection --%>
                 <div
                   :if={@scope == :app}
@@ -2251,12 +2280,6 @@ defmodule AskDriveWeb.AdminLive do
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <.input
-                    :if={@scope == :platform}
-                    field={@form[:allowed_domain]}
-                    type="text"
-                    label="許可 Google Workspace ドメイン (例: company.com)"
-                  />
-                  <.input
                     :if={@scope == :app}
                     field={@form[:tier1_threshold]}
                     type="number"
@@ -2328,7 +2351,10 @@ defmodule AskDriveWeb.AdminLive do
                   <button
                     type="submit"
                     id="save-settings-btn"
-                    data-confirm="設定を保存します。埋め込みモデルまたは次元を変更した場合、ベクトルインデックスを再作成し全件の再ベクトル化が必要になります。続行しますか？"
+                    data-confirm={
+                      @scope == :app &&
+                        "設定を保存します。埋め込みモデルまたは次元を変更した場合、ベクトルインデックスを再作成し全件の再ベクトル化が必要になります。続行しますか？"
+                    }
                     class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                   >
                     設定を保存
@@ -2827,6 +2853,24 @@ defmodule AskDriveWeb.AdminLive do
     case form[:slug].value |> to_string() |> String.trim() |> String.downcase() do
       "" -> "（URL 名）"
       slug -> slug
+    end
+  end
+
+  defp save_service_account(socket, attrs) do
+    case Settings.update_setting(socket.assigns.setting, attrs) do
+      {:ok, updated} ->
+        {:noreply,
+         socket
+         |> assign(:setting, updated)
+         |> assign(:form, to_form(Settings.change_setting(updated)))
+         |> assign(:service_account_test, nil)
+         |> put_flash(:info, "サービスアカウントの認証情報を保存しました。")}
+
+      {:error, changeset} ->
+        {:noreply,
+         socket
+         |> assign(:form, to_form(changeset))
+         |> put_flash(:error, "保存に失敗しました。JSON キーの内容を確認してください。")}
     end
   end
 end

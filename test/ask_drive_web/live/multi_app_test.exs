@@ -138,4 +138,39 @@ defmodule AskDriveWeb.MultiAppTest do
     assert Apps.current() == nil
     assert conn.private[:before_send] != []
   end
+
+  test "the platform settings put the Workspace domain in its own card; apps don't show it", %{
+    conn: conn
+  } do
+    {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
+    assert has_element?(view, "#org-settings input[name='setting[allowed_domain]']")
+
+    view |> form("#org-form", setting: %{allowed_domain: "Example.com"}) |> render_submit()
+    assert AskDrive.Settings.get_setting!().allowed_domain == "example.com"
+
+    {:ok, view, _html} = live(conn, "/hr/admin?tab=settings")
+    refute has_element?(view, "#org-settings")
+  end
+
+  test "a delegation user outside the organization's domain is refused", %{conn: conn, hr: hr} do
+    {:ok, _} =
+      AskDrive.Settings.update_setting(AskDrive.Settings.get_setting!(), %{
+        allowed_domain: "example.com"
+      })
+
+    {:ok, view, _html} = live(conn, "/hr/admin?tab=settings")
+    view |> element("button[phx-value-mode='service_account']") |> render_click()
+
+    html =
+      view
+      |> form("#service-account-form",
+        setting: %{drive_service_account_json: "", drive_impersonate_email: "sync@other.org"}
+      )
+      |> render_submit()
+
+    assert html =~ "組織のドメイン（@example.com）"
+
+    assert Apps.with_app(hr, fn -> AskDrive.Settings.get_setting!().drive_impersonate_email end) ==
+             nil
+  end
 end

@@ -276,37 +276,18 @@ BANNER
     esac
   done
 
-  echo -e "\n${BLUE}[Google 連携とアクセス制御]${NC}"
-  echo "  ※ Google Cloud Console の「承認済みのリダイレクト URI」には、実際にブラウザでアクセスする"
-  echo "    URL のホスト名をそのまま登録してください（同じ稼働機でも localhost と LAN の"
-  echo "    IP/ホスト名は別々に登録が必要です）。"
-  echo "  ※ Google は生の IP アドレスと .local(mDNS)ホスト名を拒否します。localhost 以外で"
-  echo "    LAN からアクセスさせる場合は、公開 TLD (.com 等) を持つホスト名を用意し、社内 DNS"
-  echo "    または各端末の hosts ファイルで LAN の IP に解決させてください。詳細は README 参照。"
-  read -r -p "Google OAuth クライアント ID (後から設定可): " GOOGLE_ID
-  read -r -s -p "Google OAuth クライアント シークレット (後から設定可): " GOOGLE_SECRET; echo ""
-  read -r -p "許可する Google Workspace ドメイン (例: company.com): " ALLOWED_DOMAIN
-  read -r -p "管理者へ昇格できるアカウント（カンマ区切り、複数可）: " ADMIN_EMAILS
-
-  # 管理者パスワードは sudo 相当。未入力なら初回昇格時に画面から設定させる。
+  # 管理者パスワードと Google Workspace ドメインは、ここでは聞かない（spec 6.12）。
+  # 初回に Web 画面へアクセスしたとき、サーバー上で確認できるセットアップコードを入力して設定する。
+  # Google ログイン（SSO）の OAuth クライアント ID / シークレットも、後から全体管理の画面で設定できる。
+  GOOGLE_ID=""
+  GOOGLE_SECRET=""
+  ALLOWED_DOMAIN=""
+  ADMIN_EMAILS=""
   ADMIN_PASSWORD=""
-  while true; do
-    read -r -s -p "管理者パスワード（管理画面へ昇格する際に入力・8文字以上・空欄可）: " ADMIN_PASSWORD; echo ""
-    if [[ -z "${ADMIN_PASSWORD}" ]]; then
-      echo -e "${YELLOW}未設定のまま進みます。初回の昇格時にブラウザから設定できます。${NC}"
-      break
-    fi
-    if [[ "${#ADMIN_PASSWORD}" -lt 8 ]]; then
-      echo -e "${RED}8 文字以上にしてください。${NC}"
-      continue
-    fi
-    read -r -s -p "管理者パスワード（確認）: " ADMIN_PASSWORD_CONFIRM; echo ""
-    if [[ "${ADMIN_PASSWORD}" != "${ADMIN_PASSWORD_CONFIRM}" ]]; then
-      echo -e "${RED}一致しません。もう一度入力してください。${NC}"
-      continue
-    fi
-    break
-  done
+  echo -e "\n${BLUE}[管理者パスワードと組織のドメイン]${NC}"
+  echo "  セットアップ完了後、ブラウザで AskDrive を開くと初回セットアップ画面が表示されます。"
+  echo "  そこで管理者パスワードと Google Workspace ドメインを設定してください。"
+  echo "  画面で求められるセットアップコードは ./app.sh status で確認できます。"
 
   cat << EOF > "${SCRIPT_DIR}/.env.prod"
 MIX_ENV=prod

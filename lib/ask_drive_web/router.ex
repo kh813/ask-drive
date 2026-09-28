@@ -11,6 +11,8 @@ defmodule AskDriveWeb.Router do
     plug :protect_from_forgery
     plug :put_secure_browser_headers
     plug :fetch_current_user
+    # until the first-access setup is done, every page leads to /setup (spec 6.12)
+    plug AskDriveWeb.Plugs.RequireSetup
   end
 
   pipeline :api do
@@ -37,6 +39,7 @@ defmodule AskDriveWeb.Router do
     live_session :portal,
       on_mount: [{AskDriveWeb.UserAuth, :mount_current_user}] do
       live "/", PortalLive
+      live "/setup", SetupLive
     end
   end
 
