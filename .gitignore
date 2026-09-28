@@ -41,6 +41,7 @@ npm-debug.log
 
 # Logs and environment files
 /log/
+/.runtime/
 .env
 .env.*
 !.env.example

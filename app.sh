@@ -5,6 +5,13 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUNTIME_DIR="${SCRIPT_DIR}/.runtime"
+RUNTIME_BIN="${RUNTIME_DIR}/bin"
+RUNTIME_BREW="${RUNTIME_DIR}/homebrew"
+
+# PATH の優先順位設定
+export PATH="${RUNTIME_BIN}:${RUNTIME_BREW}/bin:/opt/homebrew/bin:/usr/local/bin:${HOME}/.local/bin:${HOME}/.asdf/shims:${HOME}/.asdf/bin:${HOME}/.local/share/mise/shims:${HOME}/.local/share/mise/bin:${PATH}"
+
 APP_NAME="ask_drive"
 SERVICE_NAME="com.askdrive.server"
 PLIST_FILE="${HOME}/Library/LaunchAgents/${SERVICE_NAME}.plist"
@@ -333,7 +340,7 @@ service_install() {
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME}/.local/share/mise/shims:${HOME}/.asdf/shims</string>
+        <string>${SCRIPT_DIR}/.runtime/bin:${SCRIPT_DIR}/.runtime/homebrew/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME}/.local/share/mise/shims:${HOME}/.asdf/shims</string>
         <key>MIX_ENV</key>
         <string>prod</string>
         <key>PHX_SERVER</key>

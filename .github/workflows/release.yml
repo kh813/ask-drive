@@ -53,8 +53,12 @@ jobs:
 
           # Download sqlite-vec arm64 extension and place it in priv/sqlite_vec/vec0.dylib
           mkdir -p priv/sqlite_vec
-          curl -L -o priv/sqlite_vec/vec0.dylib \
-            https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-v0.1.9-loadable-macos-aarch64.tar.gz || true
+          curl -L -o /tmp/sqlite-vec.tar.gz \
+            https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-v0.1.9-loadable-macos-aarch64.tar.gz
+          tar -xzf /tmp/sqlite-vec.tar.gz -C /tmp
+          if [ -f /tmp/vec0.dylib ]; then
+            cp /tmp/vec0.dylib priv/sqlite_vec/vec0.dylib
+          fi
 
           # Create distribution zip archive excluding .git, _build, and local development files
           zip -r "${ARCHIVE_NAME}" . \
@@ -64,7 +68,8 @@ jobs:
             -x "*.db*" \
             -x ".env*" \
             -x "tmp/*" \
-            -x "log/*"
+            -x "log/*" \
+            -x ".runtime/*"
 
           echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
 

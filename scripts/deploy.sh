@@ -5,6 +5,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RUNTIME_DIR="${SCRIPT_DIR}/.runtime"
+RUNTIME_BIN="${RUNTIME_DIR}/bin"
+RUNTIME_BREW="${RUNTIME_DIR}/homebrew"
+
+# PATH の優先順位設定
+export PATH="${RUNTIME_BIN}:${RUNTIME_BREW}/bin:/opt/homebrew/bin:/usr/local/bin:${HOME}/.local/bin:${HOME}/.asdf/shims:${HOME}/.asdf/bin:${HOME}/.local/share/mise/shims:${HOME}/.local/share/mise/bin:${PATH}"
 
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'

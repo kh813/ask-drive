@@ -30,21 +30,19 @@ Apple Silicon Mac (8GB〜) の単一マシン上で、Google Drive 内の共有�
 
 ## 必要環境
 
-- **OS**: macOS (Apple Silicon 推奨)
-- **Elixir**: 1.17+ / Erlang 27+
-- **Ollama**: 起動済み (`bge-m3`, `qwen3:4b` モデルを pull 済み)
-- **Homebrew ツール**:
-  ```bash
-  brew install sqlite poppler pandoc
-  ```
+- **OS**: macOS (Apple Silicon / Intel, Apple Silicon 推奨)
+- **管理者権限 (sudo)**: **不要**（`./app.sh setup` がスタンドアロンバイナリおよびローカル環境 `.runtime` に必要なツール群を自動ダウンロード・セットアップします）
 
 ---
 
 ## インストールと初期セットアップ
 
-### 1. リポジトリの取得
+### 1. リリースアーカイブ（ZIP）の取得と展開
+GitHub Releases から最新版の ZIP をダウンロードして展開します。
 ```bash
-git clone https://github.com/your-org/ask-drive.git
+# 例: v0.0.1 の場合
+curl -fLO https://github.com/kh813/ask-drive/releases/download/v0.0.1/ask-drive-v0.0.1.zip
+unzip ask-drive-v0.0.1.zip -d ask-drive
 cd ask-drive
 ```
 
@@ -53,7 +51,12 @@ cd ask-drive
 ```bash
 ./app.sh setup
 ```
-（依存ツールの確認、`.env.prod` の生成、DB 作成、マイグレーション、プロダクションリリースのビルドが自動実行されます）
+> **自動実行される処理（管理者権限不要）:**
+> 1. **依存ツールの確認 & 自動配置**: `pandoc`, `ollama`, `poppler` (pdftotext), `erlang`, `elixir`, `sqlite-vec` を検出し、未インストールの場合はローカル環境（`.runtime/`）へ自動取得・セットアップ
+> 2. **Ollama モデルの自動取得**: ローカル LLM / Embedding モデル（`bge-m3`, `qwen3:4b`）の自動ダウンロード
+> 3. **環境設定ファイル生成**: `.env.prod` の自動生成と暗号化キー生成
+> 4. **データベース構築 & リリースビルド**: SQLite DB の作成、マイグレーション、プロダクションアセットとリリースの完全ビルド
+
 
 ### 3. アプリケーションの起動
 
