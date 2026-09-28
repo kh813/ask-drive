@@ -4,15 +4,26 @@ defmodule AskDriveWeb.AuthController do
   alias AskDrive.Drive.OAuth
 
   def request(conn, params) do
-    state = :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
-    redirect_uri = callback_url(conn)
-    authorize_url = OAuth.authorize_url(state, redirect_uri)
+    client_id = OAuth.get_client_id()
     return_to = params["return_to"] || "/"
 
-    conn
-    |> put_session(:oauth_state, state)
-    |> put_session(:oauth_return_to, return_to)
-    |> redirect(external: authorize_url)
+    if client_id == "" do
+      conn
+      |> put_flash(
+        :error,
+        "Google OAuth の Client ID / Secret が未設定です。管理画面で設定してください。"
+      )
+      |> redirect(to: ~p"/admin?tab=settings")
+    else
+      state = :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
+      redirect_uri = callback_url(conn)
+      authorize_url = OAuth.authorize_url(state, redirect_uri)
+
+      conn
+      |> put_session(:oauth_state, state)
+      |> put_session(:oauth_return_to, return_to)
+      |> redirect(external: authorize_url)
+    end
   end
 
   def callback(conn, %{"code" => code, "state" => state}) do
