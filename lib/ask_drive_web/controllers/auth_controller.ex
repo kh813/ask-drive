@@ -207,11 +207,17 @@ defmodule AskDriveWeb.AuthController do
     end
   end
 
+  # Deliberately built from the actual request rather than `url(~p"...")`: the latter uses
+  # the endpoint's static `:url` config (`PHX_HOST`, typically "localhost" for the machine
+  # that ran initial setup), so it would send Google the same redirect_uri no matter which
+  # host the browser actually used. On a LAN, the admin sets things up via localhost but
+  # employees reach the app by IP or hostname — those requests need their own host reflected
+  # here, or Google redirects the callback back to "localhost" from the employee's own
+  # machine, which has nothing listening on it. Whichever host ends up here must also be
+  # registered as an authorized redirect URI in Google Cloud Console (it accepts more than
+  # one per OAuth client, so both localhost and the LAN address can be registered together).
   defp callback_url(conn) do
-    url(~p"/auth/google/callback")
-  rescue
-    _ ->
-      port_suffix = if conn.port in [80, 443], do: "", else: ":#{conn.port}"
-      "#{conn.scheme}://#{conn.host}#{port_suffix}/auth/google/callback"
+    port_suffix = if conn.port in [80, 443], do: "", else: ":#{conn.port}"
+    "#{conn.scheme}://#{conn.host}#{port_suffix}/auth/google/callback"
   end
 end

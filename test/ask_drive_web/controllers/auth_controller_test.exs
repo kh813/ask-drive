@@ -19,6 +19,26 @@ defmodule AskDriveWeb.AuthControllerTest do
     assert get_session(conn, :oauth_flow) == "login"
   end
 
+  test "redirect_uri reflects the host actually used, not the endpoint's static config", %{
+    conn: conn
+  } do
+    # The admin registers Google OAuth from localhost, but employees reach the box by LAN IP
+    # or hostname. If redirect_uri were built from the endpoint's `:url` config (defaulting
+    # to "localhost") instead of the request, Google would send everyone's browser back to
+    # "localhost" — which resolves to their own machine, not the server.
+    conn =
+      conn |> Map.put(:host, "192.168.11.42") |> Map.put(:port, 4000) |> get(~p"/auth/google")
+
+    redirect_uri =
+      redirected_to(conn)
+      |> URI.parse()
+      |> Map.fetch!(:query)
+      |> URI.decode_query()
+      |> Map.fetch!("redirect_uri")
+
+    assert redirect_uri == "http://192.168.11.42:4000/auth/google/callback"
+  end
+
   test "GET /auth/google/callback with invalid state redirects with error", %{conn: conn} do
     conn =
       conn

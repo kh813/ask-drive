@@ -51,9 +51,9 @@ Apple Silicon Mac (8GB〜) の単一マシン上で、Google Drive 内の共有�
 ### 1. リリースアーカイブ（ZIP）の取得と展開
 GitHub Releases から最新版の ZIP をダウンロードして展開します。
 ```bash
-# 例: v0.0.12 の場合
-curl -fLO https://github.com/kh813/ask-drive/releases/download/v0.0.12/ask-drive-v0.0.12.zip
-unzip ask-drive-v0.0.12.zip -d ask-drive
+# 例: v0.0.13 の場合
+curl -fLO https://github.com/kh813/ask-drive/releases/download/v0.0.13/ask-drive-v0.0.13.zip
+unzip ask-drive-v0.0.13.zip -d ask-drive
 cd ask-drive
 ```
 
@@ -215,13 +215,20 @@ AskDrive は、全社公開マニュアルなどの Google Drive フォルダを
    - `[API とサービス]` ➔ `[認証情報]` ➔ `[+ 認証情報を作成]` ➔ **「OAuth クライアント ID」** を選択します。
    - **アプリケーションの種類**: **「ウェブ アプリケーション」** を選択。
    - **承認済みのリダイレクト URI**:
-     - AskDrive 稼働マシンのコールバック URL を登録します：
+     - AskDrive はアクセスされた URL のホスト名・IP をそのまま Google への `redirect_uri` として使います。**ブラウザが実際にアクセスした URL と完全に一致するリダイレクト URI が登録されていないと、Google 認証は失敗します。**
+     - 管理者が初期設定を `localhost` で行い、社員が LAN の IP やホスト名でアクセスする場合は、**両方**を登録してください（Google は 1 つの OAuth クライアントに複数のリダイレクト URI を登録できます）:
        ```text
-       http://<AskDrive稼働機のIPまたはホスト名>:4000/auth/google/callback
+       http://localhost:4000/auth/google/callback
+       http://<AskDrive稼働機のLAN IPまたはホスト名>:4000/auth/google/callback
        ```
-       （例: `http://192.168.11.42:4000/auth/google/callback` や `http://localhost:4000/auth/google/callback`）
-     - **社員ログインと Drive 同期認可は同じコールバック URI を共用します。** 登録する URI は 1 つだけで構いません。
+       （例: `http://192.168.11.42:4000/auth/google/callback`）
+     - 複数の IP・ホスト名からアクセスされ得る場合（DHCP で IP が変わる、複数の呼び方がある等）は、その分だけ URI を追加登録してください。安定したホスト名（mDNS の `.local` や社内 DNS）を割り当てて 1 つに固定するのが最も簡単です。
+     - **社員ログインと Drive 同期認可は同じコールバック URI を共用します。** 用途ごとに別の URI を用意する必要はありません。
    - **「作成」** をクリックし、表示された **「クライアント ID」** と **「クライアント シークレット」** を控えます。
+
+> **トラブルシューティング**: ログイン時に Google の画面で **「エラー 400: redirect_uri_mismatch」** が表示される場合は、今アクセスしている URL（アドレスバーの `http://...`）と完全に一致するリダイレクト URI が上記に登録されていません。追加登録してください。
+>
+> なお、ブラウザのコンソールに出る `navigate event to "..." failed because you are redirecting across live_sessions. A full page reload will be performed instead` という警告は、チャット画面と管理画面が別の LiveView セッションであることによる**無害な**メッセージです（自動的に通常のページ遷移にフォールバックするだけで、アクセス自体は失敗しません）。ログインできない場合の原因は、ほぼ常に上記の redirect_uri 未登録です。
 
 ---
 
