@@ -77,14 +77,17 @@ defmodule AskDrive.LLM.Providers.Ollama do
   chain of thought before the answer.
   """
   def generate_stream(model, prompt, opts, on_delta) when is_function(on_delta, 1) do
+    think = Keyword.get(opts, :think, false)
+    on_thinking = Keyword.get(opts, :on_thinking, fn _ -> :ok end)
+
     payload =
       %{
         model: model,
         prompt: prompt,
         stream: true,
-        think: false,
         options: ollama_options(opts)
       }
+      |> maybe_put(:think, think)
       |> maybe_put(:system, Keyword.get(opts, :system))
       |> put_keep_alive(opts)
 
@@ -101,6 +104,11 @@ defmodule AskDrive.LLM.Providers.Ollama do
 
             line, {text, false} ->
               case Jason.decode(line) do
+                # With think: true, Ollama returns a reasoning model's thinking in its own
+                # field, so the answer ("response") needs no tag parsing.
+                {:ok, %{"thinking" => thought}} when is_binary(thought) and thought != "" ->
+                  {text, on_thinking.(thought) == :halt}
+
                 {:ok, %{"response" => piece}} when is_binary(piece) and piece != "" ->
                   # on_delta may answer :halt to stop generation early (e.g. length cap)
                   {text <> piece, on_delta.(piece) == :halt}
@@ -130,23 +138,30 @@ defmodule AskDrive.LLM.Providers.Ollama do
       {:ok, %{status: 200} = resp} ->
         {:ok, Req.Response.get_private(resp, :text, "")}
 
-      {:ok, %{status: status} = resp} ->
+      {:ok, %{status: 400} = resp} when think == true ->
+        # Models whose template has no thinking support reject think: true; answer anyway
         body = Req.Response.get_private(resp, :buffer, "")
 
-        decoded =
-          case Jason.decode(body),
-            do: (
-              {:ok, map} -> map
-              _ -> body
-            )
+        if String.contains?(body, "think"),
+          do: generate_stream(model, prompt, Keyword.put(opts, :think, nil), on_delta),
+          else: {:error, HTTP.classify(400, decode_body(body))}
 
-        {:error, HTTP.classify(status, decoded)}
+      {:ok, %{status: status} = resp} ->
+        body = Req.Response.get_private(resp, :buffer, "")
+        {:error, HTTP.classify(status, decode_body(body))}
 
       {:error, %{__struct__: Req.TransportError, reason: :timeout}} ->
         {:error, {:timeout, "receive timeout"}}
 
       {:error, reason} ->
         {:error, {:network, reason}}
+    end
+  end
+
+  defp decode_body(body) do
+    case Jason.decode(body) do
+      {:ok, map} -> map
+      _ -> body
     end
   end
 

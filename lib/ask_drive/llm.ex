@@ -434,7 +434,17 @@ defmodule AskDrive.LLM do
       max_tokens: get(setting, :llm_max_tokens) || 4096,
       temperature: get(setting, :llm_temperature)
     )
-    |> Keyword.merge(Keyword.take(opts, [:system, :num_ctx, :max_tokens, :temperature, :timeout]))
+    |> Keyword.merge(
+      Keyword.take(opts, [
+        :system,
+        :num_ctx,
+        :max_tokens,
+        :temperature,
+        :timeout,
+        :think,
+        :on_thinking
+      ])
+    )
   end
 
   defp embedding_opts(provider, setting, opts, expected_dim) do

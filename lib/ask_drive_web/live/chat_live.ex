@@ -135,6 +135,10 @@ defmodule AskDriveWeb.ChatLive do
     {:noreply, update_summary(socket, id, &%{&1 | text: &1.text <> delta})}
   end
 
+  def handle_info({:summary_delta, id, :answer_reset}, socket) do
+    {:noreply, update_summary(socket, id, &%{&1 | text: ""})}
+  end
+
   def handle_info({:summary_delta, id, {:thinking, delta}}, socket) do
     {:noreply, update_summary(socket, id, &%{&1 | thinking: &1.thinking <> delta})}
   end

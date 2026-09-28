@@ -31,12 +31,18 @@ defmodule AskDrive.StubOllama do
     if pid = :persistent_term.get({__MODULE__, :owner}, nil),
       do: send(pid, {:stub_generate, conn.body_params})
 
-    pieces = :persistent_term.get({__MODULE__, :pieces}, ["要約です。"])
+    pieces = next_pieces()
     conn = conn |> put_resp_content_type("application/x-ndjson") |> send_chunked(200)
 
     conn =
       Enum.reduce(pieces, conn, fn piece, conn ->
-        {:ok, conn} = chunk(conn, Jason.encode!(%{response: piece, done: false}) <> "\n")
+        line =
+          case piece do
+            {:thinking, text} -> %{thinking: text, response: "", done: false}
+            text -> %{response: text, done: false}
+          end
+
+        {:ok, conn} = chunk(conn, Jason.encode!(line) <> "\n")
         conn
       end)
 
@@ -48,8 +54,27 @@ defmodule AskDrive.StubOllama do
     send_resp(conn, 404, "")
   end
 
-  @doc "Sets what /api/generate streams back."
+  @doc """
+  Sets what /api/generate streams back: a list of pieces (every call), or
+  `{:sequence, [pieces1, pieces2, …]}` for successive calls. A piece is a response string or
+  `{:thinking, text}` (sent in Ollama's separate thinking field).
+  """
   def put_generate_pieces(pieces), do: :persistent_term.put({__MODULE__, :pieces}, pieces)
+
+  defp next_pieces do
+    case :persistent_term.get({__MODULE__, :pieces}, ["要約です。"]) do
+      {:sequence, [current | rest]} ->
+        :persistent_term.put(
+          {__MODULE__, :pieces},
+          {:sequence, if(rest == [], do: [current], else: rest)}
+        )
+
+        current
+
+      pieces ->
+        pieces
+    end
+  end
 
   @doc "Starts the stub on a free port and returns its base URL."
   def start!(owner, dim \\ 1024) do

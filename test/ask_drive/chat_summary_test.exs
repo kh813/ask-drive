@@ -34,9 +34,12 @@ defmodule AskDrive.ChatSummaryTest do
 
     assert_received {:stub_generate, body}
     assert body["stream"] == true
-    assert body["think"] == false
-    # the length cap reaches Ollama as num_predict
-    assert body["options"]["num_predict"] == 450
+    # qwen3:4b is a reasoning model: Ollama is asked to separate the thinking
+    assert body["think"] == true
+    # thinking tokens count against num_predict, so a reasoning model gets the general
+    # generation ceiling (llm_max_tokens) instead of the 450 answer cap; the answer itself
+    # is capped by characters
+    assert body["options"]["num_predict"] == 4096
   end
 
   test "the prompt numbers the excerpts with their source and page, cleaned", %{chunk: chunk} do
@@ -127,5 +130,71 @@ defmodule AskDrive.ChatSummaryTest do
     assert ChatSummary.visible_text("考え中で閉じタグ前", true, false) == ""
     assert ChatSummary.visible_text("考え中で閉じタグ前", true, true) == "考え中で閉じタグ前"
     assert ChatSummary.visible_text("普通の回答", false, false) == "普通の回答"
+  end
+
+  test "thinking returned in Ollama's own field stays out of the answer", %{chunk: chunk} do
+    StubOllama.put_generate_pieces([
+      {:thinking, "Okay, let's tackle this query. "},
+      {:thinking, "The excerpts say..."},
+      "持ち出しは許可制です [1]。"
+    ])
+
+    test_pid = self()
+
+    assert {:ok, %{text: "持ち出しは許可制です [1]。", thinking: thinking}} =
+             ChatSummary.generate("PC持ち出しのルールは？", [chunk], &send(test_pid, {:ev, &1}))
+
+    assert thinking =~ "Okay, let's tackle this query."
+    assert Enum.join(collect(:answer)) == "持ち出しは許可制です [1]。"
+  end
+
+  test "untagged thinking is condensed into a Japanese conclusion by a second pass", %{
+    chunk: chunk
+  } do
+    StubOllama.put_generate_pieces(
+      {:sequence,
+       [
+         ["Okay, let's tackle this query. The user asks about PC. ", "Excerpt [1] says..."],
+         ["PC の持ち出しは許可制です [1]。"]
+       ]}
+    )
+
+    test_pid = self()
+
+    assert {:ok, %{text: "PC の持ち出しは許可制です [1]。", thinking: thinking}} =
+             ChatSummary.generate("PC持ち出しのルールは？", [chunk], &send(test_pid, {:ev, &1}))
+
+    assert thinking =~ "Okay, let's tackle this query."
+    assert_received {:ev, :answer_reset}
+
+    # the second request carries the first attempt as notes
+    assert_received {:stub_generate, _first}
+    assert_received {:stub_generate, second}
+    assert second["prompt"] =~ "AI が検討したメモ"
+    assert second["prompt"] =~ "Okay, let's tackle this query."
+  end
+
+  test "an English answer to a Japanese question is redone in Japanese", %{chunk: chunk} do
+    {:ok, _} =
+      Settings.update_setting(Settings.get_setting!(), %{
+        chat_summary_model: "qwen3:4b-instruct-2507-q4_K_M"
+      })
+
+    StubOllama.put_generate_pieces(
+      {:sequence, [["Taking PCs out requires approval [1]."], ["PC の持ち出しには承認が必要です [1]。"]]}
+    )
+
+    assert {:ok, %{text: "PC の持ち出しには承認が必要です [1]。"}} =
+             ChatSummary.generate("PC持ち出しのルールは？", [chunk])
+
+    assert_received {:stub_generate, first}
+    # a non-thinking model isn't asked to think, and keeps the token cap
+    assert first["think"] == false
+    assert first["options"]["num_predict"] == 450
+  end
+
+  test "mostly_japanese?/1" do
+    assert ChatSummary.mostly_japanese?("USB メモリは禁止です [1]。")
+    refute ChatSummary.mostly_japanese?("Taking PCs out requires approval [1].")
   end
 end

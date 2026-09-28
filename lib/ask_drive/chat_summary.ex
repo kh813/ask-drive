@@ -47,8 +47,81 @@ defmodule AskDrive.ChatSummary do
   def generate(question, chunks, on_event \\ fn _ -> :ok end) when is_list(chunks) do
     setting = Settings.get_setting!()
     {provider, model} = provider_and_model(setting)
-    cap = if japanese?(question), do: @ja_display_cap, else: @en_display_cap
+    ja? = japanese?(question)
+    cap = if ja?, do: @ja_display_cap, else: @en_display_cap
     thinks? = reasoning_model?(model)
+
+    reset_state()
+
+    # Reasoning models: ask Ollama to return the thinking in its own field (think: true), so
+    # the answer needs no tag guessing. Thinking tokens count against num_predict, so the
+    # answer is capped by characters (below) rather than tokens for these models.
+    opts =
+      [
+        setting: setting,
+        provider: provider,
+        system: @system_prompt,
+        timeout: @timeout,
+        max_tokens: if(thinks?, do: nil, else: @max_tokens),
+        temperature: 0.2,
+        think: thinks?,
+        on_thinking: fn thought ->
+          field = Process.get({__MODULE__, :field_thinking}) <> thought
+          Process.put({__MODULE__, :field_thinking}, field)
+          emit(:thinking, field, on_event)
+          if String.length(field) >= @raw_cap, do: :halt, else: :ok
+        end
+      ]
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+
+    # Answer pieces: tags are still honoured for models/versions that inline the thinking.
+    filtered = fn piece ->
+      raw = Process.get({__MODULE__, :raw}) <> piece
+      Process.put({__MODULE__, :raw}, raw)
+      inline? = thinks? and Process.get({__MODULE__, :field_thinking}) == ""
+
+      visible = visible_text(raw, inline?, false)
+      if inline?, do: emit(:thinking, thinking_text(raw, true, false), on_event)
+      emit(:answer, String.slice(visible, 0, cap), on_event)
+
+      if String.length(visible) >= cap or String.length(raw) >= @raw_cap, do: :halt, else: :ok
+    end
+
+    result = LLM.generate_stream(model, build_prompt(question, chunks, model), opts, filtered)
+
+    with {:ok, _} <- result do
+      raw = Process.get({__MODULE__, :raw}, "")
+      field_thinking = Process.get({__MODULE__, :field_thinking}, "")
+      inline? = thinks? and field_thinking == ""
+
+      answer = visible_text(raw, inline?, true)
+
+      thinking =
+        [field_thinking, if(inline?, do: thinking_text(raw, true, true), else: "")]
+        |> Enum.reject(&(&1 == ""))
+        |> Enum.join("\n")
+
+      # The model thought "out loud" without marking where the answer starts, or answered a
+      # Japanese question in another language: ask once more for just the conclusion.
+      ambiguous? = inline? and not String.contains?(raw, "</think>")
+      wrong_language? = ja? and answer != "" and not mostly_japanese?(answer)
+
+      if ambiguous? or wrong_language? do
+        notes = if ambiguous?, do: raw, else: Enum.join([thinking, answer], "\n")
+        finalize(question, chunks, notes, provider, model, setting, cap, on_event)
+      else
+        emit(:answer, String.slice(answer, 0, cap), on_event)
+        {:ok, %{text: cap_text(answer, cap, on_event), thinking: thinking}}
+      end
+    end
+  end
+
+  # Second pass: the first output (thinking and/or a wrong-language answer) becomes notes, and
+  # the model is asked for the conclusion only, in the question's language, within budget.
+  defp finalize(question, chunks, notes, provider, model, setting, cap, on_event) do
+    on_event.(:answer_reset)
+    Process.put({__MODULE__, :raw}, "")
+    Process.put({__MODULE__, :sent}, %{answer: 0, thinking: 0})
 
     opts = [
       setting: setting,
@@ -56,46 +129,66 @@ defmodule AskDrive.ChatSummary do
       system: @system_prompt,
       timeout: @timeout,
       max_tokens: @max_tokens,
-      temperature: 0.2
+      temperature: 0.2,
+      think: false
     ]
 
-    Process.put({__MODULE__, :raw}, "")
-    Process.put({__MODULE__, :sent}, %{answer: 0, thinking: 0})
+    prompt = finalize_prompt(question, chunks, notes, model)
 
-    # Pieces arrive raw; answer and thinking are separated and passed on as they grow.
-    filtered = fn piece ->
+    stream = fn piece ->
       raw = Process.get({__MODULE__, :raw}) <> piece
       Process.put({__MODULE__, :raw}, raw)
-
-      visible = visible_text(raw, thinks?, false)
-      emit(:thinking, thinking_text(raw, thinks?, false), on_event)
+      visible = visible_text(raw, false, false)
       emit(:answer, String.slice(visible, 0, cap), on_event)
-
-      if String.length(visible) >= cap or String.length(raw) >= @raw_cap, do: :halt, else: :ok
+      if String.length(visible) >= cap, do: :halt, else: :ok
     end
 
-    result = LLM.generate_stream(model, build_prompt(question, chunks, model), opts, filtered)
-    raw = Process.get({__MODULE__, :raw}, "")
-
-    case result do
-      {:ok, _} ->
-        visible = visible_text(raw, thinks?, true)
-        shown = String.slice(visible, 0, cap)
-
-        # Whatever was held back (a thinking model that never closed </think>) goes out now
-        emit(:answer, shown, on_event)
-        truncated? = String.length(visible) > cap
-        if truncated?, do: on_event.({:answer, "…"})
-
-        {:ok,
-         %{
-           text: if(truncated?, do: shown <> "…", else: shown),
-           thinking: thinking_text(raw, thinks?, true)
-         }}
-
-      error ->
-        error
+    with {:ok, _} <- LLM.generate_stream(model, prompt, opts, stream) do
+      answer = visible_text(Process.get({__MODULE__, :raw}, ""), false, true)
+      emit(:answer, String.slice(answer, 0, cap), on_event)
+      {:ok, %{text: cap_text(answer, cap, on_event), thinking: String.trim(notes)}}
     end
+  end
+
+  @doc "The prompt for the second pass: excerpts, the first attempt as notes, the rules."
+  def finalize_prompt(question, chunks, notes, model \\ nil) do
+    base = build_prompt(question, chunks, nil)
+    notes = notes |> String.trim() |> String.slice(-3_000, 3_000)
+
+    intro =
+      if japanese?(question),
+        do:
+          "\n参考: 以下は、この質問について AI が検討したメモです。メモの結論を、上の指示に従って日本語で答えてください。メモの言い回しや検討過程は書かないでください。\n",
+        else:
+          "\nFor reference, notes from a first attempt follow. Give only their conclusion, following the instructions above.\n"
+
+    prompt = base <> intro <> "---\n" <> (notes || "") <> "\n---\n"
+
+    if reasoning_model?(model) and String.contains?(String.downcase(model), "qwen3"),
+      do: prompt <> "/no_think",
+      else: prompt
+  end
+
+  defp cap_text(answer, cap, on_event) do
+    if String.length(answer) > cap do
+      on_event.({:answer, "…"})
+      String.slice(answer, 0, cap) <> "…"
+    else
+      answer
+    end
+  end
+
+  defp reset_state do
+    Process.put({__MODULE__, :raw}, "")
+    Process.put({__MODULE__, :field_thinking}, "")
+    Process.put({__MODULE__, :sent}, %{answer: 0, thinking: 0})
+  end
+
+  @doc "Whether at least a quarter of the letters are kana/kanji (an answer in Japanese)."
+  def mostly_japanese?(text) do
+    letters = Regex.scan(~r/[\p{L}]/u, text) |> length()
+    ja = Regex.scan(~r/[\x{3040}-\x{30FF}\x{4E00}-\x{9FFF}]/u, text) |> length()
+    letters == 0 or ja / letters >= 0.25
   end
 
   # Sends the part of `full` not yet sent for this kind of text.
