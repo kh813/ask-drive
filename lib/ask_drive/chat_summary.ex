@@ -181,7 +181,7 @@ defmodule AskDrive.ChatSummary do
   @doc "The prompt for the second pass: excerpts, the first attempt as notes, the rules."
   def finalize_prompt(question, chunks, notes, model \\ nil) do
     base = build_prompt(question, chunks, nil)
-    notes = notes |> String.trim() |> String.slice(-3_000, 3_000)
+    notes = (notes || "") |> String.trim() |> String.slice(-3_000, 3_000)
 
     intro =
       if japanese?(question),
@@ -190,7 +190,7 @@ defmodule AskDrive.ChatSummary do
         else:
           "\nFor reference, notes from a first attempt follow. Give only their conclusion, following the instructions above.\n"
 
-    prompt = base <> intro <> "---\n" <> (notes || "") <> "\n---\n"
+    prompt = base <> intro <> "---\n" <> notes <> "\n---\n"
 
     if reasoning_model?(model) and String.contains?(String.downcase(model), "qwen3"),
       do: prompt <> "/no_think",
