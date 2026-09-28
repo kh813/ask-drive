@@ -70,6 +70,29 @@ defmodule AskDrive.Freshness do
   end
 
   @doc """
+  Marks document-level artifacts stale — summaries, and extractions not tied to a chunk —
+  when a document's text changed. Chunk-level QA is handled per chunk (`invalidate_chunk/1`),
+  so QA of unchanged chunks survives an edit elsewhere in the document (spec F-336).
+  """
+  def invalidate_document_level(%Document{} = doc) do
+    {summaries, _} =
+      Repo.update_all(
+        from(s in DocSummary, where: s.document_id == ^doc.id and s.status == "active"),
+        set: [status: "stale"]
+      )
+
+    {extractions, _} =
+      Repo.update_all(
+        from(e in Extraction,
+          where: e.document_id == ^doc.id and is_nil(e.chunk_id) and e.status == "active"
+        ),
+        set: [status: "stale"]
+      )
+
+    %{summaries: summaries, extractions: extractions}
+  end
+
+  @doc """
   Invalidates generated artifacts for a specific chunk when its content hash changed.
   """
   def invalidate_chunk(%Chunk{} = chunk) do

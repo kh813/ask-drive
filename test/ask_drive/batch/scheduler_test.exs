@@ -82,6 +82,20 @@ defmodule AskDrive.Batch.SchedulerTest do
       refute AskDrive.Runtime.Mode.current_mode() == :night_batch
     end
 
+    test "ran_since?/1 ignores batches aborted by a restart" do
+      since = DateTime.add(DateTime.utc_now(), -60)
+
+      {:ok, run} =
+        %AskDrive.Batch.BatchRun{}
+        |> AskDrive.Batch.BatchRun.changeset(%{started_at: DateTime.utc_now(), status: "aborted"})
+        |> Repo.insert()
+
+      refute Scheduler.ran_since?(since)
+
+      run |> AskDrive.Batch.BatchRun.changeset(%{status: "completed"}) |> Repo.update!()
+      assert Scheduler.ran_since?(since)
+    end
+
     test "running?/0 reflects a batch in progress" do
       refute Scheduler.running?()
 

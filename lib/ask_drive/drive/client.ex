@@ -14,7 +14,7 @@ defmodule AskDrive.Drive.Client do
   Gets metadata for a specific Drive file or folder.
   """
   def get_metadata(file_id) do
-    fields = "id,name,mimeType,modifiedTime,size,webViewLink,parents,trashed"
+    fields = "id,name,mimeType,modifiedTime,size,md5Checksum,webViewLink,parents,trashed"
     url = "#{@base_url}/files/#{file_id}?fields=#{fields}&supportsAllDrives=true"
     request_with_retry(:get, url)
   end
@@ -75,7 +75,9 @@ defmodule AskDrive.Drive.Client do
 
   defp list_folder_children(folder_id, page_token \\ nil, acc \\ []) do
     query = "'#{folder_id}' in parents and trashed = false"
-    fields = "nextPageToken,files(id,name,mimeType,modifiedTime,size,webViewLink,parents)"
+
+    fields =
+      "nextPageToken,files(id,name,mimeType,modifiedTime,size,md5Checksum,webViewLink,parents)"
 
     params = [
       q: query,

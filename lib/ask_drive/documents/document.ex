@@ -10,6 +10,7 @@ defmodule AskDrive.Documents.Document do
     field :web_view_link, :string
     field :modified_time, :utc_datetime
     field :content_hash, :string
+    field :md5_checksum, :string
     field :size_bytes, :integer
     field :status, :string, default: "pending"
     field :error, :string
@@ -34,6 +35,7 @@ defmodule AskDrive.Documents.Document do
       :web_view_link,
       :modified_time,
       :content_hash,
+      :md5_checksum,
       :size_bytes,
       :status,
       :error,

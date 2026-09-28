@@ -41,9 +41,16 @@ defmodule AskDrive.Batch.Scheduler do
     Repo.exists?(from b in BatchRun, where: b.status == "running")
   end
 
-  @doc "Whether a full batch has started at or after `since` (UTC)."
+  @doc """
+  Whether a full batch has run at or after `since` (UTC). A batch cut off by a restart
+  ("aborted", e.g. a deploy during the night) doesn't count, so the night window starts it
+  again; a "failed" one does, so a persistent failure isn't retried every minute.
+  """
   def ran_since?(%DateTime{} = since) do
-    Repo.exists?(from b in BatchRun, where: b.kind == "full" and b.started_at >= ^since)
+    Repo.exists?(
+      from b in BatchRun,
+        where: b.kind == "full" and b.started_at >= ^since and b.status != "aborted"
+    )
   end
 
   @doc """
@@ -245,14 +252,14 @@ defmodule AskDrive.Batch.Scheduler do
         args = %{"document_id" => doc.id, "batch_run_id" => batch_run.id}
 
         case EmbedChunksWorker.perform(%Oban.Job{args: args}) do
-          {:ok, {:indexed, n}} -> {ok + 1, chunks + n}
+          {:ok, {:indexed, %{new: n}}} -> {ok + 1, chunks + n}
           {:ok, _} -> {ok + 1, chunks}
           _ -> {ok, chunks}
         end
       end)
 
     Logger.info(
-      "Batch ##{batch_run.id} - [Phase 3] indexed #{items_count}/#{length(unindexed_docs)} document(s), #{chunk_total} chunk(s)"
+      "Batch ##{batch_run.id} - [Phase 3] indexed #{items_count}/#{length(unindexed_docs)} document(s), #{chunk_total} new chunk(s) embedded"
     )
 
     finished_time = DateTime.utc_now()

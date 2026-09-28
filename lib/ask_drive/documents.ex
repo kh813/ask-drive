@@ -28,6 +28,11 @@ defmodule AskDrive.Documents do
   @doc """
   Upserts a document from Google Drive file metadata.
   Returns `{:created, doc}`, `{:updated, doc}`, or `{:unchanged, doc}`.
+
+  A file already indexed (or deliberately skipped) stays `:unchanged` — no re-extraction or
+  re-embedding in the batch — when Drive reports the same `modifiedTime`, or the same
+  `md5Checksum` even though `modifiedTime` moved (spec F-334). Metadata such as a new name,
+  path or link is still recorded. Failed or pending files are always retried.
   """
   def upsert_document_from_drive(drive_file) do
     drive_id = drive_file["id"]
@@ -40,6 +45,7 @@ defmodule AskDrive.Documents do
       path: drive_file["path"],
       web_view_link: drive_file["webViewLink"],
       modified_time: modified_dt,
+      md5_checksum: drive_file["md5Checksum"],
       size_bytes: parse_integer(drive_file["size"])
     }
 
@@ -53,13 +59,9 @@ defmodule AskDrive.Documents do
         {:created, doc}
 
       %Document{} = existing ->
-        # Check if modified_time changed
-        time_matches? =
-          existing.modified_time && modified_dt &&
-            DateTime.compare(existing.modified_time, modified_dt) == :eq
-
-        if time_matches? and existing.status in ["indexed", "skipped"] do
-          {:unchanged, existing}
+        if existing.status in ["indexed", "skipped"] and same_content?(existing, attrs) do
+          {:ok, doc} = existing |> Document.changeset(attrs) |> Repo.update()
+          {:unchanged, doc}
         else
           {:ok, updated} =
             existing
@@ -73,6 +75,17 @@ defmodule AskDrive.Documents do
           {:updated, updated}
         end
     end
+  end
+
+  defp same_content?(existing, attrs) do
+    same_time? =
+      existing.modified_time && attrs.modified_time &&
+        DateTime.compare(existing.modified_time, attrs.modified_time) == :eq
+
+    same_md5? =
+      is_binary(existing.md5_checksum) and existing.md5_checksum == attrs.md5_checksum
+
+    !!same_time? or same_md5?
   end
 
   @doc """

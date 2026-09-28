@@ -9,7 +9,7 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
   import Ecto.Query, warn: false
   require Logger
 
-  alias AskDrive.{Documents, Repo, Settings, Vector}
+  alias AskDrive.{Documents, Freshness, Repo, Settings, Vector}
   alias AskDrive.Batch.ItemLog
   alias AskDrive.Documents.{Chunk, Document}
   alias AskDrive.Ingest.{Chunker, Extractor}
@@ -41,11 +41,13 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
   defp log_outcome(run_id, doc, result, duration_ms) do
     {status, chunks, message} =
       case result do
-        {:ok, {:indexed, n}} ->
-          {"indexed", n, nil}
+        {:ok, {:indexed, %{total: n, new: new, reused: reused, removed: removed}}} ->
+          {"indexed", n,
+           "新規 #{new} / 再利用 #{reused} / 削除 #{removed} チャンク" <>
+             if(reused > 0, do: "（変更のないチャンクは埋め込み・QA を再利用）", else: "")}
 
         {:ok, :unchanged} ->
-          {"unchanged", nil, "内容に変更がないため再取り込みを省略しました"}
+          {"unchanged", nil, "本文に変更がないため、分割・埋め込みを省略しました"}
 
         {:ok, :empty_content} ->
           {"empty", 0, "本文が空でした（抽出できるテキストがありません）"}
@@ -99,38 +101,71 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
         {:error, reason}
 
       {:ok, %{text: text, content_hash: hash}} ->
-        if doc.content_hash == hash and doc.status == "indexed" do
-          Logger.info("EmbedChunksWorker: Document #{doc.name} content unchanged. Skipping.")
-          {:ok, :unchanged}
-        else
-          process_chunks_and_embed(doc, text, hash, setting)
-        end
+        index_text(doc, text, hash, setting)
     end
   end
 
+  @doc """
+  Indexes extracted text, skipping everything when it is identical to what is indexed.
+
+  Sync has already put the document back to "pending" by the time we get here, so the old
+  `status == "indexed"` condition never held and identical text was always re-chunked and
+  re-embedded (spec F-335). What matters is the same text with chunks present.
+  """
+  def index_text(%Document{} = doc, text, hash, setting) do
+    if doc.content_hash == hash and has_chunks?(doc) do
+      Documents.mark_indexed(doc, hash)
+      {:ok, :unchanged}
+    else
+      process_chunks_and_embed(doc, text, hash, setting)
+    end
+  end
+
+  defp has_chunks?(doc), do: Repo.exists?(from c in Chunk, where: c.document_id == ^doc.id)
+
+  @doc """
+  Chunks `text` and brings the document's chunks up to date incrementally (spec F-336):
+  a new chunk whose `content_hash` matches an existing chunk of this document reuses that
+  row — its embedding and its generated QA stay as they are — so only genuinely new chunks
+  are embedded, and only QA of chunks that disappeared goes stale. Editing one paragraph of
+  a long manual no longer re-embeds and re-generates the whole manual.
+  """
   def process_chunks_and_embed(%Document{} = doc, text, hash, setting) do
     chunks_data = Chunker.chunk(text, doc_name: doc.name)
+    existing = Repo.all(from c in Chunk, where: c.document_id == ^doc.id, order_by: c.position)
+    {plan, removed} = plan_chunks(chunks_data, existing)
 
-    if Enum.empty?(chunks_data) do
-      Documents.mark_indexed(doc, hash)
-      {:ok, :empty_content}
-    else
-      chunk_texts = Enum.map(chunks_data, & &1.content)
+    new_texts = for {:new, data} <- plan, do: data.content
 
-      # Concurrency-controlled embedding via Ollama
-      embed_result = embed_in_batches(chunk_texts, setting)
+    case embed_in_batches(new_texts, setting) do
+      {:ok, embeddings} ->
+        {:ok, stats} = save_chunks_transaction(doc, plan, removed, embeddings, hash)
 
-      case embed_result do
-        {:ok, embeddings} ->
-          {:ok, :ok} = save_chunks_transaction(doc, chunks_data, embeddings, hash)
-          {:ok, {:indexed, length(chunks_data)}}
+        if chunks_data == [],
+          do: {:ok, :empty_content},
+          else: {:ok, {:indexed, stats}}
 
-        {:error, reason} ->
-          Logger.error("EmbedChunksWorker: Embedding failed for #{doc.name}: #{inspect(reason)}")
-          Documents.mark_failed(doc, "Embedding failed: #{inspect(reason)}")
-          {:error, {:embedding, reason}}
-      end
+      {:error, reason} ->
+        Logger.error("EmbedChunksWorker: Embedding failed for #{doc.name}: #{inspect(reason)}")
+        Documents.mark_failed(doc, "Embedding failed: #{inspect(reason)}")
+        {:error, {:embedding, reason}}
     end
+  end
+
+  # Pairs each new chunk with an unused existing chunk of the same content_hash
+  # ({:reuse, chunk, data}) or marks it {:new, data}; existing chunks left over are removed.
+  defp plan_chunks(chunks_data, existing) do
+    pool = Enum.group_by(existing, & &1.content_hash)
+
+    {plan, pool} =
+      Enum.map_reduce(chunks_data, pool, fn data, pool ->
+        case Map.get(pool, data.content_hash, []) do
+          [chunk | rest] -> {{:reuse, chunk, data}, Map.put(pool, data.content_hash, rest)}
+          [] -> {{:new, data}, pool}
+        end
+      end)
+
+    {plan, pool |> Map.values() |> List.flatten()}
   end
 
   # One request per whole document timed out on long PDFs: a 186-chunk manual took 29s
@@ -138,6 +173,8 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
   # inside it no matter how long the document is, and each batch takes the semaphore on its
   # own so a long document doesn't starve chat queries needing a query embedding.
   @embed_batch_size 32
+
+  defp embed_in_batches([], _setting), do: {:ok, []}
 
   defp embed_in_batches(texts, setting) do
     texts
@@ -154,45 +191,57 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
     end
   end
 
-  defp save_chunks_transaction(doc, chunks_data, embeddings, hash) do
+  defp save_chunks_transaction(doc, plan, removed, embeddings, hash) do
     Repo.transaction(fn ->
-      # Invalidate previous QAs, summaries, extractions and answer_cache entries
-      AskDrive.Freshness.invalidate_document(doc)
+      changed? = removed != [] or Enum.any?(plan, &match?({:new, _}, &1))
 
-      # 1. Remove old chunks and old vec_chunks entries
-      old_chunk_ids =
-        Repo.all(from c in Chunk, where: c.document_id == ^doc.id, select: c.id)
-
-      Enum.each(old_chunk_ids, fn cid ->
-        Repo.query!("DELETE FROM vec_chunks WHERE chunk_id = ?", [cid])
+      # 1. Chunks that no longer exist: their QA / extractions go stale (and leave the answer
+      #    cache), then the rows and their vectors go. Reused chunks keep their QA.
+      Enum.each(removed, fn chunk ->
+        Freshness.invalidate_chunk(chunk)
+        Repo.query!("DELETE FROM vec_chunks WHERE chunk_id = ?", [chunk.id])
+        Repo.delete!(chunk)
       end)
 
-      Repo.delete_all(from c in Chunk, where: c.document_id == ^doc.id)
+      # 2. Document-level artifacts (summaries) describe the whole text: stale on any change.
+      if changed?, do: Freshness.invalidate_document_level(doc)
 
-      # 2. Insert new chunks and vec_chunks
-      Enum.zip(chunks_data, embeddings)
-      |> Enum.each(fn {c_data, emb_floats} ->
-        blob = Vector.encode(emb_floats)
-        json_vec = Vector.to_json(emb_floats)
+      # 3. Reused chunks: only position/heading can differ.
+      # 4. New chunks: insert with their fresh embeddings, in plan order.
+      {_rest, counts} =
+        Enum.reduce(plan, {embeddings, %{new: 0, reused: 0}}, fn
+          {:reuse, chunk, data}, {embs, counts} ->
+            if chunk.position != data.position or chunk.heading != data.heading do
+              chunk
+              |> Chunk.changeset(%{position: data.position, heading: data.heading})
+              |> Repo.update!()
+            end
 
-        {:ok, new_chunk} =
-          %Chunk{}
-          |> Chunk.changeset(
-            c_data
-            |> Map.put(:document_id, doc.id)
-            |> Map.put(:embedding, blob)
-          )
-          |> Repo.insert()
+            {embs, %{counts | reused: counts.reused + 1}}
 
-        Repo.query!(
-          "INSERT INTO vec_chunks(chunk_id, embedding) VALUES (?, ?)",
-          [new_chunk.id, json_vec]
-        )
-      end)
+          {:new, data}, {[emb | embs], counts} ->
+            {:ok, new_chunk} =
+              %Chunk{}
+              |> Chunk.changeset(
+                data
+                |> Map.put(:document_id, doc.id)
+                |> Map.put(:embedding, Vector.encode(emb))
+              )
+              |> Repo.insert()
 
-      # 3. Mark document indexed
+            Repo.query!(
+              "INSERT INTO vec_chunks(chunk_id, embedding) VALUES (?, ?)",
+              [new_chunk.id, Vector.to_json(emb)]
+            )
+
+            {embs, %{counts | new: counts.new + 1}}
+        end)
+
       {:ok, _} = Documents.mark_indexed(doc, hash)
-      :ok
+
+      counts
+      |> Map.put(:removed, length(removed))
+      |> Map.put(:total, length(plan))
     end)
   end
 end
