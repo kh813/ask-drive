@@ -6,20 +6,6 @@ defmodule AskDriveWeb.UserAuth do
   step that lives in the session and expires on its own, in the manner of `sudo`. Both the
   controller pipeline and the LiveView `on_mount` hooks enforce it server-side: hiding the
   admin link in the UI is a convenience, not the control (N-609).
-
-  ## Disabling authentication entirely (POC / trusted-LAN mode)
-
-  Setting `ASK_DRIVE_DISABLE_AUTH=true` bypasses login and admin elevation everywhere,
-  treating every request as an already-elevated administrator. This exists for an early
-  proof-of-concept phase on a trusted internal LAN, where per-user Google login isn't
-  finished yet and getting it working isn't the point of the exercise. It is an explicit,
-  server-side environment variable rather than a database setting or a web-UI toggle:
-  something this security-relevant should require deploy-time access to the machine to
-  change, not be a click away for whoever happens to be signed in.
-
-  Anyone who can reach the app at all gets full chat and admin access with no accountability
-  for who did what — do not use this outside a trusted LAN, and re-enable proper
-  authentication (a real admin password at minimum) before any wider rollout.
   """
   use AskDriveWeb, :verified_routes
 
@@ -34,24 +20,6 @@ defmodule AskDriveWeb.UserAuth do
   @return_to_key :user_return_to
   @elevated_at_key :admin_elevated_at
   @elevated_user_key :admin_elevated_user_id
-
-  # Not a persisted row (id 0 never occurs in SQLite's autoincrement), so it can never be
-  # confused with — or accidentally modified as if it were — a real user.
-  @guest_admin %User{
-    id: 0,
-    email: "poc@localhost",
-    name: "ゲスト（認証無効・POC モード）",
-    admin_eligible: true,
-    status: "active"
-  }
-
-  @doc """
-  Whether `ASK_DRIVE_DISABLE_AUTH` is set. See the moduledoc before using this outside the
-  two call sites that already exist (`fetch_current_user/2`, `assign_current_user/2`).
-  """
-  def auth_disabled? do
-    System.get_env("ASK_DRIVE_DISABLE_AUTH") in ["true", "1"]
-  end
 
   # --- Session lifecycle ----------------------------------------------------
 
@@ -121,22 +89,15 @@ defmodule AskDriveWeb.UserAuth do
   shows when rights actually lapsed rather than when someone next clicked something.
   """
   def fetch_current_user(conn, _opts) do
-    if auth_disabled?() do
+    user =
       conn
-      |> assign(:current_user, @guest_admin)
-      |> assign(:admin_elevated?, true)
-      |> assign(:admin_elevation_expires_at, nil)
-    else
-      user =
-        conn
-        |> get_session(@session_key)
-        |> Accounts.get_user()
-        |> active_or_nil()
+      |> get_session(@session_key)
+      |> Accounts.get_user()
+      |> active_or_nil()
 
-      conn
-      |> assign(:current_user, user)
-      |> resolve_elevation(user)
-    end
+    conn
+    |> assign(:current_user, user)
+    |> resolve_elevation(user)
   end
 
   defp resolve_elevation(conn, nil) do
@@ -328,17 +289,6 @@ defmodule AskDriveWeb.UserAuth do
   end
 
   defp assign_current_user(socket, session) do
-    if auth_disabled?() do
-      socket
-      |> Phoenix.Component.assign(:current_user, @guest_admin)
-      |> Phoenix.Component.assign(:admin_elevated?, true)
-      |> Phoenix.Component.assign(:admin_elevation_expires_at, nil)
-    else
-      do_assign_current_user(socket, session)
-    end
-  end
-
-  defp do_assign_current_user(socket, session) do
     user =
       session
       |> Map.get("#{@session_key}")

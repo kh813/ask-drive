@@ -28,12 +28,14 @@ defmodule AskDriveWeb.Router do
     delete "/logout", AuthController, :logout
   end
 
-  # --- Signed in ------------------------------------------------------------
+  # --- Chat: open to everyone for now -------------------------------------
+  # Temporary (Phase 17): employee Google login is still blocked, so general users chat
+  # without signing in. Admin screens below still require login + elevation.
   scope "/", AskDriveWeb do
-    pipe_through [:browser, :require_authenticated_user]
+    pipe_through :browser
 
-    live_session :authenticated,
-      on_mount: [{AskDriveWeb.UserAuth, :require_authenticated}] do
+    live_session :chat,
+      on_mount: [{AskDriveWeb.UserAuth, :mount_current_user}] do
       live "/", ChatLive
     end
   end

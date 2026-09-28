@@ -1,8 +1,13 @@
 defmodule AskDriveWeb.PageControllerTest do
   use AskDriveWeb.ConnCase
 
-  test "GET / redirects to login when signed out", %{conn: conn} do
+  test "GET / renders the chat page without signing in", %{conn: conn} do
     conn = get(conn, ~p"/")
+    assert html_response(conn, 200) =~ "chat-form"
+  end
+
+  test "GET /admin still requires login when signed out", %{conn: conn} do
+    conn = get(conn, ~p"/admin")
     assert redirected_to(conn) == ~p"/login"
   end
 

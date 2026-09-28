@@ -35,4 +35,17 @@ defmodule AskDriveWeb.ChatLiveTest do
 
     refute render(view) =~ "質問1"
   end
+
+  test "signed-out visitors can chat and see the admin login link" do
+    {:ok, view, _html} = live(build_conn(), ~p"/")
+    assert has_element?(view, "#chat-form")
+    assert has_element?(view, "#admin-login-link")
+    refute has_element?(view, "#logout-link")
+
+    view
+    |> form("#chat-form", %{"question" => "ゲストの質問"})
+    |> render_submit()
+
+    assert render(view) =~ "ゲストの質問"
+  end
 end

@@ -79,6 +79,15 @@ defmodule AskDriveWeb.Layouts do
 
         <div class="flex-1"></div>
 
+        <.link
+          :if={is_nil(@current_user)}
+          href={~p"/login"}
+          id="admin-login-link"
+          class="text-[11px] px-2.5 py-1 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-1"
+        >
+          <.icon name="hero-shield-check" class="w-3.5 h-3.5" /> 管理者ログイン
+        </.link>
+
         <%!-- Document text leaves the building when generation runs on a cloud API, so say
               so on every screen rather than burying it in settings (spec 1.2). --%>
         <span
