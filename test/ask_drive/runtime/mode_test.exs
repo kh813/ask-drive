@@ -40,10 +40,11 @@ defmodule AskDrive.Runtime.ModeTest do
       assert Mode.sync_with_clock() in [:daytime, :standby]
     end
 
-    test "calculate_current_mode/1 uses the local hour against the batch window (21-7)" do
-      assert Mode.calculate_current_mode(~N[2026-09-28 22:30:00]) == :night_batch
+    test "calculate_current_mode/1 uses the local hour against the batch window (0-7)" do
+      assert Mode.calculate_current_mode(~N[2026-09-29 00:30:00]) == :night_batch
       assert Mode.calculate_current_mode(~N[2026-09-29 06:59:00]) == :night_batch
       assert Mode.calculate_current_mode(~N[2026-09-29 10:00:00]) == :daytime
+      assert Mode.calculate_current_mode(~N[2026-09-28 22:30:00]) == :standby
     end
 
     test "night_window_start_utc/1 is the latest local batch_start_hour" do
@@ -53,11 +54,11 @@ defmodule AskDrive.Runtime.ModeTest do
         local |> NaiveDateTime.add(-offset) |> DateTime.from_naive!("Etc/UTC")
       end
 
-      assert Mode.night_window_start_utc(~N[2026-09-28 23:00:00]) ==
-               expected.(~N[2026-09-28 21:00:00])
-
       assert Mode.night_window_start_utc(~N[2026-09-29 03:00:00]) ==
-               expected.(~N[2026-09-28 21:00:00])
+               expected.(~N[2026-09-29 00:00:00])
+
+      assert Mode.night_window_start_utc(~N[2026-09-29 23:00:00]) ==
+               expected.(~N[2026-09-29 00:00:00])
     end
 
     test "generation is disabled during daytime when daytime_llm_enabled is false" do

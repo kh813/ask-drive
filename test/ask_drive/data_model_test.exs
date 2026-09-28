@@ -7,7 +7,7 @@ defmodule AskDrive.DataModelTest do
 
   test "settings context creates and updates singleton settings" do
     setting = Settings.get_setting!()
-    assert setting.batch_start_hour == 21
+    assert setting.batch_start_hour == 0
     assert setting.batch_model == "qwen3:4b"
 
     {:ok, updated} =

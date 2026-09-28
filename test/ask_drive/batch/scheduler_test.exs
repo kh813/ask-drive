@@ -87,7 +87,11 @@ defmodule AskDrive.Batch.SchedulerTest do
 
       {:ok, run} =
         %AskDrive.Batch.BatchRun{}
-        |> AskDrive.Batch.BatchRun.changeset(%{started_at: DateTime.utc_now(), status: "aborted"})
+        |> AskDrive.Batch.BatchRun.changeset(%{
+          started_at: DateTime.utc_now(),
+          status: "aborted",
+          trigger: "auto"
+        })
         |> Repo.insert()
 
       refute Scheduler.ran_since?(since)

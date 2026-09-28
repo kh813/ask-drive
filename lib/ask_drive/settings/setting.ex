@@ -22,7 +22,7 @@ defmodule AskDrive.Settings.Setting do
   schema "settings" do
     field :drive_folder_id, :string
     field :drive_folder_name, :string
-    field :batch_start_hour, :integer, default: 21
+    field :batch_start_hour, :integer, default: 0
     field :batch_end_hour, :integer, default: 7
     field :batch_model, :string, default: "qwen3:4b"
     field :embed_model, :string, default: "bge-m3"

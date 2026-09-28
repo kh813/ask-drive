@@ -580,9 +580,9 @@ defmodule AskDriveWeb.AdminLive do
                       @auto_status.run.status
                     )}）。次回の自動実行: {Calendar.strftime(@auto_status.next_start, "%-m/%-d %H:%M")}
                   <% :due -> %>
-                    夜間枠内で、この枠のフル実行はまだありません。1 分以内に自動で開始します。
+                    夜間枠内で、この枠の自動実行はまだありません。1 分以内に自動で開始します。
                   <% :missed -> %>
-                    {Calendar.strftime(@auto_status.window_start, "%-m/%-d")} の夜間枠では、フル実行（完了・失敗を含む）が記録されていません（再起動で中断されたものは除く）。次回の自動実行: {Calendar.strftime(
+                    {Calendar.strftime(@auto_status.window_start, "%-m/%-d")} の夜間枠では、自動実行の記録がありません（再起動で中断されたものは除く。手動実行は自動実行の代わりになりません）。次回の自動実行: {Calendar.strftime(
                       @auto_status.next_start,
                       "%-m/%-d %H:%M"
                     )}
@@ -2056,6 +2056,9 @@ defmodule AskDriveWeb.AdminLive do
   defp trigger_label(_), do: "手動"
 
   defp pad2(n), do: n |> Integer.to_string() |> String.pad_leading(2, "0")
+
+  # An aborted run's finished_at is when the next boot noticed it, not when it stopped.
+  defp duration_label(%{status: "aborted"}), do: "—（中断）"
 
   defp duration_label(%{started_at: s, finished_at: nil}) when not is_nil(s) do
     "#{format_seconds(DateTime.diff(DateTime.utc_now(), s))}〜"

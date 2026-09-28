@@ -42,14 +42,17 @@ defmodule AskDrive.Batch.Scheduler do
   end
 
   @doc """
-  Whether a full batch has run at or after `since` (UTC). A batch cut off by a restart
-  ("aborted", e.g. a deploy during the night) doesn't count, so the night window starts it
-  again; a "failed" one does, so a persistent failure isn't retried every minute.
+  Whether an automatic full batch has run at or after `since` (UTC). Manual runs don't count
+  (F-330). A batch cut off by a restart ("aborted", e.g. a deploy during the night) doesn't
+  count either, so the night window starts it again; a "failed" one does, so a persistent
+  failure isn't retried every minute.
   """
   def ran_since?(%DateTime{} = since) do
     Repo.exists?(
       from b in BatchRun,
-        where: b.kind == "full" and b.started_at >= ^since and b.status != "aborted"
+        where:
+          b.kind == "full" and b.trigger == "auto" and b.started_at >= ^since and
+            b.status != "aborted"
     )
   end
 
@@ -109,7 +112,7 @@ defmodule AskDrive.Batch.Scheduler do
   """
   def auto_status(now \\ AskDrive.Clock.local_now()) do
     setting = Settings.get_setting!()
-    start_h = setting.batch_start_hour || 21
+    start_h = setting.batch_start_hour || 0
     end_h = setting.batch_end_hour || 7
     window_start = Mode.night_window_start_utc(now)
     in_window? = Mode.calculate_current_mode(now) == :night_batch
@@ -117,7 +120,9 @@ defmodule AskDrive.Batch.Scheduler do
     tonight =
       Repo.one(
         from b in BatchRun,
-          where: b.kind == "full" and b.started_at >= ^window_start and b.status != "aborted",
+          where:
+            b.kind == "full" and b.trigger == "auto" and b.started_at >= ^window_start and
+              b.status != "aborted",
           order_by: [desc: b.started_at],
           limit: 1
       )

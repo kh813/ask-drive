@@ -120,7 +120,7 @@ defmodule AskDrive.Settings do
 
   defp default_attrs do
     %{
-      batch_start_hour: 21,
+      batch_start_hour: 0,
       batch_end_hour: 7,
       batch_model: System.get_env("ASK_DRIVE_LLM_MODEL") || "qwen3:4b",
       embed_model: System.get_env("ASK_DRIVE_EMBED_MODEL") || "bge-m3",

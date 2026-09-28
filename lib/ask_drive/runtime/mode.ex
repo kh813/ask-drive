@@ -4,8 +4,8 @@ defmodule AskDrive.Runtime.Mode do
 
   Three phases:
   - `:daytime` (07:00 - 19:00 default): Embedding model kept resident (`keep_alive: -1`), text generation disabled.
-  - `:standby` (19:00 - 02:00 default): All models unloaded (`keep_alive: 0`), text generation disabled.
-  - `:night_batch` (02:00 - 06:30 default): Generation enabled, models swapped per pipeline phase with strict single-model residency.
+  - `:standby` (19:00 - 00:00 default, and the night window while no batch runs): All models unloaded (`keep_alive: 0`), text generation disabled.
+  - `:night_batch` (while a batch runs; the automatic one starts in the 00:00 - 07:00 window): Generation enabled, models swapped per pipeline phase with strict single-model residency.
 
   The whole mechanism exists to stop the generation and embedding models from competing for
   8GB of RAM. A provider running off-machine consumes none of it, so when generation is
@@ -177,7 +177,9 @@ defmodule AskDrive.Runtime.Mode do
 
   @doc """
   Whether the nightly batch should start now: inside the night window, nothing running, and
-  no full batch has run in this window yet (one aborted by a restart doesn't count).
+  no automatic batch has run in this window yet (one aborted by a restart doesn't count, and
+  neither does a manual run: running a batch by hand in the evening must not cancel the
+  night's automatic one, as happened on 2026-09-28).
   """
   def nightly_due?(now \\ AskDrive.Clock.local_now()) do
     calculate_current_mode(now) == :night_batch and
@@ -191,7 +193,7 @@ defmodule AskDrive.Runtime.Mode do
   """
   def night_window_start_utc(now \\ AskDrive.Clock.local_now()) do
     setting = Settings.get_setting()
-    start_h = (setting && setting.batch_start_hour) || 21
+    start_h = (setting && setting.batch_start_hour) || 0
     today_start = NaiveDateTime.new!(NaiveDateTime.to_date(now), Time.new!(start_h, 0, 0))
 
     start =
@@ -213,12 +215,12 @@ defmodule AskDrive.Runtime.Mode do
     hour = now.hour
     setting = Settings.get_setting()
 
-    # Same defaults as the settings schema (21:00-07:00)
-    batch_start = (setting && setting.batch_start_hour) || 21
+    # Same defaults as the settings schema (00:00-07:00)
+    batch_start = (setting && setting.batch_start_hour) || 0
     batch_end = (setting && setting.batch_end_hour) || 7
 
     cond do
-      # Night batch window (e.g. 02:00 to 07:00)
+      # Night batch window (e.g. 00:00 to 07:00)
       in_hour_range?(hour, batch_start, batch_end) ->
         :night_batch
 
@@ -226,7 +228,7 @@ defmodule AskDrive.Runtime.Mode do
       in_hour_range?(hour, 7, 19) ->
         :daytime
 
-      # Standby window (e.g. 19:00 to 02:00)
+      # Standby window (e.g. 19:00 to 00:00)
       true ->
         :standby
     end
