@@ -10,6 +10,9 @@ config :ask_drive, AskDrive.Repo,
   pool_size: 5,
   pool: Ecto.Adapters.SQL.Sandbox
 
+# The suite exercises the real login/elevation flow; tests opt into POC mode explicitly.
+config :ask_drive, auth_disabled_by_default: false
+
 # Disable Oban queues in test
 config :ask_drive, Oban, testing: :manual
 

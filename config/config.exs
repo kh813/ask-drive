@@ -9,7 +9,9 @@ import Config
 
 config :ask_drive,
   ecto_repos: [AskDrive.Repo],
-  generators: [timestamp_type: :utc_datetime]
+  generators: [timestamp_type: :utc_datetime],
+  # POC (spec 6.9.6): login and admin elevation are off unless ASK_DRIVE_DISABLE_AUTH=false.
+  auth_disabled_by_default: true
 
 # Oban configuration for SQLite3
 config :ask_drive, Oban,

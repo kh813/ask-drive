@@ -1,15 +1,36 @@
 defmodule AskDriveWeb.AuthDisabledTest do
   @moduledoc """
   `ASK_DRIVE_DISABLE_AUTH` (spec 6.9.6, POC / trusted-LAN mode) must open admin to an
-  anonymous visitor, while leaving the default (unset) behavior — used by every other test in
-  the suite — fully intact. Chat is open either way (spec 6.9.5). Runs `async: false` because it mutates a process-global: the
-  `ASK_DRIVE_ADMIN_EMAILS`-style env var read by `AskDriveWeb.UserAuth.auth_disabled?/0`.
+  anonymous visitor, and the POC default (`:auth_disabled_by_default`, off in test.exs so
+  every other test keeps the real flow) must apply when the variable is unset. Chat is open
+  either way (spec 6.9.5). Runs `async: false` because it mutates process-globals: the env var
+  and the application env read by `AskDriveWeb.UserAuth.auth_disabled?/0`.
   """
   use AskDriveWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
   setup do
-    on_exit(fn -> System.delete_env("ASK_DRIVE_DISABLE_AUTH") end)
+    on_exit(fn ->
+      System.delete_env("ASK_DRIVE_DISABLE_AUTH")
+      Application.put_env(:ask_drive, :auth_disabled_by_default, false)
+    end)
+  end
+
+  test "GET /admin is open with no session when the default is on and the flag is unset", %{
+    conn: conn
+  } do
+    Application.put_env(:ask_drive, :auth_disabled_by_default, true)
+    {:ok, _view, html} = live(conn, ~p"/admin")
+    assert html =~ "管理ダッシュボード"
+  end
+
+  test "ASK_DRIVE_DISABLE_AUTH=false restores login even when the default is on", %{
+    conn: conn
+  } do
+    Application.put_env(:ask_drive, :auth_disabled_by_default, true)
+    System.put_env("ASK_DRIVE_DISABLE_AUTH", "false")
+    conn = get(conn, ~p"/admin")
+    assert redirected_to(conn) == ~p"/login"
   end
 
   test "GET /admin requires login when the flag is unset", %{conn: conn} do

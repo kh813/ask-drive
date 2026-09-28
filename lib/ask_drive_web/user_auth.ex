@@ -9,8 +9,10 @@ defmodule AskDriveWeb.UserAuth do
 
   ## Disabling authentication entirely (POC / trusted-LAN mode)
 
-  Setting `ASK_DRIVE_DISABLE_AUTH=true` bypasses login and admin elevation everywhere,
-  treating every request as an already-elevated administrator. This exists for an early
+  During the POC this is the default (`:auth_disabled_by_default` in config): login and admin
+  elevation are bypassed everywhere, treating every request as an already-elevated
+  administrator. `ASK_DRIVE_DISABLE_AUTH=false` restores the normal flow; `=true` forces the
+  bypass regardless of the default. This exists for an early
   proof-of-concept phase on a trusted internal LAN, where per-user Google login isn't
   finished yet and getting it working isn't the point of the exercise. It is an explicit,
   server-side environment variable rather than a database setting or a web-UI toggle:
@@ -46,13 +48,19 @@ defmodule AskDriveWeb.UserAuth do
   }
 
   @doc """
-  Whether `ASK_DRIVE_DISABLE_AUTH` is set. See the moduledoc before using this outside the
+  Whether login and elevation are bypassed: `ASK_DRIVE_DISABLE_AUTH` when it holds a
+  recognisable boolean, otherwise the configured default. See the moduledoc before using this outside the
   call sites that already exist (`fetch_current_user/2`, `assign_current_user/2`, and the
   startup health check's log line).
   """
   def auth_disabled? do
-    value = System.get_env("ASK_DRIVE_DISABLE_AUTH", "")
-    String.downcase(String.trim(value)) in ["true", "1", "yes", "on"]
+    value = System.get_env("ASK_DRIVE_DISABLE_AUTH", "") |> String.trim() |> String.downcase()
+
+    cond do
+      value in ["true", "1", "yes", "on"] -> true
+      value in ["false", "0", "no", "off"] -> false
+      true -> Application.get_env(:ask_drive, :auth_disabled_by_default, false)
+    end
   end
 
   # --- Session lifecycle ----------------------------------------------------
