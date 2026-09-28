@@ -125,5 +125,21 @@ defmodule AskDrive.Ops.ScriptsTest do
       deploy_content = File.read!(@deploy_sh)
       assert deploy_content =~ ~s(${RUNTIME_BIN}:${RUNTIME_BREW}/bin)
     end
+
+    test "config/prod.exs and config/runtime.exs are configured for direct LAN access without SSL redirect loop" do
+      prod_config = File.read!(Path.join([@root_dir, "config", "prod.exs"]))
+      refute prod_config =~ "force_ssl:"
+
+      runtime_config = File.read!(@runtime_exs)
+      assert runtime_config =~ ~s(scheme: "http")
+      assert runtime_config =~ "check_origin: false"
+      assert runtime_config =~ "ip: {0, 0, 0, 0, 0, 0, 0, 0}"
+    end
+
+    test "app.sh auto-starts Ollama if not running before launching server" do
+      app_content = File.read!(@app_sh)
+      assert app_content =~ "ollama serve"
+      assert app_content =~ "curl -s \"${ollama_host}/api/tags\""
+    end
   end
 end

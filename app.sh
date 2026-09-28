@@ -89,6 +89,16 @@ cmd_start() {
   export OLLAMA_FLASH_ATTENTION="${OLLAMA_FLASH_ATTENTION:-1}"
   export OLLAMA_KV_CACHE_TYPE="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
 
+  # Ollama サーバーの稼働確認と自動起動
+  local ollama_host="${OLLAMA_HOST:-http://localhost:11434}"
+  if ! curl -s "${ollama_host}/api/tags" >/dev/null 2>&1; then
+    if command -v ollama >/dev/null 2>&1; then
+      echo "Ollama サービスが停止しているため、バックグラウンド起動します..."
+      ollama serve > "${SCRIPT_DIR}/log/ollama.log" 2>&1 &
+      sleep 2
+    fi
+  fi
+
   if [[ -f "${SCRIPT_DIR}/_build/prod/rel/ask_drive/bin/ask_drive" ]]; then
     export MIX_ENV=prod
     export PHX_SERVER=true
