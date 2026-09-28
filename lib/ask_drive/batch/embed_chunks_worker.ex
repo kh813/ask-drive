@@ -118,10 +118,7 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
       chunk_texts = Enum.map(chunks_data, & &1.content)
 
       # Concurrency-controlled embedding via Ollama
-      embed_result =
-        Semaphore.run(fn ->
-          LLM.embed(setting.embed_model, chunk_texts, setting: setting)
-        end)
+      embed_result = embed_in_batches(chunk_texts, setting)
 
       case embed_result do
         {:ok, embeddings} ->
@@ -133,6 +130,27 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
           Documents.mark_failed(doc, "Embedding failed: #{inspect(reason)}")
           {:error, {:embedding, reason}}
       end
+    end
+  end
+
+  # One request per whole document timed out on long PDFs: a 186-chunk manual took 29s
+  # against the provider's 30s embed timeout. Fixed-size batches keep every request well
+  # inside it no matter how long the document is, and each batch takes the semaphore on its
+  # own so a long document doesn't starve chat queries needing a query embedding.
+  @embed_batch_size 32
+
+  defp embed_in_batches(texts, setting) do
+    texts
+    |> Enum.chunk_every(@embed_batch_size)
+    |> Enum.reduce_while({:ok, []}, fn batch, {:ok, acc} ->
+      case Semaphore.run(fn -> LLM.embed(setting.embed_model, batch, setting: setting) end) do
+        {:ok, vectors} -> {:cont, {:ok, [vectors | acc]}}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, batches} -> {:ok, batches |> Enum.reverse() |> Enum.concat()}
+      error -> error
     end
   end
 
