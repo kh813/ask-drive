@@ -364,9 +364,6 @@ defmodule AskDriveWeb.AdminLive do
           <div>
             <div class="flex items-center gap-2">
               <h1 class="font-bold text-2xl text-zinc-900 dark:text-zinc-100">管理ダッシュボード</h1>
-              <span class="text-xs px-2.5 py-0.5 rounded-full font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
-                相: {@current_mode}
-              </span>
             </div>
             <p class="text-xs text-zinc-500 mt-1">
               AskDrive の夜間バッチ、ナレッジカバレッジ、未回答質問、LLM プロバイダ、ユーザーを一元管理します。
@@ -766,6 +763,22 @@ defmodule AskDriveWeb.AdminLive do
                       <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
                         <td class="py-3 px-2 font-medium text-zinc-900 dark:text-zinc-100">
                           {doc.name}
+                          <%!-- Why a document didn't make it into the index (extraction or
+                                embedding error, unsupported type), so a failed batch can be
+                                diagnosed from here instead of from the server log. --%>
+                          <p
+                            :if={doc.status in ["failed", "skipped"] and doc.error}
+                            class={[
+                              "mt-1 font-normal text-[11px] break-all line-clamp-3",
+                              if(doc.status == "failed",
+                                do: "text-red-600 dark:text-red-400",
+                                else: "text-zinc-500"
+                              )
+                            ]}
+                            title={doc.error}
+                          >
+                            {doc.error}
+                          </p>
                         </td>
                         <td class="py-3 px-2">
                           <span class={[

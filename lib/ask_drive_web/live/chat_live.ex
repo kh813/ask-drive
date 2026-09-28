@@ -56,6 +56,7 @@ defmodule AskDriveWeb.ChatLive do
         answer: result.answer,
         chunks: result.chunks,
         qa_pair: result.qa_pair,
+        index_empty?: Map.get(result, :index_empty?, false),
         inserted_at: DateTime.utc_now()
       }
 
@@ -208,7 +209,10 @@ defmodule AskDriveWeb.ChatLive do
                           </span>
                         <% 3 -> %>
                           <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50">
-                            <.icon name="hero-clock" class="w-3.5 h-3.5" /> 未回答（今夜のバッチで回答生成予定）
+                            <.icon name="hero-clock" class="w-3.5 h-3.5" />
+                            {if msg[:index_empty?],
+                              do: "未回答（文書が未取り込み）",
+                              else: "未回答（今夜のバッチで回答生成予定）"}
                           </span>
                         <% _ -> %>
                           <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
@@ -260,7 +264,19 @@ defmodule AskDriveWeb.ChatLive do
 
                     <%!-- Message Content / Explanation for Tier 3 --%>
                     <%= if msg.tier == 3 do %>
-                      <div class="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed space-y-1">
+                      <div
+                        :if={msg[:index_empty?]}
+                        class="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed space-y-1"
+                      >
+                        <p>検索対象の文書がまだ1件も取り込まれていません。</p>
+                        <p class="text-zinc-500">
+                          Google Drive の同期・取り込みが完了していない可能性があります。管理者に確認してください（管理画面のドキュメント一覧で各文書の状態とエラーを確認できます）。質問内容は記録され、取り込み後の夜間バッチで回答生成の対象になります。
+                        </p>
+                      </div>
+                      <div
+                        :if={!msg[:index_empty?]}
+                        class="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed space-y-1"
+                      >
                         <p>この質問に関する明確な記載を現在のインデックスから特定できませんでした。</p>
                         <p class="text-zinc-500">
                           質問内容はシステムに記録されました。今夜の夜間バッチで全ドキュメントを対象に回答データを生成し、翌朝から即答できるようになります。

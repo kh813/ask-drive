@@ -58,6 +58,15 @@ defmodule AskDrive.Runtime.Mode do
     GenServer.call(__MODULE__, :sync_with_clock)
   end
 
+  @doc """
+  Leaves the batch: switches to whatever mode the clock calls for. `sync_with_clock/0`
+  deliberately never leaves `:night_batch` (so a clock tick can't pull the rug out from under
+  a running batch), which is why the batch itself must call this when it finishes.
+  """
+  def end_batch do
+    GenServer.call(__MODULE__, :end_batch)
+  end
+
   # --- GenServer Callbacks ---
 
   @impl true
@@ -88,6 +97,21 @@ defmodule AskDrive.Runtime.Mode do
     end
 
     {:reply, :ok, %{state | mode: new_mode}}
+  end
+
+  @impl true
+  def handle_call(:end_batch, _from, state) do
+    calculated = calculate_current_mode()
+
+    if calculated != state.mode do
+      Logger.info(
+        "Batch finished; runtime mode transitioning from #{state.mode} to #{calculated}"
+      )
+
+      apply_mode_transition(state.mode, calculated)
+    end
+
+    {:reply, calculated, %{state | mode: calculated}}
   end
 
   @impl true

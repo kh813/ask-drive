@@ -125,7 +125,10 @@ defmodule AskDrive.Answering do
           answer: nil,
           chunks: matched_chunks,
           qa_pair: nil,
-          asked_at: now
+          asked_at: now,
+          # Tier 2 has no similarity floor, so Tier 3 almost always means nothing is indexed
+          # yet (e.g. Drive sync failing) — a different message than "no good match".
+          index_empty?: tier == 3 and not Repo.exists?(AskDrive.Documents.Chunk)
         }
       end
     end

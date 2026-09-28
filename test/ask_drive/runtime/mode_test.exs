@@ -19,6 +19,15 @@ defmodule AskDrive.Runtime.ModeTest do
       assert Mode.current_mode() == :night_batch
     end
 
+    test "sync_with_clock/0 keeps night_batch, but end_batch/0 leaves it for the clock's mode" do
+      :ok = Mode.set_mode(:night_batch)
+      assert Mode.sync_with_clock() == :night_batch
+
+      expected = Mode.calculate_current_mode()
+      assert Mode.end_batch() == expected
+      assert Mode.current_mode() == expected
+    end
+
     test "generation is disabled during daytime when daytime_llm_enabled is false" do
       setting = Settings.get_setting!()
       Settings.update_setting(setting, %{daytime_llm_enabled: false})

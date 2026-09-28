@@ -91,4 +91,13 @@ defmodule AskDrive.AnsweringTiersTest do
       assert response.tier in [2, 3]
     end
   end
+
+  describe "Tier 3 with nothing indexed" do
+    test "flags index_empty? so the chat can say documents are not ingested yet" do
+      response = Answering.ask("存在しない何かについての質問")
+      assert response.tier == 3
+      assert response.index_empty?
+    end
+  end
+
 end

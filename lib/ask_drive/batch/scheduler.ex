@@ -92,8 +92,8 @@ defmodule AskDrive.Batch.Scheduler do
       # --- Phase 6: Verify & Finish ---
       {_p6_stat, batch_run} = run_phase_6_verify(batch_run, setting, deadline_reached?)
 
-      # Restore daytime or standby mode according to clock
-      Mode.sync_with_clock()
+      # Leave night_batch for whatever mode the clock calls for (daytime or standby)
+      Mode.end_batch()
 
       if caffeinate_port, do: Port.close(caffeinate_port)
 
@@ -110,7 +110,7 @@ defmodule AskDrive.Batch.Scheduler do
         })
         |> Repo.update()
 
-        Mode.sync_with_clock()
+        Mode.end_batch()
         if caffeinate_port, do: Port.close(caffeinate_port)
         {:error, e}
     end
