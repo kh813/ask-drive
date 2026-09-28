@@ -35,7 +35,7 @@ defmodule AskDriveWeb.ChatLive do
   def handle_event("send_message", %{"question" => question}, socket) do
     trimmed = String.trim(question)
 
-    if trimmed == "" do
+    if trimmed == "" or socket.assigns.loading do
       {:noreply, socket}
     else
       user_msg = %{
@@ -45,33 +45,51 @@ defmodule AskDriveWeb.ChatLive do
         inserted_at: DateTime.utc_now()
       }
 
-      # Run answering
-      result = Answering.ask(trimmed)
-
-      assistant_msg = %{
-        id: System.unique_integer([:positive]),
-        role: :assistant,
-        tier: result.tier,
-        content: result.answer,
-        answer: result.answer,
-        chunks: result.chunks,
-        qa_pair: result.qa_pair,
-        index_empty?: Map.get(result, :index_empty?, false),
-        inserted_at: DateTime.utc_now()
-      }
-
-      updated_messages = socket.assigns.messages ++ [user_msg, assistant_msg]
-
+      # Answer off the LiveView process: a query embedding can wait on a busy local model
+      # (e.g. while a batch is generating), and doing it inline froze the page with no
+      # feedback until it finished. The question shows at once with a "searching" bubble.
       {:noreply,
        socket
-       |> assign(:messages, updated_messages)
-       |> assign(:form, to_form(%{"question" => ""}))}
+       |> assign(:messages, socket.assigns.messages ++ [user_msg])
+       |> assign(:loading, true)
+       |> assign(:form, to_form(%{"question" => ""}))
+       |> start_async(:answer, fn -> Answering.ask(trimmed) end)}
     end
   end
 
   @impl true
   def handle_event("reset_chat", _params, socket) do
     {:noreply, assign(socket, :messages, [])}
+  end
+
+  @impl true
+  def handle_async(:answer, {:ok, result}, socket) do
+    assistant_msg = %{
+      id: System.unique_integer([:positive]),
+      role: :assistant,
+      tier: result.tier,
+      content: result.answer,
+      answer: result.answer,
+      chunks: result.chunks,
+      qa_pair: result.qa_pair,
+      index_empty?: Map.get(result, :index_empty?, false),
+      inserted_at: DateTime.utc_now()
+    }
+
+    {:noreply,
+     socket
+     |> assign(:messages, socket.assigns.messages ++ [assistant_msg])
+     |> assign(:loading, false)}
+  end
+
+  def handle_async(:answer, {:exit, reason}, socket) do
+    require Logger
+    Logger.error("ChatLive: answering crashed: #{inspect(reason)}")
+
+    {:noreply,
+     socket
+     |> assign(:loading, false)
+     |> put_flash(:error, "回答の検索中にエラーが発生しました。しばらくしてからもう一度お試しください。")}
   end
 
   @impl true
@@ -326,6 +344,11 @@ defmodule AskDriveWeb.ChatLive do
                 </div>
               <% end %>
             <% end %>
+            <div :if={@loading} id="answer-loading" class="flex justify-start">
+              <div class="rounded-2xl rounded-tl-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-4 py-3 text-xs text-zinc-500 flex items-center gap-2 shadow-sm">
+                <.icon name="hero-arrow-path" class="w-4 h-4 animate-spin" /> 回答を検索しています…
+              </div>
+            </div>
           <% end %>
         </div>
 
@@ -352,6 +375,7 @@ defmodule AskDriveWeb.ChatLive do
             <button
               type="submit"
               id="send-btn"
+              disabled={@loading}
               class="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm flex items-center gap-1.5 shadow-sm transition disabled:opacity-50"
             >
               <span>送信</span>

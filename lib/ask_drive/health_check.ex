@@ -47,6 +47,7 @@ defmodule AskDrive.HealthCheck do
 
   @impl true
   def handle_info(:run_startup_check, state) do
+    abort_interrupted_batches()
     results = perform_checks()
     log_results(results)
     {:noreply, %{state | status: :ready, results: results}}
@@ -157,5 +158,25 @@ defmodule AskDrive.HealthCheck do
       {:ok, info} -> Logger.info("  [✓] #{label}: #{info}")
       {:error, err} -> Logger.warning("  [✗] #{label}: #{err}")
     end
+  end
+
+  # A batch runs inside the app process, so one still "running" at boot was cut off by a
+  # restart (or crash) and will never finish. Say so instead of showing it as running forever.
+  defp abort_interrupted_batches do
+    import Ecto.Query
+
+    {count, _} =
+      AskDrive.Repo.update_all(
+        from(b in AskDrive.Batch.BatchRun, where: b.status == "running"),
+        set: [
+          status: "aborted",
+          finished_at: DateTime.utc_now() |> DateTime.truncate(:second),
+          error: "アプリの再起動によりバッチが中断されました"
+        ]
+      )
+
+    if count > 0, do: Logger.warning("  [!] 中断されたバッチ #{count} 件を aborted に更新しました")
+  rescue
+    e -> Logger.warning("Could not mark interrupted batches as aborted: #{Exception.message(e)}")
   end
 end

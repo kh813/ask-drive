@@ -20,6 +20,19 @@ defmodule AskDriveWeb.ChatLiveTest do
     assert html =~ "社内規定について教えてください"
   end
 
+  test "answers asynchronously: question first, then the answer bubble", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    view
+    |> form("#chat-form", %{"question" => "USBメモリの利用ルールは？"})
+    |> render_submit()
+
+    html = render_async(view, 20_000)
+    assert html =~ "USBメモリの利用ルールは？"
+    assert html =~ "未回答"
+    refute has_element?(view, "#answer-loading")
+  end
+
   test "resets chat history", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/")
 

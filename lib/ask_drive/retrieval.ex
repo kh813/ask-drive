@@ -61,8 +61,78 @@ defmodule AskDrive.Retrieval do
           Enum.map(rows, fn [chunk_id, rank] -> {chunk_id, rank} end)
 
         _ ->
-          like_search(trimmed, limit)
+          case like_search(trimmed, limit) do
+            [] -> term_search(trimmed, limit)
+            hits -> hits
+          end
       end
+    end
+  end
+
+  @doc """
+  Splits a natural-language question into search terms: runs of kanji / katakana / latin
+  letters and digits, with the combined run kept alongside its per-script parts.
+
+      "USBメモリの利用ルールは？" -> ["USBメモリ", "USB", "メモリ", "利用ルール", "利用", "ルール"]
+
+  Hiragana (particles, okurigana, "教えて", "ですか") and punctuation act as separators.
+  Without this, the trigram index only matched when the whole question appeared verbatim in
+  a document, so keyword search was useless as a fallback whenever embeddings were down.
+  """
+  def extract_terms(text) when is_binary(text) do
+    text
+    # Full-width latin/digits ("ＵＳＢ") to half-width, matching how documents usually spell them
+    |> :unicode.characters_to_nfkc_binary()
+    # An explicit hiragana range: \p{Hiragana} also matches the prolonged sound mark "ー"
+    # (shared with katakana), which would cut "ルール" into "ル" + "ル".
+    |> String.split(~r/[\x{3041}-\x{309F}\s\p{P}\p{S}]+/u, trim: true)
+    |> Enum.flat_map(fn run ->
+      parts = Regex.scan(~r/\p{Han}+|[\p{Katakana}ー]+|[\p{Latin}\p{Nd}]+/u, run) |> List.flatten()
+      [run | parts]
+    end)
+    |> Enum.map(&String.downcase/1)
+    |> Enum.filter(&(String.length(&1) >= 2))
+    |> Enum.uniq()
+  end
+
+  # Scores each chunk by how much of the question it covers: the summed length of the
+  # distinct terms it contains, so "USBメモリ" + "ルール" outranks a lone "利用".
+  defp term_search(query_text, limit) do
+    case extract_terms(query_text) do
+      [] ->
+        []
+
+      terms ->
+        terms
+        |> Enum.flat_map(fn term ->
+          term
+          |> term_hits(limit * 5)
+          |> Enum.map(&{&1, String.length(term)})
+        end)
+        |> Enum.group_by(fn {id, _} -> id end, fn {_, weight} -> weight end)
+        |> Enum.map(fn {id, weights} -> {id, Enum.sum(weights)} end)
+        |> Enum.sort_by(fn {_id, score} -> -score end)
+        |> Enum.take(limit)
+    end
+  end
+
+  # Trigram FTS needs 3+ characters; shorter terms (e.g. two-kanji words) use LIKE.
+  defp term_hits(term, limit) do
+    if String.length(term) >= 3 do
+      sql = "SELECT rowid FROM chunks_fts WHERE chunks_fts MATCH ? LIMIT ?"
+      quoted = ~s("#{String.replace(term, "\"", "")}")
+
+      case Repo.query(sql, [quoted, limit]) do
+        {:ok, %{rows: rows}} -> Enum.map(rows, fn [id] -> id end)
+        _ -> []
+      end
+    else
+      Repo.all(
+        from c in Chunk,
+          where: like(c.content, ^"%#{term}%") or like(c.heading, ^"%#{term}%"),
+          limit: ^limit,
+          select: c.id
+      )
     end
   end
 

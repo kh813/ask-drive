@@ -36,6 +36,12 @@ defmodule AskDrive.Batch.BatchRun do
       :error
     ])
     |> validate_required([:status])
-    |> validate_inclusion(:status, ["running", "completed", "deadline_reached", "failed"])
+    |> validate_inclusion(:status, [
+      "running",
+      "completed",
+      "deadline_reached",
+      "failed",
+      "aborted"
+    ])
   end
 end

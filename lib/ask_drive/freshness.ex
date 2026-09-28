@@ -130,8 +130,8 @@ defmodule AskDrive.Freshness do
       end)
 
       Enum.each(chunk_ids, fn id ->
+        # chunks_fts follows chunks through triggers (migration SyncChunksFts)
         Repo.query("DELETE FROM vec_chunks WHERE chunk_id = ?", [id])
-        Repo.query("DELETE FROM chunks_fts WHERE chunk_id = ?", [id])
       end)
 
       # 4. Delete document record (Ecto cascade deletes chunks, qas, answer_cache, summaries, extractions)

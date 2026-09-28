@@ -398,7 +398,7 @@ defmodule AskDrive.LLM do
     provider
     |> provider_opts(setting)
     |> Keyword.put(:expected_dim, expected_dim)
-    |> Keyword.merge(Keyword.take(opts, [:timeout, :keep_alive]))
+    |> Keyword.merge(Keyword.take(opts, [:timeout, :keep_alive, :retry]))
   end
 
   defp validate_dimensions(vectors, expected_dim) do

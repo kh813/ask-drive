@@ -18,6 +18,10 @@ defmodule AskDrive.Answering do
   alias AskDrive.Vector
   alias AskDrive.LLM
 
+  require Logger
+
+  @query_embed_timeout 10_000
+
   @doc """
   Processes a user question and returns a structured response map with tier information and sources.
   """
@@ -49,11 +53,27 @@ defmodule AskDrive.Answering do
         asked_at: now
       }
     else
-      # Not found in Tier 0. Generate query embedding for Tier 1 / Tier 2
+      # Not found in Tier 0. Generate query embedding for Tier 1 / Tier 2.
+      #
+      # Short and without retries: while a batch holds the local model (e.g. a manual batch
+      # generating QA in the daytime) the embedding request queues behind generation, and the
+      # default 30s x 3 attempts left the chat hanging for minutes. Giving up quickly lets
+      # Tier 2 answer from keyword search alone instead.
       embedding =
-        case LLM.embed(setting.embed_model, [trimmed], setting: setting) do
-          {:ok, [vec | _]} -> vec
-          _ -> nil
+        case LLM.embed(setting.embed_model, [trimmed],
+               setting: setting,
+               timeout: @query_embed_timeout,
+               retry: false
+             ) do
+          {:ok, [vec | _]} ->
+            vec
+
+          other ->
+            Logger.warning(
+              "Answering: query embedding unavailable (#{inspect(other)}); keyword search only"
+            )
+
+            nil
         end
 
       # --- Tier 1: Vector Search on Hypothetical QA pairs ---

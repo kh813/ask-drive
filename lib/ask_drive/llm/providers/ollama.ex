@@ -27,7 +27,9 @@ defmodule AskDrive.LLM.Providers.Ollama do
 
     url = base_url(opts) <> "/api/embed"
 
-    case HTTP.post_json(url, payload, [], Keyword.get(opts, :timeout, @embed_timeout)) do
+    timeout = Keyword.get(opts, :timeout, @embed_timeout)
+
+    case HTTP.post_json(url, payload, [], timeout, retry: Keyword.get(opts, :retry, true)) do
       {:ok, %{"embeddings" => embeddings}} when is_list(embeddings) ->
         {:ok, embeddings}
 
