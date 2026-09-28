@@ -58,7 +58,7 @@ defmodule AskDrive.LLM.HTTP do
   defp retry_or_fail(method, url, req_opts, attempt, opts, error) do
     if attempt >= @max_attempts or Keyword.get(opts, :retry, true) == false do
       Logger.warning(
-        "LLM request to #{host_of(url)} failed after #{attempt} attempt(s): #{kind(error)}"
+        "LLM request to #{host_of(url)} failed after #{attempt} attempt(s): #{kind(error)} (#{detail(error)})"
       )
 
       {:error, error}
@@ -100,6 +100,10 @@ defmodule AskDrive.LLM.HTTP do
 
   defp kind({k, _}), do: to_string(k)
   defp kind(other), do: inspect(other)
+
+  defp detail({_, msg}) when is_binary(msg), do: msg
+  defp detail({_, other}), do: inspect(other)
+  defp detail(other), do: inspect(other)
 
   defp error_message(%{"error" => %{"message" => message}}) when is_binary(message), do: message
   defp error_message(%{"error" => message}) when is_binary(message), do: message
