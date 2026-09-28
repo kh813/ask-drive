@@ -61,17 +61,20 @@ if launchctl list "${SERVICE_NAME}" >/dev/null 2>&1; then
 
   # kickstart は起動を待たずに戻るため、直後にステータスを出すと Ollama・AskDrive とも
   # 「停止中」と表示されてしまう。HTTP が応答するまで最大 120 秒待ってから表示する。
-  port="${PORT:-4000}"
-  echo -n "AskDrive の起動を待っています"
+  case "${ASK_DRIVE_SSL:-true}" in
+    false|0|no|off) app_url="http://localhost:${PORT:-4000}/" ;;
+    *) app_url="https://localhost:${ASK_DRIVE_HTTPS_PORT:-4443}/" ;;
+  esac
+  echo -n "AskDrive の起動を待っています (${app_url})"
   for _ in $(seq 1 120); do
-    if curl -s -o /dev/null "http://localhost:${port}/" 2>/dev/null; then
+    if curl -sk -o /dev/null "${app_url}" 2>/dev/null; then
       echo " 起動しました。"
       break
     fi
     echo -n "."
     sleep 1
   done
-  if ! curl -s -o /dev/null "http://localhost:${port}/" 2>/dev/null; then
+  if ! curl -sk -o /dev/null "${app_url}" 2>/dev/null; then
     echo ""
     echo -e "${YELLOW}120 秒以内に応答しませんでした。ログを確認してください:${NC}"
     echo "  ${SCRIPT_DIR}/log/ask_drive_stdout.log / ask_drive_stderr.log"

@@ -38,6 +38,16 @@ defmodule AskDriveWeb.AdminLive do
     setting = Settings.get_setting!()
     form = to_form(Settings.change_setting(setting))
 
+    # Own SSL certificate upload (spec 6.10): PEM files only. accept: :any because .pem/.key
+    # have no registered MIME type (a list of those extensions raises in allow_upload and
+    # takes the whole admin page down); the contents are checked by AskDrive.SSL.validate.
+    socket =
+      socket
+      |> allow_upload(:ssl_cert, accept: :any, max_entries: 1, max_file_size: 200_000)
+      |> allow_upload(:ssl_key, accept: :any, max_entries: 1, max_file_size: 200_000)
+      |> allow_upload(:ssl_chain, accept: :any, max_entries: 1, max_file_size: 500_000)
+      |> assign(:ssl_check, nil)
+
     {:ok,
      socket
      |> assign(:current_tab, "overview")
@@ -72,6 +82,69 @@ defmodule AskDriveWeb.AdminLive do
   @impl true
   def handle_info(:tick, socket) do
     {:noreply, load_dashboard_data(socket)}
+  end
+
+  @impl true
+  def handle_event("ssl_upload_change", _params, socket), do: {:noreply, socket}
+
+  # Step 1: validate the uploaded PEM files (nothing is saved yet)
+  def handle_event("check_ssl", params, socket) do
+    read = fn name ->
+      socket
+      |> consume_uploaded_entries(name, fn %{path: path}, _entry -> {:ok, File.read!(path)} end)
+      |> List.first()
+    end
+
+    pem = %{cert: read.(:ssl_cert), key: read.(:ssl_key), chain: read.(:ssl_chain)}
+    hostname = String.trim(params["ssl_hostname"] || "")
+
+    check =
+      cond do
+        is_nil(pem.cert) or is_nil(pem.key) ->
+          {:error, ["証明書と秘密鍵の両方を選択してください"]}
+
+        true ->
+          case AskDrive.SSL.validate(pem, hostname) do
+            {:ok, info} -> {:ok, info, pem}
+            {:error, errors} -> {:error, errors}
+          end
+      end
+
+    {:noreply, assign(socket, :ssl_check, check)}
+  end
+
+  # Step 2: install the validated certificate and restart the HTTPS listener. Restarting the
+  # endpoint drops this very connection, so it runs in a detached process a moment later and
+  # the page reconnects on its own.
+  def handle_event("apply_ssl", _params, socket) do
+    case socket.assigns.ssl_check do
+      {:ok, info, pem} ->
+        spawn(fn ->
+          Process.sleep(500)
+          record_ssl_result(AskDrive.SSL.install(pem, info, "custom"))
+        end)
+
+        {:noreply,
+         socket
+         |> assign(:ssl_check, nil)
+         |> put_flash(:info, "証明書を適用しています。数秒後にページが自動で再接続します（再接続しない場合は再読み込みしてください）。")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "先に「検証する」で証明書を検証してください。")}
+    end
+  end
+
+  def handle_event("reset_self_signed", _params, socket) do
+    spawn(fn ->
+      Process.sleep(500)
+      record_ssl_result(AskDrive.SSL.reset_to_self_signed())
+    end)
+
+    {:noreply, put_flash(socket, :info, "自己署名証明書を作り直して適用しています。数秒後にページが自動で再接続します。")}
+  end
+
+  def handle_event("cancel_ssl_upload", %{"ref" => ref, "upload" => upload}, socket) do
+    {:noreply, cancel_upload(socket, String.to_existing_atom(upload), ref)}
   end
 
   @impl true
@@ -2103,6 +2176,168 @@ defmodule AskDriveWeb.AdminLive do
                 </ul>
               </details>
             </div>
+
+            <%!-- HTTPS / SSL certificate (spec 6.10) --%>
+            <div
+              id="ssl-settings"
+              class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
+            >
+              <div>
+                <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-lock-closed" class="w-5 h-5 text-indigo-600" /> HTTPS（SSL 証明書）
+                </h2>
+                <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  すべての通信は HTTPS（ポート {AskDrive.SSL.https_port()}）で暗号化され、HTTP（{Enum.join(
+                    AskDrive.SSL.redirect_ports(),
+                    " / "
+                  )}）へのアクセスは HTTPS に転送されます。
+                </p>
+              </div>
+
+              <%= if AskDrive.SSL.enabled?() do %>
+                <% cert = AskDrive.SSL.current() || %{} %>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span class="text-zinc-400 block">使用中の証明書</span>
+                    <span class="font-medium text-zinc-800 dark:text-zinc-200">
+                      {case cert["source"] do
+                        "custom" -> "独自の証明書"
+                        "self_signed" -> "自己署名証明書（ブラウザに警告が出ます）"
+                        _ -> "不明"
+                      end}
+                    </span>
+                  </div>
+                  <div>
+                    <span class="text-zinc-400 block">有効期限</span>
+                    <span class="font-mono">{format_cert_time(cert["not_after"])}</span>
+                  </div>
+                  <div>
+                    <span class="text-zinc-400 block">サブジェクト / 発行者</span>
+                    <span class="font-mono break-all">{cert["subject"]} / {cert["issuer"]}</span>
+                  </div>
+                  <div>
+                    <span class="text-zinc-400 block">対象のホスト名</span>
+                    <span class="font-mono break-all">{Enum.join(cert["names"] || [], ", ")}</span>
+                  </div>
+                  <div>
+                    <span class="text-zinc-400 block">HSTS</span>
+                    <span>{if AskDrive.SSL.hsts?(), do: "有効（独自の証明書のため）", else: "無効（自己署名証明書の間は送りません）"}</span>
+                  </div>
+                </div>
+
+                <p class="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2">
+                  管理画面が認証なしで開放されている間（POC）は、LAN 内の誰でも証明書を差し替えられます。外部公開の前に認証を有効にしてください。
+                </p>
+
+                <form
+                  id="ssl-upload-form"
+                  phx-submit="check_ssl"
+                  phx-change="ssl_upload_change"
+                  class="space-y-3"
+                >
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <label class="space-y-1">
+                      <span class="block font-medium">証明書（PEM・必須）</span>
+                      <.live_file_input upload={@uploads.ssl_cert} class="text-xs" />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="block font-medium">秘密鍵（PEM・必須）</span>
+                      <.live_file_input upload={@uploads.ssl_key} class="text-xs" />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="block font-medium">中間証明書（PEM・任意）</span>
+                      <.live_file_input upload={@uploads.ssl_chain} class="text-xs" />
+                    </label>
+                  </div>
+                  <div
+                    :for={
+                      {name, upload} <- [
+                        ssl_cert: @uploads.ssl_cert,
+                        ssl_key: @uploads.ssl_key,
+                        ssl_chain: @uploads.ssl_chain
+                      ]
+                    }
+                    class="text-[11px] text-red-600"
+                  >
+                    <p :for={err <- upload_errors(upload)}>{name}: {upload_error_label(err)}</p>
+                    <p :for={entry <- upload.entries} :if={upload_errors(upload, entry) != []}>
+                      {entry.client_name}: {Enum.map_join(
+                        upload_errors(upload, entry),
+                        "、",
+                        &upload_error_label/1
+                      )}
+                    </p>
+                  </div>
+                  <label class="block text-xs space-y-1 max-w-md">
+                    <span class="block font-medium">公開するホスト名（任意。指定すると証明書に含まれているか検証します）</span>
+                    <input
+                      type="text"
+                      name="ssl_hostname"
+                      placeholder="例: askdrive.example.com"
+                      class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 font-mono"
+                    />
+                  </label>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      type="submit"
+                      id="check-ssl-btn"
+                      class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium"
+                    >
+                      検証する
+                    </button>
+                    <button
+                      :if={AskDrive.SSL.current()["source"] != "self_signed"}
+                      type="button"
+                      id="reset-self-signed-btn"
+                      phx-click="reset_self_signed"
+                      data-confirm="独自の証明書をやめ、自己署名証明書に戻します。ブラウザに証明書の警告が出るようになります。続行しますか？"
+                      class="px-4 py-2 rounded-lg text-xs text-zinc-500 underline"
+                    >
+                      自己署名証明書に戻す
+                    </button>
+                  </div>
+                </form>
+
+                <%= case @ssl_check do %>
+                  <% {:ok, info, _pem} -> %>
+                    <div
+                      id="ssl-check-ok"
+                      class="text-xs rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 dark:border-emerald-900 px-3 py-2 space-y-1"
+                    >
+                      <p class="font-medium text-emerald-800 dark:text-emerald-200">
+                        検証に成功しました（証明書と鍵の対応・有効期限・中間証明書・TLS 接続テスト）。
+                      </p>
+                      <p class="font-mono break-all">{info["subject"]}（発行者: {info["issuer"]}）</p>
+                      <p class="font-mono break-all">ホスト名: {Enum.join(info["names"], ", ")}</p>
+                      <p class="font-mono">有効期限: {format_cert_time(info["not_after"])}</p>
+                      <button
+                        type="button"
+                        id="apply-ssl-btn"
+                        phx-click="apply_ssl"
+                        data-confirm="この証明書を保存し、HTTPS を再起動します。接続が数秒途切れます。続行しますか？"
+                        class="mt-1 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium"
+                      >
+                        保存して適用（HTTPS を再起動）
+                      </button>
+                    </div>
+                  <% {:error, errors} -> %>
+                    <div
+                      id="ssl-check-error"
+                      class="text-xs rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/40 dark:border-red-900 px-3 py-2 space-y-1 text-red-700 dark:text-red-300"
+                    >
+                      <p class="font-medium">検証に失敗しました。証明書は保存していません。</p>
+                      <p :for={e <- errors}>・{e}</p>
+                    </div>
+                  <% _ -> %>
+                <% end %>
+
+                <p :if={msg = last_ssl_result()} class="text-xs text-red-600">{msg}</p>
+              <% else %>
+                <p class="text-xs text-zinc-500">
+                  HTTPS は無効です（ASK_DRIVE_SSL=false）。HTTP で待ち受けています。
+                </p>
+              <% end %>
+            </div>
           </div>
         <% end %>
       </div>
@@ -2247,4 +2482,27 @@ defmodule AskDriveWeb.AdminLive do
 
   defp pull_percent(%{completed: c, total: t}) when is_integer(t) and t > 0, do: div(c * 100, t)
   defp pull_percent(_), do: nil
+
+  defp format_cert_time(nil), do: "—"
+
+  defp format_cert_time(iso) do
+    case DateTime.from_iso8601(iso) do
+      {:ok, dt, _} -> AskDrive.Clock.format(dt, "%Y-%m-%d %H:%M")
+      _ -> iso
+    end
+  end
+
+  defp upload_error_label(:too_large), do: "ファイルが大きすぎます"
+  defp upload_error_label(:not_accepted), do: "PEM 形式（.pem / .crt / .cer / .key）のファイルを選んでください"
+  defp upload_error_label(:too_many_files), do: "1 ファイルだけ選んでください"
+  defp upload_error_label(other), do: inspect(other)
+
+  # The page that clicked "apply" is gone after the endpoint restart; a failure (rolled back
+  # to the previous certificate) is kept here so the reconnected page can show it.
+  defp record_ssl_result(:ok), do: :persistent_term.erase({__MODULE__, :ssl_result})
+
+  defp record_ssl_result({:error, message}),
+    do: :persistent_term.put({__MODULE__, :ssl_result}, "前回の証明書の適用に失敗しました: #{message}")
+
+  defp last_ssl_result, do: :persistent_term.get({__MODULE__, :ssl_result}, nil)
 end

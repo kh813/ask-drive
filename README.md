@@ -117,7 +117,7 @@ Anthropic API キー: ********
 ./app.sh service status
 ```
 
-ブラウザで `http://localhost:4000/` にアクセスします。
+ブラウザで `https://localhost:4443/` にアクセスします（`http://localhost:4080/` や従来の `:4000` も HTTPS に転送されます。初回は自己署名証明書の警告が出ます。詳しくは「HTTPS（SSL）」を参照）。
 
 ---
 
@@ -196,6 +196,27 @@ JSON の妥当性（`client_email` / `private_key` の有無）をその場で�
 
 ---
 
+## HTTPS（SSL）
+
+v0.0.45 以降、AskDrive の通信はすべて HTTPS で暗号化されます。
+
+| ポート | 役割 |
+|---|---|
+| **4443**（`ASK_DRIVE_HTTPS_PORT`） | HTTPS。アプリ本体 |
+| 4080（`ASK_DRIVE_HTTP_PORT`） | HTTP。すべて HTTPS へ転送 |
+| 4000（従来の `PORT`） | 移行用。HTTPS へ転送（`ASK_DRIVE_LEGACY_REDIRECT=false` で停止） |
+
+- **初回起動時**に自己署名証明書を自動で作成します（`localhost`・PC のホスト名・LAN の IP アドレス向け、`ssl/active/` に保存。秘密鍵は所有者のみ読み取り可）。自己署名証明書のため、ブラウザに「この接続ではプライバシーが保護されません」等の警告が出ます。社内検証中は「詳細」から続行してください。
+- **独自の証明書**（認証局が発行した証明書）は、管理画面の設定タブ **「HTTPS（SSL 証明書）」** で設定します。
+  1. 証明書・秘密鍵（パスフレーズなし）・中間証明書（任意）の PEM ファイルを選び、公開するホスト名を入力して **「検証する」** を押します。形式、証明書と鍵の対応、有効期限、中間証明書のつながり、ホスト名を確認し、実際に TLS 接続を試します。
+  2. 検証に成功したら **「保存して適用」** を押します。証明書を保存して HTTPS を再起動し、数秒後にページが自動で再接続します。新しい証明書で起動できなかった場合は、自動的に元の証明書へ戻します。
+  3. 独自の証明書を設定すると **HSTS** が有効になります（自己署名証明書の間は送りません）。「自己署名証明書に戻す」で元に戻せます。
+- **リバースプロキシ（Cloudflare・nginx 等）を前段に置く場合**は、プロキシから `https://<ホスト>:4443` に接続させ、`.env.prod` に `ASK_DRIVE_TRUST_FORWARDED=true` を設定してください（`X-Forwarded-Proto/Host/Port` を信頼し、Google ログインのリダイレクト URI 等を公開 URL で組み立てます）。プロキシを使わない場合は設定しないでください。
+- HTTPS を使わない従来の HTTP 運用に戻すには `.env.prod` に `ASK_DRIVE_SSL=false` を設定して再起動します。
+- **Google ログイン**（OAuth）のリダイレクト URI は `https://<ホスト名>:4443/auth/google/callback` になります。Google Cloud Console に登録してください。
+
+---
+
 ## 初期設定と Google 連携手順
 
 AskDrive は、全社公開マニュアルなどの Google Drive フォルダを同期する **「同期専用 Google アカウント」** と、チャットを利用する **「社員アカウント」** の 2 種類のアカウント形態をサポートしています。
@@ -206,7 +227,7 @@ AskDrive は、全社公開マニュアルなどの Google Drive フォルダを
 [ Google Drive マニュアルフォルダ ]
                │ (夜間自動同期 / 同期専用アカウントで認可)
          ┌─────▼─────┐
-         │  AskDrive │ ◄── LAN 公開 (http://<ホスト>:4000)
+         │  AskDrive │ ◄── LAN 公開 (https://<ホスト>:4443)
          └─────▲─────┘
                │ (Google ログイン / @company.com ドメイン限定)
                ▼
@@ -264,10 +285,10 @@ AskDrive は、全社公開マニュアルなどの Google Drive フォルダを
      - **⚠️ 生の IP アドレス（`http://192.168.x.x:...`）や `.local`（mDNS）ホスト名は Google 側で拒否されます。** `localhost` 以外で LAN からアクセスさせたい場合は、**正式な公開 TLD（`.com` / `.net` など）を持つホスト名**が必須です（社内 DNS や各端末の `hosts` ファイルで、そのホスト名を稼働機の LAN IP に向ければ、実際にインターネットへ公開する必要はありません）。
      - 管理者が初期設定を `localhost` で行い、社員が LAN 経由でアクセスする場合は、**両方**を登録してください（Google は 1 つの OAuth クライアントに複数のリダイレクト URI を登録できます）:
        ```text
-       http://localhost:4000/auth/google/callback
-       http://<自社ドメインのサブドメイン>:4000/auth/google/callback
+       https://localhost:4443/auth/google/callback
+       https://<自社ドメインのサブドメイン>:4443/auth/google/callback
        ```
-       （例: `http://ask-drive.company.com:4000/auth/google/callback`。`company.com` は自社が保有する実在のドメインで、社内 DNS または各端末の `hosts` ファイルに `192.168.11.42 ask-drive.company.com` を追加して名前解決します）
+       （例: `https://ask-drive.company.com:4443/auth/google/callback`。v0.0.45 以降は HTTPS のため、以前 `http://…:4000/…` で登録していた場合は HTTPS の URI を追加してください。`company.com` は自社が保有する実在のドメインで、社内 DNS または各端末の `hosts` ファイルに `192.168.11.42 ask-drive.company.com` を追加して名前解決します）
      - 複数のホスト名からアクセスされ得る場合は、その分だけ URI を追加登録してください。
      - **ログインだけでなく、それ以降のチャット・管理画面の利用も同じホスト名で統一してください。** ログイン時と別のホスト名（例: 生の IP）でアクセスすると、ブラウザのセッション Cookie が別オリジン扱いとなりログイン状態が引き継がれません。
      - **社員ログインと Drive 同期認可は同じコールバック URI を共用します。** 用途ごとに別の URI を用意する必要はありません。
@@ -283,7 +304,7 @@ AskDrive は、全社公開マニュアルなどの Google Drive フォルダを
 
 ### ステップ 2: ログインと管理者への昇格
 
-1. ブラウザで `http://<Google Cloud Console に登録したホスト名>:4000/` を開きます。未ログインの場合はログイン画面が表示されます。
+1. ブラウザで `https://<Google Cloud Console に登録したホスト名>:4443/` を開きます。未ログインの場合はログイン画面が表示されます。
 2. **「Google でログイン」** をクリックし、初期セットアップで指定したアカウントでログインします。この時点では一般ユーザーです。
 3. ヘッダの **「管理者として操作」** をクリックし、初期セットアップで設定した**管理者パスワード**を入力します。
 4. 昇格に成功するとヘッダが「管理者モード（残り 30 分）」に変わり、**「管理」** リンクから管理画面に入れます。
@@ -317,7 +338,7 @@ ASK_DRIVE_DISABLE_AUTH=false
 
 ### ステップ 3: Web 管理画面での設定
 
-1. ブラウザで `http://<Google Cloud Console に登録したホスト名>:4000/admin?tab=settings` を開きます（昇格中のみ）。
+1. ブラウザで `https://<Google Cloud Console に登録したホスト名>:4443/admin?tab=settings` を開きます（昇格中のみ）。
 2. **LLM プロバイダ設定** を確認・変更します:
    - **回答生成プロバイダ / モデル**: `ollama` + `qwen3:4b`（既定）、または `anthropic` + `claude-sonnet-5` など
    - **埋め込みプロバイダ / モデル / 次元**: 既定は `ollama` + `bge-m3` + `1024`
@@ -397,7 +418,7 @@ ASK_DRIVE_DISABLE_AUTH=false
 
 ### ステップ 4: 一般ユーザーの利用
 
-- 社員はブラウザから `http://<Google Cloud Console に登録したホスト名>:4000/` にアクセスし、各自の Google Workspace アカウントでログインして質問チャットを利用します。
+- 社員はブラウザから `https://<Google Cloud Console に登録したホスト名>:4443/` にアクセスし、各自の Google Workspace アカウントでログインして質問チャットを利用します。
 - `許可 Google Workspace ドメイン` 以外のアカウントによるアクセスは自動的に遮断されます。
 - 初回ログイン時に自動で一般ユーザーとして登録されます。事前の招待や登録作業は不要です。
 - 一般ユーザーには管理画面への導線が表示されず、URL を直接開いてもチャット画面に戻されます。

@@ -64,6 +64,21 @@ if config_env() == :prod do
 
   config :ask_drive, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
+  # HTTPS (spec 6.10). On by default: the endpoint serves HTTPS on ASK_DRIVE_HTTPS_PORT and
+  # ASK_DRIVE_HTTP_PORT (and the legacy PORT, 4000) only redirect there. ASK_DRIVE_SSL=false
+  # restores plain HTTP on PORT. Certificates live in ASK_DRIVE_SSL_DIR (default ./ssl).
+  config :ask_drive,
+    ssl_enabled: System.get_env("ASK_DRIVE_SSL", "true") not in ["false", "0", "no", "off"],
+    https_port: String.to_integer(System.get_env("ASK_DRIVE_HTTPS_PORT") || "4443"),
+    http_port: String.to_integer(System.get_env("ASK_DRIVE_HTTP_PORT") || "4080"),
+    legacy_http_port:
+      if(System.get_env("ASK_DRIVE_LEGACY_REDIRECT", "true") in ["false", "0", "no", "off"],
+        do: nil,
+        else: port
+      ),
+    ssl_dir: System.get_env("ASK_DRIVE_SSL_DIR"),
+    trust_forwarded: System.get_env("ASK_DRIVE_TRUST_FORWARDED") in ["true", "1", "yes", "on"]
+
   config :ask_drive, AskDriveWeb.Endpoint,
     url: [host: host, port: port, scheme: "http"],
     http: [

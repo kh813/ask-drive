@@ -62,6 +62,14 @@ AskDrive 管理スクリプト
 EOF
 }
 
+# アプリの URL（ヘルスチェック用）。HTTPS が既定（自己署名証明書のため curl は -k で使う）
+app_url() {
+  case "${ASK_DRIVE_SSL:-true}" in
+    false|0|no|off) echo "http://localhost:${PORT:-4000}/" ;;
+    *) echo "https://localhost:${ASK_DRIVE_HTTPS_PORT:-4443}/" ;;
+  esac
+}
+
 # 環境変数の読み込み
 load_env() {
   if [[ -f "${ENV_FILE}" ]]; then
@@ -230,13 +238,14 @@ cmd_status() {
     echo -e "${BLUE}未登録${NC}"
   fi
 
-  # 4. HTTP ヘルスチェック (ポート 4000)
-  echo -n "HTTP エンドポイント: "
-  local port="${PORT:-4000}"
-  if curl -s -o /dev/null -w "%{http_code}" "http://localhost:${port}/" > /dev/null 2>&1; then
-    echo -e "${GREEN}応答あり (http://localhost:${port}/)${NC}"
+  # 4. HTTP(S) ヘルスチェック。既定は HTTPS（4443）。ASK_DRIVE_SSL=false のときは HTTP（PORT）
+  local url
+  url="$(app_url)"
+  echo -n "Web エンドポイント: "
+  if curl -sk -o /dev/null "${url}" > /dev/null 2>&1; then
+    echo -e "${GREEN}応答あり (${url})${NC}"
   else
-    echo -e "${YELLOW}接続不可${NC}"
+    echo -e "${YELLOW}接続不可 (${url})${NC}"
   fi
 }
 
