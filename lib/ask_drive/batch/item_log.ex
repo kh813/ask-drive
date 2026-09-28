@@ -98,6 +98,42 @@ defmodule AskDrive.Batch.ItemLog do
   end
 
   @doc """
+  Per-run totals for the history table: `%{run_id => %{indexed: n, chunks: n, failed: n}}`.
+  """
+  def summaries([]), do: %{}
+
+  def summaries(run_ids) do
+    Repo.all(
+      from l in __MODULE__,
+        where: l.batch_run_id in ^run_ids,
+        group_by: l.batch_run_id,
+        select:
+          {l.batch_run_id,
+           %{
+             indexed:
+               sum(
+                 fragment(
+                   "CASE WHEN ? = 'embed_chunks' AND ? = 'indexed' THEN 1 ELSE 0 END",
+                   l.phase,
+                   l.status
+                 )
+               ),
+             chunks:
+               sum(
+                 fragment(
+                   "CASE WHEN ? = 'embed_chunks' AND ? = 'indexed' THEN COALESCE(?, 0) ELSE 0 END",
+                   l.phase,
+                   l.status,
+                   l.chunks
+                 )
+               ),
+             failed: sum(fragment("CASE WHEN ? = 'failed' THEN 1 ELSE 0 END", l.status))
+           }}
+    )
+    |> Map.new()
+  end
+
+  @doc """
   Turns an error term from Drive/extraction/embedding into one readable line. Drive answers
   a file the caller may not read with 404, so say that rather than "not found".
   """

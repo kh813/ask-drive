@@ -70,6 +70,83 @@ defmodule AskDrive.Batch.Scheduler do
     else
       do_run_batch(opts)
     end
+  rescue
+    # A crash before the batch_runs row exists (or outside the phases' own rescue) used to
+    # vanish into a Task's log line; the night then looked as if nothing had been tried.
+    # Record it as a failed run so the history shows the attempt and the reason (F-338).
+    e ->
+      Logger.error("Batch crashed: #{Exception.format(:error, e, __STACKTRACE__)}")
+
+      %BatchRun{}
+      |> BatchRun.changeset(%{
+        started_at: DateTime.utc_now(),
+        finished_at: DateTime.utc_now(),
+        status: "failed",
+        kind: if(Keyword.get(opts, :ingest_only, false), do: "ingest_only", else: "full"),
+        trigger: if(Keyword.get(opts, :trigger) == "auto", do: "auto", else: "manual"),
+        error: Exception.message(e)
+      })
+      |> Repo.insert()
+
+      Mode.end_batch()
+      {:error, e}
+  end
+
+  @doc "Recent batch runs, newest first, with their phase stats."
+  def list_runs(limit \\ 20) do
+    Repo.all(
+      from b in BatchRun,
+        order_by: [desc: b.started_at, desc: b.id],
+        limit: ^limit,
+        preload: [:phase_stats]
+    )
+  end
+
+  @doc """
+  What the night-window trigger will do, for the admin screen (spec F-338):
+  `%{window: {start_h, end_h}, window_start: local, in_window?: bool,
+  state: :running | :done | :due | :missed, run: run | nil, next_start: local}`.
+  """
+  def auto_status(now \\ AskDrive.Clock.local_now()) do
+    setting = Settings.get_setting!()
+    start_h = setting.batch_start_hour || 21
+    end_h = setting.batch_end_hour || 7
+    window_start = Mode.night_window_start_utc(now)
+    in_window? = Mode.calculate_current_mode(now) == :night_batch
+
+    tonight =
+      Repo.one(
+        from b in BatchRun,
+          where: b.kind == "full" and b.started_at >= ^window_start and b.status != "aborted",
+          order_by: [desc: b.started_at],
+          limit: 1
+      )
+
+    today_start = NaiveDateTime.new!(NaiveDateTime.to_date(now), Time.new!(start_h, 0, 0))
+
+    next_start =
+      if NaiveDateTime.compare(now, today_start) == :lt,
+        do: today_start,
+        else: NaiveDateTime.add(today_start, 86_400)
+
+    # :done covers "this window" while inside it and "last night" in the daytime;
+    # :missed means last night's window closed without a (non-aborted) full batch.
+    state =
+      cond do
+        running?() -> :running
+        tonight -> :done
+        in_window? -> :due
+        true -> :missed
+      end
+
+    %{
+      window: {start_h, end_h},
+      window_start: AskDrive.Clock.to_local(window_start),
+      in_window?: in_window?,
+      state: state,
+      run: tonight,
+      next_start: next_start
+    }
   end
 
   defp do_run_batch(opts) do
@@ -88,7 +165,8 @@ defmodule AskDrive.Batch.Scheduler do
         qa_generated: 0,
         qa_invalidated: 0,
         questions_resolved: 0,
-        kind: if(ingest_only?, do: "ingest_only", else: "full")
+        kind: if(ingest_only?, do: "ingest_only", else: "full"),
+        trigger: Keyword.get(opts, :trigger, "manual")
       })
       |> Repo.insert()
 

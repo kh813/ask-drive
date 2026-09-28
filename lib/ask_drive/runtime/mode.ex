@@ -167,15 +167,22 @@ defmodule AskDrive.Runtime.Mode do
   # except the admin button. Start it from the clock once per night window. "Once" is read
   # from batch_runs, so a restart inside the window doesn't start a second one.
   defp maybe_start_nightly_batch do
-    if Application.get_env(:ask_drive, :auto_nightly_batch, true) and
-         calculate_current_mode() == :night_batch and
-         not AskDrive.Batch.Scheduler.running?() and
-         not AskDrive.Batch.Scheduler.ran_since?(night_window_start_utc()) do
+    if Application.get_env(:ask_drive, :auto_nightly_batch, true) and nightly_due?() do
       Logger.info("Night window reached: starting the nightly batch")
-      Task.start(fn -> AskDrive.Batch.Scheduler.run_batch() end)
+      Task.start(fn -> AskDrive.Batch.Scheduler.run_batch(trigger: "auto") end)
     end
   rescue
     e -> Logger.error("Could not start the nightly batch: #{Exception.message(e)}")
+  end
+
+  @doc """
+  Whether the nightly batch should start now: inside the night window, nothing running, and
+  no full batch has run in this window yet (one aborted by a restart doesn't count).
+  """
+  def nightly_due?(now \\ AskDrive.Clock.local_now()) do
+    calculate_current_mode(now) == :night_batch and
+      not AskDrive.Batch.Scheduler.running?() and
+      not AskDrive.Batch.Scheduler.ran_since?(night_window_start_utc(now))
   end
 
   @doc """

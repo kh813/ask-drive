@@ -14,6 +14,7 @@ defmodule AskDrive.Batch.BatchRun do
     field :queue_remaining, :integer, default: 0
     field :error, :string
     field :kind, :string, default: "full"
+    field :trigger, :string, default: "manual"
 
     has_many :phase_stats, AskDrive.Batch.BatchPhaseStat, on_delete: :delete_all
     has_many :item_logs, AskDrive.Batch.ItemLog, on_delete: :delete_all
@@ -35,10 +36,12 @@ defmodule AskDrive.Batch.BatchRun do
       :questions_resolved,
       :queue_remaining,
       :error,
-      :kind
+      :kind,
+      :trigger
     ])
     |> validate_required([:status])
     |> validate_inclusion(:kind, ["full", "ingest_only"])
+    |> validate_inclusion(:trigger, ["manual", "auto"])
     |> validate_inclusion(:status, [
       "running",
       "completed",

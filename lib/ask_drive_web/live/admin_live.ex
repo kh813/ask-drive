@@ -18,7 +18,7 @@ defmodule AskDriveWeb.AdminLive do
   import Ecto.Query, warn: false
 
   alias AskDrive.Accounts.{AdminAccess, AdminElevationLog}
-  alias AskDrive.Batch.{BatchRun, ItemLog, Scheduler}
+  alias AskDrive.Batch.{ItemLog, Scheduler}
   alias AskDrive.Documents.{Chunk, Document}
   alias AskDrive.Drive.{Client, ServiceAccount}
   alias AskDrive.LLM
@@ -57,6 +57,11 @@ defmodule AskDriveWeb.AdminLive do
   @impl true
   def handle_info(:tick, socket) do
     {:noreply, load_dashboard_data(socket)}
+  end
+
+  @impl true
+  def handle_event("select_run", %{"id" => id}, socket) do
+    {:noreply, socket |> assign(:selected_run_id, String.to_integer(id)) |> load_dashboard_data()}
   end
 
   @impl true
@@ -308,16 +313,14 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   defp load_dashboard_data(socket) do
-    # 1. Latest Batch Run and stats
-    latest_run =
-      Repo.one(
-        from b in BatchRun,
-          order_by: [desc: b.started_at],
-          limit: 1,
-          preload: [:phase_stats]
-      )
-
+    # 1. Batch history (spec F-338): recent runs, the one being inspected (latest unless the
+    #    admin picked another row), and what the night-window trigger is doing.
+    runs = Scheduler.list_runs(20)
+    selected_id = socket.assigns[:selected_run_id]
+    latest_run = Enum.find(runs, &(&1.id == selected_id)) || List.first(runs)
     item_logs = if latest_run, do: ItemLog.list_for_run(latest_run.id), else: []
+    run_summaries = runs |> Enum.map(& &1.id) |> ItemLog.summaries()
+    auto_status = Scheduler.auto_status()
 
     # 2. Coverage Stats
     total_chunks = Repo.aggregate(Chunk, :count, :id) || 0
@@ -346,6 +349,9 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:generation_provider, LLM.generation_provider(setting))
     |> assign(:embedding_provider, LLM.embedding_provider(setting))
     |> assign(:latest_run, latest_run)
+    |> assign(:runs, runs)
+    |> assign(:run_summaries, run_summaries)
+    |> assign(:auto_status, auto_status)
     |> assign(:item_logs, item_logs)
     |> assign(:total_chunks, total_chunks)
     |> assign(:active_qas, active_qas)
@@ -532,11 +538,140 @@ defmodule AskDriveWeb.AdminLive do
               </div>
             </div>
 
+            <%!-- Nightly trigger status and batch history (spec F-338) --%>
+            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-clock" class="w-5 h-5 text-indigo-600" /> 夜間バッチの自動実行と履歴
+                </h2>
+                <span class="text-xs text-zinc-500">
+                  夜間枠: 毎日 {pad2(elem(@auto_status.window, 0))}:00〜翌 {pad2(
+                    elem(@auto_status.window, 1)
+                  )}:00（この PC のローカル時刻）
+                </span>
+              </div>
+
+              <div
+                id="auto-batch-status"
+                class={[
+                  "text-sm px-3 py-2 rounded-lg border",
+                  case @auto_status.state do
+                    :done ->
+                      "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-200"
+
+                    :running ->
+                      "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-200"
+
+                    :due ->
+                      "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-200"
+
+                    :missed ->
+                      "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-900 dark:text-amber-200"
+                  end
+                ]}
+              >
+                <%= case @auto_status.state do %>
+                  <% :running -> %>
+                    バッチを実行中です。
+                  <% :done -> %>
+                    {Calendar.strftime(@auto_status.window_start, "%-m/%-d")} の夜間枠は実行済みです（#{@auto_status.run.id}・{trigger_label(
+                      @auto_status.run.trigger
+                    )}・{AskDrive.Clock.format(@auto_status.run.started_at, "%H:%M")} 開始・{status_label(
+                      @auto_status.run.status
+                    )}）。次回の自動実行: {Calendar.strftime(@auto_status.next_start, "%-m/%-d %H:%M")}
+                  <% :due -> %>
+                    夜間枠内で、この枠のフル実行はまだありません。1 分以内に自動で開始します。
+                  <% :missed -> %>
+                    {Calendar.strftime(@auto_status.window_start, "%-m/%-d")} の夜間枠では、フル実行（完了・失敗を含む）が記録されていません（再起動で中断されたものは除く）。次回の自動実行: {Calendar.strftime(
+                      @auto_status.next_start,
+                      "%-m/%-d %H:%M"
+                    )}
+                <% end %>
+              </div>
+
+              <%= if @runs == [] do %>
+                <p class="text-xs text-zinc-500">バッチの実行履歴はまだありません。</p>
+              <% else %>
+                <div class="overflow-x-auto">
+                  <table
+                    id="batch-history"
+                    class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400"
+                  >
+                    <thead class="text-[11px] text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                      <tr>
+                        <th class="py-2 px-2">#</th>
+                        <th class="py-2 px-2">開始</th>
+                        <th class="py-2 px-2 text-right">所要時間</th>
+                        <th class="py-2 px-2">起動</th>
+                        <th class="py-2 px-2">種別</th>
+                        <th class="py-2 px-2">状態</th>
+                        <th class="py-2 px-2 text-right">取り込み（文書 / チャンク）</th>
+                        <th class="py-2 px-2 text-right">失敗</th>
+                        <th class="py-2 px-2 text-right">生成QA</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                      <tr
+                        :for={run <- @runs}
+                        id={"batch-run-#{run.id}"}
+                        phx-click="select_run"
+                        phx-value-id={run.id}
+                        class={[
+                          "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition",
+                          @latest_run && run.id == @latest_run.id &&
+                            "bg-indigo-50/60 dark:bg-indigo-950/30"
+                        ]}
+                      >
+                        <td class="py-2 px-2 font-mono">{run.id}</td>
+                        <td class="py-2 px-2 font-mono whitespace-nowrap">
+                          {AskDrive.Clock.format(run.started_at, "%m/%d %H:%M")}
+                        </td>
+                        <td class="py-2 px-2 text-right font-mono whitespace-nowrap">
+                          {duration_label(run)}
+                        </td>
+                        <td class="py-2 px-2 whitespace-nowrap">{trigger_label(run.trigger)}</td>
+                        <td class="py-2 px-2 whitespace-nowrap">
+                          {if run.kind == "ingest_only", do: "取り込みのみ", else: "フル"}
+                        </td>
+                        <td class="py-2 px-2 whitespace-nowrap">
+                          <span class={[
+                            "px-2 py-0.5 rounded-full text-[10px] font-medium",
+                            status_class(run.status)
+                          ]}>
+                            {status_label(run.status)}
+                          </span>
+                        </td>
+                        <td class="py-2 px-2 text-right font-mono">
+                          <% sum =
+                            Map.get(@run_summaries, run.id, %{indexed: 0, chunks: 0, failed: 0}) %>
+                          {sum.indexed || 0} / {sum.chunks || 0}
+                        </td>
+                        <td class={[
+                          "py-2 px-2 text-right font-mono",
+                          (Map.get(@run_summaries, run.id, %{failed: 0}).failed || 0) > 0 &&
+                            "text-red-600"
+                        ]}>
+                          {Map.get(@run_summaries, run.id, %{failed: 0}).failed || 0}
+                        </td>
+                        <td class="py-2 px-2 text-right font-mono">{run.qa_generated || 0}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="text-[11px] text-zinc-400">
+                  行をクリックすると、下の「バッチ実行状況」にそのバッチの詳細（フェーズ別内訳・ファイル別ログ）を表示します。
+                </p>
+              <% end %>
+            </div>
+
             <%!-- Latest Batch Run Card --%>
             <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
               <div class="flex items-center justify-between">
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-cpu-chip" class="w-5 h-5 text-indigo-600" /> 直近の夜間バッチ実行状況
+                  <.icon name="hero-cpu-chip" class="w-5 h-5 text-indigo-600" /> バッチ実行状況
+                  <span :if={@latest_run} class="text-xs font-normal text-zinc-400">
+                    #{@latest_run.id}
+                  </span>
                 </h2>
                 <div :if={@latest_run} class="flex items-center gap-2">
                   <span class={[
@@ -555,7 +690,10 @@ defmodule AskDriveWeb.AdminLive do
                         "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300 border border-red-200/50"
                     end
                   ]}>
-                    {@latest_run.status}
+                    {status_label(@latest_run.status)}
+                  </span>
+                  <span class="text-xs px-2.5 py-1 rounded-full font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+                    {trigger_label(@latest_run.trigger)}
                   </span>
                   <span
                     :if={@latest_run.kind == "ingest_only"}
@@ -1895,4 +2033,40 @@ defmodule AskDriveWeb.AdminLive do
     do: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
 
   defp item_status_class(_), do: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+
+  defp status_label("completed"), do: "完了"
+  defp status_label("running"), do: "実行中"
+  defp status_label("aborted"), do: "中断（再起動）"
+  defp status_label("failed"), do: "失敗"
+  defp status_label("deadline_reached"), do: "時間切れ"
+  defp status_label(other), do: other
+
+  defp status_class("completed"),
+    do: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+
+  defp status_class("running"),
+    do: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 animate-pulse"
+
+  defp status_class("deadline_reached"),
+    do: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+
+  defp status_class(_), do: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+
+  defp trigger_label("auto"), do: "自動"
+  defp trigger_label(_), do: "手動"
+
+  defp pad2(n), do: n |> Integer.to_string() |> String.pad_leading(2, "0")
+
+  defp duration_label(%{started_at: s, finished_at: nil}) when not is_nil(s) do
+    "#{format_seconds(DateTime.diff(DateTime.utc_now(), s))}〜"
+  end
+
+  defp duration_label(%{started_at: s, finished_at: f}) when not is_nil(s) and not is_nil(f),
+    do: format_seconds(DateTime.diff(f, s))
+
+  defp duration_label(_), do: "—"
+
+  defp format_seconds(sec) when sec < 60, do: "#{sec}秒"
+  defp format_seconds(sec) when sec < 3600, do: "#{div(sec, 60)}分#{rem(sec, 60)}秒"
+  defp format_seconds(sec), do: "#{div(sec, 3600)}時間#{div(rem(sec, 3600), 60)}分"
 end
