@@ -218,20 +218,52 @@ defmodule AskDrive.Batch.Scheduler do
     Logger.info("Batch ##{batch_run.id} - [Phase 4: Generate] starting...")
 
     # Embed model already unloaded. Now generation model will be loaded by Ollama on first request.
+    # Collect candidate chunk IDs from unresolved Tier 2 / 3 question logs (Priority 1)
+    unresolved_logs =
+      Repo.all(
+        from q in AskDrive.QA.QuestionLog,
+          where: is_nil(q.resolved_at) and q.tier_reached in [2, 3]
+      )
+
+    unresolved_chunk_ids =
+      unresolved_logs
+      |> Enum.flat_map(fn log -> log.candidate_chunk_ids || [] end)
+      |> Enum.uniq()
+
     chunks_query =
       if force_all do
-        from c in Chunk, order_by: [asc: c.id]
+        from(c in Chunk)
       else
         # Find chunks without QA pairs or with stale QA pairs
         from c in Chunk,
           left_join: q in QAPair,
           on: q.chunk_id == c.id,
           where: is_nil(q.id) or q.status == "stale",
-          distinct: true,
-          order_by: [asc: c.id]
+          distinct: true
       end
 
-    pending_chunks = Repo.all(chunks_query)
+    all_pending = Repo.all(chunks_query)
+
+    # Sort chunks by specification priority (11-1 & 11-2):
+    # 1. Associated with unresolved question logs
+    # 2. Has stale QA pairs
+    # 3. New chunks (no QA pairs)
+    # 4. High reference count
+    # 5. Rest
+    stale_chunk_ids =
+      Repo.all(from q in QAPair, where: q.status == "stale", select: q.chunk_id) |> MapSet.new()
+
+    unresolved_set = MapSet.new(unresolved_chunk_ids)
+
+    pending_chunks =
+      Enum.sort_by(all_pending, fn chunk ->
+        cond do
+          MapSet.member?(unresolved_set, chunk.id) -> {0, -chunk.reference_count, chunk.id}
+          MapSet.member?(stale_chunk_ids, chunk.id) -> {1, -chunk.reference_count, chunk.id}
+          true -> {2, -chunk.reference_count, chunk.id}
+        end
+      end)
+
     total_chunks = length(pending_chunks)
     Logger.info("Batch ##{batch_run.id} - Found #{total_chunks} chunks queued for generation.")
 
@@ -437,6 +469,43 @@ defmodule AskDrive.Batch.Scheduler do
     start_time = DateTime.utc_now()
     Logger.info("Batch ##{batch_run.id} - [Phase 6: Verify] starting...")
 
+    # Resolve question_log entries whose candidate chunks now have active QAs (11-3)
+    unresolved_logs =
+      Repo.all(
+        from q in AskDrive.QA.QuestionLog,
+          where: is_nil(q.resolved_at)
+      )
+
+    resolved_count =
+      Enum.reduce(unresolved_logs, 0, fn log, acc ->
+        candidate_ids = log.candidate_chunk_ids || []
+
+        matching_qa =
+          if candidate_ids != [] do
+            Repo.one(
+              from q in QAPair,
+                where: q.chunk_id in ^candidate_ids and q.status == "active",
+                order_by: [desc: q.id],
+                limit: 1
+            )
+          else
+            nil
+          end
+
+        if matching_qa do
+          log
+          |> AskDrive.QA.QuestionLog.changeset(%{
+            resolved_at: DateTime.utc_now(),
+            resolved_qa_id: matching_qa.id
+          })
+          |> Repo.update()
+
+          acc + 1
+        else
+          acc
+        end
+      end)
+
     # Verify virtual table counts or consistency
     final_status = if deadline_reached?, do: "deadline_reached", else: "completed"
     finished_time = DateTime.utc_now()
@@ -446,7 +515,8 @@ defmodule AskDrive.Batch.Scheduler do
       batch_run
       |> BatchRun.changeset(%{
         finished_at: finished_time,
-        status: final_status
+        status: final_status,
+        questions_resolved: resolved_count
       })
       |> Repo.update!()
 
@@ -457,10 +527,13 @@ defmodule AskDrive.Batch.Scheduler do
         start_time,
         finished_time,
         duration,
-        0
+        resolved_count
       )
 
-    Logger.info("Batch ##{batch_run.id} finished with status: #{final_status}")
+    Logger.info(
+      "Batch ##{batch_run.id} finished with status: #{final_status}, questions resolved: #{resolved_count}"
+    )
+
     {stat, batch_run}
   end
 

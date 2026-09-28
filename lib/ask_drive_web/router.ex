@@ -18,6 +18,7 @@ defmodule AskDriveWeb.Router do
     pipe_through :browser
 
     live "/", ChatLive
+    live "/admin", AdminLive
 
     get "/auth/google", AuthController, :request
     get "/auth/google/callback", AuthController, :callback

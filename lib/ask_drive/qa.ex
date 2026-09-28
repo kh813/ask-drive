@@ -4,7 +4,7 @@ defmodule AskDrive.QA do
   """
   import Ecto.Query, warn: false
   alias AskDrive.Repo
-  alias AskDrive.QA.{AnswerCache, QAPair}
+  alias AskDrive.QA.{AnswerCache, QAPair, QuestionLog}
   alias AskDrive.Vector
 
   @doc """
@@ -155,5 +155,30 @@ defmodule AskDrive.QA do
         })
         |> Repo.update()
     end
+  end
+
+  @doc """
+  Lists unresolved Tier 2 / 3 questions from question_log.
+  """
+  def list_unresolved_questions do
+    Repo.all(
+      from q in QuestionLog,
+        where: is_nil(q.resolved_at) and q.tier_reached in [2, 3],
+        order_by: [desc: q.asked_at],
+        limit: 50
+    )
+  end
+
+  @doc """
+  Lists recently resolved questions from question_log.
+  """
+  def list_resolved_questions do
+    Repo.all(
+      from q in QuestionLog,
+        where: not is_nil(q.resolved_at),
+        preload: [resolved_qa: [:document]],
+        order_by: [desc: q.resolved_at],
+        limit: 50
+    )
   end
 end
