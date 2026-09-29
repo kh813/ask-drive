@@ -71,8 +71,16 @@ if LDAPTLS_CACERT="${DIR}/ca.pem" ldapsearch -x -H ldaps://localhost:636 -b dc=e
   echo "expected LDAPS without a client certificate to be refused" >&2
   exit 1
 fi
-LDAPTLS_CACERT="${DIR}/ca.pem" LDAPTLS_CERT="${DIR}/client.pem" LDAPTLS_KEY="${DIR}/client.key" \
-  ldapsearch -x -H ldaps://localhost:636 -b dc=example,dc=com "(mail=taro@example.com)" dn | grep -q "uid=taro"
+if ! LDAPTLS_CACERT="${DIR}/ca.pem" LDAPTLS_CERT="${DIR}/client.pem" LDAPTLS_KEY="${DIR}/client.key" \
+  ldapsearch -x -H ldaps://localhost:636 -b dc=example,dc=com "(mail=taro@example.com)" dn | grep -q "uid=taro"; then
+  echo "--- diagnostics ---" >&2
+  sudo ss -ltnp | grep -E ':(389|636)' >&2 || true
+  sudo slapcat -b cn=config 2>/dev/null | grep -i '^olcTLS' >&2 || true
+  echo | openssl s_client -connect localhost:636 -CAfile "${DIR}/ca.pem" -cert "${DIR}/client.pem" -key "${DIR}/client.key" 2>&1 | head -20 >&2 || true
+  sudo journalctl -u slapd --no-pager -n 30 >&2 || true
+  sudo dmesg 2>/dev/null | grep -i apparmor | tail -5 >&2 || true
+  exit 1
+fi
 echo "OpenLDAP (LDAPS, client certificate demanded) is ready"
 
 {
