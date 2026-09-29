@@ -5,10 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
     <.live_title default="AskDrive" suffix=" · Phoenix Framework" phx-no-format>{assigns[:page_title]}</.live_title>
-    <%!-- the header's "AD" app icon (favicon.svg; .ico and apple-touch-icon rendered from it) --%>
-    <link rel="icon" href={~p"/favicon.svg"} type="image/svg+xml" />
-    <link rel="icon" href={~p"/favicon.ico"} sizes="16x16 32x32 48x48" />
-    <link rel="apple-touch-icon" href={~p"/apple-touch-icon.png"} />
+    <%!-- the header's "AD" app icon (favicon.svg; .ico and apple-touch-icon rendered from it).
+          Plain paths, not ~p: in prod ~p digests them to favicon-<hash>.svg, which Plug.Static's
+          `only` (exact first segment) doesn't serve. ?v= makes browsers drop the old icon. --%>
+    <link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico?v=2" sizes="16x16 32x32 48x48" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
     <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
     </script>

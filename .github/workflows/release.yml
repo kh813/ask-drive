@@ -35,6 +35,12 @@ jobs:
             echo "TAG=${TAG_NAME}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Check mix.exs version matches the tag
+        run: |
+          MIX_VER="$(sed -n 's/^[[:space:]]*version: "\([^"]*\)".*/\1/p' mix.exs | head -n 1)"
+          echo "mix.exs: ${MIX_VER} / release: ${{ steps.vars.outputs.VERSION }}"
+          test "${MIX_VER}" = "${{ steps.vars.outputs.VERSION }}"
+
       - name: Setup Elixir and Erlang
         uses: erlef/setup-beam@v1
         with:

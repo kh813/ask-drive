@@ -117,6 +117,16 @@ jobs:
           sudo cat /etc/sudoers.d/askdrive
           ./app.sh status
 
+      - name: Icons linked by the page are served by the prod build (digested assets)
+        run: |
+          html="$(curl -sk https://localhost:4443/setup)"
+          for href in $(echo "$html" | grep -oE 'rel="(icon|apple-touch-icon)" href="[^"]+"' | sed -E 's/.*href="([^"]+)"/\1/'); do
+            code="$(curl -sk -o /dev/null -w '%{http_code}' "https://localhost:4443${href}")"
+            echo "${href} -> ${code}"
+            test "$code" = "200"
+          done
+          echo "$html" | grep -q 'href="/favicon.svg'
+
       - name: deploy.sh restarts the registered systemd service
         run: |
           before="$(systemctl show -p MainPID --value askdrive.service)"

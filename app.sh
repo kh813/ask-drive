@@ -205,6 +205,7 @@ cmd_restart() {
 cmd_status() {
   load_env
   echo -e "${BLUE}=== AskDrive システムステータス ===${NC}"
+  echo "インストール済みバージョン: v$(sed -n 's/^[[:space:]]*version: "\([^"]*\)".*/\1/p' "${SCRIPT_DIR}/mix.exs" | head -n 1)（稼働中のバージョンは管理画面の見出し横に表示）"
   
   # 1. Ollama の確認
   echo -n "Ollama 状態: "

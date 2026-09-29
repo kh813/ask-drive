@@ -150,6 +150,10 @@ defmodule AskDriveWeb.AdminBatchHistoryTest do
     assert has_element?(view, "#given-up-chunks", "規則.pdf（チャンク 2）")
     assert has_element?(view, "#given-up-chunks", "JSON parse failed")
 
+    # the header leads to resuming as well, and shows the running version
+    assert has_element?(view, "#resume-header-btn", "続きから再実行（残り 1 チャンク）")
+    assert has_element?(view, "#app-version", "v#{AskDrive.version()}")
+
     view |> element("#retry-given-up-btn") |> render_click()
     refute has_element?(view, "#given-up-chunks")
     assert has_element?(view, "#batch-resume", "QA 未生成 2 チャンク")

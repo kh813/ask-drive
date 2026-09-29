@@ -13,7 +13,14 @@ defmodule AskDriveWeb.FaviconTest do
     on_exit(fn -> System.delete_env("ASK_DRIVE_DISABLE_AUTH") end)
 
     html = conn |> get("/it-support") |> html_response(200)
-    assert html =~ ~s(rel="icon" href="/favicon.svg")
-    assert html =~ ~s(rel="apple-touch-icon" href="/apple-touch-icon.png")
+    # plain (undigested) paths: prod digests ~p paths to favicon-<hash>.svg, which
+    # Plug.Static's `only` list doesn't serve
+    assert html =~ ~s(rel="icon" href="/favicon.svg?v=2")
+    assert html =~ ~s(rel="apple-touch-icon" href="/apple-touch-icon.png?v=2")
+    refute html =~ ~r/favicon-[0-9a-f]{32}/
+
+    # every file the page links is one Plug.Static is allowed to serve
+    for path <- ["favicon.svg", "favicon.ico", "apple-touch-icon.png"],
+        do: assert(path in AskDriveWeb.static_paths())
   end
 end

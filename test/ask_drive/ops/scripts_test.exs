@@ -162,6 +162,11 @@ defmodule AskDrive.Ops.ScriptsTest do
     end
   end
 
+  test "a release fails unless mix.exs carries the tag's version (shown on the dashboard)" do
+    assert File.read!(@release_yml) =~ "Check mix.exs version matches the tag"
+    assert File.read!(@app_sh) =~ "インストール済みバージョン"
+  end
+
   describe "platform.sh (macOS / Linux)" do
     test "detects the OS and architecture of this machine" do
       out = run_platform(~s|echo "$ASKDRIVE_OS $ASKDRIVE_ARCH $(sqlite_vec_filename)"|)

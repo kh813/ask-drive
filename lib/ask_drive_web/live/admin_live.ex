@@ -640,6 +640,13 @@ defmodule AskDriveWeb.AdminLive do
               <h1 class="font-bold text-2xl text-zinc-900 dark:text-zinc-100">
                 {if @scope == :app, do: "管理: AskDrive for #{@app.name}", else: "全体管理"}
               </h1>
+              <span
+                id="app-version"
+                title="稼働中の AskDrive のバージョン"
+                class="text-[11px] font-mono px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+              >
+                v{AskDrive.version()}
+              </span>
             </div>
             <p class="text-xs text-zinc-500 mt-1">
               {if @scope == :app,
@@ -670,6 +677,24 @@ defmodule AskDriveWeb.AdminLive do
           </div>
 
           <div :if={@scope == :app && !@running_run} class="flex flex-wrap items-center gap-2">
+            <%!-- The newest run ended early and work is left: resuming is the obvious next step
+                  (F-342), so it leads here too, not only in the run details below. --%>
+            <button
+              :if={resumable?(@runs, @remaining)}
+              id="resume-header-btn"
+              phx-click="trigger_batch"
+              phx-value-kind="full"
+              data-confirm={
+                if(@current_mode == :daytime,
+                  do: "現在は営業時間相です。QA 生成ありのバッチは生成モデルを長時間占有し、その間チャットは原文検索のみ（キーワード中心）になります。続きから再実行しますか？",
+                  else: "続きから再実行しますか？"
+                )
+              }
+              title="前回のバッチが最後まで終わっていません。残りだけを処理します（済んだ部分はやり直しません）。"
+              class="text-xs px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium shadow-sm flex items-center gap-1.5 transition"
+            >
+              <.icon name="hero-arrow-path" class="w-4 h-4" /> 続きから再実行（残り {@remaining.chunks} チャンク）
+            </button>
             <%!-- Ingest only (spec 6.3.8 F-331): sync + indexing, no QA generation, so the
                   local model stays free for chat. The safe default for daytime runs. --%>
             <button
@@ -3005,6 +3030,13 @@ defmodule AskDriveWeb.AdminLive do
     do: format_seconds(DateTime.diff(f, s))
 
   defp duration_label(_), do: "—"
+
+  # the newest run ended before finishing, and a re-run has something to do
+  defp resumable?([%{status: status} | _], remaining)
+       when status in ["failed", "stopped", "aborted", "deadline_reached"],
+       do: remaining.documents + remaining.chunks + remaining.questions > 0
+
+  defp resumable?(_runs, _remaining), do: false
 
   defp eta_label(sec) when sec < 60, do: "1 分未満"
   defp eta_label(sec) when sec < 3600, do: "約 #{div(sec + 59, 60)} 分"
