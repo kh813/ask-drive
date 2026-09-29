@@ -7,7 +7,7 @@ defmodule Mix.Tasks.AskDrive.Auth do
 
       mix ask_drive.auth status
       mix ask_drive.auth disable            # back to guest (POC): no login anywhere
-      mix ask_drive.auth enable [email]     # login required; email = administrator account
+      mix ask_drive.auth enable [email ...] # login required; emails = administrator accounts
       mix ask_drive.auth ldap off|on        # LDAP sign-in off / on
 
   The running service reads the setting on every request, so a change applies at once.
@@ -35,10 +35,7 @@ defmodule Mix.Tasks.AskDrive.Auth do
       Mix.raise("ログインの方法がありません。Google Secure LDAP または Google ログイン（OAuth）を設定してください。")
     end
 
-    case rest do
-      [email] -> {:ok, _} = Accounts.grant_admin(email)
-      [] -> :ok
-    end
+    Enum.each(rest, fn email -> {:ok, _} = Accounts.grant_admin(email) end)
 
     if Accounts.count_eligible_admins() == 0 do
       Mix.raise("管理者に昇格できるアカウントがありません。mix ask_drive.auth enable <email> で指定してください。")
@@ -62,7 +59,7 @@ defmodule Mix.Tasks.AskDrive.Auth do
   end
 
   defp run_task(_) do
-    Mix.raise("使用方法: mix ask_drive.auth status | disable | enable [email] | ldap on|off")
+    Mix.raise("使用方法: mix ask_drive.auth status | disable | enable [email ...] | ldap on|off")
   end
 
   defp status do

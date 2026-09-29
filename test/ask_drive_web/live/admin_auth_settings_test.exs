@@ -31,16 +31,47 @@ defmodule AskDriveWeb.AdminAuthSettingsTest do
     view |> form("#enable-auth-form", %{"admin_email" => "boss@other.com"}) |> render_submit()
     assert render(view) =~ "@example.com"
 
+    # several administrators at once (commas / spaces)
     assert {:error, {:redirect, %{to: "/login"}}} =
              view
-             |> form("#enable-auth-form", %{"admin_email" => "Boss@example.com"})
+             |> form("#enable-auth-form", %{
+               "admin_email" => "Boss@example.com, second@example.com  third@example.com"
+             })
              |> render_submit()
 
     assert UserAuth.auth_mode() == {:enabled, :setting}
-    assert Accounts.get_user_by_email("boss@example.com").admin_eligible
+
+    for email <- ~w(boss@example.com second@example.com third@example.com),
+        do: assert(Accounts.get_user_by_email(email).admin_eligible)
 
     # now the chat needs signing in
     assert build_conn() |> get(~p"/it-support") |> redirected_to() =~ "/login"
+  end
+
+  test "administrators are added by e-mail on the users tab, before their first sign-in", %{
+    conn: conn
+  } do
+    {:ok, _} =
+      Settings.update_setting(Settings.platform_setting!(), %{"allowed_domain" => "example.com"})
+
+    {:ok, view, _html} = live(conn, ~p"/admin?tab=users")
+
+    view
+    |> form("#grant-admin-form", %{"emails" => "a@example.com, x@other.com"})
+    |> render_submit()
+
+    assert render(view) =~ "@example.com 以外のアドレスは指定できません: x@other.com"
+    refute Accounts.get_user_by_email("a@example.com")
+
+    view
+    |> form("#grant-admin-form", %{"emails" => "a@example.com, b@example.com"})
+    |> render_submit()
+
+    assert render(view) =~ "a@example.com、b@example.com を昇格可にしました"
+    assert Accounts.get_user_by_email("a@example.com").admin_eligible
+    assert Accounts.get_user_by_email("b@example.com").admin_eligible
+    # listed now, before they have ever signed in
+    assert render(view) =~ "b@example.com"
   end
 
   test "an administrator switches it off again", %{conn: conn} do
@@ -82,9 +113,10 @@ defmodule AskDriveWeb.AdminAuthSettingsTest do
       assert run.(["disable"]) =~ "無効にしました"
       assert UserAuth.auth_mode() == {:disabled, :setting}
 
-      assert run.(["enable", "boss@example.com"]) =~ "有効にしました"
+      assert run.(["enable", "boss@example.com", "second@example.com"]) =~ "有効にしました"
       assert UserAuth.auth_mode() == {:enabled, :setting}
       assert Accounts.get_user_by_email("boss@example.com").admin_eligible
+      assert Accounts.get_user_by_email("second@example.com").admin_eligible
 
       assert run.(["ldap", "off"]) =~ "無効"
       refute Settings.platform_setting!().ldap_enabled

@@ -54,7 +54,7 @@ AskDrive 管理スクリプト
   admin password     管理者パスワードを再設定 (対話入力)
   auth status        ログイン認証・LDAP・管理者アカウントの状態
   auth disable       ログイン認証を無効に戻す (ゲスト・POC。締め出されたときの復旧)
-  auth enable [mail] ログイン認証を有効にする (mail = 管理者に昇格できるアカウント)
+  auth enable [mail…] ログイン認証を有効にする (mail = 管理者に昇格できるアカウント、複数可)
   auth ldap on|off   LDAP でのログインを有効 / 無効にする
   ollama <args>      アプリ専用の Ollama を操作 (例: ./app.sh ollama pull <model> / ./app.sh ollama list)
   drive service-account [key.json] [--subject user@example.com]
@@ -342,7 +342,7 @@ cmd_auth() {
       MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.auth "$@"
       ;;
     *)
-      echo -e "${RED}使用方法: ./app.sh auth status | disable | enable [email] | ldap on|off${NC}"
+      echo -e "${RED}使用方法: ./app.sh auth status | disable | enable [email ...] | ldap on|off${NC}"
       exit 1
       ;;
   esac

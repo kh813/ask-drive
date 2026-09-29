@@ -253,10 +253,9 @@ defmodule AskDriveWeb.AdminLive do
   # Required login (spec F-1308). Switching it on from the guest (POC) session would leave
   # nobody able to administer unless someone can sign in and elevate, so it needs a way to
   # sign in (LDAP or Google), the administrator password, and an administrator account.
-  def handle_event("enable_auth", %{"admin_email" => email}, socket) do
+  def handle_event("enable_auth", %{"admin_email" => text}, socket) do
     setting = Settings.platform_setting!()
-    email = email |> String.trim() |> String.downcase()
-    domain = setting.allowed_domain
+    parsed = parse_admin_emails(text, setting.allowed_domain)
 
     problem =
       cond do
@@ -269,11 +268,8 @@ defmodule AskDriveWeb.AdminLive do
         not AdminAccess.password_set?(setting) ->
           "管理者パスワードが未設定です。先に設定してください。"
 
-        not String.match?(email, ~r/^[^@\s]+@[^@\s]+$/) ->
-          "管理者のメールアドレスを入力してください。"
-
-        is_binary(domain) and domain != "" and not String.ends_with?(email, "@" <> domain) ->
-          "管理者のメールアドレスは @#{domain} のアドレスにしてください。"
+        match?({:error, _}, parsed) ->
+          elem(parsed, 1)
 
         true ->
           nil
@@ -282,17 +278,39 @@ defmodule AskDriveWeb.AdminLive do
     if problem do
       {:noreply, put_flash(socket, :error, problem)}
     else
-      {:ok, _} = Accounts.grant_admin(email)
+      {:ok, emails} = parsed
+      Enum.each(emails, fn email -> {:ok, _} = Accounts.grant_admin(email) end)
       {:ok, _} = Settings.set_auth_required(true)
-      Logger.info("AdminLive: login required switched on (administrator: #{email})")
+
+      Logger.info(
+        "AdminLive: login required switched on (administrators: #{Enum.join(emails, ", ")})"
+      )
 
       {:noreply,
        socket
        |> put_flash(
          :info,
-         "ログイン認証を有効にしました。#{email} でログインし、管理者パスワードで昇格してください。"
+         "ログイン認証を有効にしました。#{Enum.join(emails, "、")} のいずれかでログインし、管理者パスワードで昇格してください。"
        )
        |> redirect(to: ~p"/login")}
+    end
+  end
+
+  # Administrators by e-mail, including people who have never signed in (they appear in the
+  # list once registered, and elevate after their first sign-in)
+  def handle_event("grant_admin_emails", %{"emails" => text}, socket) do
+    case parse_admin_emails(text, Settings.platform_setting!().allowed_domain) do
+      {:ok, emails} ->
+        Enum.each(emails, fn email -> {:ok, _} = Accounts.grant_admin(email) end)
+        Logger.info("AdminLive: administrators added: #{Enum.join(emails, ", ")}")
+
+        {:noreply,
+         socket
+         |> put_flash(:info, "#{Enum.join(emails, "、")} を昇格可にしました。")
+         |> load_dashboard_data()}
+
+      {:error, message} ->
+        {:noreply, put_flash(socket, :error, message)}
     end
   end
 
@@ -1840,6 +1858,37 @@ defmodule AskDriveWeb.AdminLive do
                 <span class="text-xs text-zinc-500 shrink-0">合計 {length(@users)} 名</span>
               </div>
 
+              <%!-- Administrators by e-mail, before their first sign-in too (F-1309) --%>
+              <form
+                id="grant-admin-form"
+                phx-submit="grant_admin_emails"
+                class="flex flex-col sm:flex-row gap-2 sm:items-end"
+              >
+                <label class="flex-1 text-xs space-y-1">
+                  <span class="block font-medium text-zinc-700 dark:text-zinc-300">
+                    メールアドレスで管理者（昇格可）を追加（複数可・カンマ区切り。まだログインしたことのない人も追加できます）
+                  </span>
+                  <input
+                    type="text"
+                    name="emails"
+                    required
+                    placeholder={
+                      if @setting.allowed_domain,
+                        do: "name@#{@setting.allowed_domain}, name2@#{@setting.allowed_domain}",
+                        else: "name@company.com"
+                    }
+                    class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  id="grant-admin-btn"
+                  class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                >
+                  昇格可にする
+                </button>
+              </form>
+
               <%= if Accounts.configured_admin_emails() != [] do %>
                 <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800 text-xs text-zinc-600 dark:text-zinc-400">
                   <span class="font-medium text-zinc-700 dark:text-zinc-300">
@@ -2146,16 +2195,16 @@ defmodule AskDriveWeb.AdminLive do
               >
                 <label class="block text-xs space-y-1">
                   <span class="block font-medium text-zinc-700 dark:text-zinc-300">
-                    管理者のメールアドレス（有効にした後、このアカウントでログインして昇格します）
+                    管理者のメールアドレス（複数可・カンマ区切り。有効にした後、このいずれかでログインして昇格します）
                   </span>
                   <input
-                    type="email"
+                    type="text"
                     name="admin_email"
                     required
                     placeholder={
                       if @setting.allowed_domain,
-                        do: "name@#{@setting.allowed_domain}",
-                        else: "name@company.com"
+                        do: "name@#{@setting.allowed_domain}, name2@#{@setting.allowed_domain}",
+                        else: "name@company.com, name2@company.com"
                     }
                     class="w-full sm:w-96 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
                   />
@@ -3503,6 +3552,30 @@ defmodule AskDriveWeb.AdminLive do
        do: remaining.documents + remaining.chunks + remaining.questions > 0
 
   defp resumable?(_runs, _remaining), do: false
+
+  # one or more addresses separated by commas, spaces or new lines, all in the domain
+  defp parse_admin_emails(text, domain) do
+    emails =
+      text
+      |> to_string()
+      |> String.split(~r/[\s,;、]+/, trim: true)
+      |> Enum.map(&String.downcase/1)
+      |> Enum.uniq()
+
+    bad = Enum.reject(emails, &String.match?(&1, ~r/^[^@\s]+@[^@\s]+\.[^@\s]+$/))
+
+    outside =
+      if is_binary(domain) and domain != "",
+        do: Enum.reject(emails -- bad, &String.ends_with?(&1, "@" <> String.downcase(domain))),
+        else: []
+
+    cond do
+      emails == [] -> {:error, "管理者のメールアドレスを入力してください。"}
+      bad != [] -> {:error, "メールアドレスとして読み取れません: #{Enum.join(bad, "、")}"}
+      outside != [] -> {:error, "@#{domain} 以外のアドレスは指定できません: #{Enum.join(outside, "、")}"}
+      true -> {:ok, emails}
+    end
+  end
 
   # the LDAP form's fields as the saved settings have them
   defp ldap_form(setting) do
