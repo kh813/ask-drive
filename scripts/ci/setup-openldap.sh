@@ -21,7 +21,9 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y slapd ldap-utils >/dev/nu
 # CA, server certificate for localhost, and the client certificate AskDrive presents
 openssl req -x509 -newkey rsa:2048 -nodes -keyout ca.key -out ca.pem -days 2 -subj /CN=LdapTestCA 2>/dev/null
 openssl req -newkey rsa:2048 -nodes -keyout server.key -out server.csr -subj /CN=localhost 2>/dev/null
-printf "subjectAltName=DNS:localhost\n" > server.ext
+# libldap (ldapsearch) resolves "localhost" back to the machine's own name before checking
+# the certificate, so name that too; AskDrive (Erlang :ssl) checks the name as given.
+printf "subjectAltName=DNS:localhost,DNS:%s,DNS:%s,IP:127.0.0.1\n" "$(hostname)" "$(hostname -f)" > server.ext
 openssl x509 -req -in server.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out server.pem -days 2 -extfile server.ext 2>/dev/null
 openssl req -newkey rsa:2048 -nodes -keyout client.key -out client.csr -subj /CN=AskDriveLdapClient 2>/dev/null
 # a v3 client certificate for TLS client authentication, like Google's LDAP client certificates
