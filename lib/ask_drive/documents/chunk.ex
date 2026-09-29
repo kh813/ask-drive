@@ -12,6 +12,9 @@ defmodule AskDrive.Documents.Chunk do
     field :page, :integer
     field :embedding, :binary
     field :reference_count, :integer, default: 0
+    field :qa_attempts, :integer, default: 0
+    field :qa_error, :string
+    field :qa_attempted_at, :utc_datetime
 
     has_many :qa_pairs, AskDrive.QA.QAPair, on_delete: :nilify_all
     has_many :extractions, AskDrive.Documents.Extraction, on_delete: :nilify_all

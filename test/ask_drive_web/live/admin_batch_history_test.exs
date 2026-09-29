@@ -73,7 +73,8 @@ defmodule AskDriveWeb.AdminBatchHistoryTest do
     assert has_element?(view, "#batch-progress", "52 / 208 件（25%）")
     assert has_element?(view, "#batch-progress", "/Manual/a.pdf")
     assert has_element?(view, "#batch-progress", "埋め込み 64 / 186 チャンク")
-    assert has_element?(view, "#batch-progress", "残り 約 30 分")
+    # 600 s for 52 of 208 → about 30 more minutes (a second of test time may round it to 31)
+    assert render(view) =~ ~r/残り 約 3[01] 分/
     assert has_element?(view, "#auto-batch-status", "全体の目安 19%")
   end
 
@@ -109,6 +110,49 @@ defmodule AskDriveWeb.AdminBatchHistoryTest do
     {:ok, view, _html} = live(conn, ~p"/it-support/admin")
     assert has_element?(view, "#batch-error", "失敗の原因")
     assert has_element?(view, "#batch-error", "MatchError")
+  end
+
+  test "a failed run offers to resume, with what is left; given-up chunks can be put back", %{
+    conn: conn
+  } do
+    run!(~N[2026-09-29 09:40:00], %{status: "failed", error: "boom"})
+
+    doc =
+      %AskDrive.Documents.Document{}
+      |> AskDrive.Documents.Document.changeset(%{
+        drive_file_id: "d1",
+        name: "規則.pdf",
+        mime_type: "application/pdf",
+        status: "indexed"
+      })
+      |> AskDrive.Repo.insert!()
+
+    for {i, attempts} <- [{0, 0}, {1, 3}] do
+      %AskDrive.Documents.Chunk{}
+      |> AskDrive.Documents.Chunk.changeset(%{
+        document_id: doc.id,
+        position: i,
+        content: "c#{i}",
+        content_hash: "c#{i}"
+      })
+      |> Ecto.Changeset.change(
+        qa_attempts: attempts,
+        qa_error: if(attempts > 0, do: "JSON parse failed after retry")
+      )
+      |> AskDrive.Repo.insert!()
+    end
+
+    {:ok, view, _html} = live(conn, ~p"/it-support/admin")
+
+    assert has_element?(view, "#batch-resume", "QA 未生成 1 チャンク")
+    assert has_element?(view, "#batch-resume", "3 回失敗して除外中 1 チャンク")
+    assert has_element?(view, "#resume-batch-btn")
+    assert has_element?(view, "#given-up-chunks", "規則.pdf（チャンク 2）")
+    assert has_element?(view, "#given-up-chunks", "JSON parse failed")
+
+    view |> element("#retry-given-up-btn") |> render_click()
+    refute has_element?(view, "#given-up-chunks")
+    assert has_element?(view, "#batch-resume", "QA 未生成 2 チャンク")
   end
 
   test "auto_status: missed, done (automatic only), due, next start" do

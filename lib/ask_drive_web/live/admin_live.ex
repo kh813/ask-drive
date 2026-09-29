@@ -285,6 +285,15 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   @impl true
+  def handle_event("retry_given_up", _params, socket) do
+    count = Scheduler.retry_given_up_chunks()
+
+    {:noreply,
+     socket
+     |> put_flash(:info, "#{count} 件のチャンクを QA 生成の対象に戻しました。次のバッチで再び生成します。")
+     |> load_dashboard_data()}
+  end
+
   def handle_event("stop_batch", _params, socket) do
     socket =
       case Scheduler.request_stop() do
@@ -594,6 +603,8 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:run_summaries, run_summaries)
     |> assign(:auto_status, auto_status)
     |> assign(:running_run, running_run)
+    |> assign(:remaining, Scheduler.remaining())
+    |> assign(:given_up_chunks, Scheduler.given_up_chunks(50))
     |> assign(:running_progress, running_run && progress_view(running_run))
     |> assign(:selected_progress, latest_run && progress_view(latest_run))
     |> assign(:item_logs, item_logs)
@@ -978,6 +989,43 @@ defmodule AskDriveWeb.AdminLive do
                   <pre class="text-[11px] leading-relaxed text-red-900 dark:text-red-100 whitespace-pre-wrap break-all max-h-60 overflow-y-auto">{@latest_run.error}</pre>
                 </div>
 
+                <%!-- Resume (spec F-342): a re-run continues from the data — only what is left is
+                      done — so a failed, stopped or cut-off run is simply run again. --%>
+                <div
+                  :if={
+                    @scope == :app && !@running_run &&
+                      @latest_run.status in ["failed", "stopped", "aborted", "deadline_reached"]
+                  }
+                  id="batch-resume"
+                  class="p-3 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200/70 dark:border-indigo-900 space-y-2 text-xs"
+                >
+                  <p class="font-semibold text-indigo-900 dark:text-indigo-200">続きから再実行</p>
+                  <p class="text-zinc-700 dark:text-zinc-300">
+                    残り: 取り込み待ち {@remaining.documents} 文書・QA 未生成 {@remaining.chunks} チャンク・質問の埋め込み待ち {@remaining.questions} 件
+                    <span :if={@remaining.given_up > 0} class="text-amber-700 dark:text-amber-300">
+                      （3 回失敗して除外中 {@remaining.given_up} チャンク）
+                    </span>
+                  </p>
+                  <p class="text-zinc-500">
+                    取り込み済みの文書と、QA を生成済みのチャンクは再実行しません。前回失敗したチャンクは後回しにします。
+                  </p>
+                  <button
+                    id="resume-batch-btn"
+                    phx-click="trigger_batch"
+                    phx-value-kind="full"
+                    data-confirm={
+                      if(@current_mode == :daytime,
+                        do:
+                          "現在は営業時間相です。QA 生成ありのバッチは生成モデルを長時間占有し、その間チャットは原文検索のみ（キーワード中心）になります。続きから再実行しますか？",
+                        else: "続きから再実行しますか？"
+                      )
+                    }
+                    class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm inline-flex items-center gap-1.5 transition"
+                  >
+                    <.icon name="hero-arrow-path" class="w-4 h-4" /> 続きから再実行
+                  </button>
+                </div>
+
                 <%!-- Progress of the run (spec F-340): overall, the current step, and the item --%>
                 <div
                   :if={
@@ -1076,6 +1124,48 @@ defmodule AskDriveWeb.AdminLive do
                         </div>
                       </div>
                     <% end %>
+                  </div>
+                </div>
+
+                <%!-- Chunks given up after 3 failed generations (spec F-342) --%>
+                <div
+                  :if={@scope == :app && @given_up_chunks != []}
+                  id="given-up-chunks"
+                  class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-2"
+                >
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                      QA を生成できなかったチャンク（3 回失敗・{@remaining.given_up} 件）
+                    </h3>
+                    <button
+                      id="retry-given-up-btn"
+                      phx-click="retry_given_up"
+                      class="text-xs px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium inline-flex items-center gap-1.5 transition"
+                    >
+                      <.icon name="hero-arrow-uturn-left" class="w-4 h-4" /> 生成の対象に戻す
+                    </button>
+                  </div>
+                  <p class="text-[11px] text-zinc-400">
+                    バッチはこれらを飛ばします（毎晩同じチャンクで時間を使わないため）。モデルを変えたときや、原因を直したあとに対象へ戻してください。文書を更新すると、変わったチャンクは自動で対象に戻ります。
+                  </p>
+                  <div class="overflow-x-auto max-h-60 overflow-y-auto">
+                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                      <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                        <tr :for={chunk <- @given_up_chunks}>
+                          <td class="py-1.5 px-2 break-all">
+                            {(chunk.document && (chunk.document.path || chunk.document.name)) || "—"}（チャンク {chunk.position +
+                              1}）
+                          </td>
+                          <td class="py-1.5 px-2 text-red-700 dark:text-red-300 break-all">
+                            {chunk.qa_error}
+                          </td>
+                          <td class="py-1.5 px-2 font-mono whitespace-nowrap">
+                            {chunk.qa_attempted_at &&
+                              AskDrive.Clock.format(chunk.qa_attempted_at, "%m/%d %H:%M")}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
 

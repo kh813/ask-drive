@@ -213,6 +213,127 @@ defmodule AskDrive.Batch.SchedulerTest do
     end
   end
 
+  describe "resuming: only what is left, failed chunks last, given up after 3 (F-342)" do
+    setup do
+      {server, url} = AskDrive.StubOllama.start!(self())
+
+      on_exit(fn ->
+        AskDrive.StubOllama.put_generate_pieces(["要約です。"])
+        AskDrive.Runtime.Mode.set_mode(:daytime)
+        Process.exit(server, :normal)
+      end)
+
+      {:ok, _} =
+        AskDrive.Settings.update_setting(AskDrive.Settings.get_setting!(), %{
+          ollama_host: url,
+          llm_provider: "ollama",
+          embed_provider: "ollama",
+          summary_enabled: false,
+          extraction_enabled: false
+        })
+
+      doc =
+        %Document{}
+        |> Document.changeset(%{
+          drive_file_id: "doc_resume",
+          name: "規則.pdf",
+          mime_type: "application/pdf",
+          status: "indexed",
+          content_hash: "h"
+        })
+        |> Repo.insert!()
+
+      chunk = fn i ->
+        %Chunk{}
+        |> Chunk.changeset(%{
+          document_id: doc.id,
+          position: i,
+          content: "第#{i}条 勤務時間は午前9時から午後6時までです。",
+          content_hash: "r#{i}"
+        })
+        |> Repo.insert!()
+      end
+
+      %{doc: doc, done: chunk.(0), todo: chunk.(1)}
+    end
+
+    test "a re-run generates only chunks without QA", %{doc: doc, done: done, todo: todo} do
+      AskDrive.QA.create_qa_pair(%{
+        document_id: doc.id,
+        chunk_id: done.id,
+        question: "既存",
+        answer: "既存",
+        status: "active",
+        generated_by: "m",
+        source_hash: "r0"
+      })
+
+      assert %{chunks: 1} = Scheduler.remaining()
+
+      AskDrive.StubOllama.put_generate_pieces([
+        ~s([{"question": "勤務時間は？", "answer": "9時から18時。"}])
+      ])
+
+      {:ok, run} = Scheduler.run_batch()
+
+      assert run.chunks_processed == 1
+      # generation requests only (model unloads also hit /api/generate, without a prompt)
+      prompts = for {:stub_generate, %{"prompt" => p}} <- flush_messages(), p != "", do: p
+      assert [prompt] = prompts
+      assert prompt =~ "第1条"
+      assert Repo.exists?(from q in AskDrive.QA.QAPair, where: q.chunk_id == ^todo.id)
+      assert %{chunks: 0} = Scheduler.remaining()
+    end
+
+    test "unusable output counts against the chunk; after 3 it is skipped until put back",
+         %{todo: todo, done: done} do
+      AskDrive.StubOllama.put_generate_pieces(["JSON ではない出力"])
+
+      for n <- 1..3 do
+        {:ok, _} = Scheduler.run_batch()
+        assert Repo.get!(Chunk, todo.id).qa_attempts == n
+      end
+
+      chunk = Repo.get!(Chunk, todo.id)
+      assert chunk.qa_error =~ "JSON parse failed"
+      assert chunk.qa_attempted_at
+      assert %{chunks: 0, given_up: 2} = Scheduler.remaining()
+
+      assert Scheduler.given_up_chunks() |> Enum.map(& &1.id) |> Enum.sort() ==
+               Enum.sort([done.id, todo.id])
+
+      # skipped now: a 4th run doesn't try them
+      {:ok, run} = Scheduler.run_batch()
+      assert run.chunks_processed == 0
+
+      # put back, and a success clears the record
+      assert Scheduler.retry_given_up_chunks() == 2
+      AskDrive.StubOllama.put_generate_pieces([~s([{"question": "Q", "answer": "A"}])])
+      {:ok, _} = Scheduler.run_batch()
+      assert %{qa_attempts: 0, qa_error: nil} = Repo.get!(Chunk, todo.id)
+      assert %{chunks: 0, given_up: 0} = Scheduler.remaining()
+    end
+
+    test "a failure that says nothing about the chunk (model unreachable) doesn't count",
+         %{todo: todo} do
+      {:ok, _} =
+        AskDrive.Settings.update_setting(AskDrive.Settings.get_setting!(), %{
+          ollama_host: "http://127.0.0.1:1"
+        })
+
+      {:ok, _} = Scheduler.run_batch()
+      assert Repo.get!(Chunk, todo.id).qa_attempts == 0
+    end
+  end
+
+  defp flush_messages(acc \\ []) do
+    receive do
+      msg -> flush_messages([msg | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
+
   defp wait_until(fun, tries \\ 200) do
     cond do
       fun.() -> :ok

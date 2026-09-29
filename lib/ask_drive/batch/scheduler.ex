@@ -453,12 +453,7 @@ defmodule AskDrive.Batch.Scheduler do
       if force_all do
         from(c in Chunk)
       else
-        # Find chunks without QA pairs or with stale QA pairs
-        from c in Chunk,
-          left_join: q in QAPair,
-          on: q.chunk_id == c.id,
-          where: is_nil(q.id) or q.status == "stale",
-          distinct: true
+        pending_generation_query()
       end
 
     all_pending = Repo.all(chunks_query)
@@ -476,10 +471,19 @@ defmodule AskDrive.Batch.Scheduler do
 
     pending_chunks =
       Enum.sort_by(all_pending, fn chunk ->
+        # chunks that failed before go after every untried one (F-342), so a chunk the model
+        # keeps tripping over doesn't eat the start of every night
+        retry = min(chunk.qa_attempts || 0, 1)
+
         cond do
-          MapSet.member?(unresolved_set, chunk.id) -> {0, -chunk.reference_count, chunk.id}
-          MapSet.member?(stale_chunk_ids, chunk.id) -> {1, -chunk.reference_count, chunk.id}
-          true -> {2, -chunk.reference_count, chunk.id}
+          MapSet.member?(unresolved_set, chunk.id) ->
+            {retry, 0, -chunk.reference_count, chunk.id}
+
+          MapSet.member?(stale_chunk_ids, chunk.id) ->
+            {retry, 1, -chunk.reference_count, chunk.id}
+
+          true ->
+            {retry, 2, -chunk.reference_count, chunk.id}
         end
       end)
 
@@ -582,7 +586,7 @@ defmodule AskDrive.Batch.Scheduler do
         qa_generated: qa_count
       })
 
-      new_qas =
+      outcome =
         try do
           generate_chunk(chunk, setting)
         rescue
@@ -601,8 +605,10 @@ defmodule AskDrive.Batch.Scheduler do
               message: "QA 生成で例外: " <> String.slice(Exception.message(e), 0, 300)
             })
 
-            0
+            {:error, {:exception, Exception.message(e)}}
         end
+
+      new_qas = record_generation_outcome(chunk, outcome)
 
       process_generation_loop(
         rest,
@@ -614,10 +620,116 @@ defmodule AskDrive.Batch.Scheduler do
     end
   end
 
-  # QA (and, if enabled, structured fields) for one chunk; returns the number of QA saved
+  @max_qa_attempts 3
+
+  @doc """
+  Chunks that still need QA (spec F-342): no QA yet or stale QA, and fewer than
+  #{@max_qa_attempts} failed attempts. A re-run after a failure, stop or cut-off therefore
+  continues where the last run left off: chunks with QA are not generated again.
+  """
+  def pending_generation_query do
+    from c in Chunk,
+      left_join: q in QAPair,
+      on: q.chunk_id == c.id,
+      where: (is_nil(q.id) or q.status == "stale") and c.qa_attempts < @max_qa_attempts,
+      distinct: true
+  end
+
+  @doc "Chunks skipped after #{@max_qa_attempts} failed attempts, newest failure first."
+  def given_up_chunks(limit \\ 50) do
+    Repo.all(
+      from c in Chunk,
+        left_join: q in QAPair,
+        on: q.chunk_id == c.id and q.status == "active",
+        where: is_nil(q.id) and c.qa_attempts >= @max_qa_attempts,
+        order_by: [desc: c.qa_attempted_at],
+        limit: ^limit,
+        preload: [:document]
+    )
+  end
+
+  @doc "Puts every given-up chunk back in the queue (their attempt count starts over)."
+  def retry_given_up_chunks do
+    {count, _} =
+      Repo.update_all(from(c in Chunk, where: c.qa_attempts >= @max_qa_attempts),
+        set: [qa_attempts: 0, qa_error: nil]
+      )
+
+    count
+  end
+
+  @doc """
+  What a re-run would still do (spec F-342): documents to index, chunks to generate,
+  chunks given up, and generated questions still to embed.
+  """
+  def remaining do
+    %{
+      documents:
+        Repo.one(
+          from d in AskDrive.Documents.Document,
+            where: d.status in ["pending", "processing"],
+            select: count(d.id)
+        ),
+      chunks: Repo.one(from c in subquery(pending_generation_query()), select: count(c.id)),
+      given_up:
+        Repo.one(
+          from c in Chunk,
+            left_join: q in QAPair,
+            on: q.chunk_id == c.id and q.status == "active",
+            where: is_nil(q.id) and c.qa_attempts >= @max_qa_attempts,
+            select: count(c.id)
+        ),
+      questions:
+        Repo.one(
+          from q in QAPair,
+            where: is_nil(q.question_embedding) and q.status == "active",
+            select: count(q.id)
+        )
+    }
+  end
+
+  # A failure that says something about the chunk (the model's output couldn't be used, it
+  # crashed, it ran past the timeout) counts against it; one that says nothing about it
+  # (Ollama down, generation not allowed in this mode, quota) doesn't, or one bad night would
+  # give up on every chunk.
+  defp record_generation_outcome(chunk, {:ok, count}) do
+    if (chunk.qa_attempts || 0) > 0 or chunk.qa_error do
+      Repo.update_all(from(c in Chunk, where: c.id == ^chunk.id),
+        set: [qa_attempts: 0, qa_error: nil, qa_attempted_at: now_s()]
+      )
+    end
+
+    count
+  end
+
+  defp record_generation_outcome(chunk, {:error, reason}) do
+    if counts_against_chunk?(reason) do
+      Repo.update_all(from(c in Chunk, where: c.id == ^chunk.id),
+        inc: [qa_attempts: 1],
+        set: [qa_error: describe_generation_error(reason), qa_attempted_at: now_s()]
+      )
+    end
+
+    0
+  end
+
+  defp counts_against_chunk?(reason) when is_binary(reason), do: true
+  defp counts_against_chunk?({:exception, _}), do: true
+  defp counts_against_chunk?({:timeout, _}), do: true
+  defp counts_against_chunk?({:invalid_response, _}), do: true
+  defp counts_against_chunk?(_), do: false
+
+  defp describe_generation_error(reason) when is_binary(reason), do: String.slice(reason, 0, 255)
+  defp describe_generation_error({:exception, msg}), do: String.slice("例外: " <> msg, 0, 255)
+  defp describe_generation_error({:timeout, _}), do: "時間切れ（応答がタイムアウトしました）"
+  defp describe_generation_error(other), do: other |> inspect() |> String.slice(0, 255)
+
+  defp now_s, do: DateTime.utc_now() |> DateTime.truncate(:second)
+
+  # QA (and, if enabled, structured fields) for one chunk: {:ok, QA saved} or {:error, reason}
   defp generate_chunk(chunk, setting) do
     # 1. Generate QA pairs
-    new_qas =
+    result =
       case QA.generate_for_chunk(chunk, LLM.generation_model(setting), setting.batch_num_ctx) do
         {:ok, qa_list} ->
           saved =
@@ -638,11 +750,11 @@ defmodule AskDrive.Batch.Scheduler do
               qa_pair
             end)
 
-          length(saved)
+          {:ok, length(saved)}
 
         {:error, reason} ->
           Logger.error("Failed to generate QA for chunk #{chunk.id}: #{inspect(reason)}")
-          0
+          {:error, reason}
       end
 
     # 2. Extract structured fields if enabled
@@ -669,7 +781,7 @@ defmodule AskDrive.Batch.Scheduler do
       end
     end
 
-    new_qas
+    result
   end
 
   # =========================================================================
