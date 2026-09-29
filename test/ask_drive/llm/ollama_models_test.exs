@@ -7,6 +7,8 @@ defmodule AskDrive.LLM.OllamaModelsTest do
 
   setup do
     {server, url} = StubOllama.start!(self())
+    # pulls finished by earlier tests would show instead of this test's state
+    AskDrive.LLM.OllamaModels.reset_pulls()
     on_exit(fn -> Process.exit(server, :normal) end)
     Phoenix.PubSub.subscribe(AskDrive.PubSub, OllamaModels.topic())
 

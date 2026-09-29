@@ -59,7 +59,8 @@ defmodule AskDrive.LdapIntegrationTest do
     assert {:error, {:unavailable, message}} =
              Ldap.authenticate(stranger, "taro@example.com", "correct-horse")
 
-    assert message =~ "接続できません"
+    # refused at connect (TLS 1.2) or right after the handshake (TLS 1.3)
+    assert message =~ "接続できません" or message =~ "クライアント証明書が拒否された"
   end
 
   test "a server certificate from an untrusted CA is refused", %{setting: setting} do

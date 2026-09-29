@@ -33,6 +33,10 @@ defmodule AskDrive.LLM.OllamaModels do
   @doc "Pulls in progress or finished: `%{model => %{status:, completed:, total:, error:}}`."
   def pulls, do: GenServer.call(__MODULE__, :pulls)
 
+  @doc false
+  # Forgets finished pulls (tests: the state outlives each test)
+  def reset_pulls, do: GenServer.call(__MODULE__, :reset_pulls)
+
   @doc "Starts pulling `model` in the background (no-op if it's already being pulled)."
   def pull_async(model) when is_binary(model) do
     model = String.trim(model)
@@ -130,6 +134,8 @@ defmodule AskDrive.LLM.OllamaModels do
 
   @impl true
   def handle_call(:pulls, _from, state), do: {:reply, state.pulls, state}
+
+  def handle_call(:reset_pulls, _from, state), do: {:reply, :ok, %{state | pulls: %{}}}
 
   @impl true
   def handle_cast({:pull, model}, state) do

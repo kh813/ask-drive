@@ -9,6 +9,8 @@ defmodule AskDriveWeb.AdminOllamaModelsTest do
     on_exit(fn -> System.delete_env("ASK_DRIVE_DISABLE_AUTH") end)
 
     {server, url} = StubOllama.start!(self())
+    # pulls finished by earlier tests would show instead of this test's state
+    AskDrive.LLM.OllamaModels.reset_pulls()
     on_exit(fn -> Process.exit(server, :normal) end)
 
     {:ok, setting} =

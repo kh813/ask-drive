@@ -51,6 +51,9 @@ defmodule AskDrive.FakeLdap do
       {:search_denied, _} ->
         {:error, :insufficientAccessRights}
 
+      {:closed, _} ->
+        {:error, :ldap_closed}
+
       {_, :base} ->
         {:ok, [%{dn: base, attrs: %{}}]}
 

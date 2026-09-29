@@ -80,6 +80,7 @@ defmodule AskDrive.Ldap do
     if present?(setting.ldap_bind_dn) and present?(setting.ldap_bind_password) do
       case client.bind(handle, setting.ldap_bind_dn, setting.ldap_bind_password) do
         :ok -> :ok
+        {:error, :ldap_closed} -> closed()
         {:error, reason} -> unavailable("アクセス認証情報でのバインドに失敗しました", reason)
       end
     else
@@ -101,6 +102,9 @@ defmodule AskDrive.Ldap do
       {:error, :insufficientAccessRights} ->
         unavailable("ユーザー情報を読み取る権限がありません", :insufficientAccessRights)
 
+      {:error, :ldap_closed} ->
+        closed()
+
       {:error, reason} ->
         unavailable("ユーザーを検索できません", reason)
     end
@@ -116,6 +120,7 @@ defmodule AskDrive.Ldap do
         with :ok <- service_bind(client, handle, setting) do
           case client.search(handle, base_dn(setting), :base) do
             {:ok, _} -> :ok
+            {:error, :ldap_closed} -> closed()
             {:error, reason} -> unavailable("ベース DN（#{base_dn(setting)}）を読み取れません", reason)
           end
         end
@@ -209,6 +214,12 @@ defmodule AskDrive.Ldap do
   rescue
     _ -> {:error, "CA 証明書を読み取れません"}
   end
+
+  # With TLS 1.3 the server checks the client certificate after the handshake has completed
+  # on our side, so a refused certificate shows up as the connection closing on the first
+  # request rather than as a failed connect.
+  defp closed,
+    do: unavailable("LDAP サーバーが接続を切断しました（クライアント証明書が拒否された可能性があります）", :ldap_closed)
 
   defp unavailable(message, reason) do
     Logger.warning("LDAP: #{message}: #{inspect(reason)}")

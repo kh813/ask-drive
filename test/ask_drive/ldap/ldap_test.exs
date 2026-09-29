@@ -48,6 +48,10 @@ defmodule AskDrive.LdapTest do
     assert msg =~ "ldap.google.com:636"
     assert msg =~ "certificate required"
 
+    FakeLdap.put_mode(:closed)
+    assert {:error, {:unavailable, msg}} = Ldap.authenticate(setting, "taro@example.com", "x")
+    assert msg =~ "クライアント証明書が拒否された可能性"
+
     FakeLdap.put_mode(:search_denied)
     assert {:error, {:unavailable, msg}} = Ldap.authenticate(setting, "taro@example.com", "x")
     assert msg =~ "ユーザー情報を読み取る権限がありません"

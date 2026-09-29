@@ -180,6 +180,10 @@ defmodule AskDrive.ChatSummaryTest do
         chat_summary_model: "qwen3:4b-instruct-2507-q4_K_M"
       })
 
+    # installed, so it isn't swapped for the batch model (a reasoning one) while "pulling";
+    # a pull left over from an earlier test may add models to the stub's list at any time
+    StubOllama.put_installed(["qwen3:4b-instruct-2507-q4_K_M"])
+
     StubOllama.put_generate_pieces(
       {:sequence, [["Taking PCs out requires approval [1]."], ["PC の持ち出しには承認が必要です [1]。"]]}
     )
