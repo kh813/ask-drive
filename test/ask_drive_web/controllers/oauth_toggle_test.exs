@@ -31,6 +31,11 @@ defmodule AskDriveWeb.OAuthToggleTest do
     assert redirected_to(conn) == "/login"
     assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Google ログインは無効"
 
+    # the intro speaks of the LDAP password only, not of Google accounts
+    assert html =~ "メールアドレスと Google Workspace のパスワードでログインしてください"
+    refute html =~ "Google アカウントでログインしてください"
+    refute html =~ "login-divider"
+
     # the credentials are kept
     assert Settings.platform_setting!().google_client_id == "cid.apps.googleusercontent.com"
   end
@@ -66,5 +71,23 @@ defmodule AskDriveWeb.OAuthToggleTest do
     assert run.(["status"]) =~ "Google ログイン（OAuth）: 無効（認証情報は設定済み）"
     assert run.(["oauth", "on"]) =~ "有効にしました"
     assert Settings.platform_setting!().oauth_login_enabled
+  end
+
+  test "only Google login on: the intro speaks of Google accounts, no LDAP form", %{conn: conn} do
+    html = conn |> get(~p"/login") |> html_response(200)
+    assert html =~ "google-login-btn"
+    assert html =~ "Google アカウントでログインしてください"
+    refute html =~ "ldap-login-form"
+  end
+
+  test "no method switched on: no buttons, and a notice saying so", %{conn: conn} do
+    {:ok, _} =
+      Settings.update_setting(Settings.platform_setting!(), %{"oauth_login_enabled" => "false"})
+
+    html = conn |> get(~p"/login") |> html_response(200)
+    refute html =~ "google-login-btn"
+    refute html =~ "ldap-login-form"
+    assert html =~ "ログインの方法が設定されていません"
+    refute html =~ "OAuth が未設定です"
   end
 end

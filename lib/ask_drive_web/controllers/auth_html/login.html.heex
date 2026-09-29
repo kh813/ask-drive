@@ -15,13 +15,27 @@
     <div class="p-8 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-6">
       <div class="space-y-1.5 text-center">
         <h2 class="font-semibold text-base text-zinc-900 dark:text-zinc-100">ログイン</h2>
-        <p class="text-xs text-zinc-500 leading-relaxed">
-          <%= if @allowed_domain do %>
-            <span class="font-medium text-zinc-700 dark:text-zinc-300">@{@allowed_domain}</span>
-            の Google アカウントでログインしてください。
-          <% else %>
-            Google アカウントでログインしてください。
-          <% end %>
+        <%!-- worded for the sign-in methods that are switched on (spec F-1310) --%>
+        <p id="login-intro" class="text-xs text-zinc-500 leading-relaxed">
+          <span
+            :if={@allowed_domain && (@ldap_enabled? || @oauth_configured?)}
+            class="font-medium text-zinc-700 dark:text-zinc-300"
+          >
+            @{@allowed_domain} の
+          </span>
+          {cond do
+            @ldap_enabled? && @oauth_configured? ->
+              "Google Workspace アカウントでログインしてください。"
+
+            @ldap_enabled? ->
+              "メールアドレスと Google Workspace のパスワードでログインしてください。"
+
+            @oauth_configured? ->
+              "Google アカウントでログインしてください。"
+
+            true ->
+              "現在ログインできる方法がありません。"
+          end}
         </p>
       </div>
 
@@ -82,6 +96,7 @@
 
       <div
         :if={@ldap_enabled? && @oauth_configured?}
+        id="login-divider"
         class="flex items-center gap-3 text-[11px] text-zinc-400"
       >
         <span class="flex-1 h-px bg-zinc-200 dark:bg-zinc-800"></span>
@@ -98,35 +113,19 @@
         </a>
       <% end %>
       <%= if !@oauth_configured? && !@ldap_enabled? do %>
-        <div class="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 space-y-2">
+        <div
+          id="no-login-method"
+          class="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 space-y-2"
+        >
           <p class="font-medium text-sm flex items-center gap-1.5">
-            <.icon name="hero-exclamation-triangle" class="w-4 h-4" /> OAuth が未設定です
+            <.icon name="hero-exclamation-triangle" class="w-4 h-4" /> ログインの方法が設定されていません
           </p>
           <p class="text-xs leading-relaxed">
-            <code
-              class="font-mono text-[11px] bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded"
-              phx-no-curly-interpolation
-            >.env.prod</code>
-            に
-            <code
-              class="font-mono text-[11px] bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded"
-              phx-no-curly-interpolation
-            >GOOGLE_CLIENT_ID</code>
-            /
-            <code
-              class="font-mono text-[11px] bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded"
-              phx-no-curly-interpolation
-            >GOOGLE_CLIENT_SECRET</code>
-            /
-            <code
-              class="font-mono text-[11px] bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded"
-              phx-no-curly-interpolation
-            >ASK_DRIVE_ADMIN_EMAILS</code>
-            を設定し、<code
-              class="font-mono text-[11px] bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded"
-              phx-no-curly-interpolation
-            >./app.sh restart</code>
-            で再起動してください。
+            管理者は、全体管理の「全体設定」→「組織（Google Workspace）」→「ログインの方法」で Google Secure LDAP または Google ログイン（OAuth）を有効にしてください。管理画面に入れない場合は、サーバー上で
+            <code class="font-mono text-[11px] bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded">
+              ./app.sh auth status
+            </code>
+            で状態を確認できます。
           </p>
         </div>
       <% end %>

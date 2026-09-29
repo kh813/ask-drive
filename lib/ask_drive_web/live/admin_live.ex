@@ -2165,8 +2165,7 @@ defmodule AskDriveWeb.AdminLive do
                   </label>
                   <div class="space-y-3">
                     <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                      <.icon name="hero-key" class="w-4 h-4 text-indigo-500" />
-                      認証情報
+                      <.icon name="hero-key" class="w-4 h-4 text-indigo-500" /> 認証情報
                     </h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <.input
