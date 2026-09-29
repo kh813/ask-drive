@@ -516,6 +516,7 @@ mix hex.audit
 - [x] 30-4 各窓口の管理画面（`/:app/admin?tab=logs` または `tab=metrics`）での API 利用量・トークン数・レイテンシ・エラー状況のダッシュボード表示
 - [x] 30-5 全体管理画面（`/admin?tab=metrics` または `tab=logs`）でのシステム全体の API 利用状況サマリー表示
 - [x] 30-6 単体・LiveView テスト作成と **ビルドゲート**
+- [x] 30-7 インデックス対象データ（ファイル形式別・文書個別）のトークン効率・密度（Tokens/KB）・有効テキスト比率分析および改善アドバイス表示（仕様 14.6）
 
 ## Phase 26 — Google Authenticator（TOTP）による 2 段階目の確認 【将来 ToDo・未着手】
 

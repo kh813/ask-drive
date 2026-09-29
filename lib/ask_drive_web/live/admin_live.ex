@@ -871,6 +871,7 @@ defmodule AskDriveWeb.AdminLive do
     # 6. Metrics & API Usage
     metrics_summary = AskDrive.Metrics.get_summary(30)
     recent_api_errors = AskDrive.Metrics.list_recent_errors(20)
+    data_efficiency = AskDrive.Metrics.get_data_efficiency_summary()
 
     socket
     |> assign(
@@ -909,6 +910,7 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:resolved_questions, resolved_questions)
     |> assign(:metrics_summary, metrics_summary)
     |> assign(:recent_api_errors, recent_api_errors)
+    |> assign(:data_efficiency, data_efficiency)
     |> assign(:health, health)
     |> assign(:current_mode, current_mode)
     |> assign(:account, account)
@@ -1721,12 +1723,15 @@ defmodule AskDriveWeb.AdminLive do
                       <th class="py-3 px-2">ドキュメント名</th>
                       <th class="py-3 px-2">状態</th>
                       <th class="py-3 px-2">ファイル形式</th>
+                      <th class="py-3 px-2 text-right">トークン効率</th>
                       <th class="py-3 px-2">最終同期</th>
                       <th class="py-3 px-2 text-right">Drive</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
                     <%= for doc <- @documents do %>
+                      <% eff =
+                        Enum.find(@data_efficiency.doc_stats, fn s -> s.document.id == doc.id end) %>
                       <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
                         <td class="py-3 px-2 font-medium text-zinc-900 dark:text-zinc-100">
                           {doc.name}
@@ -1769,6 +1774,36 @@ defmodule AskDriveWeb.AdminLive do
                         </td>
                         <td class="py-3 px-2 font-mono text-[11px] text-zinc-500">
                           {doc.mime_type}
+                        </td>
+                        <td class="py-3 px-2 text-right">
+                          <%= if eff do %>
+                            <span class={[
+                              "px-2 py-0.5 rounded-full text-[10px] font-medium inline-block",
+                              cond do
+                                String.starts_with?(eff.score_rating, "優良") ->
+                                  "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+
+                                String.starts_with?(eff.score_rating, "良好") ->
+                                  "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
+
+                                String.starts_with?(eff.score_rating, "普通") ->
+                                  "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+
+                                String.starts_with?(eff.score_rating, "要改善") ->
+                                  "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+
+                                true ->
+                                  "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+                              end
+                            ]}>
+                              {eff.score_rating}
+                            </span>
+                            <span class="text-[10px] text-zinc-400 block mt-0.5">
+                              {eff.total_tokens} tokens
+                            </span>
+                          <% else %>
+                            <span class="text-zinc-400">—</span>
+                          <% end %>
                         </td>
                         <td class="py-3 px-2 text-zinc-400">
                           {if doc.synced_at,
@@ -2510,6 +2545,180 @@ defmodule AskDriveWeb.AdminLive do
                   </table>
                 </div>
               <% end %>
+            </div>
+            <%!-- Data & Ingestion Token Efficiency (spec 14.6) --%>
+            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-5">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-200/60 dark:border-zinc-800 pb-3">
+                <div>
+                  <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                    <.icon name="hero-document-chart-bar" class="w-5 h-5 text-indigo-600" />
+                    インデックス対象データのトークン効率・構造化分析
+                  </h3>
+                  <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                    取り込み文書がどれだけ効率よくトークン化（テキスト抽出・構造化）されているかを分析します。Markdown等の構造化テキストはトークン密度と検索精度が高く、スキャン画像や複雑なPDFはトークン効率が低下する傾向があります。
+                  </p>
+                </div>
+                <div class="text-right shrink-0">
+                  <span class="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                    対象文書: {@data_efficiency.total_indexed_docs} 件
+                  </span>
+                  <span class="text-[11px] text-zinc-400 block">
+                    総インデックス: {@data_efficiency.total_tokens} トークン
+                  </span>
+                </div>
+              </div>
+
+              <%!-- Format Comparison Cards / Table --%>
+              <div class="space-y-3">
+                <h4 class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  ファイル形式別のトークン効率比較
+                </h4>
+                <%= if @data_efficiency.format_breakdown == [] do %>
+                  <p class="text-xs text-zinc-400 py-3 text-center">インデックス済みの文書がありません。</p>
+                <% else %>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                      <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                        <tr>
+                          <th class="py-2.5 px-2">形式・種別</th>
+                          <th class="py-2.5 px-2 text-right">文書数</th>
+                          <th class="py-2.5 px-2 text-right">総トークン数</th>
+                          <th class="py-2.5 px-2 text-right">元データ合計</th>
+                          <th class="py-2.5 px-2 text-right">トークン密度 (Tokens/KB)</th>
+                          <th class="py-2.5 px-2 text-right">有効テキスト比率</th>
+                          <th class="py-2.5 px-2">効率評価</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                        <%= for fmt <- @data_efficiency.format_breakdown do %>
+                          <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
+                            <td class="py-2.5 px-2 font-medium text-zinc-900 dark:text-zinc-100">
+                              {fmt.category}
+                            </td>
+                            <td class="py-2.5 px-2 text-right">{fmt.docs_count}</td>
+                            <td class="py-2.5 px-2 text-right font-mono text-indigo-600 dark:text-indigo-400">
+                              {fmt.total_tokens}
+                            </td>
+                            <td class="py-2.5 px-2 text-right font-mono text-[11px]">
+                              {div(fmt.total_bytes, 1024)} KB
+                            </td>
+                            <td class="py-2.5 px-2 text-right font-mono">{fmt.avg_density}</td>
+                            <td class="py-2.5 px-2 text-right font-mono">{fmt.avg_ratio}%</td>
+                            <td class="py-2.5 px-2">
+                              <span class={[
+                                "px-2 py-0.5 rounded-full text-[10px] font-medium",
+                                cond do
+                                  String.starts_with?(fmt.category, "Markdown") or
+                                      String.starts_with?(fmt.category, "Plain") ->
+                                    "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+
+                                  String.starts_with?(fmt.category, "CSV") or
+                                    String.starts_with?(fmt.category, "Docs") or
+                                      String.starts_with?(fmt.category, "Sheets") ->
+                                    "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
+
+                                  String.starts_with?(fmt.category, "PDF") ->
+                                    "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+
+                                  true ->
+                                    "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                                end
+                              ]}>
+                                {cond do
+                                  String.starts_with?(fmt.category, "Markdown") or
+                                      String.starts_with?(fmt.category, "Plain") ->
+                                    "最高 (S)"
+
+                                  String.starts_with?(fmt.category, "CSV") or
+                                    String.starts_with?(fmt.category, "Docs") or
+                                      String.starts_with?(fmt.category, "Sheets") ->
+                                    "良好 (A)"
+
+                                  String.starts_with?(fmt.category, "PDF") ->
+                                    "標準 (B)"
+
+                                  true ->
+                                    "要確認 (C)"
+                                end}
+                              </span>
+                            </td>
+                          </tr>
+                        <% end %>
+                      </tbody>
+                    </table>
+                  </div>
+                <% end %>
+              </div>
+
+              <%!-- Document Details & Advice List --%>
+              <div class="space-y-3 pt-3 border-t border-zinc-200/60 dark:border-zinc-800">
+                <h4 class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  文書ごとのトークン効率と改善アドバイス
+                </h4>
+                <%= if @data_efficiency.doc_stats == [] do %>
+                  <p class="text-xs text-zinc-400 py-3 text-center">インデックス済みの文書がありません。</p>
+                <% else %>
+                  <div class="overflow-x-auto max-h-80 overflow-y-auto">
+                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                      <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 bg-white dark:bg-zinc-900">
+                        <tr>
+                          <th class="py-2.5 px-2">ドキュメント</th>
+                          <th class="py-2.5 px-2">種別</th>
+                          <th class="py-2.5 px-2 text-right">推定トークン</th>
+                          <th class="py-2.5 px-2 text-right">元サイズ</th>
+                          <th class="py-2.5 px-2">効率スコア</th>
+                          <th class="py-2.5 px-2">データ作成者向けアドバイス</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                        <%= for stat <- @data_efficiency.doc_stats do %>
+                          <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
+                            <td
+                              class="py-2.5 px-2 font-medium text-zinc-900 dark:text-zinc-100 max-w-xs truncate"
+                              title={stat.document.name}
+                            >
+                              {stat.document.name}
+                            </td>
+                            <td class="py-2.5 px-2 text-[11px] text-zinc-500">{stat.category}</td>
+                            <td class="py-2.5 px-2 text-right font-mono text-indigo-600 dark:text-indigo-400">
+                              {stat.total_tokens}
+                            </td>
+                            <td class="py-2.5 px-2 text-right font-mono text-[11px]">
+                              {div(stat.raw_size_bytes, 1024)} KB
+                            </td>
+                            <td class="py-2.5 px-2 whitespace-nowrap">
+                              <span class={[
+                                "px-2 py-0.5 rounded-full text-[10px] font-medium",
+                                cond do
+                                  String.starts_with?(stat.score_rating, "優良") ->
+                                    "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+
+                                  String.starts_with?(stat.score_rating, "良好") ->
+                                    "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
+
+                                  String.starts_with?(stat.score_rating, "普通") ->
+                                    "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+
+                                  String.starts_with?(stat.score_rating, "要改善") ->
+                                    "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+
+                                  true ->
+                                    "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+                                end
+                              ]}>
+                                {stat.score_rating}
+                              </span>
+                            </td>
+                            <td class="py-2.5 px-2 text-[11px] text-zinc-500 leading-snug">
+                              {stat.advice}
+                            </td>
+                          </tr>
+                        <% end %>
+                      </tbody>
+                    </table>
+                  </div>
+                <% end %>
+              </div>
             </div>
           </div>
         <% end %>

@@ -63,4 +63,66 @@ defmodule AskDrive.MetricsTest do
       assert hd(errors).error_message =~ "429"
     end
   end
+
+  describe "data token efficiency" do
+    alias AskDrive.Documents.{Chunk, Document}
+
+    test "calculates document efficiency and aggregates format breakdown" do
+      {:ok, doc1} =
+        %Document{}
+        |> Document.changeset(%{
+          drive_file_id: "doc_eff_1",
+          name: "guidelines.md",
+          mime_type: "text/markdown",
+          size_bytes: 2048,
+          status: "indexed"
+        })
+        |> Repo.insert()
+
+      {:ok, _chunk1} =
+        %Chunk{}
+        |> Chunk.changeset(%{
+          document_id: doc1.id,
+          position: 0,
+          content: "# 開発ガイドライン\nここに詳細を記載します。",
+          content_hash: "hash1",
+          token_estimate: 50
+        })
+        |> Repo.insert()
+
+      {:ok, doc2} =
+        %Document{}
+        |> Document.changeset(%{
+          drive_file_id: "doc_eff_2",
+          name: "scanned_doc.pdf",
+          mime_type: "application/pdf",
+          size_bytes: 500_000,
+          status: "indexed"
+        })
+        |> Repo.insert()
+
+      {:ok, _chunk2} =
+        %Chunk{}
+        |> Chunk.changeset(%{
+          document_id: doc2.id,
+          position: 0,
+          content: "OCRスキャンテキスト",
+          content_hash: "hash2",
+          token_estimate: 10
+        })
+        |> Repo.insert()
+
+      doc1_eff = Metrics.calculate_doc_efficiency(doc1)
+      assert doc1_eff.category =~ "Markdown"
+      assert doc1_eff.score_rating =~ "優良"
+
+      doc2_eff = Metrics.calculate_doc_efficiency(doc2)
+      assert doc2_eff.category =~ "PDF"
+
+      summary = Metrics.get_data_efficiency_summary()
+      assert summary.total_indexed_docs == 2
+      assert summary.total_tokens == 60
+      assert length(summary.format_breakdown) >= 2
+    end
+  end
 end

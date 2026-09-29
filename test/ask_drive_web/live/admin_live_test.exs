@@ -172,6 +172,8 @@ defmodule AskDriveWeb.AdminLiveTest do
       assert html =~ "総消費トークン数"
       assert html =~ "平均応答時間"
       assert html =~ "gemini-2.5-flash"
+      assert html =~ "インデックス対象データのトークン効率・構造化分析"
+      assert html =~ "ファイル形式別のトークン効率比較"
     end
   end
 end
