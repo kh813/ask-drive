@@ -155,6 +155,16 @@ defmodule AskDrive.Drive.OAuth do
     end
   end
 
+  @doc """
+  Whether employees can sign in with Google (spec F-1310): switched on (platform setting)
+  and a client ID configured. Only the sign-in flow; Drive sync's OAuth doesn't depend on it.
+  """
+  def login_enabled? do
+    get_client_id() != "" and AskDrive.Settings.platform_setting!().oauth_login_enabled != false
+  rescue
+    _ -> get_client_id() != ""
+  end
+
   def get_client_id do
     case AskDrive.Settings.get_setting() do
       %{google_client_id: id} when is_binary(id) and id != "" ->

@@ -56,6 +56,7 @@ AskDrive 管理スクリプト
   auth disable       ログイン認証を無効に戻す (ゲスト・POC。締め出されたときの復旧)
   auth enable [mail…] ログイン認証を有効にする (mail = 管理者に昇格できるアカウント、複数可)
   auth ldap on|off   LDAP でのログインを有効 / 無効にする
+  auth oauth on|off  Google ログイン（OAuth）を有効 / 無効にする
   ollama <args>      アプリ専用の Ollama を操作 (例: ./app.sh ollama pull <model> / ./app.sh ollama list)
   drive service-account [key.json] [--subject user@example.com]
                      Drive 同期をサービスアカウント認証に設定 (Web 管理画面を使わずに設定)
@@ -338,11 +339,11 @@ cmd_auth() {
   cd "${SCRIPT_DIR}"
 
   case "${1:-}" in
-    status|disable|enable|ldap)
+    status|disable|enable|ldap|oauth)
       MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.auth "$@"
       ;;
     *)
-      echo -e "${RED}使用方法: ./app.sh auth status | disable | enable [email ...] | ldap on|off${NC}"
+      echo -e "${RED}使用方法: ./app.sh auth status | disable | enable [email ...] | ldap on|off | oauth on|off${NC}"
       exit 1
       ;;
   esac

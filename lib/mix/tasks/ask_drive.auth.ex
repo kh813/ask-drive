@@ -9,6 +9,7 @@ defmodule Mix.Tasks.AskDrive.Auth do
       mix ask_drive.auth disable            # back to guest (POC): no login anywhere
       mix ask_drive.auth enable [email ...] # login required; emails = administrator accounts
       mix ask_drive.auth ldap off|on        # LDAP sign-in off / on
+      mix ask_drive.auth oauth off|on       # Google login (OAuth) off / on
 
   The running service reads the setting on every request, so a change applies at once.
   `ASK_DRIVE_DISABLE_AUTH` in `.env.prod`, when present, overrides the setting.
@@ -31,7 +32,7 @@ defmodule Mix.Tasks.AskDrive.Auth do
   defp run_task(["enable" | rest]) do
     setting = Settings.platform_setting!()
 
-    unless Ldap.enabled?(setting) or AskDrive.Drive.OAuth.get_client_id() != "" do
+    unless Ldap.enabled?(setting) or AskDrive.Drive.OAuth.login_enabled?() do
       Mix.raise("ログインの方法がありません。Google Secure LDAP または Google ログイン（OAuth）を設定してください。")
     end
 
@@ -44,6 +45,15 @@ defmodule Mix.Tasks.AskDrive.Auth do
     {:ok, _} = Settings.set_auth_required(true)
     Mix.shell().info("ログイン認証を有効にしました。")
     warn_env()
+  end
+
+  defp run_task(["oauth", state]) when state in ["on", "off"] do
+    {:ok, _} =
+      Settings.update_setting(Settings.platform_setting!(), %{
+        "oauth_login_enabled" => to_string(state == "on")
+      })
+
+    Mix.shell().info("Google ログイン（OAuth）を#{if state == "on", do: "有効", else: "無効"}にしました。")
   end
 
   defp run_task(["ldap", state]) when state in ["on", "off"] do
@@ -59,7 +69,9 @@ defmodule Mix.Tasks.AskDrive.Auth do
   end
 
   defp run_task(_) do
-    Mix.raise("使用方法: mix ask_drive.auth status | disable | enable [email ...] | ldap on|off")
+    Mix.raise(
+      "使用方法: mix ask_drive.auth status | disable | enable [email ...] | ldap on|off | oauth on|off"
+    )
   end
 
   defp status do
@@ -76,9 +88,17 @@ defmodule Mix.Tasks.AskDrive.Auth do
     Mix.shell().info("""
     ログイン認証: #{if state == :enabled, do: "有効", else: "無効（ゲスト・POC）"}（#{source_label}）
     Google Secure LDAP: #{if Ldap.enabled?(setting), do: "有効 (#{setting.ldap_host || Ldap.default_host()})", else: "無効"}
-    Google ログイン（OAuth）: #{if AskDrive.Drive.OAuth.get_client_id() != "", do: "設定済み", else: "未設定"}
+    Google ログイン（OAuth）: #{oauth_label()}
     管理者に昇格できるアカウント: #{Accounts.count_eligible_admins()} 件
     """)
+  end
+
+  defp oauth_label do
+    cond do
+      AskDrive.Drive.OAuth.get_client_id() == "" -> "未設定"
+      AskDrive.Drive.OAuth.login_enabled?() -> "有効"
+      true -> "無効（認証情報は設定済み）"
+    end
   end
 
   defp warn_env do

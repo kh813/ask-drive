@@ -48,6 +48,8 @@ defmodule AskDrive.Settings.Setting do
     # first-access web setup (spec 6.12); set by AskDrive.Setup, not cast from forms
     field :setup_completed_at, :utc_datetime
     field :google_client_id, :string
+    # Google login (OAuth) on/off (spec F-1310); Drive sync's OAuth is not affected
+    field :oauth_login_enabled, :boolean, default: true
     field :google_client_secret, Binary
     field :maintenance_mode, :boolean, default: false
     field :maintenance_message, :string
@@ -194,6 +196,7 @@ defmodule AskDrive.Settings.Setting do
         :drive_folder_name,
         :google_client_id,
         :google_client_secret,
+        :oauth_login_enabled,
         :batch_start_hour,
         :batch_end_hour,
         :batch_deadline_hour,

@@ -26,7 +26,7 @@ defmodule AskDriveWeb.AuthController do
       conn
       |> remember_return_to(params["return_to"])
       |> ensure_device_cookie()
-      |> assign(:oauth_configured?, OAuth.get_client_id() != "")
+      |> assign(:oauth_configured?, OAuth.login_enabled?())
       |> assign(:ldap_enabled?, ldap_enabled?())
       |> assign(:allowed_domain, allowed_domain())
       |> assign(:page_title, "AskDrive - ログイン")
@@ -158,7 +158,15 @@ defmodule AskDriveWeb.AuthController do
   @doc """
   Starts the employee sign-in flow.
   """
-  def request(conn, params), do: start_oauth(conn, :login, params["return_to"] || "/")
+  def request(conn, params) do
+    if OAuth.login_enabled?() do
+      start_oauth(conn, :login, params["return_to"] || "/")
+    else
+      conn
+      |> put_flash(:error, "Google ログインは無効になっています。")
+      |> redirect(to: ~p"/login")
+    end
+  end
 
   @doc """
   Starts the Drive sync account authorization flow (administrators only).
