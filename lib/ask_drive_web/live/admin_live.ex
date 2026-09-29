@@ -18,7 +18,7 @@ defmodule AskDriveWeb.AdminLive do
   import Ecto.Query, warn: false
 
   alias AskDrive.Accounts.{AdminAccess, AdminElevationLog}
-  alias AskDrive.Batch.{ItemLog, Scheduler}
+  alias AskDrive.Batch.{ItemLog, Progress, Scheduler}
   alias AskDrive.Documents.{Chunk, Document}
   alias AskDrive.Drive.{Client, ServiceAccount}
   alias AskDrive.LLM
@@ -541,6 +541,8 @@ defmodule AskDriveWeb.AdminLive do
     item_logs = if latest_run, do: ItemLog.list_for_run(latest_run.id), else: []
     run_summaries = runs |> Enum.map(& &1.id) |> ItemLog.summaries()
     auto_status = Scheduler.auto_status()
+    # progress of the run in progress (spec F-340); the dashboard ticks every 5 s
+    running_run = Enum.find(runs, &(&1.status == "running"))
 
     # 2. Coverage Stats
     total_chunks = Repo.aggregate(Chunk, :count, :id) || 0
@@ -577,6 +579,9 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:runs, runs)
     |> assign(:run_summaries, run_summaries)
     |> assign(:auto_status, auto_status)
+    |> assign(:running_run, running_run)
+    |> assign(:running_progress, running_run && progress_view(running_run))
+    |> assign(:selected_progress, latest_run && progress_view(latest_run))
     |> assign(:item_logs, item_logs)
     |> assign(:total_chunks, total_chunks)
     |> assign(:active_qas, active_qas)
@@ -735,7 +740,12 @@ defmodule AskDriveWeb.AdminLive do
               >
                 <%= case @auto_status.state do %>
                   <% :running -> %>
-                    バッチを実行中です。
+                    バッチを実行中です。<span :if={@running_progress}>
+                      全体の目安 {@running_progress.overall}% ・ ステップ {@running_progress.step}/{@running_progress.steps}「{@running_progress.label}」{if @running_progress.total >
+                                                                                                                                                   0,
+                                                                                                                                                 do:
+                                                                                                                                                   " #{@running_progress.done} / #{@running_progress.total}"}
+                    </span>
                   <% :done -> %>
                     {Calendar.strftime(@auto_status.window_start, "%-m/%-d")} の夜間枠は実行済みです（#{@auto_status.run.id}・{trigger_label(
                       @auto_status.run.trigger
@@ -802,6 +812,15 @@ defmodule AskDriveWeb.AdminLive do
                             status_class(run.status)
                           ]}>
                             {status_label(run.status)}
+                          </span>
+                          <span
+                            :if={
+                              run.status == "running" && @running_run && run.id == @running_run.id &&
+                                @running_progress
+                            }
+                            class="ml-1 font-mono text-blue-700 dark:text-blue-300"
+                          >
+                            {@running_progress.overall}%
                           </span>
                         </td>
                         <td class="py-2 px-2 text-right font-mono">
@@ -909,6 +928,84 @@ defmodule AskDriveWeb.AdminLive do
                   </div>
                 </div>
 
+                <%!-- Progress of the run (spec F-340): overall, the current step, and the item --%>
+                <div
+                  :if={@selected_progress && @latest_run.status in ["running", "aborted", "failed"]}
+                  id="batch-progress"
+                  class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3"
+                >
+                  <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                    {if @latest_run.status == "running", do: "進捗", else: "停止した位置"}
+                  </h3>
+                  <div>
+                    <div class="flex items-baseline justify-between text-xs text-zinc-600 dark:text-zinc-400">
+                      <span>全体の目安</span>
+                      <span class="font-mono text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                        {@selected_progress.overall}%
+                      </span>
+                    </div>
+                    <div class="mt-1 h-2.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                      <div
+                        class="h-full rounded-full bg-indigo-600 transition-all duration-700"
+                        style={"width: #{@selected_progress.overall}%"}
+                      >
+                      </div>
+                    </div>
+                  </div>
+                  <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800/80 space-y-1.5 text-xs">
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                      <span class="font-medium text-zinc-800 dark:text-zinc-200">
+                        ステップ {@selected_progress.step}/{@selected_progress.steps}: {@selected_progress.label}
+                      </span>
+                      <span
+                        :if={@selected_progress.total > 0}
+                        class="font-mono text-zinc-600 dark:text-zinc-400"
+                      >
+                        {@selected_progress.done} / {@selected_progress.total} 件（{@selected_progress.percent}%）
+                      </span>
+                    </div>
+                    <div
+                      :if={@selected_progress.total > 0}
+                      class="h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden"
+                    >
+                      <div
+                        class="h-full rounded-full bg-blue-500 transition-all duration-700"
+                        style={"width: #{@selected_progress.percent}%"}
+                      >
+                      </div>
+                    </div>
+                    <p
+                      :if={@selected_progress.item}
+                      class="text-zinc-600 dark:text-zinc-400 break-all"
+                    >
+                      {if @latest_run.status == "running", do: "処理中", else: "最後に処理していたもの"}: {@selected_progress.item}
+                      <span :if={@selected_progress.detail} class="text-zinc-500">
+                        — {@selected_progress.detail}
+                      </span>
+                    </p>
+                    <p
+                      :if={!@selected_progress.item && @selected_progress.detail}
+                      class="text-zinc-600 dark:text-zinc-400"
+                    >
+                      {@selected_progress.detail}
+                    </p>
+                    <p :if={@latest_run.status == "running"} class="text-zinc-500">
+                      このステップの経過 {format_seconds(@selected_progress.elapsed_seconds)}<span :if={
+                        @selected_progress.eta_seconds
+                      }>・残り {eta_label(@selected_progress.eta_seconds)}（ここまでのペースから推定）</span>
+                    </p>
+                    <p
+                      :if={@selected_progress[:past_deadline]}
+                      class="text-amber-700 dark:text-amber-300"
+                    >
+                      このペースでは打ち切り時刻（{@selected_progress.past_deadline}）までに全件は終わらない見込みです。残りは次回のバッチで続きから生成します。
+                    </p>
+                  </div>
+                  <p class="text-[11px] text-zinc-400">
+                    全体の % はステップごとの重み（取り込みと想定QAの生成が大半）による目安です。この画面は 5 秒ごとに更新されます。
+                  </p>
+                </div>
+
                 <%!-- Phase Breakdown List --%>
                 <div class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-2">
                   <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
@@ -918,7 +1015,7 @@ defmodule AskDriveWeb.AdminLive do
                     <%= for stat <- @latest_run.phase_stats do %>
                       <div class="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800/80 flex items-center justify-between">
                         <span class="font-medium text-zinc-700 dark:text-zinc-300">
-                          {stat.phase_name}
+                          {Progress.label(stat.phase_name)}
                         </span>
                         <div class="text-right text-zinc-500">
                           <span>{stat.duration_seconds}秒</span>
@@ -2760,6 +2857,28 @@ defmodule AskDriveWeb.AdminLive do
     do: format_seconds(DateTime.diff(f, s))
 
   defp duration_label(_), do: "—"
+
+  defp eta_label(sec) when sec < 60, do: "1 分未満"
+  defp eta_label(sec) when sec < 3600, do: "約 #{div(sec + 59, 60)} 分"
+  defp eta_label(sec), do: "約 #{div(sec, 3600)} 時間 #{div(rem(sec, 3600), 60)} 分"
+
+  # Progress.overview plus, while generating, whether the pace reaches the cut-off time
+  defp progress_view(run) do
+    now = DateTime.utc_now()
+
+    case Progress.overview(run, now) do
+      %{phase: "generate", eta_seconds: eta} = view
+      when is_integer(eta) and run.status == "running" ->
+        deadline = Scheduler.calculate_deadline(Settings.platform_setting!())
+
+        if DateTime.compare(DateTime.add(now, eta), deadline) == :gt,
+          do: Map.put(view, :past_deadline, AskDrive.Clock.format(deadline, "%H:%M")),
+          else: view
+
+      view ->
+        view
+    end
+  end
 
   defp format_seconds(sec) when sec < 60, do: "#{sec}秒"
   defp format_seconds(sec) when sec < 3600, do: "#{div(sec, 60)}分#{rem(sec, 60)}秒"

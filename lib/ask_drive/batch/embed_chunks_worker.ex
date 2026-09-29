@@ -10,7 +10,7 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
   require Logger
 
   alias AskDrive.{Documents, Freshness, Repo, Settings, Vector}
-  alias AskDrive.Batch.ItemLog
+  alias AskDrive.Batch.{ItemLog, Progress}
   alias AskDrive.Documents.{Chunk, Document}
   alias AskDrive.Ingest.{Chunker, Extractor}
   alias AskDrive.LLM
@@ -88,6 +88,7 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
     setting = Settings.get_setting!()
 
     Logger.info("EmbedChunksWorker: Processing document #{doc.name} (id: #{doc.id})...")
+    Progress.detail("本文を取得・抽出中")
 
     case Extractor.extract_from_drive(doc) do
       {:skipped, reason} ->
@@ -177,12 +178,20 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
   defp embed_in_batches([], _setting), do: {:ok, []}
 
   defp embed_in_batches(texts, setting) do
+    total = length(texts)
+    Progress.detail("埋め込み 0 / #{total} チャンク")
+
     texts
     |> Enum.chunk_every(@embed_batch_size)
     |> Enum.reduce_while({:ok, []}, fn batch, {:ok, acc} ->
       case Semaphore.run(fn -> LLM.embed(setting.embed_model, batch, setting: setting) end) do
-        {:ok, vectors} -> {:cont, {:ok, [vectors | acc]}}
-        {:error, _} = error -> {:halt, error}
+        {:ok, vectors} ->
+          done = min(total, (length(acc) + 1) * @embed_batch_size)
+          Progress.detail("埋め込み #{done} / #{total} チャンク")
+          {:cont, {:ok, [vectors | acc]}}
+
+        {:error, _} = error ->
+          {:halt, error}
       end
     end)
     |> case do

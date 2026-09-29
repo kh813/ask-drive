@@ -51,6 +51,32 @@ defmodule AskDriveWeb.AdminBatchHistoryTest do
     assert html =~ "/Manual/a.pdf"
   end
 
+  test "a running batch shows its progress: overall %, step, item and time left", %{conn: conn} do
+    run =
+      run!(~N[2026-09-29 08:38:00], %{
+        status: "running",
+        finished_at: nil,
+        progress_phase: "embed_chunks",
+        progress_done: 52,
+        progress_total: 208,
+        progress_item: "/Manual/a.pdf",
+        progress_detail: "埋め込み 64 / 186 チャンク",
+        progress_phase_started_at: DateTime.add(DateTime.utc_now(), -600, :second)
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/it-support/admin")
+
+    # 10 + 1 + 35 × 0.25 = 19.75
+    assert has_element?(view, "#batch-run-#{run.id}", "19%")
+    assert has_element?(view, "#batch-progress", "19%")
+    assert has_element?(view, "#batch-progress", "ステップ 3/6")
+    assert has_element?(view, "#batch-progress", "52 / 208 件（25%）")
+    assert has_element?(view, "#batch-progress", "/Manual/a.pdf")
+    assert has_element?(view, "#batch-progress", "埋め込み 64 / 186 チャンク")
+    assert has_element?(view, "#batch-progress", "残り 約 30 分")
+    assert has_element?(view, "#auto-batch-status", "全体の目安 19%")
+  end
+
   test "auto_status: missed, done (automatic only), due, next start" do
     assert %{state: :missed} = Scheduler.auto_status(~N[2026-09-29 09:00:00])
 

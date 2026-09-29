@@ -82,6 +82,19 @@ defmodule AskDrive.Batch.SchedulerTest do
       refute AskDrive.Runtime.Mode.current_mode() == :night_batch
     end
 
+    test "the run records its progress; it ends on the last step" do
+      AskDrive.Runtime.Mode.set_mode(:daytime)
+      {:ok, batch_run} = Scheduler.run_batch(ingest_only: true)
+
+      run = Repo.get!(AskDrive.Batch.BatchRun, batch_run.id)
+      assert run.progress_phase == "verify"
+      assert run.progress_phase_started_at
+
+      assert %{step: 4, steps: 4, overall: 100} = AskDrive.Batch.Progress.overview(run)
+      # the reporting process is released when the run ends
+      assert AskDrive.Batch.Progress.current_run_id() == nil
+    end
+
     test "ran_since?/1 ignores batches aborted by a restart" do
       since = DateTime.add(DateTime.utc_now(), -60)
 

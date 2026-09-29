@@ -26,6 +26,7 @@ defmodule AskDrive.Batch.Scheduler do
     BatchRun,
     EmbedChunksWorker,
     EmbedQuestionsWorker,
+    Progress,
     SyncWorker
   }
 
@@ -183,6 +184,9 @@ defmodule AskDrive.Batch.Scheduler do
       })
       |> Repo.insert()
 
+    # progress reports from this process (and the workers it calls) go to this run (F-340)
+    Progress.bind(batch_run.id)
+
     # Transition runtime mode into night_batch (a full batch only: ingest-only never loads the
     # generation model, and the daytime mode keeps the embedding model resident for chat)
     unless ingest_only?, do: Mode.set_mode(:night_batch)
@@ -234,6 +238,7 @@ defmodule AskDrive.Batch.Scheduler do
       if ingest_only?, do: rewarm_embedding(setting)
 
       if caffeinate_port, do: Port.close(caffeinate_port)
+      Progress.unbind()
 
       {:ok, batch_run}
     rescue
@@ -251,6 +256,7 @@ defmodule AskDrive.Batch.Scheduler do
         Mode.end_batch()
         if ingest_only?, do: rewarm_embedding(setting)
         if caffeinate_port, do: Port.close(caffeinate_port)
+        Progress.unbind()
         {:error, e}
     end
   end
@@ -262,6 +268,9 @@ defmodule AskDrive.Batch.Scheduler do
   defp run_phase_1_sync(batch_run, setting) do
     start_time = DateTime.utc_now()
     Logger.info("Batch ##{batch_run.id} - [Phase 1: Sync] starting...")
+
+    Progress.start_phase("sync", 0)
+    Progress.detail("Drive のファイル一覧を取得中")
 
     # Ensure all LLM models unloaded during pure sync
     LLM.unload_model(setting.batch_model, setting: setting)
@@ -287,6 +296,7 @@ defmodule AskDrive.Batch.Scheduler do
   defp run_phase_2_invalidate(batch_run, _setting) do
     start_time = DateTime.utc_now()
     Logger.info("Batch ##{batch_run.id} - [Phase 2: Invalidate] starting...")
+    Progress.start_phase("invalidate", 0)
 
     # Find modified documents where hash changed but old QAs are still active
     invalidated_count =
@@ -339,9 +349,14 @@ defmodule AskDrive.Batch.Scheduler do
       "Batch ##{batch_run.id} - [Phase 3] #{length(unindexed_docs)} document(s) to index"
     )
 
+    Progress.start_phase("embed_chunks", length(unindexed_docs))
+
     {items_count, chunk_total} =
-      Enum.reduce(unindexed_docs, {0, 0}, fn doc, {ok, chunks} ->
+      unindexed_docs
+      |> Enum.with_index()
+      |> Enum.reduce({0, 0}, fn {doc, index}, {ok, chunks} ->
         args = %{"document_id" => doc.id, "batch_run_id" => batch_run.id}
+        Progress.item(index, doc.path || doc.name)
 
         case EmbedChunksWorker.perform(%Oban.Job{args: args}) do
           {:ok, {:indexed, %{new: n}}} -> {ok + 1, chunks + n}
@@ -349,6 +364,8 @@ defmodule AskDrive.Batch.Scheduler do
           _ -> {ok, chunks}
         end
       end)
+
+    Progress.done(length(unindexed_docs))
 
     Logger.info(
       "Batch ##{batch_run.id} - [Phase 3] indexed #{items_count}/#{length(unindexed_docs)} document(s), #{chunk_total} new chunk(s) embedded"
@@ -433,6 +450,8 @@ defmodule AskDrive.Batch.Scheduler do
 
     total_chunks = length(pending_chunks)
     Logger.info("Batch ##{batch_run.id} - Found #{total_chunks} chunks queued for generation.")
+    Progress.start_phase("generate", total_chunks)
+    Process.put({__MODULE__, :doc_names}, document_names(pending_chunks))
 
     {processed_count, generated_qa_count, deadline_reached?} =
       process_generation_loop(
@@ -522,6 +541,12 @@ defmodule AskDrive.Batch.Scheduler do
       Logger.warning("Batch generation deadline #{inspect(deadline)} reached. Stopping Phase 4.")
       {processed, qa_count, true}
     else
+      # progress: the chunk being generated, and the counts so far in the history table
+      Progress.item(processed, chunk_label(chunk), %{
+        chunks_processed: processed,
+        qa_generated: qa_count
+      })
+
       # 1. Generate QA pairs
       new_qas =
         case QA.generate_for_chunk(chunk, LLM.generation_model(setting), setting.batch_num_ctx) do
@@ -602,14 +627,18 @@ defmodule AskDrive.Batch.Scheduler do
 
     items_count = length(unembedded_qas)
     Logger.info("Batch ##{batch_run.id} - Found #{items_count} questions to embed.")
+    Progress.start_phase("embed_questions", items_count)
 
     if items_count > 0 do
       qa_ids = Enum.map(unembedded_qas, & &1.id)
       # Batch in chunks of 50
       qa_ids
       |> Enum.chunk_every(50)
-      |> Enum.each(fn chunk_ids ->
+      |> Enum.reduce(0, fn chunk_ids, done ->
         EmbedQuestionsWorker.perform(%Oban.Job{args: %{"qa_pair_ids" => chunk_ids}})
+        done = done + length(chunk_ids)
+        Progress.done(done)
+        done
       end)
     end
 
@@ -642,6 +671,7 @@ defmodule AskDrive.Batch.Scheduler do
   defp run_phase_6_verify(batch_run, _setting, deadline_reached?) do
     start_time = DateTime.utc_now()
     Logger.info("Batch ##{batch_run.id} - [Phase 6: Verify] starting...")
+    Progress.start_phase("verify", 0)
 
     # Resolve question_log entries whose candidate chunks now have active QAs (11-3)
     unresolved_logs =
@@ -712,6 +742,22 @@ defmodule AskDrive.Batch.Scheduler do
   end
 
   # --- Helpers ---
+
+  defp document_names(chunks) do
+    ids = chunks |> Enum.map(& &1.document_id) |> Enum.uniq()
+
+    Repo.all(
+      from d in AskDrive.Documents.Document,
+        where: d.id in ^ids,
+        select: {d.id, fragment("coalesce(?, ?)", d.path, d.name)}
+    )
+    |> Map.new()
+  end
+
+  defp chunk_label(chunk) do
+    name = Map.get(Process.get({__MODULE__, :doc_names}, %{}), chunk.document_id, "文書")
+    if chunk.position, do: "#{name}（チャンク #{chunk.position + 1}）", else: name
+  end
 
   # The next batch_deadline_hour:00 in local time (spec F-339; default 08:00). The automatic
   # run may start until batch_end_hour (07:00), and gets until the deadline to finish.

@@ -8,7 +8,7 @@ defmodule AskDrive.Batch.SyncWorker do
 
   require Logger
   alias AskDrive.{Accounts, Documents, Settings}
-  alias AskDrive.Batch.ItemLog
+  alias AskDrive.Batch.{ItemLog, Progress}
   alias AskDrive.Drive.Client, as: DriveClient
 
   @impl Oban.Worker
@@ -56,10 +56,15 @@ defmodule AskDrive.Batch.SyncWorker do
     case DriveClient.list_files(folder_id) do
       {:ok, drive_files} ->
         Logger.info("SyncWorker: Found #{length(drive_files)} files in Drive.")
+        Progress.start_phase("sync", length(drive_files))
 
         stats =
-          Enum.reduce(drive_files, %{created: 0, updated: 0, unchanged: 0, failed: 0}, fn file,
-                                                                                          acc ->
+          drive_files
+          |> Enum.with_index()
+          |> Enum.reduce(%{created: 0, updated: 0, unchanged: 0, failed: 0}, fn {file, index},
+                                                                                acc ->
+            Progress.item(index, file["path"] || file["name"])
+
             try do
               {outcome, doc} = Documents.upsert_document_from_drive(file)
 
@@ -76,6 +81,8 @@ defmodule AskDrive.Batch.SyncWorker do
                 %{acc | failed: acc.failed + 1}
             end
           end)
+
+        Progress.done(length(drive_files))
 
         # Remove deleted files from local DB
         current_drive_ids = Enum.map(drive_files, & &1["id"])
