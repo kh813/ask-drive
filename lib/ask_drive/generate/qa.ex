@@ -7,6 +7,10 @@ defmodule AskDrive.Generate.QA do
   alias AskDrive.LLM
   alias AskDrive.LLM.Semaphore
 
+  # 3〜5 QA pairs in JSON take a few hundred tokens; the cap stops a model that starts
+  # repeating itself from holding the GPU until the timeout
+  @max_tokens 1536
+
   @system_prompt """
   あなたは社内ナレッジの想定質問回答（QA）を生成するAIアシスタントです。
   与えられた【文書セクション】の内容のみを根拠として、利用者が検索・質問しそうな「質問」とそれに対する明確な「回答」のペアを3〜5件作成してください。
@@ -50,7 +54,11 @@ defmodule AskDrive.Generate.QA do
     # Call LLM with semaphore control
     llm_result =
       Semaphore.run(fn ->
-        LLM.generate(model, prompt, system: @system_prompt, num_ctx: num_ctx)
+        LLM.generate(model, prompt,
+          system: @system_prompt,
+          num_ctx: num_ctx,
+          max_tokens: @max_tokens
+        )
       end)
 
     case llm_result do
@@ -92,7 +100,11 @@ defmodule AskDrive.Generate.QA do
 
     llm_result =
       Semaphore.run(fn ->
-        LLM.generate(model, retry_prompt, system: @system_prompt, num_ctx: num_ctx)
+        LLM.generate(model, retry_prompt,
+          system: @system_prompt,
+          num_ctx: num_ctx,
+          max_tokens: @max_tokens
+        )
       end)
 
     case llm_result do

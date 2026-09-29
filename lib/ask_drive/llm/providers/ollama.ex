@@ -43,6 +43,11 @@ defmodule AskDrive.LLM.Providers.Ollama do
 
   @impl true
   def generate(model, prompt, opts \\ []) when is_binary(prompt) do
+    # think: false as in generate_stream/4. Without it qwen3 (a reasoning model) wrote a long
+    # hidden chain of thought before every answer, and the nightly QA generation spent most
+    # of its GPU time (often past the timeout) on text nobody reads.
+    think = Keyword.get(opts, :think, false)
+
     payload =
       %{
         model: model,
@@ -50,6 +55,7 @@ defmodule AskDrive.LLM.Providers.Ollama do
         stream: false,
         options: ollama_options(opts)
       }
+      |> maybe_put(:think, think)
       |> maybe_put(:system, Keyword.get(opts, :system))
       |> put_keep_alive(opts)
 
@@ -58,6 +64,12 @@ defmodule AskDrive.LLM.Providers.Ollama do
     case HTTP.post_json(url, payload, [], Keyword.get(opts, :timeout, @generate_timeout)) do
       {:ok, %{"response" => response}} when is_binary(response) ->
         {:ok, response}
+
+      # models whose template has no thinking support reject the think field; ask without it
+      {:error, {:invalid_response, message}} when not is_nil(think) ->
+        if String.contains?(message, "think"),
+          do: generate(model, prompt, Keyword.put(opts, :think, nil)),
+          else: {:error, {:invalid_response, message}}
 
       {:ok, body} ->
         {:error, {:invalid_response, "response missing: #{inspect(Map.keys(body))}"}}

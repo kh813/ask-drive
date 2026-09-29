@@ -32,6 +32,27 @@ defmodule AskDrive.StubOllama do
       do: send(pid, {:stub_generate, conn.body_params})
 
     pieces = next_pieces()
+
+    cond do
+      :persistent_term.get({__MODULE__, :reject_think}, false) and
+          Map.has_key?(conn.body_params, "think") ->
+        conn
+        |> put_resp_content_type("application/json")
+        |> send_resp(400, Jason.encode!(%{error: "\"stub\" does not support thinking"}))
+
+      conn.body_params["stream"] == false ->
+        text = pieces |> Enum.reject(&match?({:thinking, _}, &1)) |> Enum.join()
+
+        conn
+        |> put_resp_content_type("application/json")
+        |> send_resp(200, Jason.encode!(%{response: text, done: true}))
+
+      true ->
+        stream_pieces(conn, pieces)
+    end
+  end
+
+  defp stream_pieces(conn, pieces) do
     conn = conn |> put_resp_content_type("application/x-ndjson") |> send_chunked(200)
 
     conn =
@@ -106,6 +127,9 @@ defmodule AskDrive.StubOllama do
     end
   end
 
+  @doc "Makes /api/generate reject requests carrying `think` (models without thinking)."
+  def reject_think(on?), do: :persistent_term.put({__MODULE__, :reject_think}, on?)
+
   @doc "Sets the model names /api/tags reports as installed."
   def put_installed(names), do: :persistent_term.put({__MODULE__, :installed}, names)
 
@@ -114,6 +138,7 @@ defmodule AskDrive.StubOllama do
     :persistent_term.put({__MODULE__, :owner}, owner)
     :persistent_term.put({__MODULE__, :dim}, dim)
     :persistent_term.put({__MODULE__, :installed}, [])
+    :persistent_term.put({__MODULE__, :reject_think}, false)
     {:ok, pid} = Bandit.start_link(plug: __MODULE__, port: 0, ip: {127, 0, 0, 1})
     {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
     {pid, "http://127.0.0.1:#{port}"}
