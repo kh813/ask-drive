@@ -80,6 +80,18 @@ defmodule AskDrive.Settings do
   bind password. `"clear_ca" => "true"` removes the CA certificate.
   """
   def update_ldap(%Setting{} = setting, params, uploads \\ %{}) do
+    setting |> ldap_changeset(params, uploads) |> Repo.update()
+  end
+
+  @doc """
+  The LDAP settings as they would be after saving `params` / `uploads`, without saving:
+  `{:ok, setting}` for the connection test on unsaved form contents, or `{:error, changeset}`.
+  """
+  def preview_ldap(%Setting{} = setting, params, uploads \\ %{}) do
+    setting |> ldap_changeset(params, uploads) |> Ecto.Changeset.apply_action(:validate)
+  end
+
+  defp ldap_changeset(setting, params, uploads) do
     attrs =
       params
       |> Map.take(
@@ -95,7 +107,7 @@ defmodule AskDrive.Settings do
         if params["clear_ca"] == "true", do: Map.put(a, "ldap_ca_cert", nil), else: a
       end)
 
-    setting |> Setting.ldap_changeset(attrs) |> Repo.update()
+    Setting.ldap_changeset(setting, attrs)
   end
 
   defp maybe_put(map, _key, nil), do: map

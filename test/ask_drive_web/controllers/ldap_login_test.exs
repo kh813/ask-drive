@@ -134,7 +134,8 @@ defmodule AskDriveWeb.LdapLoginTest do
       :ok
     end
 
-    test "upload the certificate and key, enable, save, and test the connection", %{conn: conn} do
+    test "checking the box fills in Google's defaults; the test runs on unsaved choices; save keeps them",
+         %{conn: conn} do
       {:ok, _} =
         AskDrive.Settings.update_setting(AskDrive.Settings.platform_setting!(), %{
           "allowed_domain" => "example.com"
@@ -142,9 +143,22 @@ defmodule AskDriveWeb.LdapLoginTest do
 
       pem = AskDrive.CertHelper.ca_signed(["Google"])
       {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
-
       assert has_element?(view, "#ldap-settings", "無効")
-      assert has_element?(view, "#ldap-settings", "dc=example,dc=com")
+
+      # switching it on fills server, port and base DN
+      view |> form("#ldap-form", %{"ldap" => %{"ldap_enabled" => "true"}}) |> render_change()
+
+      assert has_element?(
+               view,
+               ~s(#ldap-form input[name="ldap[ldap_host]"][value="ldap.google.com"])
+             )
+
+      assert has_element?(view, ~s(#ldap-form input[name="ldap[ldap_port]"][value="636"]))
+
+      assert has_element?(
+               view,
+               ~s(#ldap-form input[name="ldap[ldap_base_dn]"][value="dc=example,dc=com"])
+             )
 
       file_input(view, "#ldap-form", :ldap_cert, [
         %{name: "google.crt", content: pem.cert, type: "application/x-x509-ca-cert"}
@@ -156,15 +170,34 @@ defmodule AskDriveWeb.LdapLoginTest do
       ])
       |> render_upload("google.key")
 
-      view
-      |> form("#ldap-form", %{"ldap" => %{"ldap_enabled" => "true"}})
-      |> render_submit()
+      # test before saving: uses the chosen files and the typed values
+      view |> form("#ldap-form") |> render_submit(%{"op" => "test"})
+      assert has_element?(view, "#ldap-test-result", "接続できました")
+      assert_received {:ldap, :open, {"ldap.google.com", 636, _}}
+      # nothing saved yet, and the form kept its state (the box stays checked)
+      refute AskDrive.Settings.platform_setting!().ldap_enabled
+      assert has_element?(view, ~s(#ldap-form input[type="checkbox"][checked]))
+      assert has_element?(view, "#ldap-pending", "google.crt")
 
+      # save without choosing the files again
+      view |> form("#ldap-form") |> render_submit(%{"op" => "save"})
       assert has_element?(view, "#ldap-settings", "有効")
       assert has_element?(view, "#ldap-cert-info", "CN=Google")
+      refute has_element?(view, "#ldap-pending")
 
-      view |> element("#test-ldap-btn") |> render_click()
-      assert has_element?(view, "#ldap-test-result", "接続できました")
+      setting = AskDrive.Settings.platform_setting!()
+      assert setting.ldap_enabled
+      assert setting.ldap_host == "ldap.google.com"
+      assert setting.ldap_client_key == pem.key
+    end
+
+    test "testing without a certificate says what is missing, and keeps the form", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
+      view |> form("#ldap-form", %{"ldap" => %{"ldap_enabled" => "true"}}) |> render_change()
+      view |> form("#ldap-form") |> render_submit(%{"op" => "test"})
+
+      assert has_element?(view, "#ldap-test-result", "証明書")
+      assert has_element?(view, ~s(#ldap-form input[type="checkbox"][checked]))
     end
 
     test "active locks are listed and can be lifted", %{conn: conn} do

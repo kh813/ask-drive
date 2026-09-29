@@ -51,6 +51,7 @@ defmodule AskDriveWeb.AdminLive do
       |> allow_upload(:ldap_key, accept: :any, max_entries: 1, max_file_size: 200_000)
       |> allow_upload(:ldap_ca, accept: :any, max_entries: 1, max_file_size: 500_000)
       |> assign(:ldap_test, nil)
+      |> assign(:ldap_pending, %{})
       |> assign(:ssl_check, nil)
 
     # One LiveView, two scopes (spec 6.11): /admin administers the platform (apps, users,
@@ -72,6 +73,7 @@ defmodule AskDriveWeb.AdminLive do
      socket
      |> assign(:current_tab, default_tab(scope))
      |> assign(:setting, setting)
+     |> assign(:ldap_form, ldap_form(setting))
      |> assign(:form, form)
      |> assign(:trigger_batch_loading, false)
      |> assign(:connection_test, %{})
@@ -207,36 +209,44 @@ defmodule AskDriveWeb.AdminLive do
   @impl true
   def handle_event("ssl_upload_change", _params, socket), do: {:noreply, socket}
 
+  # The LDAP form keeps what is being typed (a re-render must not reset it) and fills in the
+  # Google defaults when sign-in is switched on (spec F-1306).
+  def handle_event("ldap_change", %{"ldap" => params}, socket) do
+    {:noreply, assign(socket, :ldap_form, autofill_ldap(params, socket.assigns.setting))}
+  end
+
   def handle_event("ldap_change", _params, socket), do: {:noreply, socket}
 
-  # LDAP sign-in settings (spec 6.13): fields plus any newly uploaded PEM files
+  # "保存" and "接続テスト" submit the same form (the button pressed arrives as "op"):
+  # the test runs on the form's contents, saved or not, including newly chosen files.
   def handle_event("save_ldap", params, socket) do
-    read = fn name ->
-      socket
-      |> consume_uploaded_entries(name, fn %{path: path}, _entry -> {:ok, File.read!(path)} end)
-      |> List.first()
-    end
+    socket = take_ldap_uploads(socket)
+    form = autofill_ldap(Map.get(params, "ldap", %{}), socket.assigns.setting)
+    uploads = Map.new(socket.assigns.ldap_pending, fn {kind, {_name, pem}} -> {kind, pem} end)
+    socket = assign(socket, :ldap_form, form)
 
-    uploads = %{cert: read.(:ldap_cert), key: read.(:ldap_key), ca: read.(:ldap_ca)}
-    params = Map.get(params, "ldap", %{})
+    if params["op"] == "test" do
+      result =
+        case Settings.preview_ldap(socket.assigns.setting, form, uploads) do
+          {:ok, preview} -> AskDrive.Ldap.test_connection(preview)
+          {:error, changeset} -> {:error, changeset_messages(changeset)}
+        end
 
-    case Settings.update_ldap(socket.assigns.setting, params, uploads) do
-      {:ok, updated} ->
-        {:noreply,
-         socket
-         |> assign(:setting, updated)
-         |> assign(:form, to_form(Settings.change_setting(updated)))
-         |> assign(:ldap_test, nil)
-         |> put_flash(:info, "LDAP ログインの設定を保存しました。")}
+      {:noreply, assign(socket, :ldap_test, result)}
+    else
+      case Settings.update_ldap(socket.assigns.setting, form, uploads) do
+        {:ok, updated} ->
+          {:noreply,
+           socket
+           |> assign(:setting, updated)
+           |> assign(:form, to_form(Settings.change_setting(updated)))
+           |> assign(:ldap_form, ldap_form(updated))
+           |> assign(:ldap_pending, %{})
+           |> put_flash(:info, "LDAP ログインの設定を保存しました。")}
 
-      {:error, changeset} ->
-        messages =
-          changeset
-          |> Ecto.Changeset.traverse_errors(fn {msg, _} -> msg end)
-          |> Map.values()
-          |> List.flatten()
-
-        {:noreply, put_flash(socket, :error, "保存できませんでした: " <> Enum.join(messages, "／"))}
+        {:error, changeset} ->
+          {:noreply, put_flash(socket, :error, "保存できませんでした: " <> changeset_messages(changeset))}
+      end
     end
   end
 
@@ -252,11 +262,6 @@ defmodule AskDriveWeb.AdminLive do
       end
 
     {:noreply, load_dashboard_data(socket)}
-  end
-
-  def handle_event("test_ldap", _params, socket) do
-    result = AskDrive.Ldap.test_connection(socket.assigns.setting)
-    {:noreply, assign(socket, :ldap_test, result)}
   end
 
   # Step 1: validate the uploaded PEM files (nothing is saved yet)
@@ -2090,7 +2095,7 @@ defmodule AskDriveWeb.AdminLive do
                     type="checkbox"
                     name="ldap[ldap_enabled]"
                     value="true"
-                    checked={@setting.ldap_enabled}
+                    checked={@ldap_form["ldap_enabled"] == "true"}
                     class="rounded border-zinc-300"
                   /> LDAP でのログインを有効にする
                 </label>
@@ -2100,7 +2105,7 @@ defmodule AskDriveWeb.AdminLive do
                     <input
                       type="text"
                       name="ldap[ldap_host]"
-                      value={@setting.ldap_host}
+                      value={@ldap_form["ldap_host"]}
                       placeholder={AskDrive.Ldap.default_host()}
                       class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
                     />
@@ -2110,7 +2115,7 @@ defmodule AskDriveWeb.AdminLive do
                     <input
                       type="number"
                       name="ldap[ldap_port]"
-                      value={@setting.ldap_port}
+                      value={@ldap_form["ldap_port"]}
                       placeholder={AskDrive.Ldap.default_port()}
                       class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
                     />
@@ -2122,7 +2127,7 @@ defmodule AskDriveWeb.AdminLive do
                     <input
                       type="text"
                       name="ldap[ldap_base_dn]"
-                      value={@setting.ldap_base_dn}
+                      value={@ldap_form["ldap_base_dn"]}
                       placeholder={
                         AskDrive.Ldap.domain_base_dn(@setting.allowed_domain) || "dc=company,dc=com"
                       }
@@ -2161,7 +2166,7 @@ defmodule AskDriveWeb.AdminLive do
                       <input
                         type="text"
                         name="ldap[ldap_bind_dn]"
-                        value={@setting.ldap_bind_dn}
+                        value={@ldap_form["ldap_bind_dn"]}
                         class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
                       />
                     </label>
@@ -2180,17 +2185,29 @@ defmodule AskDriveWeb.AdminLive do
                     Google では証明書だけで接続できるため通常は不要です。管理コンソールで「アクセス認証情報」を生成した場合に入力します。
                   </p>
                 </details>
+                <p
+                  :if={@ldap_pending != %{}}
+                  id="ldap-pending"
+                  class="text-xs text-amber-700 dark:text-amber-300"
+                >
+                  選択済み・未保存: {@ldap_pending
+                  |> Enum.map(fn {_kind, {name, _pem}} -> name end)
+                  |> Enum.join("、")}（「保存」で登録されます）
+                </p>
                 <div class="flex flex-wrap justify-end gap-2">
                   <button
-                    type="button"
+                    type="submit"
+                    name="op"
+                    value="test"
                     id="test-ldap-btn"
-                    phx-click="test_ldap"
                     class="px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium text-xs transition"
                   >
-                    接続テスト（保存済みの設定）
+                    接続テスト（入力中の内容で）
                   </button>
                   <button
                     type="submit"
+                    name="op"
+                    value="save"
                     id="save-ldap-btn"
                     class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                   >
@@ -3338,6 +3355,60 @@ defmodule AskDriveWeb.AdminLive do
        do: remaining.documents + remaining.chunks + remaining.questions > 0
 
   defp resumable?(_runs, _remaining), do: false
+
+  # the LDAP form's fields as the saved settings have them
+  defp ldap_form(setting) do
+    %{
+      "ldap_enabled" => to_string(setting.ldap_enabled == true),
+      "ldap_host" => setting.ldap_host || "",
+      "ldap_port" => if(setting.ldap_port, do: to_string(setting.ldap_port), else: ""),
+      "ldap_base_dn" => setting.ldap_base_dn || "",
+      "ldap_bind_dn" => setting.ldap_bind_dn || ""
+    }
+  end
+
+  # switched on with blank fields: Google's server, LDAPS port and the domain's base DN
+  defp autofill_ldap(%{"ldap_enabled" => "true"} = form, setting) do
+    fill = fn form, key, value ->
+      if String.trim(form[key] || "") == "" and value, do: Map.put(form, key, value), else: form
+    end
+
+    form
+    |> fill.("ldap_host", AskDrive.Ldap.default_host())
+    |> fill.("ldap_port", to_string(AskDrive.Ldap.default_port()))
+    |> fill.("ldap_base_dn", AskDrive.Ldap.domain_base_dn(setting.allowed_domain))
+  end
+
+  defp autofill_ldap(form, _setting), do: form
+
+  # newly chosen PEM files, kept (with their names) until saved, so a test and then a save
+  # don't need the files chosen twice
+  defp take_ldap_uploads(socket) do
+    pending =
+      Enum.reduce(
+        [cert: :ldap_cert, key: :ldap_key, ca: :ldap_ca],
+        socket.assigns.ldap_pending,
+        fn
+          {kind, upload}, acc ->
+            case consume_uploaded_entries(socket, upload, fn %{path: path}, entry ->
+                   {:ok, {entry.client_name, File.read!(path)}}
+                 end) do
+              [file | _] -> Map.put(acc, kind, file)
+              [] -> acc
+            end
+        end
+      )
+
+    assign(socket, :ldap_pending, pending)
+  end
+
+  defp changeset_messages(changeset) do
+    changeset
+    |> Ecto.Changeset.traverse_errors(fn {msg, _} -> msg end)
+    |> Map.values()
+    |> List.flatten()
+    |> Enum.join("／")
+  end
 
   defp eta_label(sec) when sec < 60, do: "1 分未満"
   defp eta_label(sec) when sec < 3600, do: "約 #{div(sec + 59, 60)} 分"
