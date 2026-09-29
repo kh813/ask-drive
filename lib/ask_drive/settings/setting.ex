@@ -61,6 +61,10 @@ defmodule AskDrive.Settings.Setting do
     # itself, so org-only shared drives are readable (spec F-121).
     field :drive_impersonate_email, :string
 
+    # Login required (spec F-1308); nil = not chosen yet (POC default). Set with
+    # Settings.set_auth_required/1, never cast from forms.
+    field :auth_required, :boolean
+
     # --- Sign-in with Google Secure LDAP (spec 6.13), platform-wide ---
     # Saved through Settings.update_ldap/2 (uploads + validation), not the general form.
     field :ldap_enabled, :boolean, default: false

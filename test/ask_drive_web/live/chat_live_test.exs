@@ -92,11 +92,12 @@ defmodule AskDriveWeb.ChatLiveTest do
     refute render(view) =~ "質問1"
   end
 
-  test "signed-out visitors can chat and see the admin login link" do
+  test "with login off (POC), visitors chat without signing in (as the guest)" do
+    System.put_env("ASK_DRIVE_DISABLE_AUTH", "true")
+    on_exit(fn -> System.delete_env("ASK_DRIVE_DISABLE_AUTH") end)
+
     {:ok, view, _html} = live(build_conn(), ~p"/it-support")
     assert has_element?(view, "#chat-form")
-    assert has_element?(view, "#admin-login-link")
-    refute has_element?(view, "#logout-link")
 
     view
     |> form("#chat-form", %{"question" => "ゲストの質問"})

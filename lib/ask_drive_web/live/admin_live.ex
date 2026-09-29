@@ -250,6 +250,71 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
+  # Required login (spec F-1308). Switching it on from the guest (POC) session would leave
+  # nobody able to administer unless someone can sign in and elevate, so it needs a way to
+  # sign in (LDAP or Google), the administrator password, and an administrator account.
+  def handle_event("enable_auth", %{"admin_email" => email}, socket) do
+    setting = Settings.platform_setting!()
+    email = email |> String.trim() |> String.downcase()
+    domain = setting.allowed_domain
+
+    problem =
+      cond do
+        elem(AskDriveWeb.UserAuth.auth_mode(), 1) == :env ->
+          "環境変数 ASK_DRIVE_DISABLE_AUTH で固定されています。.env.prod からこの行を削除して再起動してください。"
+
+        not (AskDrive.Ldap.enabled?(setting) or AskDrive.Drive.OAuth.get_client_id() != "") ->
+          "ログインの方法がありません。先に「Google Secure LDAP でのログイン」または Google ログイン（OAuth）を設定してください。"
+
+        not AdminAccess.password_set?(setting) ->
+          "管理者パスワードが未設定です。先に設定してください。"
+
+        not String.match?(email, ~r/^[^@\s]+@[^@\s]+$/) ->
+          "管理者のメールアドレスを入力してください。"
+
+        is_binary(domain) and domain != "" and not String.ends_with?(email, "@" <> domain) ->
+          "管理者のメールアドレスは @#{domain} のアドレスにしてください。"
+
+        true ->
+          nil
+      end
+
+    if problem do
+      {:noreply, put_flash(socket, :error, problem)}
+    else
+      {:ok, _} = Accounts.grant_admin(email)
+      {:ok, _} = Settings.set_auth_required(true)
+      Logger.info("AdminLive: login required switched on (administrator: #{email})")
+
+      {:noreply,
+       socket
+       |> put_flash(
+         :info,
+         "ログイン認証を有効にしました。#{email} でログインし、管理者パスワードで昇格してください。"
+       )
+       |> redirect(to: ~p"/login")}
+    end
+  end
+
+  def handle_event("disable_auth", _params, socket) do
+    if elem(AskDriveWeb.UserAuth.auth_mode(), 1) == :env do
+      {:noreply,
+       put_flash(
+         socket,
+         :error,
+         "環境変数 ASK_DRIVE_DISABLE_AUTH で固定されています。.env.prod からこの行を削除して再起動してください。"
+       )}
+    else
+      {:ok, _} = Settings.set_auth_required(false)
+      Logger.warning("AdminLive: login required switched off (guest mode)")
+
+      {:noreply,
+       socket
+       |> put_flash(:info, "ログイン認証を無効にしました（誰でもゲストとして管理者操作ができます）。")
+       |> load_dashboard_data()}
+    end
+  end
+
   def handle_event("unlock_login", %{"id" => id}, socket) do
     socket =
       case AskDrive.Accounts.LoginThrottle.unlock(String.to_integer(id)) do
@@ -2035,6 +2100,89 @@ defmodule AskDriveWeb.AdminLive do
                   </button>
                 </div>
               </.form>
+            </div>
+
+            <%!-- Required login, platform-wide (spec F-1308) --%>
+            <% {auth_state, auth_source} = AskDriveWeb.UserAuth.auth_mode() %>
+            <div
+              :if={@scope == :platform}
+              id="auth-settings"
+              class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
+            >
+              <div>
+                <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-user-circle" class="w-5 h-5 text-indigo-600" /> ログイン認証
+                  <span class={[
+                    "text-[11px] font-medium px-2 py-0.5 rounded-full",
+                    if(auth_state == :enabled,
+                      do:
+                        "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+                      else: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+                    )
+                  ]}>
+                    {if auth_state == :enabled, do: "有効", else: "無効（ゲスト・POC）"}
+                  </span>
+                </h2>
+                <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  有効にすると、窓口一覧・チャットを含むすべての画面でログインが必要になり、管理画面はさらに管理者パスワードでの昇格が必要になります。無効の間は、誰でもログインなしでチャットと管理画面を使えます。締め出された場合は、サーバー上で
+                  <code class="font-mono">./app.sh auth disable</code>
+                  を実行すると無効に戻せます。
+                </p>
+              </div>
+
+              <p
+                :if={auth_source == :env}
+                id="auth-env-fixed"
+                class="text-xs px-3 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+              >
+                環境変数 <code class="font-mono">ASK_DRIVE_DISABLE_AUTH</code>（.env.prod）で固定されています。この画面や ./app.sh auth で切り替えるには、.env.prod からその行を削除して再起動してください。
+              </p>
+
+              <form
+                :if={auth_source != :env && auth_state == :disabled}
+                id="enable-auth-form"
+                phx-submit="enable_auth"
+                class="space-y-3"
+              >
+                <label class="block text-xs space-y-1">
+                  <span class="block font-medium text-zinc-700 dark:text-zinc-300">
+                    管理者のメールアドレス（有効にした後、このアカウントでログインして昇格します）
+                  </span>
+                  <input
+                    type="email"
+                    name="admin_email"
+                    required
+                    placeholder={
+                      if @setting.allowed_domain,
+                        do: "name@#{@setting.allowed_domain}",
+                        else: "name@company.com"
+                    }
+                    class="w-full sm:w-96 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
+                  />
+                </label>
+                <p class="text-xs text-zinc-500">
+                  必要なもの: ログインの方法（Google Secure LDAP または Google ログイン）が設定済みで、管理者パスワードが設定済みであること。有効にすると、このブラウザもログイン画面に移ります。
+                </p>
+                <button
+                  type="submit"
+                  id="enable-auth-btn"
+                  data-confirm="ログイン認証を有効にしますか？有効にした後は、ログインと管理者パスワードでの昇格をしないと管理画面に入れません。"
+                  class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                >
+                  ログイン認証を有効にする
+                </button>
+              </form>
+
+              <div :if={auth_source != :env && auth_state == :enabled} class="flex justify-end">
+                <button
+                  id="disable-auth-btn"
+                  phx-click="disable_auth"
+                  data-confirm="ログイン認証を無効にしますか？誰でもログインなしでチャットと管理画面を使えるようになります。"
+                  class="px-4 py-2.5 rounded-xl border border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/40 font-medium text-xs transition"
+                >
+                  ログイン認証を無効にする（ゲスト・POC に戻す）
+                </button>
+              </div>
             </div>
 
             <%!-- Sign-in with Google Secure LDAP, platform-wide (spec 6.13) --%>

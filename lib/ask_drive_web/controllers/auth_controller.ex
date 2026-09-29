@@ -19,11 +19,12 @@ defmodule AskDriveWeb.AuthController do
   @doc """
   Renders the sign-in page.
   """
-  def login(conn, _params) do
+  def login(conn, params) do
     if conn.assigns[:current_user] do
       redirect(conn, to: ~p"/")
     else
       conn
+      |> remember_return_to(params["return_to"])
       |> ensure_device_cookie()
       |> assign(:oauth_configured?, OAuth.get_client_id() != "")
       |> assign(:ldap_enabled?, ldap_enabled?())
@@ -138,6 +139,15 @@ defmodule AskDriveWeb.AuthController do
       user_agent: ua
     }
   end
+
+  # only a path on this site (not "//host" or a full URL), so it can't redirect elsewhere
+  defp remember_return_to(conn, "/" <> rest = path) do
+    if String.starts_with?(rest, ["/", "\\"]),
+      do: conn,
+      else: put_session(conn, :user_return_to, path)
+  end
+
+  defp remember_return_to(conn, _), do: conn
 
   defp ldap_enabled? do
     Ldap.enabled?(Settings.platform_setting!())

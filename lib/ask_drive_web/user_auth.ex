@@ -53,14 +53,43 @@ defmodule AskDriveWeb.UserAuth do
   call sites that already exist (`fetch_current_user/2`, `assign_current_user/2`, and the
   startup health check's log line).
   """
-  def auth_disabled? do
+  def auth_disabled?, do: auth_mode() |> elem(0) == :disabled
+
+  @doc """
+  `{:enabled | :disabled, source}` — where the mode comes from (spec F-1308):
+
+    * `:env` — `ASK_DRIVE_DISABLE_AUTH` in `.env.prod` fixes it (the screen and
+      `./app.sh auth` can't change it until that line is removed);
+    * `:setting` — chosen on the admin screen or with `./app.sh auth` (read on every
+      request, so a change applies at once, without a restart);
+    * `:default` — nothing chosen yet: the configured default (the POC runs without login).
+  """
+  def auth_mode do
     value = System.get_env("ASK_DRIVE_DISABLE_AUTH", "") |> String.trim() |> String.downcase()
 
     cond do
-      value in ["true", "1", "yes", "on"] -> true
-      value in ["false", "0", "no", "off"] -> false
-      true -> Application.get_env(:ask_drive, :auth_disabled_by_default, false)
+      value in ["true", "1", "yes", "on"] ->
+        {:disabled, :env}
+
+      value in ["false", "0", "no", "off"] ->
+        {:enabled, :env}
+
+      is_boolean(required = stored_auth_required()) ->
+        {if(required, do: :enabled, else: :disabled), :setting}
+
+      Application.get_env(:ask_drive, :auth_disabled_by_default, false) ->
+        {:disabled, :default}
+
+      true ->
+        {:enabled, :default}
     end
+  end
+
+  defp stored_auth_required do
+    AskDrive.Settings.platform_setting!().auth_required
+  rescue
+    # before the first migration, or the database briefly unavailable: fall back
+    _ -> nil
   end
 
   # --- Session lifecycle ----------------------------------------------------
@@ -294,6 +323,26 @@ defmodule AskDriveWeb.UserAuth do
   """
   def on_mount(:mount_current_user, _params, session, socket) do
     {:cont, assign_current_user(socket, session)}
+  end
+
+  # Chat and the portal (spec F-1308): open while login is off (the POC), signed in otherwise
+  def on_mount(:require_login_when_enabled, params, session, socket) do
+    socket = assign_current_user(socket, session)
+
+    if socket.assigns.current_user do
+      {:cont, socket}
+    else
+      # back to the app after signing in (a LiveView can't write the session; /login keeps it)
+      return_to = if params["app"], do: "/" <> params["app"], else: "/"
+
+      {:halt,
+       redirect_with(
+         socket,
+         :info,
+         "ログインしてください。",
+         ~p"/login?#{%{return_to: return_to}}"
+       )}
+    end
   end
 
   def on_mount(:require_authenticated, _params, session, socket) do

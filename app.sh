@@ -52,6 +52,10 @@ AskDrive 管理スクリプト
   repair-ollama      .runtime の Ollama を再インストール (llama-server 欠落の修復)
   admin grant <mail> 指定メールアドレスに管理者への昇格を許可 (ロックアウト時の復旧)
   admin password     管理者パスワードを再設定 (対話入力)
+  auth status        ログイン認証・LDAP・管理者アカウントの状態
+  auth disable       ログイン認証を無効に戻す (ゲスト・POC。締め出されたときの復旧)
+  auth enable [mail] ログイン認証を有効にする (mail = 管理者に昇格できるアカウント)
+  auth ldap on|off   LDAP でのログインを有効 / 無効にする
   ollama <args>      アプリ専用の Ollama を操作 (例: ./app.sh ollama pull <model> / ./app.sh ollama list)
   drive service-account [key.json] [--subject user@example.com]
                      Drive 同期をサービスアカウント認証に設定 (Web 管理画面を使わずに設定)
@@ -322,6 +326,23 @@ cmd_admin() {
       ;;
     *)
       echo -e "${RED}使用方法: ./app.sh admin grant <email> | ./app.sh admin password${NC}"
+      exit 1
+      ;;
+  esac
+}
+
+# ログイン認証（F-1308）: 管理画面に入れなくなったときの復旧用。稼働中のサービスは
+# リクエストごとに設定を読むため、再起動なしで反映される。
+cmd_auth() {
+  load_env
+  cd "${SCRIPT_DIR}"
+
+  case "${1:-}" in
+    status|disable|enable|ldap)
+      MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.auth "$@"
+      ;;
+    *)
+      echo -e "${RED}使用方法: ./app.sh auth status | disable | enable [email] | ldap on|off${NC}"
       exit 1
       ;;
   esac
@@ -716,6 +737,9 @@ case "${COMMAND}" in
     ;;
   admin)
     cmd_admin "$@"
+    ;;
+  auth)
+    cmd_auth "$@"
     ;;
   drive)
     cmd_drive "$@"

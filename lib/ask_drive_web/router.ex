@@ -32,15 +32,19 @@ defmodule AskDriveWeb.Router do
   end
 
   # --- Portal: the list of apps (spec 6.11) --------------------------------
-  # Temporary (Phase 17): employee Google login is still blocked, so general users chat
-  # without signing in. Admin screens below still require login + elevation.
+  # Login required when it is switched on (spec F-1308); while it is off (the POC), the
+  # guest stands in and everyone gets in. The first-access setup is always reachable.
   scope "/", AskDriveWeb do
     pipe_through :browser
 
-    live_session :portal,
+    live_session :setup,
       on_mount: [{AskDriveWeb.UserAuth, :mount_current_user}] do
-      live "/", PortalLive
       live "/setup", SetupLive
+    end
+
+    live_session :portal,
+      on_mount: [{AskDriveWeb.UserAuth, :require_login_when_enabled}] do
+      live "/", PortalLive
     end
   end
 
@@ -112,7 +116,10 @@ defmodule AskDriveWeb.Router do
     pipe_through :browser
 
     live_session :app_chat,
-      on_mount: [{AskDriveWeb.UserAuth, :mount_current_user}, {AskDriveWeb.AppScope, :app}] do
+      on_mount: [
+        {AskDriveWeb.UserAuth, :require_login_when_enabled},
+        {AskDriveWeb.AppScope, :app}
+      ] do
       live "/:app", ChatLive
     end
   end

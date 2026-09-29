@@ -83,6 +83,13 @@ defmodule AskDrive.Settings do
     setting |> ldap_changeset(params, uploads) |> Repo.update()
   end
 
+  @doc "Turns required login on or off (spec F-1308): the admin screen and `./app.sh auth`."
+  def set_auth_required(required) when is_boolean(required) do
+    AskDrive.Apps.platform(fn ->
+      get_setting!() |> Ecto.Changeset.change(auth_required: required) |> Repo.update()
+    end)
+  end
+
   @doc """
   The LDAP settings as they would be after saving `params` / `uploads`, without saving:
   `{:ok, setting}` for the connection test on unsaved form contents, or `{:error, changeset}`.
