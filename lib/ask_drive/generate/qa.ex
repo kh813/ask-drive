@@ -64,22 +64,10 @@ defmodule AskDrive.Generate.QA do
     case llm_result do
       {:ok, response} ->
         case parse_qa_json(response) do
-          {:ok, qa_list} ->
-            processed =
-              Enum.map(qa_list, fn item ->
-                h_flag = check_hallucination(chunk.content, item["answer"])
+          {:ok, qa_list} when qa_list != [] ->
+            {:ok, to_pairs(qa_list, chunk)}
 
-                %{
-                  question: String.trim(item["question"]),
-                  answer: String.trim(item["answer"]),
-                  hallucination_flag: h_flag
-                }
-              end)
-              |> Enum.filter(fn item -> item.question != "" and item.answer != "" end)
-
-            {:ok, processed}
-
-          {:error, _parse_err} ->
+          _unparsable_or_empty ->
             # Retry 1 time with strict JSON formatting
             retry_generation(chunk, model, num_ctx)
         end
@@ -110,22 +98,11 @@ defmodule AskDrive.Generate.QA do
     case llm_result do
       {:ok, response} ->
         case parse_qa_json(response) do
-          {:ok, qa_list} ->
-            processed =
-              Enum.map(qa_list, fn item ->
-                h_flag = check_hallucination(chunk.content, item["answer"])
+          {:ok, qa_list} when qa_list != [] ->
+            {:ok, to_pairs(qa_list, chunk)}
 
-                %{
-                  question: String.trim(item["question"]),
-                  answer: String.trim(item["answer"]),
-                  hallucination_flag: h_flag
-                }
-              end)
-
-            {:ok, processed}
-
-          {:error, parse_err} ->
-            {:error, "JSON parse failed after retry: #{inspect(parse_err)}"}
+          other ->
+            {:error, "JSON parse failed after retry: #{inspect(other) |> String.slice(0, 200)}"}
         end
 
       {:error, reason} ->
@@ -137,6 +114,42 @@ defmodule AskDrive.Generate.QA do
   Extracts and parses JSON array from LLM text response.
   """
   def parse_qa_json(response) when is_binary(response) do
+    case decode_json(response) do
+      {:ok, decoded} -> {:ok, qa_items(decoded)}
+      error -> error
+    end
+  end
+
+  # Whatever shape the model chose, the usable {question, answer} maps in it. Models don't
+  # always follow the requested array: a single object, an object wrapping the array
+  # ({"qa_pairs": [...]}), items missing a field or holding a number. Any of these used to
+  # crash String.trim/1 and fail the whole nightly batch after an hour of work.
+  defp qa_items(list) when is_list(list), do: Enum.filter(list, &valid_item?/1)
+
+  defp qa_items(%{"question" => _} = item), do: qa_items([item])
+
+  defp qa_items(map) when is_map(map) do
+    map |> Map.values() |> Enum.find([], &is_list/1) |> qa_items()
+  end
+
+  defp qa_items(_), do: []
+
+  defp valid_item?(%{"question" => q, "answer" => a}) when is_binary(q) and is_binary(a),
+    do: String.trim(q) != "" and String.trim(a) != ""
+
+  defp valid_item?(_), do: false
+
+  defp to_pairs(items, chunk) do
+    Enum.map(items, fn item ->
+      %{
+        question: String.trim(item["question"]),
+        answer: String.trim(item["answer"]),
+        hallucination_flag: check_hallucination(chunk.content, item["answer"])
+      }
+    end)
+  end
+
+  defp decode_json(response) do
     cleaned =
       response
       |> String.replace(~r/```json\s*/, "")

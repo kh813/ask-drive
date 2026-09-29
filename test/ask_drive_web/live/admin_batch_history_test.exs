@@ -100,6 +100,17 @@ defmodule AskDriveWeb.AdminBatchHistoryTest do
     assert has_element?(view, "#trigger-batch-btn")
   end
 
+  test "a failed run shows why it failed", %{conn: conn} do
+    run!(~N[2026-09-29 09:40:00], %{
+      status: "failed",
+      error: "** (MatchError) no match of right hand side value: {:error, #Ecto.Changeset<>}"
+    })
+
+    {:ok, view, _html} = live(conn, ~p"/it-support/admin")
+    assert has_element?(view, "#batch-error", "失敗の原因")
+    assert has_element?(view, "#batch-error", "MatchError")
+  end
+
   test "auto_status: missed, done (automatic only), due, next start" do
     assert %{state: :missed} = Scheduler.auto_status(~N[2026-09-29 09:00:00])
 

@@ -26,6 +26,7 @@ defmodule AskDrive.Batch.Scheduler do
     BatchRun,
     EmbedChunksWorker,
     EmbedQuestionsWorker,
+    ItemLog,
     Progress,
     SyncWorker
   }
@@ -258,13 +259,16 @@ defmodule AskDrive.Batch.Scheduler do
       {:ok, batch_run}
     rescue
       e ->
-        Logger.error("Batch ##{batch_run.id} failed with error: #{inspect(e)}")
+        # the message and where it happened, shown on the dashboard (the server's log may be
+        # out of reach of whoever looks at the failed run)
+        error = Exception.format(:error, e, Enum.take(__STACKTRACE__, 8))
+        Logger.error("Batch ##{batch_run.id} failed with error: #{error}")
 
         batch_run
         |> BatchRun.changeset(%{
           finished_at: DateTime.utc_now(),
           status: "failed",
-          error: inspect(e)
+          error: String.slice(error, 0, 4000)
         })
         |> Repo.update()
 
@@ -578,58 +582,27 @@ defmodule AskDrive.Batch.Scheduler do
         qa_generated: qa_count
       })
 
-      # 1. Generate QA pairs
       new_qas =
-        case QA.generate_for_chunk(chunk, LLM.generation_model(setting), setting.batch_num_ctx) do
-          {:ok, qa_list} ->
-            saved =
-              Enum.map(qa_list, fn item ->
-                {:ok, qa_pair} =
-                  AskDrive.QA.create_qa_pair(%{
-                    document_id: chunk.document_id,
-                    chunk_id: chunk.id,
-                    question: item.question,
-                    answer: item.answer,
-                    status: "active",
-                    hallucination_flag: item.hallucination_flag,
-                    generated_by: LLM.generation_model(setting),
-                    generated_at: DateTime.utc_now(),
-                    source_hash: chunk.content_hash
-                  })
+        try do
+          generate_chunk(chunk, setting)
+        rescue
+          # one chunk the model (or the data) trips over must not fail the whole night's
+          # batch; it is logged and the chunk stays without QA for the next run
+          e ->
+            Logger.error(
+              "Batch: generation crashed on chunk #{chunk.id}: #{Exception.format(:error, e, __STACKTRACE__)}"
+            )
 
-                qa_pair
-              end)
+            ItemLog.record(Progress.current_run_id(), %{
+              phase: "generate",
+              document_id: chunk.document_id,
+              name: chunk_label(chunk),
+              status: "failed",
+              message: "QA 生成で例外: " <> String.slice(Exception.message(e), 0, 300)
+            })
 
-            length(saved)
-
-          {:error, reason} ->
-            Logger.error("Failed to generate QA for chunk #{chunk.id}: #{inspect(reason)}")
             0
         end
-
-      # 2. Extract structured fields if enabled
-      if Map.get(setting, :extraction_enabled, false) == true do
-        case Extraction.extract(
-               chunk.content,
-               LLM.generation_model(setting),
-               setting.batch_num_ctx
-             ) do
-          {:ok, items} when items != [] ->
-            # Save extractions
-            Enum.each(items, fn item ->
-              AskDrive.Documents.create_extraction(%{
-                document_id: chunk.document_id,
-                chunk_id: chunk.id,
-                key: item["key"] || "item",
-                value: to_string(item["value"]),
-                value_type: item["value_type"] || "text"
-              })
-            end)
-
-          _ ->
-            :ok
-        end
-      end
 
       process_generation_loop(
         rest,
@@ -639,6 +612,64 @@ defmodule AskDrive.Batch.Scheduler do
         qa_count + new_qas
       )
     end
+  end
+
+  # QA (and, if enabled, structured fields) for one chunk; returns the number of QA saved
+  defp generate_chunk(chunk, setting) do
+    # 1. Generate QA pairs
+    new_qas =
+      case QA.generate_for_chunk(chunk, LLM.generation_model(setting), setting.batch_num_ctx) do
+        {:ok, qa_list} ->
+          saved =
+            Enum.map(qa_list, fn item ->
+              {:ok, qa_pair} =
+                AskDrive.QA.create_qa_pair(%{
+                  document_id: chunk.document_id,
+                  chunk_id: chunk.id,
+                  question: item.question,
+                  answer: item.answer,
+                  status: "active",
+                  hallucination_flag: item.hallucination_flag,
+                  generated_by: LLM.generation_model(setting),
+                  generated_at: DateTime.utc_now(),
+                  source_hash: chunk.content_hash
+                })
+
+              qa_pair
+            end)
+
+          length(saved)
+
+        {:error, reason} ->
+          Logger.error("Failed to generate QA for chunk #{chunk.id}: #{inspect(reason)}")
+          0
+      end
+
+    # 2. Extract structured fields if enabled
+    if Map.get(setting, :extraction_enabled, false) == true do
+      case Extraction.extract(
+             chunk.content,
+             LLM.generation_model(setting),
+             setting.batch_num_ctx
+           ) do
+        {:ok, items} when items != [] ->
+          # Save extractions
+          Enum.each(items, fn item ->
+            AskDrive.Documents.create_extraction(%{
+              document_id: chunk.document_id,
+              chunk_id: chunk.id,
+              key: item["key"] || "item",
+              value: to_string(item["value"]),
+              value_type: item["value_type"] || "text"
+            })
+          end)
+
+        _ ->
+          :ok
+      end
+    end
+
+    new_qas
   end
 
   # =========================================================================

@@ -966,6 +966,18 @@ defmodule AskDriveWeb.AdminLive do
                   </div>
                 </div>
 
+                <%!-- Why a run failed (batch_runs.error): the message and where it happened --%>
+                <div
+                  :if={@latest_run.status == "failed" && @latest_run.error}
+                  id="batch-error"
+                  class="p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 space-y-1"
+                >
+                  <p class="text-xs font-semibold text-red-800 dark:text-red-200">
+                    失敗の原因（エラー内容）
+                  </p>
+                  <pre class="text-[11px] leading-relaxed text-red-900 dark:text-red-100 whitespace-pre-wrap break-all max-h-60 overflow-y-auto">{@latest_run.error}</pre>
+                </div>
+
                 <%!-- Progress of the run (spec F-340): overall, the current step, and the item --%>
                 <div
                   :if={
@@ -2841,6 +2853,7 @@ defmodule AskDriveWeb.AdminLive do
 
   defp phase_label("sync"), do: "同期"
   defp phase_label("embed_chunks"), do: "取り込み"
+  defp phase_label("generate"), do: "生成"
   defp phase_label(other), do: other
 
   defp item_status_label("created"), do: "新規"
