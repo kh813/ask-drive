@@ -36,6 +36,20 @@ defmodule AskDrive.Batch.ProgressTest do
     assert run.qa_generated == 7
   end
 
+  test "a stop request is honoured at the next report: it throws :batch_stop_requested" do
+    run = run!()
+    Progress.bind(run.id)
+    assert Progress.item(0, "/a.pdf") == :ok
+
+    Repo.update_all(from(b in BatchRun, where: b.id == ^run.id),
+      set: [stop_requested_at: DateTime.utc_now() |> DateTime.truncate(:second)]
+    )
+
+    assert catch_throw(Progress.item(1, "/b.pdf")) == :batch_stop_requested
+    assert catch_throw(Progress.detail("埋め込み 32 / 186 チャンク")) == :batch_stop_requested
+    assert catch_throw(Progress.start_phase("verify", 0)) == :batch_stop_requested
+  end
+
   test "overview: step, phase %, weighted overall %, time left from the pace so far" do
     started = ~U[2026-09-29 08:00:00Z]
 

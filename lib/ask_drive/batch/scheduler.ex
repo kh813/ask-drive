@@ -42,6 +42,21 @@ defmodule AskDrive.Batch.Scheduler do
     Repo.exists?(from b in BatchRun, where: b.status == "running")
   end
 
+  @doc """
+  Asks this app's running batch to stop (spec F-341). It stops at the next item boundary —
+  after the file, document or chunk in progress — and is recorded as "stopped". A stopped
+  automatic run counts as this night's run, so the window doesn't start it again.
+  """
+  def request_stop do
+    {count, _} =
+      Repo.update_all(
+        from(b in BatchRun, where: b.status == "running" and is_nil(b.stop_requested_at)),
+        set: [stop_requested_at: DateTime.utc_now() |> DateTime.truncate(:second)]
+      )
+
+    if count > 0, do: :ok, else: {:error, :not_running}
+  end
+
   @doc "Whether any app's batch is running (they share one local model; spec 6.11)."
   def running_anywhere? do
     AskDrive.Apps.each(fn _app -> running?() end) |> Enum.any?(fn {_app, r} -> r end)
@@ -258,6 +273,22 @@ defmodule AskDrive.Batch.Scheduler do
         if caffeinate_port, do: Port.close(caffeinate_port)
         Progress.unbind()
         {:error, e}
+    catch
+      :throw, :batch_stop_requested ->
+        Logger.info("Batch ##{batch_run.id} stopped at the admin's request")
+        Progress.unbind()
+
+        {:ok, batch_run} =
+          batch_run
+          |> Repo.reload!()
+          |> BatchRun.changeset(%{finished_at: DateTime.utc_now(), status: "stopped"})
+          |> Repo.update()
+
+        LLM.unload_model(setting.batch_model, setting: setting)
+        Mode.end_batch()
+        if ingest_only?, do: rewarm_embedding(setting)
+        if caffeinate_port, do: Port.close(caffeinate_port)
+        {:ok, batch_run}
     end
   end
 

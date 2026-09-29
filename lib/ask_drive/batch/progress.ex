@@ -8,6 +8,12 @@ defmodule AskDrive.Batch.Progress do
   The batch runs its phases in one process; `bind/1` remembers the run in that process so
   workers called synchronously from it (sync, chunk embedding) can report without being
   handed the run. Outside a batch (a standalone job) every call is a no-op.
+
+  Every report is also where a stop request is honoured (spec F-341): when an admin has
+  asked the run to stop, `start_phase/2`, `item/3` and `detail/1` throw `:batch_stop_requested`,
+  which the scheduler catches. They are only called between items, never inside a
+  transaction, so nothing is left half-written; the item being worked on is picked up again
+  by the next batch.
   """
 
   import Ecto.Query, warn: false
@@ -45,6 +51,8 @@ defmodule AskDrive.Batch.Progress do
 
   @doc "Enters `phase` with `total` items to go through."
   def start_phase(phase, total) do
+    check_stop(:ok)
+
     update(%{
       progress_phase: phase,
       progress_done: 0,
@@ -58,13 +66,24 @@ defmodule AskDrive.Batch.Progress do
   @doc "Now working on item number `done + 1` (`item` is its name); `extra` = more run fields."
   def item(done, item, extra \\ %{}) do
     update(Map.merge(%{progress_done: done, progress_item: item, progress_detail: nil}, extra))
+    |> check_stop()
   end
 
   @doc "`done` items finished (the phase's last one included)."
   def done(done, extra \\ %{}), do: update(Map.merge(%{progress_done: done}, extra))
 
   @doc "What is happening inside the current item (nil clears it)."
-  def detail(text), do: update(%{progress_detail: text})
+  def detail(text), do: update(%{progress_detail: text}) |> check_stop()
+
+  defp check_stop(:ok) do
+    with run_id when not is_nil(run_id) <- current_run_id(),
+         %DateTime{} <-
+           Repo.one(from b in BatchRun, where: b.id == ^run_id, select: b.stop_requested_at) do
+      throw(:batch_stop_requested)
+    end
+
+    :ok
+  end
 
   defp update(attrs) do
     case current_run_id() do

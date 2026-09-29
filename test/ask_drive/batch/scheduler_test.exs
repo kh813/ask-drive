@@ -125,4 +125,99 @@ defmodule AskDrive.Batch.SchedulerTest do
       assert {:error, :already_running} = Scheduler.run_batch(ingest_only: true)
     end
   end
+
+  describe "stopping a running batch (F-341)" do
+    setup do
+      {server, url} = AskDrive.StubOllama.start!(self())
+      on_exit(fn -> Process.exit(server, :normal) end)
+
+      {:ok, _} =
+        AskDrive.Settings.update_setting(AskDrive.Settings.get_setting!(), %{
+          ollama_host: url,
+          llm_provider: "ollama",
+          embed_provider: "ollama",
+          summary_enabled: false,
+          extraction_enabled: false
+        })
+
+      {:ok, doc} =
+        %Document{}
+        |> Document.changeset(%{
+          drive_file_id: "doc_stop",
+          name: "規則.pdf",
+          mime_type: "application/pdf",
+          status: "indexed",
+          content_hash: "h"
+        })
+        |> Repo.insert()
+
+      for i <- 0..4 do
+        %Chunk{}
+        |> Chunk.changeset(%{
+          document_id: doc.id,
+          position: i,
+          content: "第#{i}条 勤務時間は午前9時から午後6時までです。",
+          content_hash: "c#{i}"
+        })
+        |> Repo.insert!()
+      end
+
+      AskDrive.StubOllama.put_generate_pieces([
+        ~s([{"question": "勤務時間は？", "answer": "9時から18時です。"}])
+      ])
+
+      AskDrive.StubOllama.put_generate_delay(300)
+
+      on_exit(fn ->
+        AskDrive.StubOllama.put_generate_delay(0)
+        AskDrive.StubOllama.put_generate_pieces(["要約です。"])
+        AskDrive.Runtime.Mode.set_mode(:daytime)
+      end)
+
+      :ok
+    end
+
+    @tag timeout: 60_000
+    test "request_stop/0 stops the run at the next chunk; it is recorded as stopped" do
+      assert Scheduler.request_stop() == {:error, :not_running}
+
+      owner = self()
+
+      task =
+        Task.async(fn ->
+          Ecto.Adapters.SQL.Sandbox.allow(Repo, owner, self())
+          Scheduler.run_batch()
+        end)
+
+      Ecto.Adapters.SQL.Sandbox.allow(Repo, owner, task.pid)
+
+      # wait until it is generating, then ask it to stop
+      wait_until(fn ->
+        Repo.exists?(
+          from b in AskDrive.Batch.BatchRun,
+            where: b.progress_phase == "generate" and b.progress_done >= 1
+        )
+      end)
+
+      assert Scheduler.request_stop() == :ok
+      assert {:ok, run} = Task.await(task, 30_000)
+
+      assert run.status == "stopped"
+      assert run.finished_at
+      assert run.progress_phase == "generate"
+      assert run.progress_done < 5
+      # the chunks generated before the stop keep their QA
+      assert Repo.aggregate(AskDrive.QA.QAPair, :count) >= 1
+      refute Scheduler.running?()
+      refute AskDrive.Runtime.Mode.current_mode() == :night_batch
+    end
+  end
+
+  defp wait_until(fun, tries \\ 200) do
+    cond do
+      fun.() -> :ok
+      tries == 0 -> flunk("condition not met")
+      true -> Process.sleep(25) && wait_until(fun, tries - 1)
+    end
+  end
 end

@@ -77,6 +77,29 @@ defmodule AskDriveWeb.AdminBatchHistoryTest do
     assert has_element?(view, "#auto-batch-status", "全体の目安 19%")
   end
 
+  test "a running batch can be stopped from the dashboard (F-341)", %{conn: conn} do
+    run = run!(~N[2026-09-29 08:38:00], %{status: "running", finished_at: nil})
+
+    {:ok, view, _html} = live(conn, ~p"/it-support/admin")
+
+    # the trigger buttons give way to the stop button while it runs
+    refute has_element?(view, "#trigger-batch-btn")
+    view |> element("#stop-batch-btn") |> render_click()
+
+    assert AskDrive.Repo.get!(BatchRun, run.id).stop_requested_at
+    assert has_element?(view, "#stop-requested", "処理中の項目が終わり次第止まります")
+    refute has_element?(view, "#stop-batch-btn")
+
+    # once stopped, it shows as such and the buttons come back
+    AskDrive.Repo.get!(BatchRun, run.id)
+    |> BatchRun.changeset(%{status: "stopped", finished_at: DateTime.utc_now()})
+    |> AskDrive.Repo.update!()
+
+    {:ok, view, _html} = live(conn, ~p"/it-support/admin")
+    assert has_element?(view, "#batch-run-#{run.id}", "停止（手動）")
+    assert has_element?(view, "#trigger-batch-btn")
+  end
+
   test "auto_status: missed, done (automatic only), due, next start" do
     assert %{state: :missed} = Scheduler.auto_status(~N[2026-09-29 09:00:00])
 

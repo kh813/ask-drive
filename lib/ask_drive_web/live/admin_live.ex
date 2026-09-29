@@ -285,6 +285,20 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   @impl true
+  def handle_event("stop_batch", _params, socket) do
+    socket =
+      case Scheduler.request_stop() do
+        :ok ->
+          Logger.info("AdminLive: stop requested for the running batch")
+          put_flash(socket, :info, "バッチの停止を要求しました。処理中の項目が終わり次第止まります。")
+
+        {:error, :not_running} ->
+          put_flash(socket, :error, "実行中のバッチはありません。")
+      end
+
+    {:noreply, load_dashboard_data(socket)}
+  end
+
   def handle_event("trigger_batch", params, socket) do
     ingest_only? = params["kind"] == "ingest_only"
 
@@ -623,7 +637,28 @@ defmodule AskDriveWeb.AdminLive do
             </p>
           </div>
 
-          <div :if={@scope == :app} class="flex flex-wrap items-center gap-2">
+          <%!-- While this app's batch runs, the trigger buttons give way to stopping it (F-341) --%>
+          <div :if={@scope == :app && @running_run} class="flex flex-wrap items-center gap-2">
+            <%= if @running_run.stop_requested_at do %>
+              <span
+                id="stop-requested"
+                class="text-xs px-3.5 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-200 flex items-center gap-1.5"
+              >
+                <.icon name="hero-clock" class="w-4 h-4" /> 停止を要求しました。処理中の項目が終わり次第止まります
+              </span>
+            <% else %>
+              <button
+                id="stop-batch-btn"
+                phx-click="stop_batch"
+                data-confirm="実行中のバッチを停止しますか？処理中のファイル（またはチャンク）が終わった時点で止まります。ここまでの取り込み・生成結果は残り、残りは次回のバッチで続きから処理します。"
+                class="text-xs px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium shadow-sm flex items-center gap-1.5 transition"
+              >
+                <.icon name="hero-stop" class="w-4 h-4" /> バッチを停止
+              </button>
+            <% end %>
+          </div>
+
+          <div :if={@scope == :app && !@running_run} class="flex flex-wrap items-center gap-2">
             <%!-- Ingest only (spec 6.3.8 F-331): sync + indexing, no QA generation, so the
                   local model stays free for chat. The safe default for daytime runs. --%>
             <button
@@ -868,6 +903,9 @@ defmodule AskDriveWeb.AdminLive do
                       "running" ->
                         "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/50 animate-pulse"
 
+                      "stopped" ->
+                        "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-200/50"
+
                       _ ->
                         "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300 border border-red-200/50"
                     end
@@ -930,7 +968,10 @@ defmodule AskDriveWeb.AdminLive do
 
                 <%!-- Progress of the run (spec F-340): overall, the current step, and the item --%>
                 <div
-                  :if={@selected_progress && @latest_run.status in ["running", "aborted", "failed"]}
+                  :if={
+                    @selected_progress &&
+                      @latest_run.status in ["running", "aborted", "failed", "stopped"]
+                  }
                   id="batch-progress"
                   class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3"
                 >
@@ -2828,6 +2869,7 @@ defmodule AskDriveWeb.AdminLive do
   defp status_label("aborted"), do: "中断（再起動）"
   defp status_label("failed"), do: "失敗"
   defp status_label("deadline_reached"), do: "時間切れ"
+  defp status_label("stopped"), do: "停止（手動）"
   defp status_label(other), do: other
 
   defp status_class("completed"),
@@ -2838,6 +2880,9 @@ defmodule AskDriveWeb.AdminLive do
 
   defp status_class("deadline_reached"),
     do: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+
+  defp status_class("stopped"),
+    do: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
 
   defp status_class(_), do: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
 

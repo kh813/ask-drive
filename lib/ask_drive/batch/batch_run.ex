@@ -21,6 +21,7 @@ defmodule AskDrive.Batch.BatchRun do
     field :progress_item, :string
     field :progress_detail, :string
     field :progress_phase_started_at, :utc_datetime
+    field :stop_requested_at, :utc_datetime
 
     has_many :phase_stats, AskDrive.Batch.BatchPhaseStat, on_delete: :delete_all
     has_many :item_logs, AskDrive.Batch.ItemLog, on_delete: :delete_all
@@ -49,7 +50,8 @@ defmodule AskDrive.Batch.BatchRun do
       :progress_total,
       :progress_item,
       :progress_detail,
-      :progress_phase_started_at
+      :progress_phase_started_at,
+      :stop_requested_at
     ])
     |> validate_required([:status])
     |> validate_inclusion(:kind, ["full", "ingest_only"])
@@ -59,7 +61,8 @@ defmodule AskDrive.Batch.BatchRun do
       "completed",
       "deadline_reached",
       "failed",
-      "aborted"
+      "aborted",
+      "stopped"
     ])
   end
 end
