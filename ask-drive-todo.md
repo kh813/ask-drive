@@ -471,6 +471,17 @@ mix hex.audit
 
 ---
 
+## Phase 27 — インターネット公開とゼロトラスト（Cloudflare Tunnel ＋ Access） 【将来 ToDo・未着手】
+
+仕様書 14.4 節（将来構想）に対応。ゼロトラストを推進し VPN を廃止する方向に合わせ、AskDrive の前段に Cloudflare Access（Google アカウント＋2 段階認証）を置き、Tunnel で LAN 内の AskDrive に中継する。
+
+- [ ] 27-1 Cloudflare Zero Trust の準備（公開ホスト名、Access アプリ、IdP に Google Workspace、許可ポリシー: ドメイン / Google グループ）
+- [ ] 27-2 LAN 内に cloudflared を設置し、Tunnel で `https://<LAN 内 IP>:4443` へ中継（自己署名証明書の検証設定）。cloudflared の常駐（launchd / systemd）
+- [ ] 27-3 AskDrive: 利用者の実際の IP を `CF-Connecting-IP` から取得（トンネルからの接続のみ信頼）
+- [ ] 27-4 ② のログイン方式を決める: A. Secure LDAP のまま / B. Google ログイン（OAuth、リダイレクト URI を公開ホスト名で登録）/ C. Cloudflare Access のトークン（`Cf-Access-Jwt-Assertion`）を検証して引き継ぐ（要実装）
+- [ ] 27-5 公開後の見直し（ロックの閾値・接続元 IP 単位の制限、管理者の絞り込み、アップデートとバックアップの運用）
+- [ ] 27-6 会社管理の端末に Cloudflare 側の端末条件（証明書・端末の状態）を段階的に適用（14.1 の代替・補完）
+
 ## Phase 26 — Google Authenticator（TOTP）による 2 段階目の確認 【将来 ToDo・未着手】
 
 仕様書 14.3 節（将来構想）に対応。Secure LDAP のパスワード確認（実装済み・変更不要）の後に、6 桁のコード確認を追加する。
