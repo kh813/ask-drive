@@ -8,7 +8,10 @@ import Config
 config :ask_drive, AskDrive.Repo,
   database: Path.expand("../ask_drive_test.db", __DIR__),
   pool_size: 5,
-  pool: Ecto.Adapters.SQL.Sandbox
+  pool: Ecto.Adapters.SQL.Sandbox,
+  # each sandboxed test holds SQLite's write lock until it ends, so a writer can wait on a
+  # parallel test for a while; the default 5 s was too short on the slower CI runners
+  busy_timeout: 30_000
 
 # The suite exercises the real login/elevation flow; tests opt into POC mode explicitly.
 config :ask_drive, auth_disabled_by_default: false
