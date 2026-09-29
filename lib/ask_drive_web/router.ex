@@ -24,6 +24,7 @@ defmodule AskDriveWeb.Router do
     pipe_through :browser
 
     get "/login", AuthController, :login
+    post "/login/ldap", AuthController, :ldap_login
     get "/auth/google", AuthController, :request
     get "/auth/google/callback", AuthController, :callback
     get "/logout", AuthController, :logout

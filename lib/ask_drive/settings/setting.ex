@@ -61,6 +61,18 @@ defmodule AskDrive.Settings.Setting do
     # itself, so org-only shared drives are readable (spec F-121).
     field :drive_impersonate_email, :string
 
+    # --- Sign-in with Google Secure LDAP (spec 6.13), platform-wide ---
+    # Saved through Settings.update_ldap/2 (uploads + validation), not the general form.
+    field :ldap_enabled, :boolean, default: false
+    field :ldap_host, :string
+    field :ldap_port, :integer
+    field :ldap_base_dn, :string
+    field :ldap_client_cert, Binary
+    field :ldap_client_key, Binary
+    field :ldap_ca_cert, :string
+    field :ldap_bind_dn, :string
+    field :ldap_bind_password, Binary
+
     # --- Administrator elevation (spec 6.2.1.1) ---
     # Digest only. The password itself is never stored, cast, or rendered.
     field :admin_password_hash, :string
@@ -113,6 +125,60 @@ defmodule AskDrive.Settings.Setting do
   Accepted values for `drive_auth_mode`.
   """
   def drive_auth_modes, do: @drive_auth_modes
+
+  @doc """
+  Sign-in with LDAP (spec 6.13). Validates the client certificate and key as a pair whenever
+  either changes, and requires them (and a base DN, explicit or from the domain) to enable.
+  """
+  def ldap_changeset(setting, attrs) do
+    changeset =
+      setting
+      |> cast(attrs, [
+        :ldap_enabled,
+        :ldap_host,
+        :ldap_port,
+        :ldap_base_dn,
+        :ldap_client_cert,
+        :ldap_client_key,
+        :ldap_ca_cert,
+        :ldap_bind_dn,
+        :ldap_bind_password
+      ])
+      |> validate_number(:ldap_port, greater_than: 0, less_than: 65_536)
+
+    cert = get_field(changeset, :ldap_client_cert)
+    key = get_field(changeset, :ldap_client_key)
+
+    changeset =
+      if (changed?(changeset, :ldap_client_cert) or changed?(changeset, :ldap_client_key)) and
+           present?(cert) and present?(key) do
+        case AskDrive.SSL.validate_client_pair(cert, key) do
+          {:ok, _info} -> changeset
+          {:error, messages} -> add_error(changeset, :ldap_client_cert, Enum.join(messages, "／"))
+        end
+      else
+        changeset
+      end
+
+    if get_field(changeset, :ldap_enabled) do
+      changeset
+      |> check_present(cert, :ldap_client_cert, "有効にするにはクライアント証明書が必要です")
+      |> check_present(key, :ldap_client_key, "有効にするには秘密鍵が必要です")
+      |> check_present(
+        AskDrive.Ldap.base_dn(apply_changes(changeset)),
+        :ldap_base_dn,
+        "ベース DN を入力するか、組織の Google Workspace ドメインを設定してください"
+      )
+    else
+      changeset
+    end
+  end
+
+  defp check_present(changeset, value, field, message) do
+    if present?(value), do: changeset, else: add_error(changeset, field, message)
+  end
+
+  defp present?(v), do: is_binary(v) and String.trim(v) != ""
 
   @doc false
   def changeset(setting, attrs) do

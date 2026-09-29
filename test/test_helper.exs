@@ -18,5 +18,9 @@ unless embedding_reachable? do
   )
 end
 
+# Against a real LDAPS directory (OpenLDAP demanding a client certificate, set up by the
+# Linux CI): run with LDAP_IT_HOST etc. and `mix test --only ldap_integration`.
+exclude = [:ldap_integration | exclude]
+
 ExUnit.start(exclude: exclude)
 Ecto.Adapters.SQL.Sandbox.mode(AskDrive.Repo, :manual)

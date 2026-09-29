@@ -56,3 +56,6 @@ config :phoenix_live_view,
 # Sort query params output of verified routes for robust url comparisons
 config :phoenix,
   sort_verified_routes_query_params: true
+
+# Sign-in with LDAP (spec 6.13) talks to a stand-in directory in tests
+config :ask_drive, ldap_client: AskDrive.FakeLdap

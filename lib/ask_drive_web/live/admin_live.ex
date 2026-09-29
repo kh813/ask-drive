@@ -46,6 +46,11 @@ defmodule AskDriveWeb.AdminLive do
       |> allow_upload(:ssl_cert, accept: :any, max_entries: 1, max_file_size: 200_000)
       |> allow_upload(:ssl_key, accept: :any, max_entries: 1, max_file_size: 200_000)
       |> allow_upload(:ssl_chain, accept: :any, max_entries: 1, max_file_size: 500_000)
+      # Google Secure LDAP client certificate / key and an optional CA (spec 6.13)
+      |> allow_upload(:ldap_cert, accept: :any, max_entries: 1, max_file_size: 200_000)
+      |> allow_upload(:ldap_key, accept: :any, max_entries: 1, max_file_size: 200_000)
+      |> allow_upload(:ldap_ca, accept: :any, max_entries: 1, max_file_size: 500_000)
+      |> assign(:ldap_test, nil)
       |> assign(:ssl_check, nil)
 
     # One LiveView, two scopes (spec 6.11): /admin administers the platform (apps, users,
@@ -201,6 +206,44 @@ defmodule AskDriveWeb.AdminLive do
 
   @impl true
   def handle_event("ssl_upload_change", _params, socket), do: {:noreply, socket}
+
+  def handle_event("ldap_change", _params, socket), do: {:noreply, socket}
+
+  # LDAP sign-in settings (spec 6.13): fields plus any newly uploaded PEM files
+  def handle_event("save_ldap", params, socket) do
+    read = fn name ->
+      socket
+      |> consume_uploaded_entries(name, fn %{path: path}, _entry -> {:ok, File.read!(path)} end)
+      |> List.first()
+    end
+
+    uploads = %{cert: read.(:ldap_cert), key: read.(:ldap_key), ca: read.(:ldap_ca)}
+    params = Map.get(params, "ldap", %{})
+
+    case Settings.update_ldap(socket.assigns.setting, params, uploads) do
+      {:ok, updated} ->
+        {:noreply,
+         socket
+         |> assign(:setting, updated)
+         |> assign(:form, to_form(Settings.change_setting(updated)))
+         |> assign(:ldap_test, nil)
+         |> put_flash(:info, "LDAP ログインの設定を保存しました。")}
+
+      {:error, changeset} ->
+        messages =
+          changeset
+          |> Ecto.Changeset.traverse_errors(fn {msg, _} -> msg end)
+          |> Map.values()
+          |> List.flatten()
+
+        {:noreply, put_flash(socket, :error, "保存できませんでした: " <> Enum.join(messages, "／"))}
+    end
+  end
+
+  def handle_event("test_ldap", _params, socket) do
+    result = AskDrive.Ldap.test_connection(socket.assigns.setting)
+    {:noreply, assign(socket, :ldap_test, result)}
+  end
 
   # Step 1: validate the uploaded PEM files (nothing is saved yet)
   def handle_event("check_ssl", params, socket) do
@@ -1966,6 +2009,193 @@ defmodule AskDriveWeb.AdminLive do
                   </button>
                 </div>
               </.form>
+            </div>
+
+            <%!-- Sign-in with Google Secure LDAP, platform-wide (spec 6.13) --%>
+            <div
+              :if={@scope == :platform}
+              id="ldap-settings"
+              class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
+            >
+              <div>
+                <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-lock-closed" class="w-5 h-5 text-indigo-600" />
+                  Google Secure LDAP でのログイン
+                  <span class={[
+                    "text-[11px] font-medium px-2 py-0.5 rounded-full",
+                    if(AskDrive.Ldap.enabled?(@setting),
+                      do:
+                        "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+                      else: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
+                    )
+                  ]}>
+                    {if AskDrive.Ldap.enabled?(@setting), do: "有効", else: "無効"}
+                  </span>
+                </h2>
+                <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  ログイン画面に「メールアドレスとパスワード」の欄を出し、Google Workspace のパスワードを Secure LDAP で確認します（パスワードは AskDrive に保存しません）。外部公開の URL がなくても使えます。Google 管理コンソールで LDAP クライアントを追加し、「ユーザー認証情報の確認」と「ユーザー情報の読み取り」を許可して、発行された証明書（.crt）と秘密鍵（.key）をここに登録してください。
+                </p>
+                <p class="text-xs text-amber-700 dark:text-amber-300 mt-1 leading-relaxed">
+                  LDAP でのパスワード確認には Google の 2 段階認証がかかりません。同じアカウントで 5 回、同じ接続元から 20 回失敗すると 15 分間ロックします。
+                </p>
+              </div>
+
+              <% ldap_cert =
+                @setting.ldap_client_cert && AskDrive.SSL.describe_cert(@setting.ldap_client_cert) %>
+              <div class="text-xs text-zinc-600 dark:text-zinc-400 space-y-0.5">
+                <%= case ldap_cert do %>
+                  <% {:ok, info} -> %>
+                    <p id="ldap-cert-info">
+                      登録済みの証明書: <span class="font-mono">{info["subject"]}</span>・有効期限 {String.slice(
+                        info["not_after"],
+                        0,
+                        10
+                      )}
+                    </p>
+                  <% _ -> %>
+                    <p>クライアント証明書: 未登録</p>
+                <% end %>
+                <p>
+                  秘密鍵: {secret_state(@setting.ldap_client_key)}・CA 証明書: {if @setting.ldap_ca_cert,
+                    do: "登録済み",
+                    else: "なし（公的な CA で検証）"}
+                </p>
+              </div>
+
+              <form id="ldap-form" phx-submit="save_ldap" phx-change="ldap_change" class="space-y-4">
+                <label class="flex items-center gap-2 text-sm text-zinc-800 dark:text-zinc-200">
+                  <input type="hidden" name="ldap[ldap_enabled]" value="false" />
+                  <input
+                    type="checkbox"
+                    name="ldap[ldap_enabled]"
+                    value="true"
+                    checked={@setting.ldap_enabled}
+                    class="rounded border-zinc-300"
+                  /> LDAP でのログインを有効にする
+                </label>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <label class="space-y-1 sm:col-span-2">
+                    <span class="block font-medium">LDAP サーバー</span>
+                    <input
+                      type="text"
+                      name="ldap[ldap_host]"
+                      value={@setting.ldap_host}
+                      placeholder={AskDrive.Ldap.default_host()}
+                      class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
+                    />
+                  </label>
+                  <label class="space-y-1">
+                    <span class="block font-medium">ポート（LDAPS）</span>
+                    <input
+                      type="number"
+                      name="ldap[ldap_port]"
+                      value={@setting.ldap_port}
+                      placeholder={AskDrive.Ldap.default_port()}
+                      class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
+                    />
+                  </label>
+                  <label class="space-y-1 sm:col-span-3">
+                    <span class="block font-medium">ベース DN（空欄ならドメインから自動: {AskDrive.Ldap.domain_base_dn(
+                      @setting.allowed_domain
+                    ) || "ドメイン未設定"}）</span>
+                    <input
+                      type="text"
+                      name="ldap[ldap_base_dn]"
+                      value={@setting.ldap_base_dn}
+                      placeholder={
+                        AskDrive.Ldap.domain_base_dn(@setting.allowed_domain) || "dc=company,dc=com"
+                      }
+                      class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 font-mono"
+                    />
+                  </label>
+                  <label class="space-y-1">
+                    <span class="block font-medium">クライアント証明書（.crt）</span>
+                    <.live_file_input upload={@uploads.ldap_cert} class={ssl_file_input_class()} />
+                  </label>
+                  <label class="space-y-1">
+                    <span class="block font-medium">秘密鍵（.key）</span>
+                    <.live_file_input upload={@uploads.ldap_key} class={ssl_file_input_class()} />
+                  </label>
+                  <label class="space-y-1">
+                    <span class="block font-medium">CA 証明書（任意・Google では不要）</span>
+                    <.live_file_input upload={@uploads.ldap_ca} class={ssl_file_input_class()} />
+                  </label>
+                </div>
+                <label
+                  :if={@setting.ldap_ca_cert}
+                  class="flex items-center gap-2 text-xs text-zinc-600"
+                >
+                  <input
+                    type="checkbox"
+                    name="ldap[clear_ca]"
+                    value="true"
+                    class="rounded border-zinc-300"
+                  /> 登録済みの CA 証明書を削除する
+                </label>
+                <details class="text-xs">
+                  <summary class="cursor-pointer text-zinc-500">アクセス認証情報（任意）</summary>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                    <label class="space-y-1">
+                      <span class="block font-medium">ユーザー名（バインド DN）</span>
+                      <input
+                        type="text"
+                        name="ldap[ldap_bind_dn]"
+                        value={@setting.ldap_bind_dn}
+                        class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
+                      />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="block font-medium">パスワード（{secret_state(@setting.ldap_bind_password)}）</span>
+                      <input
+                        type="password"
+                        name="ldap[ldap_bind_password]"
+                        value=""
+                        autocomplete="new-password"
+                        class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
+                      />
+                    </label>
+                  </div>
+                  <p class="text-zinc-400 mt-1">
+                    Google では証明書だけで接続できるため通常は不要です。管理コンソールで「アクセス認証情報」を生成した場合に入力します。
+                  </p>
+                </details>
+                <div class="flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    id="test-ldap-btn"
+                    phx-click="test_ldap"
+                    class="px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium text-xs transition"
+                  >
+                    接続テスト（保存済みの設定）
+                  </button>
+                  <button
+                    type="submit"
+                    id="save-ldap-btn"
+                    class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                  >
+                    保存
+                  </button>
+                </div>
+              </form>
+
+              <p
+                :if={@ldap_test}
+                id="ldap-test-result"
+                class={[
+                  "text-xs px-3 py-2 rounded-lg border",
+                  if(@ldap_test == :ok,
+                    do:
+                      "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-200",
+                    else:
+                      "bg-red-50 border-red-200 text-red-800 dark:bg-red-950/40 dark:border-red-900 dark:text-red-200"
+                  )
+                ]}
+              >
+                {case @ldap_test do
+                  :ok -> "接続できました（証明書・ベース DN とも OK）。ログイン画面でパスワードを試してください。"
+                  {:error, message} -> "接続できません: " <> message
+                end}
+              </p>
             </div>
 
             <%!-- Card 1: Administrator password --%>

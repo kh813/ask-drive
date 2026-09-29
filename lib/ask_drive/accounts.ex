@@ -277,7 +277,7 @@ defmodule AskDrive.Accounts do
       params = %{
         email: email,
         name: attrs[:name] || attrs["name"],
-        picture_url: attrs[:picture] || attrs["picture"],
+        picture_url: attrs[:picture] || attrs["picture"] || (existing && existing.picture_url),
         admin_eligible: resolve_eligibility(email, existing),
         status: "active",
         last_login_at: DateTime.utc_now() |> DateTime.truncate(:second)

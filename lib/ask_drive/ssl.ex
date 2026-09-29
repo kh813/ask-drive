@@ -220,6 +220,25 @@ defmodule AskDrive.SSL do
     end
   end
 
+  @doc """
+  Validates a TLS *client* certificate and its key (e.g. the Google Secure LDAP client,
+  spec 6.13): both readable, the key matches, and the certificate is within its validity.
+  Returns `{:ok, info}` or `{:error, [message]}`.
+  """
+  def validate_client_pair(cert_pem, key_pem) do
+    with {:ok, _der, cert} <- decode_cert(cert_pem),
+         {:ok, key} <- decode_key(key_pem) do
+      errors =
+        []
+        |> check(key_matches?(key, cert), "秘密鍵が証明書と対になっていません（別の証明書の鍵です）")
+        |> check_validity(cert)
+
+      if errors == [], do: {:ok, cert_info(cert)}, else: {:error, Enum.reverse(errors)}
+    else
+      {:error, message} -> {:error, [message]}
+    end
+  end
+
   defp check(errors, true, _message), do: errors
   defp check(errors, false, message), do: [message | errors]
 

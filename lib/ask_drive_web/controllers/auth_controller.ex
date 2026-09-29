@@ -10,7 +10,9 @@ defmodule AskDriveWeb.AuthController do
   use AskDriveWeb, :controller
 
   alias AskDrive.Accounts
+  alias AskDrive.Accounts.LoginThrottle
   alias AskDrive.Drive.OAuth
+  alias AskDrive.Ldap
   alias AskDrive.Settings
   alias AskDriveWeb.UserAuth
 
@@ -23,10 +25,94 @@ defmodule AskDriveWeb.AuthController do
     else
       conn
       |> assign(:oauth_configured?, OAuth.get_client_id() != "")
+      |> assign(:ldap_enabled?, ldap_enabled?())
       |> assign(:allowed_domain, allowed_domain())
       |> assign(:page_title, "AskDrive - ログイン")
       |> render(:login)
     end
+  end
+
+  @doc """
+  Signs an employee in with their Google Workspace e-mail and password, verified by Google
+  Secure LDAP (spec 6.13). Throttled per account and per address (LoginThrottle); an
+  unknown account and a wrong password get the same answer.
+  """
+  def ldap_login(conn, params) do
+    email =
+      params |> get_in(["ldap", "email"]) |> to_string() |> String.trim() |> String.downcase()
+
+    password = params |> get_in(["ldap", "password"]) |> to_string()
+    ip = conn.remote_ip |> :inet.ntoa() |> to_string()
+    setting = Settings.platform_setting!()
+
+    cond do
+      not Ldap.enabled?(setting) ->
+        ldap_failed(conn, email, "LDAP ログインは有効になっていません。")
+
+      email == "" or password == "" ->
+        ldap_failed(conn, email, "メールアドレスとパスワードを入力してください。")
+
+      domain_denied?(email) ->
+        ldap_failed(conn, email, "アクセス拒否: 許可されたドメイン (@#{allowed_domain()}) のアカウントのみログインできます。")
+
+      match?({:locked, _}, LoginThrottle.check(email, ip)) ->
+        {:locked, until} = LoginThrottle.check(email, ip)
+
+        ldap_failed(
+          conn,
+          email,
+          "ログインの失敗が続いたため、#{AskDrive.Clock.format(until, "%H:%M")} まで受け付けません。"
+        )
+
+      true ->
+        case Ldap.authenticate(setting, email, password) do
+          {:ok, %{email: verified, name: name}} ->
+            LoginThrottle.clear(email)
+            finish_password_login(conn, %{email: verified, name: name})
+
+          {:error, :invalid_credentials} ->
+            LoginThrottle.record_failure(email, ip, "invalid_credentials")
+            left = LoginThrottle.remaining(email)
+
+            ldap_failed(
+              conn,
+              email,
+              "メールアドレスまたはパスワードが違います。" <>
+                if(left > 0, do: "（あと #{left} 回失敗すると一時的にロックされます）", else: "")
+            )
+
+          {:error, {:unavailable, message}} ->
+            ldap_failed(conn, email, "LDAP サーバーで確認できませんでした: #{message}")
+        end
+    end
+  end
+
+  defp finish_password_login(conn, attrs) do
+    case Accounts.upsert_user_from_login(attrs) do
+      {:ok, user} ->
+        conn
+        |> put_flash(:info, "#{user.name || user.email} としてログインしました。")
+        |> UserAuth.log_in_user(user)
+
+      {:error, :disabled} ->
+        ldap_failed(conn, attrs.email, "このアカウントは無効化されています。管理者にお問い合わせください。")
+
+      {:error, _changeset} ->
+        ldap_failed(conn, attrs.email, "ログイン情報を保存できませんでした。")
+    end
+  end
+
+  defp ldap_failed(conn, email, message) do
+    conn
+    |> put_flash(:error, message)
+    |> put_flash(:ldap_email, email)
+    |> redirect(to: ~p"/login")
+  end
+
+  defp ldap_enabled? do
+    Ldap.enabled?(Settings.platform_setting!())
+  rescue
+    _ -> false
   end
 
   @doc """

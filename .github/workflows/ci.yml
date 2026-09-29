@@ -35,6 +35,29 @@ jobs:
       - run: mix compile --warnings-as-errors
       - run: mix test
 
+  ldap:
+    name: LDAP sign-in against a real LDAPS server (client certificate demanded)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '28'
+          elixir-version: '1.19'
+
+      - name: sqlite-vec (Linux .so)
+        run: |
+          RUNTIME_DIR="$(mktemp -d)"; RUNTIME_BIN="${RUNTIME_DIR}/bin"
+          source scripts/lib/platform.sh
+          install_sqlite_vec priv/sqlite_vec
+
+      - name: OpenLDAP with LDAPS demanding a client certificate
+        run: scripts/ci/setup-openldap.sh /tmp/ldap-it
+
+      - run: mix deps.get
+      - run: mix test --only ldap_integration
+
   runtime:
     name: Linux runtime install + systemd unit
     runs-on: ubuntu-latest

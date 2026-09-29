@@ -75,6 +75,33 @@ defmodule AskDrive.Settings do
   end
 
   @doc """
+  Saves the LDAP sign-in settings (spec 6.13). `uploads` carries newly uploaded PEM files
+  (`:cert`, `:key`, `:ca`); files not uploaded keep what is stored, and so does a blank
+  bind password. `"clear_ca" => "true"` removes the CA certificate.
+  """
+  def update_ldap(%Setting{} = setting, params, uploads \\ %{}) do
+    attrs =
+      params
+      |> Map.take(
+        ~w(ldap_enabled ldap_host ldap_port ldap_base_dn ldap_bind_dn ldap_bind_password)
+      )
+      |> Map.reject(fn {k, v} ->
+        k == "ldap_bind_password" and String.trim(to_string(v)) == ""
+      end)
+      |> maybe_put("ldap_client_cert", uploads[:cert])
+      |> maybe_put("ldap_client_key", uploads[:key])
+      |> maybe_put("ldap_ca_cert", uploads[:ca])
+      |> then(fn a ->
+        if params["clear_ca"] == "true", do: Map.put(a, "ldap_ca_cert", nil), else: a
+      end)
+
+    setting |> Setting.ldap_changeset(attrs) |> Repo.update()
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  @doc """
   Returns an `%Ecto.Changeset{}` for tracking setting changes.
   """
   def change_setting(%Setting{} = setting, attrs \\ %{}) do

@@ -21,7 +21,7 @@ defmodule AskDrive.MixProject do
   def application do
     [
       mod: {AskDrive.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger, :runtime_tools, :eldap]
     ]
   end
 
