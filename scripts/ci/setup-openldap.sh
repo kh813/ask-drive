@@ -24,7 +24,9 @@ openssl req -newkey rsa:2048 -nodes -keyout server.key -out server.csr -subj /CN
 printf "subjectAltName=DNS:localhost\n" > server.ext
 openssl x509 -req -in server.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out server.pem -days 2 -extfile server.ext 2>/dev/null
 openssl req -newkey rsa:2048 -nodes -keyout client.key -out client.csr -subj /CN=AskDriveLdapClient 2>/dev/null
-openssl x509 -req -in client.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out client.pem -days 2 2>/dev/null
+# a v3 client certificate for TLS client authentication, like Google's LDAP client certificates
+printf "basicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=clientAuth\n" > client.ext
+openssl x509 -req -in client.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out client.pem -days 2 -extfile client.ext 2>/dev/null
 
 sudo mkdir -p /etc/ldap/tls
 sudo cp ca.pem server.pem server.key /etc/ldap/tls/
@@ -77,6 +79,8 @@ if ! LDAPTLS_CACERT="${DIR}/ca.pem" LDAPTLS_CERT="${DIR}/client.pem" LDAPTLS_KEY
   sudo ss -ltnp | grep -E ':(389|636)' >&2 || true
   sudo slapcat -b cn=config 2>/dev/null | grep -i '^olcTLS' >&2 || true
   echo | openssl s_client -connect localhost:636 -CAfile "${DIR}/ca.pem" -cert "${DIR}/client.pem" -key "${DIR}/client.key" 2>&1 | head -20 >&2 || true
+  LDAPTLS_CACERT="${DIR}/ca.pem" LDAPTLS_CERT="${DIR}/client.pem" LDAPTLS_KEY="${DIR}/client.key" \
+    ldapsearch -d 1 -x -H ldaps://localhost:636 -b dc=example,dc=com -s base 2>&1 | grep -iE "tls|error|cert" | head -20 >&2 || true
   sudo journalctl -u slapd --no-pager -n 30 >&2 || true
   sudo dmesg 2>/dev/null | grep -i apparmor | tail -5 >&2 || true
   exit 1
