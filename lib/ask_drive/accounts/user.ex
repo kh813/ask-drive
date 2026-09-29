@@ -24,6 +24,8 @@ defmodule AskDrive.Accounts.User do
     field :last_login_at, :utc_datetime
     field :last_elevated_at, :utc_datetime
 
+    has_many :app_admins, AskDrive.Accounts.AppAdmin
+
     timestamps(type: :utc_datetime)
   end
 

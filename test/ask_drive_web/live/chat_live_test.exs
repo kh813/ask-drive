@@ -212,4 +212,35 @@ defmodule AskDriveWeb.ChatLiveTest do
     [answer_part | _] = String.split(html, "AI の思考過程を表示")
     refute answer_part =~ "Okay, let"
   end
+
+  test "locks chat when access password is enabled, unlocks with correct password", %{conn: conn} do
+    alias AskDrive.Accounts.AdminAccess
+    alias AskDrive.Settings
+
+    setting = Settings.get_setting!()
+    {:ok, _} = AdminAccess.set_access_password(setting, "pass12345")
+
+    # Regular user visiting chat should see access lock
+    {:ok, view, html} = live(conn, ~p"/it-support")
+    assert html =~ "合言葉を入力してください"
+    assert has_element?(view, "#chat-access-form")
+
+    # Submit wrong password
+    html =
+      view
+      |> form("#chat-access-form", %{"chat_access" => %{"password" => "wrongpwd"}})
+      |> render_submit()
+
+    assert html =~ "合言葉（アクセスパスワード）が正しくありません。"
+    assert has_element?(view, "#chat-access-form")
+
+    # Submit correct password
+    html =
+      view
+      |> form("#chat-access-form", %{"chat_access" => %{"password" => "pass12345"}})
+      |> render_submit()
+
+    assert html =~ "アクセス制限を解除しました。"
+    assert html =~ "chat-form"
+  end
 end

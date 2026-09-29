@@ -86,6 +86,10 @@ defmodule AskDrive.Settings.Setting do
     field :admin_max_attempts, :integer, default: 5
     field :admin_lockout_minutes, :integer, default: 15
 
+    # --- App Access Password (spec 6.11 F-1112) ---
+    field :access_password_hash, :string
+    field :access_password_enabled, :boolean, default: false
+
     # --- LLM providers (spec 6.2.2) ---
     field :llm_provider, :string, default: "ollama"
     field :embed_provider, :string, default: "ollama"

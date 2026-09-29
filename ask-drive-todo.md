@@ -481,6 +481,41 @@ mix hex.audit
 - [ ] 27-4 ② のログイン方式を決める: A. Secure LDAP のまま / B. Google ログイン（OAuth、リダイレクト URI を公開ホスト名で登録）/ C. Cloudflare Access のトークン（`Cf-Access-Jwt-Assertion`）を検証して引き継ぐ（要実装）
 - [ ] 27-5 公開後の見直し（ロックの閾値・接続元 IP 単位の制限、管理者の絞り込み、アップデートとバックアップの運用）
 - [ ] 27-6 会社管理の端末に Cloudflare 側の端末条件（証明書・端末の状態）を段階的に適用（14.1 の代替・補完）
+## Phase 28 — 窓口（アプリ）管理者の権限分離と Web 設定 【完了】
+
+仕様書 6.11 節（F-1110, F-1111）に対応。
+各窓口（アプリ）の管理者権限を分離し、Web 管理画面からの Gemini 等の API キー管理を窓口ごとに安全に行えるようにする。
+
+- [x] 28-1 `app_admins` マイグレーションとスキーマ作成（プラットフォーム DB: `user_id` と `app_slug` の紐付け）
+- [x] 28-2 `AskDrive.Accounts` コンテキストに窓口管理者の割り当て・解除・判定関数（`list_app_admins/1`, `assign_app_admin/2`, `revoke_app_admin/2`, `app_admin?/2`）を追加
+- [x] 28-3 `AskDriveWeb.UserAuth` および `AppScope` で `/:app/admin` へのアクセス認可（Super Admin または当該 App Admin のみアクセス可）を実装
+- [x] 28-4 全体管理（`/admin`）のユーザー管理画面から、各ユーザーに窓口管理者権限を付与・解除できる UI を追加
+- [x] 28-5 各窓口の管理画面（`/:app/admin`）の設定タブで、Gemini / Claude / OpenAI API キーおよび Drive 設定が直感的に保存・検証できることのテストコード作成
+- [x] 28-6 **ビルドゲート**
+
+## Phase 29 — 窓口管理者パスワード・窓口アクセスパスワード（合言葉）とリセット機能 【完了】
+
+仕様書 6.11 節（F-1112）に対応。
+各窓口に独自の管理者パスワードとチャット利用制限パスワード（合言葉）を持たせ、全体管理者が窓口管理者パスワードをリセットできるようにする。
+
+- [x] 29-1 `settings` テーブルへの `access_password_hash` および `access_password_enabled` 追加マイグレーションとスキーマ更新
+- [x] 29-2 `AskDrive.Accounts.AdminAccess` に窓口管理者パスワード変更・リセット、アクセスパスワード設定・検証関数を追加
+- [x] 29-3 各窓口の管理画面（`/:app/admin?tab=settings`）で窓口管理者パスワード変更およびアクセスパスワード有効化・変更 UI を実装
+- [x] 29-4 全体管理（`/admin?tab=apps`）の窓口一覧から全体管理者が窓口管理者パスワードをリセットできる UI を実装
+- [x] 29-5 窓口チャット画面（`/:app`）でアクセスパスワードが有効な場合の合言葉ロック・解除 UI を実装
+- [x] 29-6 単体・LiveView テスト作成と **ビルドゲート**
+
+## Phase 30 — API 利用量・トークン数ログとモニタリングダッシュボード 【完了】
+
+仕様書 14.5 節に対応。
+プライバシー（ユーザーの検索キーワードや結果は一切ログに残さない）を厳格に維持しつつ、API 送信データ量・トークン数・レイテンシ・エラーログを記録し、窓口管理者および全体管理者向けのダッシュボードで可視化する。
+
+- [x] 30-1 `api_usage_logs` テーブル作成マイグレーションと `AskDrive.Metrics.ApiUsageLog` スキーマの作成
+- [x] 30-2 `AskDrive.Metrics` コンテキスト（`record/1`, `get_summary/1`, `list_daily_usage/2`, `list_recent_errors/2`）の実装
+- [x] 30-3 `AskDrive.LLM` 呼び出し（`generate`, `generate_stream`, `embed`）でのトークン数・リクエストバイト数・レイテンシ・エラーの非同期記録連携
+- [x] 30-4 各窓口の管理画面（`/:app/admin?tab=logs` または `tab=metrics`）での API 利用量・トークン数・レイテンシ・エラー状況のダッシュボード表示
+- [x] 30-5 全体管理画面（`/admin?tab=metrics` または `tab=logs`）でのシステム全体の API 利用状況サマリー表示
+- [x] 30-6 単体・LiveView テスト作成と **ビルドゲート**
 
 ## Phase 26 — Google Authenticator（TOTP）による 2 段階目の確認 【将来 ToDo・未着手】
 

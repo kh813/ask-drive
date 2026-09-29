@@ -136,9 +136,52 @@ defmodule AskDrive.LLM do
   def generate(model, prompt, opts \\ []) when is_binary(prompt) do
     setting = resolve_setting(Keyword.get(opts, :setting))
     provider = Keyword.get(opts, :provider) || generation_provider(setting)
+    purpose = Keyword.get(opts, :purpose, "generation")
+    start_time = System.monotonic_time(:millisecond)
+    request_bytes = byte_size(prompt)
 
-    with :ok <- check_api_key(provider, setting) do
-      module(provider).generate(model, prompt, generation_opts(provider, setting, opts))
+    result =
+      with :ok <- check_api_key(provider, setting) do
+        module(provider).generate(model, prompt, generation_opts(provider, setting, opts))
+      end
+
+    elapsed_ms = System.monotonic_time(:millisecond) - start_time
+
+    case result do
+      {:ok, text} ->
+        # Calculate tokens estimation: ~1 token per 3 bytes if token count metadata isn't returned
+        prompt_tokens = estimate_tokens(prompt)
+        completion_tokens = estimate_tokens(text)
+
+        AskDrive.Metrics.record(%{
+          provider: to_string(provider),
+          model: to_string(model),
+          purpose: purpose,
+          prompt_tokens: prompt_tokens,
+          completion_tokens: completion_tokens,
+          total_tokens: prompt_tokens + completion_tokens,
+          request_bytes: request_bytes,
+          latency_ms: elapsed_ms,
+          status: "ok"
+        })
+
+        {:ok, text}
+
+      {:error, reason} = error ->
+        AskDrive.Metrics.record(%{
+          provider: to_string(provider),
+          model: to_string(model),
+          purpose: purpose,
+          prompt_tokens: estimate_tokens(prompt),
+          completion_tokens: 0,
+          total_tokens: estimate_tokens(prompt),
+          request_bytes: request_bytes,
+          latency_ms: elapsed_ms,
+          status: "error",
+          error_message: inspect(reason)
+        })
+
+        error
     end
   end
 
@@ -150,22 +193,64 @@ defmodule AskDrive.LLM do
   def generate_stream(model, prompt, opts, on_delta) when is_function(on_delta, 1) do
     setting = resolve_setting(Keyword.get(opts, :setting))
     provider = Keyword.get(opts, :provider) || generation_provider(setting)
+    purpose = Keyword.get(opts, :purpose, "chat_summary")
     mod = module(provider)
     gen_opts = generation_opts(provider, setting, opts)
+    start_time = System.monotonic_time(:millisecond)
+    request_bytes = byte_size(prompt)
 
-    with :ok <- check_api_key(provider, setting) do
-      Code.ensure_loaded(mod)
+    result =
+      with :ok <- check_api_key(provider, setting) do
+        Code.ensure_loaded(mod)
 
-      # apply/3: calling mod.generate_stream/4 directly makes the type checker (Elixir 1.20)
-      # warn for every provider module that has no streaming variant.
-      if function_exported?(mod, :generate_stream, 4) do
-        apply(mod, :generate_stream, [model, prompt, gen_opts, on_delta])
-      else
-        with {:ok, text} <- mod.generate(model, prompt, gen_opts) do
-          on_delta.(text)
-          {:ok, text}
+        # apply/3: calling mod.generate_stream/4 directly makes the type checker (Elixir 1.20)
+        # warn for every provider module that has no streaming variant.
+        if function_exported?(mod, :generate_stream, 4) do
+          apply(mod, :generate_stream, [model, prompt, gen_opts, on_delta])
+        else
+          with {:ok, text} <- mod.generate(model, prompt, gen_opts) do
+            on_delta.(text)
+            {:ok, text}
+          end
         end
       end
+
+    elapsed_ms = System.monotonic_time(:millisecond) - start_time
+
+    case result do
+      {:ok, text} ->
+        prompt_tokens = estimate_tokens(prompt)
+        completion_tokens = estimate_tokens(text)
+
+        AskDrive.Metrics.record(%{
+          provider: to_string(provider),
+          model: to_string(model),
+          purpose: purpose,
+          prompt_tokens: prompt_tokens,
+          completion_tokens: completion_tokens,
+          total_tokens: prompt_tokens + completion_tokens,
+          request_bytes: request_bytes,
+          latency_ms: elapsed_ms,
+          status: "ok"
+        })
+
+        {:ok, text}
+
+      {:error, reason} = error ->
+        AskDrive.Metrics.record(%{
+          provider: to_string(provider),
+          model: to_string(model),
+          purpose: purpose,
+          prompt_tokens: estimate_tokens(prompt),
+          completion_tokens: 0,
+          total_tokens: estimate_tokens(prompt),
+          request_bytes: request_bytes,
+          latency_ms: elapsed_ms,
+          status: "error",
+          error_message: inspect(reason)
+        })
+
+        error
     end
   end
 
@@ -179,18 +264,67 @@ defmodule AskDrive.LLM do
   def embed(model, inputs, opts \\ []) when is_list(inputs) do
     setting = resolve_setting(Keyword.get(opts, :setting))
     provider = Keyword.get(opts, :provider) || embedding_provider(setting)
+    purpose = Keyword.get(opts, :purpose, "embedding")
     expected_dim = Keyword.get(opts, :expected_dim) || embedding_dim(setting)
+    start_time = System.monotonic_time(:millisecond)
+    request_bytes = Enum.reduce(inputs, 0, fn i, acc -> acc + byte_size(to_string(i)) end)
 
-    with :ok <- check_api_key(provider, setting),
-         {:ok, vectors} <-
-           module(provider).embed(
-             model,
-             inputs,
-             embedding_opts(provider, setting, opts, expected_dim)
-           ) do
-      validate_dimensions(vectors, expected_dim)
+    result =
+      with :ok <- check_api_key(provider, setting),
+           {:ok, vectors} <-
+             module(provider).embed(
+               model,
+               inputs,
+               embedding_opts(provider, setting, opts, expected_dim)
+             ) do
+        validate_dimensions(vectors, expected_dim)
+      end
+
+    elapsed_ms = System.monotonic_time(:millisecond) - start_time
+
+    total_input_tokens =
+      Enum.reduce(inputs, 0, fn i, acc -> acc + estimate_tokens(to_string(i)) end)
+
+    case result do
+      {:ok, vectors} ->
+        AskDrive.Metrics.record(%{
+          provider: to_string(provider),
+          model: to_string(model),
+          purpose: purpose,
+          prompt_tokens: total_input_tokens,
+          completion_tokens: 0,
+          total_tokens: total_input_tokens,
+          request_bytes: request_bytes,
+          latency_ms: elapsed_ms,
+          status: "ok"
+        })
+
+        {:ok, vectors}
+
+      {:error, reason} = error ->
+        AskDrive.Metrics.record(%{
+          provider: to_string(provider),
+          model: to_string(model),
+          purpose: purpose,
+          prompt_tokens: total_input_tokens,
+          completion_tokens: 0,
+          total_tokens: total_input_tokens,
+          request_bytes: request_bytes,
+          latency_ms: elapsed_ms,
+          status: "error",
+          error_message: inspect(reason)
+        })
+
+        error
     end
   end
+
+  defp estimate_tokens(text) when is_binary(text) do
+    # Heuristic estimation (~3 chars/bytes per token for CJK/English mix)
+    max(1, div(byte_size(text), 3))
+  end
+
+  defp estimate_tokens(_), do: 0
 
   @doc """
   Frees a resident model. Only Ollama exposes an unload API; every other provider is a

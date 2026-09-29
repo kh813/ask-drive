@@ -196,7 +196,7 @@ defmodule AskDriveWeb.UserAuth do
 
       # Eligibility can be revoked while a session is still elevated; drop it immediately
       # rather than waiting for the timer.
-      not User.admin_eligible?(user) ->
+      not Accounts.any_admin_eligible?(user) ->
         release_elevation(conn)
 
       expired?(elevated_at) ->
@@ -244,7 +244,14 @@ defmodule AskDriveWeb.UserAuth do
 
     cond do
       conn.assigns[:admin_elevated?] ->
-        conn
+        if User.admin_eligible?(user) do
+          conn
+        else
+          conn
+          |> put_flash(:error, "全体管理画面は全体管理者のみ利用できます。")
+          |> redirect(to: ~p"/")
+          |> halt()
+        end
 
       is_nil(user) ->
         require_authenticated_user(conn, [])
@@ -265,11 +272,33 @@ defmodule AskDriveWeb.UserAuth do
   end
 
   @doc """
+  Halts unless the session currently holds administrator rights for the app in params.
+  """
+  def require_app_admin_session(conn, _opts) do
+    user = conn.assigns[:current_user]
+
+    cond do
+      conn.assigns[:admin_elevated?] ->
+        conn
+
+      is_nil(user) ->
+        require_authenticated_user(conn, [])
+
+      true ->
+        conn
+        |> put_flash(:info, "管理操作を行うには管理者パスワードを入力してください。")
+        |> maybe_store_return_to()
+        |> redirect(to: ~p"/admin/elevate")
+        |> halt()
+    end
+  end
+
+  @doc """
   Halts unless the signed-in account is allowed to attempt elevation (F-905).
   """
   def require_admin_eligible(conn, _opts) do
     cond do
-      User.admin_eligible?(conn.assigns[:current_user]) ->
+      Accounts.any_admin_eligible?(conn.assigns[:current_user]) ->
         conn
 
       conn.assigns[:current_user] ->
@@ -361,7 +390,11 @@ defmodule AskDriveWeb.UserAuth do
 
     cond do
       socket.assigns.admin_elevated? ->
-        {:cont, socket}
+        if User.admin_eligible?(user) do
+          {:cont, socket}
+        else
+          {:halt, redirect_with(socket, :error, "全体管理画面は全体管理者のみ利用できます。", ~p"/")}
+        end
 
       is_nil(user) ->
         {:halt, redirect_with(socket, :error, "続行するにはログインしてください。", ~p"/login")}
@@ -378,6 +411,51 @@ defmodule AskDriveWeb.UserAuth do
       true ->
         {:halt, redirect_with(socket, :error, "管理画面は管理者のみ利用できます。", ~p"/")}
     end
+  end
+
+  def on_mount(:require_app_admin_session, %{"app" => slug}, session, socket) do
+    socket = assign_current_user(socket, session)
+    user = socket.assigns.current_user
+
+    cond do
+      socket.assigns.admin_elevated? ->
+        if Accounts.app_admin_eligible?(user, slug) do
+          {:cont, socket}
+        else
+          {:halt,
+           redirect_with(
+             socket,
+             :error,
+             "窓口「#{slug}」の管理権限がありません。",
+             "/" <> slug
+           )}
+        end
+
+      is_nil(user) ->
+        {:halt, redirect_with(socket, :error, "続行するにはログインしてください。", ~p"/login")}
+
+      Accounts.app_admin_eligible?(user, slug) ->
+        {:halt,
+         redirect_with(
+           socket,
+           :info,
+           "管理操作を行うには管理者パスワードを入力してください。",
+           ~p"/admin/elevate"
+         )}
+
+      true ->
+        {:halt,
+         redirect_with(
+           socket,
+           :error,
+           "窓口「#{slug}」の管理権限がありません。",
+           "/" <> slug
+         )}
+    end
+  end
+
+  def on_mount(:require_app_admin_session, _params, session, socket) do
+    on_mount(:require_admin_session, %{}, session, socket)
   end
 
   defp redirect_with(socket, kind, message, to) do
@@ -409,7 +487,7 @@ defmodule AskDriveWeb.UserAuth do
 
     elevated? =
       not is_nil(user) and not is_nil(elevated_at) and elevated_user_id == user.id and
-        User.admin_eligible?(user) and not expired?(elevated_at)
+        Accounts.any_admin_eligible?(user) and not expired?(elevated_at)
 
     socket
     |> Phoenix.Component.assign(:current_user, user)

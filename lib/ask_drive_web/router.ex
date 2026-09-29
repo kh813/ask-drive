@@ -50,7 +50,7 @@ defmodule AskDriveWeb.Router do
 
   # --- Elevation prompt: signed in and allowed to try, but not yet elevated --
   scope "/", AskDriveWeb do
-    pipe_through [:browser, :require_authenticated_user, :require_admin_eligible]
+    pipe_through [:browser, :require_authenticated_user]
 
     get "/admin/elevate", AdminAccessController, :new
     post "/admin/elevate", AdminAccessController, :create
@@ -104,10 +104,13 @@ defmodule AskDriveWeb.Router do
   # --- Apps (spec 6.11) — last, so the "/:app" catch-all can't shadow any route above ---
   # Reserved slugs (AskDrive.Apps.App.reserved_slugs/0) keep apps from claiming those paths.
   scope "/", AskDriveWeb do
-    pipe_through [:browser, :require_admin_session]
+    pipe_through [:browser, :require_app_admin_session]
 
     live_session :app_admin,
-      on_mount: [{AskDriveWeb.UserAuth, :require_admin_session}, {AskDriveWeb.AppScope, :app}] do
+      on_mount: [
+        {AskDriveWeb.UserAuth, :require_app_admin_session},
+        {AskDriveWeb.AppScope, :app}
+      ] do
       live "/:app/admin", AdminLive, :app
     end
   end

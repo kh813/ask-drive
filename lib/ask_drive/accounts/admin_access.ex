@@ -93,26 +93,26 @@ defmodule AskDrive.Accounts.AdminAccess do
   Every outcome is written to the audit log before returning.
   """
   def elevate(%User{} = user, password, context \\ %{}) do
-    setting = Settings.platform_setting!()
+    setting = Settings.get_setting() || Settings.platform_setting!()
+    platform_setting = Settings.platform_setting!()
 
     cond do
-      not User.admin_eligible?(user) ->
-        log(user, "denied", context)
-        {:error, :not_eligible}
-
-      not password_set?(setting) ->
+      not password_set?(setting) and not password_set?(platform_setting) ->
         {:error, :no_password}
 
       true ->
-        case locked_out_until(user, setting) do
-          nil -> verify_and_elevate(user, password, setting, context)
+        case locked_out_until(user, platform_setting) do
+          nil -> verify_and_elevate(user, password, setting, platform_setting, context)
           unlock_at -> deny_locked_out(user, unlock_at, context)
         end
     end
   end
 
-  defp verify_and_elevate(user, password, setting, context) do
-    if password_matches?(setting.admin_password_hash, password) do
+  defp verify_and_elevate(user, password, setting, platform_setting, context) do
+    # App-specific password if set, otherwise fallback to platform admin password
+    hash = setting.admin_password_hash || platform_setting.admin_password_hash
+
+    if password_matches?(hash, password) do
       {:ok, user} = touch_elevated_at(user)
       log(user, "granted", context)
       {:ok, user}
@@ -141,6 +141,42 @@ defmodule AskDrive.Accounts.AdminAccess do
   def record_expiry(%User{} = user, context \\ %{}) do
     log(user, "expired", context)
     :ok
+  end
+
+  # --- Access password (合言葉・チャットアクセス制限, spec F-1112) ---
+
+  @doc """
+  Verifies if candidate password matches the app access password.
+  """
+  def verify_access_password(candidate, %Settings.Setting{} = setting) do
+    if setting.access_password_enabled and is_binary(setting.access_password_hash) do
+      password_matches?(setting.access_password_hash, candidate)
+    else
+      true
+    end
+  end
+
+  @doc """
+  Sets or updates the app access password.
+  """
+  def set_access_password(%Settings.Setting{} = setting, password) when is_binary(password) do
+    with :ok <- validate_password(password) do
+      setting
+      |> Ecto.Changeset.change(%{
+        access_password_hash: hash_password(password),
+        access_password_enabled: true
+      })
+      |> AskDrive.Repo.update()
+    end
+  end
+
+  @doc """
+  Disables the app access password.
+  """
+  def disable_access_password(%Settings.Setting{} = setting) do
+    setting
+    |> Ecto.Changeset.change(%{access_password_enabled: false})
+    |> AskDrive.Repo.update()
   end
 
   @doc """
@@ -216,15 +252,54 @@ defmodule AskDrive.Accounts.AdminAccess do
 
   @doc """
   Changes the administrator password. The current password must be supplied (F-914).
+  Supports passing an app-specific setting struct.
   """
-  def change_password(%User{} = user, current_password, new_password, context \\ %{}) do
-    setting = Settings.platform_setting!()
+  def change_password(
+        %User{} = user,
+        current_password,
+        new_password,
+        context \\ %{},
+        setting \\ nil
+      ) do
+    target_setting = setting || Settings.get_setting() || Settings.platform_setting!()
+    platform_setting = Settings.platform_setting!()
+    current_hash = target_setting.admin_password_hash || platform_setting.admin_password_hash
 
-    if password_matches?(setting.admin_password_hash, current_password) do
-      store_password(setting, new_password, user, "password_changed", context)
+    # Platform super admin can change with either current password or platform admin password
+    if password_matches?(current_hash, current_password) or
+         (User.admin_eligible?(user) and
+            password_matches?(platform_setting.admin_password_hash, current_password)) do
+      store_password(target_setting, new_password, user, "password_changed", context)
     else
       log(user, "denied", context)
       {:error, :invalid_password}
+    end
+  end
+
+  @doc """
+  Resets the admin password for an app (called by Super Admin).
+  """
+  def reset_app_admin_password(
+        %User{} = actor,
+        %AskDrive.Apps.App{} = app,
+        new_password,
+        context \\ %{}
+      ) do
+    if User.admin_eligible?(actor) do
+      AskDrive.Apps.with_app(app, fn ->
+        setting = Settings.get_setting!()
+
+        with :ok <- validate_password(new_password),
+             {:ok, updated} <-
+               setting
+               |> Ecto.Changeset.change(admin_password_hash: hash_password(new_password))
+               |> AskDrive.Repo.update() do
+          log(actor, "password_changed", context)
+          {:ok, updated}
+        end
+      end)
+    else
+      {:error, :not_authorized}
     end
   end
 
@@ -246,7 +321,7 @@ defmodule AskDrive.Accounts.AdminAccess do
          {:ok, updated} <-
            setting
            |> Ecto.Changeset.change(admin_password_hash: hash_password(password))
-           |> PlatformRepo.update() do
+           |> AskDrive.Repo.update() do
       log(user, event, context)
       {:ok, updated}
     end

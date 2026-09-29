@@ -12,7 +12,7 @@ defmodule AskDrive.Accounts do
   """
   import Ecto.Query, warn: false
 
-  alias AskDrive.Accounts.{GoogleAccount, User}
+  alias AskDrive.Accounts.{AppAdmin, GoogleAccount, User}
   alias AskDrive.Drive.{OAuth, ServiceAccount}
   alias AskDrive.Repo
   alias AskDrive.Settings
@@ -227,10 +227,15 @@ defmodule AskDrive.Accounts do
 
   @doc """
   All users, elevation-eligible accounts first and then alphabetically by email.
+  Preloads associated `app_admins`.
   """
   def list_users do
     on_platform(fn ->
-      Repo.all(from u in User, order_by: [desc: u.admin_eligible, asc: u.email])
+      Repo.all(
+        from u in User,
+          order_by: [desc: u.admin_eligible, asc: u.email],
+          preload: [:app_admins]
+      )
     end)
   end
 
@@ -351,6 +356,118 @@ defmodule AskDrive.Accounts do
           |> Repo.update()
         end)
     end
+  end
+
+  # --- App Admins (spec 6.11 F-1110) ----------------------------------------
+
+  @doc """
+  Returns all app slugs a user is authorized to administer.
+  """
+  def list_user_app_slugs(%User{id: user_id}) do
+    on_platform(fn ->
+      Repo.all(from aa in AppAdmin, where: aa.user_id == ^user_id, select: aa.app_slug)
+    end)
+  end
+
+  def list_user_app_slugs(_), do: []
+
+  @doc """
+  Checks if a user is authorized to administer a specific app.
+  Global elevation-eligible admins can administer all apps.
+  App admins can administer their assigned app(s).
+  """
+  def app_admin_eligible?(%User{status: "active"} = user, app_slug) when is_binary(app_slug) do
+    if User.admin_eligible?(user) do
+      true
+    else
+      normalized_slug = String.trim(String.downcase(app_slug))
+
+      on_platform(fn ->
+        Repo.exists?(
+          from aa in AppAdmin,
+            where: aa.user_id == ^user.id and aa.app_slug == ^normalized_slug
+        )
+      end)
+    end
+  end
+
+  def app_admin_eligible?(_, _), do: false
+
+  @doc """
+  Checks if a user can elevate to ANY administration role (platform or at least one app).
+  """
+  def any_admin_eligible?(%User{status: "active"} = user) do
+    if User.admin_eligible?(user) do
+      true
+    else
+      on_platform(fn ->
+        Repo.exists?(from aa in AppAdmin, where: aa.user_id == ^user.id)
+      end)
+    end
+  end
+
+  def any_admin_eligible?(_), do: false
+
+  @doc """
+  Assigns a user as admin of a specific app.
+  """
+  def add_app_admin(%User{} = user, app_slug) when is_binary(app_slug) do
+    slug = String.trim(String.downcase(app_slug))
+
+    on_platform(fn ->
+      case Repo.get_by(AppAdmin, user_id: user.id, app_slug: slug) do
+        nil ->
+          %AppAdmin{}
+          |> AppAdmin.changeset(%{user_id: user.id, app_slug: slug})
+          |> Repo.insert()
+
+        existing ->
+          {:ok, existing}
+      end
+    end)
+  end
+
+  @doc """
+  Revokes app admin rights for a specific user and app.
+  """
+  def remove_app_admin(%User{} = user, app_slug) when is_binary(app_slug) do
+    slug = String.trim(String.downcase(app_slug))
+
+    on_platform(fn ->
+      case Repo.get_by(AppAdmin, user_id: user.id, app_slug: slug) do
+        nil -> :ok
+        app_admin -> Repo.delete(app_admin)
+      end
+    end)
+  end
+
+  @doc """
+  Sets the full list of apps a user is allowed to administer.
+  """
+  def set_user_apps(%User{} = user, app_slugs) when is_list(app_slugs) do
+    target_slugs =
+      app_slugs
+      |> Enum.map(&String.trim(String.downcase(&1)))
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+
+    on_platform(fn ->
+      current = Repo.all(from aa in AppAdmin, where: aa.user_id == ^user.id)
+      current_slugs = Enum.map(current, & &1.app_slug)
+
+      to_remove = Enum.filter(current, &(&1.app_slug not in target_slugs))
+      to_add = target_slugs -- current_slugs
+
+      Enum.each(to_remove, &Repo.delete/1)
+
+      Enum.each(to_add, fn slug ->
+        %AppAdmin{}
+        |> AppAdmin.changeset(%{user_id: user.id, app_slug: slug})
+        |> Repo.insert!()
+      end)
+
+      :ok
+    end)
   end
 
   defp ensure_not_self(%User{id: id}, %User{id: id}), do: {:error, :cannot_modify_self}

@@ -104,8 +104,9 @@ defmodule AskDriveWeb.MultiAppTest do
     {:ok, _view, html} = live(conn, "/legal/admin?tab=settings")
     assert html =~ "管理: AskDrive for Legal"
     assert html =~ "Google Drive"
+    assert html =~ "窓口管理者パスワード"
     refute html =~ "HTTPS（SSL 証明書）"
-    refute html =~ "管理者パスワード"
+    refute html =~ "Google Secure LDAP でのログイン"
 
     {:ok, _view, html} = live(conn, ~p"/admin?tab=settings")
     assert html =~ "HTTPS（SSL 証明書）"

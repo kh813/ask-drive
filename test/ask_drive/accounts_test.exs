@@ -40,4 +40,107 @@ defmodule AskDrive.AccountsTest do
 
     assert {:ok, "valid_token_xyz"} = Accounts.get_valid_access_token()
   end
+
+  test "app admin delegation and permission check" do
+    user =
+      %AskDrive.Accounts.User{}
+      |> AskDrive.Accounts.User.changeset(%{
+        email: "staff@example.com",
+        name: "Staff",
+        admin_eligible: false,
+        status: "active"
+      })
+      |> AskDrive.Repo.insert!()
+
+    assert Accounts.app_admin_eligible?(user, "hr") == false
+    assert Accounts.any_admin_eligible?(user) == false
+    assert Accounts.list_user_app_slugs(user) == []
+
+    # Assign to hr
+    {:ok, _} = Accounts.add_app_admin(user, "hr")
+    assert Accounts.app_admin_eligible?(user, "hr") == true
+    assert Accounts.app_admin_eligible?(user, "it-support") == false
+    assert Accounts.any_admin_eligible?(user) == true
+    assert Accounts.list_user_app_slugs(user) == ["hr"]
+
+    # Assign multiple apps via set_user_apps
+    :ok = Accounts.set_user_apps(user, ["it-support", "finance"])
+    assert Accounts.app_admin_eligible?(user, "hr") == false
+    assert Accounts.app_admin_eligible?(user, "it-support") == true
+    assert Accounts.app_admin_eligible?(user, "finance") == true
+
+    # Super admin has access to all apps
+    super_admin =
+      %AskDrive.Accounts.User{}
+      |> AskDrive.Accounts.User.changeset(%{
+        email: "superadmin@example.com",
+        name: "SuperAdmin",
+        admin_eligible: true,
+        status: "active"
+      })
+      |> AskDrive.Repo.insert!()
+
+    assert Accounts.app_admin_eligible?(super_admin, "hr") == true
+    assert Accounts.app_admin_eligible?(super_admin, "finance") == true
+    assert Accounts.any_admin_eligible?(super_admin) == true
+  end
+
+  test "AdminAccess: access password set, verify, and disable" do
+    alias AskDrive.Accounts.AdminAccess
+    alias AskDrive.Settings
+
+    setting = Settings.get_setting!()
+    assert AdminAccess.verify_access_password("any_candidate", setting) == true
+
+    # Set access password
+    {:ok, updated} = AdminAccess.set_access_password(setting, "secret12345")
+    assert updated.access_password_enabled == true
+    assert is_binary(updated.access_password_hash)
+
+    assert AdminAccess.verify_access_password("secret12345", updated) == true
+    assert AdminAccess.verify_access_password("wrongpassword", updated) == false
+
+    # Disable access password
+    {:ok, disabled} = AdminAccess.disable_access_password(updated)
+    assert disabled.access_password_enabled == false
+    assert AdminAccess.verify_access_password("wrongpassword", disabled) == true
+  end
+
+  test "AdminAccess: super admin resets app admin password" do
+    alias AskDrive.Accounts.AdminAccess
+    alias AskDrive.Apps
+
+    super_admin =
+      %AskDrive.Accounts.User{}
+      |> AskDrive.Accounts.User.changeset(%{
+        email: "super@example.com",
+        name: "Super",
+        admin_eligible: true,
+        status: "active"
+      })
+      |> AskDrive.Repo.insert!()
+
+    normal_user =
+      %AskDrive.Accounts.User{}
+      |> AskDrive.Accounts.User.changeset(%{
+        email: "user@example.com",
+        name: "User",
+        admin_eligible: false,
+        status: "active"
+      })
+      |> AskDrive.Repo.insert!()
+
+    app = Apps.get_by_slug!("it-support")
+
+    # Normal user cannot reset
+    assert {:error, :not_authorized} =
+             AdminAccess.reset_app_admin_password(normal_user, app, "newsecret999")
+
+    # Super admin can reset
+    assert {:ok, _} =
+             AdminAccess.reset_app_admin_password(super_admin, app, "newsecret999")
+
+    # Verify new password elevates
+    assert {:ok, _} = AdminAccess.elevate(super_admin, "newsecret999")
+  end
 end

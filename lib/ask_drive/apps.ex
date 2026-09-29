@@ -104,6 +104,10 @@ defmodule AskDrive.Apps do
   def get_by_slug(slug) when is_binary(slug), do: Enum.find(list(), &(&1.slug == slug))
   def get_by_slug(_), do: nil
 
+  def get_by_slug!(slug) when is_binary(slug) do
+    get_by_slug(slug) || raise Ecto.NoResultsError, queryable: App
+  end
+
   def get!(id), do: platform(fn -> Repo.get!(App, id) end)
 
   def primary, do: Enum.find(list(), & &1.primary) || virtual_primary()

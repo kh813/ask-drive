@@ -36,11 +36,6 @@ defmodule AskDriveWeb.AdminAccessController do
       {:error, :no_password} ->
         render_prompt(conn, error: "管理者パスワードが未設定です。まず初回パスワードを設定してください。")
 
-      {:error, :not_eligible} ->
-        conn
-        |> put_flash(:error, "このアカウントは管理者権限に昇格できません。")
-        |> redirect(to: ~p"/")
-
       {:error, {:locked_out, unlock_at}} ->
         render_prompt(conn,
           error: "試行回数の上限に達しました。#{Calendar.strftime(unlock_at, "%H:%M")} 以降に再度お試しください。"

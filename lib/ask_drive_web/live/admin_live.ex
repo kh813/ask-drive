@@ -79,6 +79,8 @@ defmodule AskDriveWeb.AdminLive do
      |> assign(:connection_test, %{})
      |> assign(:service_account_test, nil)
      |> assign(:password_form, to_form(%{}, as: :admin_password))
+     |> assign(:access_password_form, to_form(%{}, as: :access_password))
+     |> assign(:resetting_app_slug, nil)
      |> load_dashboard_data()}
   end
 
@@ -90,13 +92,20 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   defp tabs(:platform),
-    do: [{"apps", "窓口（アプリ）"}, {"users", "ユーザー管理"}, {"audit", "昇格ログ"}, {"settings", "全体設定"}]
+    do: [
+      {"apps", "窓口（アプリ）"},
+      {"users", "ユーザー管理"},
+      {"audit", "昇格ログ"},
+      {"metrics", "API利用量・ログ"},
+      {"settings", "全体設定"}
+    ]
 
   defp tabs(:app),
     do: [
       {"overview", "概要・バッチ状況"},
       {"questions", "未回答・解消質問"},
       {"documents", "ドキュメント一覧"},
+      {"metrics", "API利用量・ログ"},
       {"settings", "設定"}
     ]
 
@@ -612,6 +621,31 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   @impl true
+  def handle_event("toggle_user_app_admin", %{"user_id" => user_id, "app_slug" => slug}, socket) do
+    user = Accounts.get_user(user_id)
+
+    if user do
+      current_slugs = Accounts.list_user_app_slugs(user)
+
+      new_slugs =
+        if slug in current_slugs do
+          current_slugs -- [slug]
+        else
+          [slug | current_slugs]
+        end
+
+      :ok = Accounts.set_user_apps(user, new_slugs)
+
+      {:noreply,
+       socket
+       |> put_flash(:info, "#{user.email} の窓口管理者権限を更新しました。")
+       |> load_dashboard_data()}
+    else
+      {:noreply, put_flash(socket, :error, "ユーザーが見つかりません。")}
+    end
+  end
+
+  @impl true
   def handle_event("change_admin_password", %{"admin_password" => params}, socket) do
     %{"current" => current, "new" => new_password, "confirmation" => confirmation} =
       Map.merge(%{"current" => "", "new" => "", "confirmation" => ""}, params)
@@ -622,7 +656,13 @@ defmodule AskDriveWeb.AdminLive do
       if new_password != confirmation do
         {:error, :mismatch}
       else
-        AdminAccess.change_password(socket.assigns.current_user, current, new_password, context)
+        AdminAccess.change_password(
+          socket.assigns.current_user,
+          current,
+          new_password,
+          context,
+          socket.assigns.setting
+        )
       end
 
     case result do
@@ -635,6 +675,101 @@ defmodule AskDriveWeb.AdminLive do
 
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, password_error_message(reason))}
+    end
+  end
+
+  @impl true
+  def handle_event("toggle_reset_app_password", %{"app_slug" => app_slug}, socket) do
+    next_slug =
+      if is_binary(app_slug) and app_slug != "" and socket.assigns.resetting_app_slug != app_slug,
+        do: app_slug,
+        else: nil
+
+    {:noreply, assign(socket, :resetting_app_slug, next_slug)}
+  end
+
+  @impl true
+  def handle_event(
+        "reset_app_admin_password",
+        %{"app_slug" => app_slug, "new_password" => new_password, "confirmation" => confirmation},
+        socket
+      ) do
+    app = AskDrive.Apps.get_by_slug!(app_slug)
+    context = %{ip_address: nil, user_agent: nil}
+
+    result =
+      if new_password != confirmation do
+        {:error, :mismatch}
+      else
+        AdminAccess.reset_app_admin_password(
+          socket.assigns.current_user,
+          app,
+          new_password,
+          context
+        )
+      end
+
+    case result do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:resetting_app_slug, nil)
+         |> put_flash(:info, "窓口「#{app.name}」の管理者パスワードを再設定しました。")
+         |> load_dashboard_data()}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, password_error_message(reason))}
+    end
+  end
+
+  @impl true
+  def handle_event("save_access_password", %{"access_password" => params}, socket) do
+    enabled = params["enabled"] in ["true", "1", true]
+    new_password = params["password"] || ""
+    confirmation = params["confirmation"] || ""
+
+    result =
+      if enabled do
+        if new_password != confirmation do
+          {:error, :mismatch}
+        else
+          AdminAccess.set_access_password(socket.assigns.setting, new_password)
+        end
+      else
+        AdminAccess.disable_access_password(socket.assigns.setting)
+      end
+
+    case result do
+      {:ok, updated} ->
+        {:noreply,
+         socket
+         |> assign(:setting, updated)
+         |> put_flash(
+           :info,
+           if(enabled,
+             do: "窓口アクセスパスワード（合言葉）を設定しました。",
+             else: "窓口アクセスパスワード（合言葉）を無効化しました。"
+           )
+         )
+         |> load_dashboard_data()}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, password_error_message(reason))}
+    end
+  end
+
+  @impl true
+  def handle_event("disable_access_password", _params, socket) do
+    case AdminAccess.disable_access_password(socket.assigns.setting) do
+      {:ok, updated} ->
+        {:noreply,
+         socket
+         |> assign(:setting, updated)
+         |> put_flash(:info, "窓口アクセスパスワード（合言葉）を無効化しました。")
+         |> load_dashboard_data()}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "無効化できませんでした: #{inspect(reason)}")}
     end
   end
 
@@ -657,13 +792,14 @@ defmodule AskDriveWeb.AdminLive do
   defp event_class(_), do: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
 
   defp password_error_message(:mismatch), do: "新しいパスワードが一致しません。"
-  defp password_error_message(:invalid_password), do: "現在の管理者パスワードが違います。"
+  defp password_error_message(:invalid_password), do: "現在のパスワードが違います。"
 
   defp password_error_message(:too_short),
     do: "パスワードは #{AdminAccess.min_password_length()} 文字以上にしてください。"
 
   defp password_error_message(:surrounding_whitespace), do: "パスワードの前後に空白を含めないでください。"
-  defp password_error_message(_), do: "管理者パスワードを変更できませんでした。"
+  defp password_error_message(:not_authorized), do: "この操作を行う権限がありません。"
+  defp password_error_message(_), do: "パスワードの変更・設定に失敗しました。"
 
   defp handle_user_change({:ok, user}, socket) do
     {:noreply,
@@ -732,6 +868,10 @@ defmodule AskDriveWeb.AdminLive do
     setting = socket.assigns[:setting]
     users = Accounts.list_users()
 
+    # 6. Metrics & API Usage
+    metrics_summary = AskDrive.Metrics.get_summary(30)
+    recent_api_errors = AskDrive.Metrics.list_recent_errors(20)
+
     socket
     |> assign(
       :app_summaries,
@@ -767,6 +907,8 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:documents, docs)
     |> assign(:unresolved_questions, unresolved_questions)
     |> assign(:resolved_questions, resolved_questions)
+    |> assign(:metrics_summary, metrics_summary)
+    |> assign(:recent_api_errors, recent_api_errors)
     |> assign(:health, health)
     |> assign(:current_mode, current_mode)
     |> assign(:account, account)
@@ -1772,69 +1914,123 @@ defmodule AskDriveWeb.AdminLive do
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
-                    <tr :for={app <- @apps} id={"app-row-#{app.slug}"}>
-                      <td class="py-2 px-2">
-                        <form :if={app.id} phx-submit="update_app" class="space-y-1">
-                          <input type="hidden" name="app_id" value={app.id} />
-                          <input
-                            type="text"
-                            name="name"
-                            value={app.name}
-                            class="w-44 px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-medium"
-                          />
-                          <input
-                            type="text"
-                            name="description"
-                            value={app.description}
-                            placeholder="説明（ポータルに表示）"
-                            class="w-full px-2 py-1 rounded border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[11px]"
-                          />
-                          <button type="submit" class="text-[11px] underline text-indigo-600">保存</button>
-                        </form>
-                        <span :if={is_nil(app.id)} class="font-medium">{app.name}</span>
-                      </td>
-                      <td class="py-2 px-2 font-mono whitespace-nowrap">
-                        <a href={"/" <> app.slug} class="text-indigo-600 underline">/{app.slug}</a>
-                        <a href={"/" <> app.slug <> "/admin"} class="ml-2 text-zinc-500 underline">管理</a>
-                      </td>
-                      <% sum = Map.get(@app_summaries, app.slug, %{}) %>
-                      <td class="py-2 px-2 text-right font-mono">
-                        {sum[:docs] || 0} / {sum[:chunks] || 0}
-                      </td>
-                      <td class="py-2 px-2 whitespace-nowrap">
-                        <%= if sum[:drive?] do %>
-                          設定済み
-                        <% else %>
-                          <a
-                            href={"/" <> app.slug <> "/admin?tab=settings"}
-                            class="text-amber-700 dark:text-amber-300 underline"
+                    <%= for app <- @apps do %>
+                      <tr id={"app-row-#{app.slug}"}>
+                        <td class="py-2 px-2">
+                          <form :if={app.id} phx-submit="update_app" class="space-y-1">
+                            <input type="hidden" name="app_id" value={app.id} />
+                            <input
+                              type="text"
+                              name="name"
+                              value={app.name}
+                              class="w-44 px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-medium"
+                            />
+                            <input
+                              type="text"
+                              name="description"
+                              value={app.description}
+                              placeholder="説明（ポータルに表示）"
+                              class="w-full px-2 py-1 rounded border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[11px]"
+                            />
+                            <button type="submit" class="text-[11px] underline text-indigo-600">保存</button>
+                          </form>
+                          <span :if={is_nil(app.id)} class="font-medium">{app.name}</span>
+                        </td>
+                        <td class="py-2 px-2 font-mono whitespace-nowrap">
+                          <a href={"/" <> app.slug} class="text-indigo-600 underline">/{app.slug}</a>
+                          <a href={"/" <> app.slug <> "/admin"} class="ml-2 text-zinc-500 underline">管理</a>
+                        </td>
+                        <% sum = Map.get(@app_summaries, app.slug, %{}) %>
+                        <td class="py-2 px-2 text-right font-mono">
+                          {sum[:docs] || 0} / {sum[:chunks] || 0}
+                        </td>
+                        <td class="py-2 px-2 whitespace-nowrap">
+                          <%= if sum[:drive?] do %>
+                            設定済み
+                          <% else %>
+                            <a
+                              href={"/" <> app.slug <> "/admin?tab=settings"}
+                              class="text-amber-700 dark:text-amber-300 underline"
+                            >
+                              未設定（設定する）
+                            </a>
+                          <% end %>
+                        </td>
+                        <td class="py-2 px-2 whitespace-nowrap">
+                          <%= if run = sum[:last_run] do %>
+                            {AskDrive.Clock.format(run.started_at, "%m/%d %H:%M")} {status_label(
+                              run.status
+                            )}
+                          <% else %>
+                            —
+                          <% end %>
+                        </td>
+                        <td class="py-2 px-2 text-right whitespace-nowrap space-x-2">
+                          <button
+                            type="button"
+                            phx-click="toggle_reset_app_password"
+                            phx-value-app_slug={app.slug}
+                            class="text-[11px] text-indigo-600 dark:text-indigo-400 underline"
                           >
-                            未設定（設定する）
-                          </a>
-                        <% end %>
-                      </td>
-                      <td class="py-2 px-2 whitespace-nowrap">
-                        <%= if run = sum[:last_run] do %>
-                          {AskDrive.Clock.format(run.started_at, "%m/%d %H:%M")} {status_label(
-                            run.status
-                          )}
-                        <% else %>
-                          —
-                        <% end %>
-                      </td>
-                      <td class="py-2 px-2 text-right">
-                        <button
-                          :if={not app.primary and app.id}
-                          type="button"
-                          phx-click="delete_app"
-                          phx-value-id={app.id}
-                          data-confirm={"窓口「#{app.name}」を削除します。チャット・管理画面が使えなくなります（データベースファイルは名前を変えて残します）。続行しますか？"}
-                          class="text-[11px] text-red-600 underline"
-                        >
-                          削除
-                        </button>
-                      </td>
-                    </tr>
+                            管理者PW再設定
+                          </button>
+                          <button
+                            :if={not app.primary and app.id}
+                            type="button"
+                            phx-click="delete_app"
+                            phx-value-id={app.id}
+                            data-confirm={"窓口「#{app.name}」を削除します。チャット・管理画面が使えなくなります（データベースファイルは名前を変えて残します）。続行しますか？"}
+                            class="text-[11px] text-red-600 underline"
+                          >
+                            削除
+                          </button>
+                        </td>
+                      </tr>
+                      <tr
+                        :if={@resetting_app_slug == app.slug}
+                        class="bg-indigo-50/50 dark:bg-indigo-950/30"
+                      >
+                        <td colspan="6" class="p-3">
+                          <form
+                            phx-submit="reset_app_admin_password"
+                            class="flex flex-wrap items-center gap-3 text-xs"
+                          >
+                            <input type="hidden" name="app_slug" value={app.slug} />
+                            <span class="font-medium text-zinc-800 dark:text-zinc-200">
+                              「{app.name}」の管理者パスワードを再設定:
+                            </span>
+                            <input
+                              type="password"
+                              name="new_password"
+                              placeholder="新しいパスワード（8文字以上）"
+                              required
+                              class="px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs w-48"
+                            />
+                            <input
+                              type="password"
+                              name="confirmation"
+                              placeholder="確認用パスワード"
+                              required
+                              class="px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs w-48"
+                            />
+                            <button
+                              type="submit"
+                              class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                            >
+                              再設定を実行
+                            </button>
+                            <button
+                              type="button"
+                              phx-click="toggle_reset_app_password"
+                              phx-value-app_slug=""
+                              class="px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-xs transition"
+                            >
+                              キャンセル
+                            </button>
+                          </form>
+                        </td>
+                      </tr>
+                    <% end %>
                   </tbody>
                 </table>
               </div>
@@ -1908,7 +2104,8 @@ defmodule AskDriveWeb.AdminLive do
                   <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                     <tr>
                       <th class="py-3 px-2">ユーザー</th>
-                      <th class="py-3 px-2">管理者への昇格</th>
+                      <th class="py-3 px-2">全体管理者への昇格</th>
+                      <th class="py-3 px-2">担当窓口（アプリ管理者）</th>
                       <th class="py-3 px-2">状態</th>
                       <th class="py-3 px-2">最終ログイン / 最終昇格</th>
                       <th class="py-3 px-2 text-right">操作</th>
@@ -1916,6 +2113,7 @@ defmodule AskDriveWeb.AdminLive do
                   </thead>
                   <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
                     <%= for user <- @users do %>
+                      <% user_slugs = Enum.map(user.app_admins || [], & &1.app_slug) %>
                       <tr
                         id={"user-row-#{user.id}"}
                         class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition"
@@ -1941,8 +2139,43 @@ defmodule AskDriveWeb.AdminLive do
                               else: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
                             )
                           ]}>
-                            {if user.admin_eligible, do: "昇格可", else: "不可"}
+                            {if user.admin_eligible, do: "全体昇格可", else: "不可"}
                           </span>
+                        </td>
+                        <td class="py-3 px-2">
+                          <%= if user.admin_eligible do %>
+                            <span class="text-[11px] text-zinc-400">（全窓口の管理が可能）</span>
+                          <% else %>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                              <%= for app <- @apps do %>
+                                <% is_app_admin = app.slug in user_slugs %>
+                                <button
+                                  type="button"
+                                  id={"user-#{user.id}-app-#{app.slug}"}
+                                  phx-click="toggle_user_app_admin"
+                                  phx-value-user_id={user.id}
+                                  phx-value-app_slug={app.slug}
+                                  title={
+                                    if(is_app_admin,
+                                      do: "クリックして #{app.name} の管理者権限を解除",
+                                      else: "クリックして #{app.name} の管理者権限を付与"
+                                    )
+                                  }
+                                  class={[
+                                    "px-2 py-0.5 rounded text-[10px] font-medium border transition",
+                                    if(is_app_admin,
+                                      do:
+                                        "bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300",
+                                      else:
+                                        "bg-zinc-50 border-zinc-200 text-zinc-400 hover:text-zinc-700 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-500"
+                                    )
+                                  ]}
+                                >
+                                  {if is_app_admin, do: "✓ ", else: "+ "}{app.name}
+                                </button>
+                              <% end %>
+                            </div>
+                          <% end %>
                         </td>
                         <td class="py-3 px-2">
                           <span class={[
@@ -2084,6 +2317,200 @@ defmodule AskDriveWeb.AdminLive do
                 </table>
               </div>
             <% end %>
+          </div>
+        <% end %>
+
+        <%!-- Tab: API Usage Metrics & Logs --%>
+        <%= if @current_tab == "metrics" do %>
+          <div class="space-y-6">
+            <%!-- KPI Cards --%>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                <p class="text-xs font-medium text-zinc-500">総リクエスト数 (過去30日)</p>
+                <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
+                  {@metrics_summary.total_requests}
+                  <span class="text-xs font-normal text-zinc-500">回</span>
+                </p>
+                <p class="text-[11px] text-zinc-400 mt-1">成功率: {@metrics_summary.success_rate}%</p>
+              </div>
+
+              <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                <p class="text-xs font-medium text-zinc-500">総消費トークン数</p>
+                <p class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+                  {@metrics_summary.total_tokens}
+                </p>
+                <p class="text-[11px] text-zinc-400 mt-1">
+                  入力 {@metrics_summary.prompt_tokens} / 出力 {@metrics_summary.completion_tokens}
+                </p>
+              </div>
+
+              <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                <p class="text-xs font-medium text-zinc-500">送信データ量</p>
+                <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
+                  {div(@metrics_summary.total_bytes, 1024)}
+                  <span class="text-xs font-normal text-zinc-500">KB</span>
+                </p>
+                <p class="text-[11px] text-zinc-400 mt-1">({@metrics_summary.total_bytes} bytes)</p>
+              </div>
+
+              <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                <p class="text-xs font-medium text-zinc-500">平均応答時間 (レイテンシ)</p>
+                <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
+                  {@metrics_summary.avg_latency_ms}
+                  <span class="text-xs font-normal text-zinc-500">ms</span>
+                </p>
+                <p class="text-[11px] text-zinc-400 mt-1">
+                  エラー発生数: {@metrics_summary.error_requests} 件
+                </p>
+              </div>
+            </div>
+
+            <%!-- Provider & Model Breakdown --%>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+                <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-cpu-chip" class="w-5 h-5 text-indigo-600" /> プロバイダ・モデル別利用内訳
+                </h3>
+                <%= if @metrics_summary.provider_breakdown == [] do %>
+                  <p class="text-xs text-zinc-500 py-4 text-center">API呼び出しの記録はまだありません。</p>
+                <% else %>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                      <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                        <tr>
+                          <th class="py-2.5 px-2">プロバイダ</th>
+                          <th class="py-2.5 px-2">モデル</th>
+                          <th class="py-2.5 px-2 text-right">リクエスト</th>
+                          <th class="py-2.5 px-2 text-right">総トークン</th>
+                          <th class="py-2.5 px-2 text-right">エラー</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                        <%= for row <- @metrics_summary.provider_breakdown do %>
+                          <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
+                            <td class="py-2.5 px-2 font-medium text-zinc-900 dark:text-zinc-100">
+                              {row.provider}
+                            </td>
+                            <td class="py-2.5 px-2 font-mono text-[11px]">{row.model}</td>
+                            <td class="py-2.5 px-2 text-right">{row.requests}</td>
+                            <td class="py-2.5 px-2 text-right font-mono text-indigo-600 dark:text-indigo-400">
+                              {row.total_tokens}
+                            </td>
+                            <td class="py-2.5 px-2 text-right">
+                              <%= if row.errors > 0 do %>
+                                <span class="text-red-600 dark:text-red-400 font-medium">{row.errors}</span>
+                              <% else %>
+                                <span class="text-zinc-400">0</span>
+                              <% end %>
+                            </td>
+                          </tr>
+                        <% end %>
+                      </tbody>
+                    </table>
+                  </div>
+                <% end %>
+              </div>
+
+              <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+                <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-tag" class="w-5 h-5 text-indigo-600" /> 機能・用途別内訳
+                </h3>
+                <%= if @metrics_summary.purpose_breakdown == [] do %>
+                  <p class="text-xs text-zinc-500 py-4 text-center">API呼び出しの記録はまだありません。</p>
+                <% else %>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                      <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                        <tr>
+                          <th class="py-2.5 px-2">用途</th>
+                          <th class="py-2.5 px-2 text-right">リクエスト数</th>
+                          <th class="py-2.5 px-2 text-right">総トークン数</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                        <%= for row <- @metrics_summary.purpose_breakdown do %>
+                          <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
+                            <td class="py-2.5 px-2 font-medium text-zinc-900 dark:text-zinc-100">
+                              {case row.purpose do
+                                "batch_generation" -> "夜間バッチ QA生成"
+                                "chat_summary" -> "チャット AI要約"
+                                "embedding" -> "埋め込みベクトル生成"
+                                "generation" -> "テキスト生成"
+                                other -> other
+                              end}
+                            </td>
+                            <td class="py-2.5 px-2 text-right">{row.requests}</td>
+                            <td class="py-2.5 px-2 text-right font-mono text-indigo-600 dark:text-indigo-400">
+                              {row.total_tokens}
+                            </td>
+                          </tr>
+                        <% end %>
+                      </tbody>
+                    </table>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+
+            <%!-- Recent API Errors Log --%>
+            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                    <.icon name="hero-exclamation-triangle" class="w-5 h-5 text-red-500" />
+                    直近の API 通信エラーログ（プライバシー配慮: 質問本文や文書内容は保存・表示しません）
+                  </h3>
+                  <p class="text-xs text-zinc-500 mt-1">
+                    直近発生した API 通信エラーの履歴です。API キーの失効やレート制限（429）、タイムアウトなどを確認できます。
+                  </p>
+                </div>
+              </div>
+
+              <%= if @recent_api_errors == [] do %>
+                <div class="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                  <.icon
+                    name="hero-check-circle"
+                    class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0"
+                  />
+                  <span>直近のエラーは発生していません。正常に稼働しています。</span>
+                </div>
+              <% else %>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                    <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                      <tr>
+                        <th class="py-2.5 px-2">日時</th>
+                        <th class="py-2.5 px-2">プロバイダ</th>
+                        <th class="py-2.5 px-2">モデル</th>
+                        <th class="py-2.5 px-2">用途</th>
+                        <th class="py-2.5 px-2">エラー内容</th>
+                        <th class="py-2.5 px-2 text-right">遅延</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                      <%= for err <- @recent_api_errors do %>
+                        <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
+                          <td class="py-2.5 px-2 font-mono text-[11px] whitespace-nowrap">
+                            {AskDrive.Clock.format(err.inserted_at, "%Y-%m-%d %H:%M:%S")}
+                          </td>
+                          <td class="py-2.5 px-2 font-medium text-zinc-900 dark:text-zinc-100">
+                            {err.provider}
+                          </td>
+                          <td class="py-2.5 px-2 font-mono text-[11px]">{err.model}</td>
+                          <td class="py-2.5 px-2">{err.purpose}</td>
+                          <td class="py-2.5 px-2 text-red-600 dark:text-red-400 break-all">
+                            {err.error_message}
+                          </td>
+                          <td class="py-2.5 px-2 text-right font-mono whitespace-nowrap">
+                            {err.latency_ms} ms
+                          </td>
+                        </tr>
+                      <% end %>
+                    </tbody>
+                  </table>
+                </div>
+              <% end %>
+            </div>
           </div>
         <% end %>
 
@@ -2618,6 +3045,138 @@ defmodule AskDriveWeb.AdminLive do
               <p class="text-[11px] text-zinc-400">
                 上記 3 項目は下の「設定を保存」で反映されます。入力ミスのロックは管理者への昇格（管理者パスワード）に対するもので、LDAP ログインのロックは「組織」→「Google Secure LDAP でのログイン」に記載のとおり別に働きます。
               </p>
+            </div>
+
+            <%!-- Card 1b: App Administrator Password (for App scope) --%>
+            <div
+              :if={@scope == :app}
+              class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
+            >
+              <div>
+                <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-shield-check" class="w-5 h-5 text-indigo-600" /> 窓口管理者パスワード
+                </h2>
+                <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  この窓口（{@app.name}）の管理画面へ昇格する際に入力するパスワードです。未設定時はプラットフォーム管理者パスワードで昇格できます。
+                </p>
+              </div>
+
+              <.form
+                for={@password_form}
+                id="app-admin-password-form"
+                phx-submit="change_admin_password"
+                class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end"
+              >
+                <.input
+                  field={@password_form[:current]}
+                  type="password"
+                  value=""
+                  label="現在のパスワード"
+                  autocomplete="current-password"
+                />
+                <.input
+                  field={@password_form[:new]}
+                  type="password"
+                  value=""
+                  label={"新しいパスワード（#{AdminAccess.min_password_length()} 文字以上）"}
+                  autocomplete="new-password"
+                />
+                <div class="flex items-end gap-3">
+                  <div class="flex-1">
+                    <.input
+                      field={@password_form[:confirmation]}
+                      type="password"
+                      value=""
+                      label="確認"
+                      autocomplete="new-password"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    id="change-app-admin-password-btn"
+                    class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition whitespace-nowrap"
+                  >
+                    変更
+                  </button>
+                </div>
+              </.form>
+            </div>
+
+            <%!-- Card 1c: App Access Password (合言葉 / 利用制限) --%>
+            <div
+              :if={@scope == :app}
+              class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
+            >
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                    <.icon name="hero-lock-closed" class="w-5 h-5 text-indigo-600" /> 窓口アクセスパスワード（合言葉）
+                  </h2>
+                  <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                    この窓口のチャット利用を限定するための合言葉です。有効にすると、正しい合言葉を入力したユーザーのみがチャットを利用できるようになります。
+                  </p>
+                </div>
+                <div>
+                  <span class={[
+                    "text-xs px-2.5 py-1 rounded-full font-medium inline-flex items-center gap-1.5",
+                    if(@setting.access_password_enabled,
+                      do:
+                        "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800",
+                      else:
+                        "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700"
+                    )
+                  ]}>
+                    <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                    {if @setting.access_password_enabled, do: "利用制限: 有効", else: "利用制限: 無効"}
+                  </span>
+                </div>
+              </div>
+
+              <.form
+                for={@access_password_form}
+                id="access-password-form"
+                phx-submit="save_access_password"
+                class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end"
+              >
+                <input type="hidden" name="access_password[enabled]" value="true" />
+                <.input
+                  field={@access_password_form[:password]}
+                  type="password"
+                  value=""
+                  label={"#{if @setting.access_password_enabled, do: "新しい合言葉", else: "合言葉（アクセスパスワード）"}（#{AdminAccess.min_password_length()} 文字以上）"}
+                  autocomplete="new-password"
+                  required
+                />
+                <div class="flex items-end gap-3 sm:col-span-2">
+                  <div class="flex-1">
+                    <.input
+                      field={@access_password_form[:confirmation]}
+                      type="password"
+                      value=""
+                      label="確認"
+                      autocomplete="new-password"
+                      required
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    id="save-access-password-btn"
+                    class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition whitespace-nowrap"
+                  >
+                    {if @setting.access_password_enabled, do: "合言葉を変更", else: "合言葉を設定して有効化"}
+                  </button>
+                  <button
+                    :if={@setting.access_password_enabled}
+                    type="button"
+                    id="disable-access-password-btn"
+                    phx-click="disable_access_password"
+                    data-confirm="合言葉による利用制限を無効化しますか？"
+                    class="px-4 py-2.5 rounded-xl border border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium text-xs transition whitespace-nowrap"
+                  >
+                    利用制限を解除
+                  </button>
+                </div>
+              </.form>
             </div>
 
             <%!-- Card 2: Google Drive Sync Authentication --%>

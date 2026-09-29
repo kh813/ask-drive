@@ -91,7 +91,7 @@ defmodule AskDriveWeb.Layouts do
             {if @app, do: "チャット", else: "窓口一覧"}
           </.link>
           <.link
-            :if={@admin_elevated? and @app}
+            :if={@admin_elevated? and can_access_app_admin?(@current_user, @app)}
             href={"/" <> @app.slug <> "/admin"}
             id="admin-nav-link"
             class="px-2.5 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
@@ -99,7 +99,7 @@ defmodule AskDriveWeb.Layouts do
             管理
           </.link>
           <.link
-            :if={@admin_elevated?}
+            :if={@admin_elevated? and is_platform_admin?(@current_user)}
             href={~p"/admin"}
             id="platform-admin-nav-link"
             class="px-2.5 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
@@ -193,8 +193,18 @@ defmodule AskDriveWeb.Layouts do
     """
   end
 
-  defp admin_eligible?(%{admin_eligible: true, status: "active"}), do: true
-  defp admin_eligible?(_), do: false
+  defp admin_eligible?(nil), do: false
+  defp admin_eligible?(user), do: AskDrive.Accounts.any_admin_eligible?(user)
+
+  defp is_platform_admin?(%{admin_eligible: true, status: "active"}), do: true
+  defp is_platform_admin?(_), do: false
+
+  defp can_access_app_admin?(_user, nil), do: false
+
+  defp can_access_app_admin?(%{status: "active"} = user, %{slug: slug}),
+    do: AskDrive.Accounts.app_admin_eligible?(user, slug)
+
+  defp can_access_app_admin?(_, _), do: false
 
   defp role_label(_user, true), do: "管理者（昇格中）"
 
