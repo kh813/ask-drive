@@ -65,9 +65,7 @@ defmodule AskDrive.Ops.ScriptsTest do
     test "sqlite-vec URL has no extra v prefix in the file name, for macOS and Linux" do
       platform = File.read!(@platform_sh)
       assert platform =~ "download/v${ver}/sqlite-vec-${ver}-loadable-${os}-${arch}.tar.gz"
-
-      assert run_platform("is_macos; echo ok") =~ "ok" or
-               run_platform("is_linux; echo ok") =~ "ok"
+      refute platform =~ "sqlite-vec-v${ver}-loadable"
     end
 
     test "Ollama: flat .tgz into .runtime/bin on macOS, .tar.zst (bin/ + lib/ollama) on Linux" do

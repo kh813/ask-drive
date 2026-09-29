@@ -45,8 +45,12 @@ Apple Silicon Mac (8GB〜) の単一マシン上で、Google Drive 内の共有�
 
 ## 必要環境
 
-- **OS**: macOS (Apple Silicon / Intel, Apple Silicon 推奨)
-- **管理者権限 (sudo)**: **不要**（`./app.sh setup` がスタンドアロンバイナリおよびローカル環境 `.runtime` に必要なツール群を自動ダウンロード・セットアップします）
+- **OS**:
+  - macOS (Apple Silicon / Intel, Apple Silicon 推奨)
+  - **Linux (x64 / arm64)**: Ubuntu 22.04 / 24.04、Debian 12 以降（systemd 必須）
+- **管理者権限 (sudo)**:
+  - macOS: **不要**（`./app.sh setup` がスタンドアロンバイナリおよびローカル環境 `.runtime` に必要なツール群を自動ダウンロード・セットアップします）
+  - Linux: **初回のみ必要**（`./app.sh setup` の apt パッケージ導入と `./app.sh service install` の systemd 登録）。以後の起動・停止・再起動・`./app.sh deploy` は sudo のパスワードなしで動きます（下記「Linux（systemd）」）
 
 ---
 
@@ -120,7 +124,7 @@ Anthropic API キー: ********
 ./app.sh start
 ```
 
-#### launchd 常駐サービス登録・起動（推奨）:
+#### 常駐サービス登録・起動（推奨。macOS: launchd / Linux: systemd）:
 ```bash
 ./app.sh service install
 ./app.sh service start
@@ -129,6 +133,14 @@ Anthropic API キー: ********
 ```bash
 ./app.sh service status
 ```
+
+#### Linux（systemd）
+
+- `./app.sh setup` は最初に `sudo apt-get install` で `poppler-utils`（pdftotext）・`zstd`・`unzip`・`git`・`curl`・`openssl`・`build-essential` を入れ、Erlang/OTP 28・Elixir 1.19・pandoc・Ollama・sqlite-vec（`vec0.so`）は `.runtime/` と `priv/sqlite_vec/` に配置します（Homebrew は使いません）。
+- `./app.sh service install` は **systemd のシステムサービス** `/etc/systemd/system/askdrive.service` を作成し、`enable --now` で起動します。サービスは `service install` を実行したユーザーの権限で動き（root では動きません）、ログは `log/ask_drive.log` / `log/ask_drive_error.log` に追記されます。
+- 同時に `/etc/sudoers.d/askdrive` を作成し、そのユーザーに **`systemctl start|stop|restart askdrive.service` だけ**をパスワードなしで許可します。これにより、管理画面からの証明書の適用（再起動）や `./app.sh deploy` の再起動が sudo のパスワードなしで動きます。
+- 状態・ログ: `./app.sh status`、`systemctl status askdrive`、`journalctl -u askdrive`
+- 解除: `./app.sh service uninstall`（sudo が必要）
 
 ブラウザで `https://localhost:4443/` にアクセスします（`http://localhost:4080/` や従来の `:4000` も HTTPS に転送されます。初回は自己署名証明書の警告が出ます。詳しくは「HTTPS（SSL）」を参照）。
 
@@ -143,18 +155,18 @@ Anthropic API キー: ********
 | `./app.sh start` | アプリケーションをフォアグラウンドで起動 |
 | `./app.sh stop` | 実行中プロセスを停止 |
 | `./app.sh restart` | アプリケーションを再起動 |
-| `./app.sh status` | Ollama, アプリ, launchd, HTTP エンドポイントの稼働状態を表示 |
+| `./app.sh status` | Ollama, アプリ, 常駐サービス（launchd / systemd）, HTTP エンドポイントの稼働状態を表示 |
 | `./app.sh setup` | 初回環境構築・DB 初期化・リリースビルド |
-| `./app.sh deploy` | 最新コードの依存関係更新・マイグレーション・再ビルド・再起動。launchd サービスとして登録済みならサービスを再起動（停止中なら起動）し、未登録ならフォアグラウンドで起動します |
+| `./app.sh deploy` | 最新コードの依存関係更新・マイグレーション・再ビルド・再起動。常駐サービス（launchd / systemd）として登録済みならサービスを再起動（停止中なら起動）し、未登録ならフォアグラウンドで起動します |
 | `./app.sh update` | Git リモートから最新版へ自己アップデート（確認ダイアログ付き） |
 | `./app.sh update --yes` | 確認なしで最新版へ自己アップデート |
 | `./app.sh update --ver <tag/hash>` | 指定バージョン（タグやコミット）へアップデートまたはロールバック |
-| `./app.sh service install` | macOS launchd サービスを登録 |
-| `./app.sh service uninstall` | launchd サービスを解除 |
-| `./app.sh service start` | launchd サービスを開始 |
-| `./app.sh service stop` | launchd サービスを停止 |
-| `./app.sh service restart` | launchd サービスを再起動 |
-| `./app.sh service status` | launchd サービス稼働状態およびログ確認 |
+| `./app.sh service install` | 常駐サービスを登録（macOS: launchd / Linux: systemd。Linux は sudo が必要） |
+| `./app.sh service uninstall` | 常駐サービスを解除 |
+| `./app.sh service start` | 常駐サービスを開始 |
+| `./app.sh service stop` | 常駐サービスを停止 |
+| `./app.sh service restart` | 常駐サービスを再起動 |
+| `./app.sh service status` | 常駐サービスの稼働状態およびログ確認 |
 
 ### 管理者のロックアウトからの復旧
 

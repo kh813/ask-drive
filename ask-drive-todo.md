@@ -390,6 +390,16 @@ mix hex.audit
 - [ ] 16d-14 実機で要約の所要時間を実測する（POC はローカル）。本番移行時に「チャット要約プロバイダ」を Gemini に切り替え、API キーとモデル名を設定する
 - [x] 16d-10 差分取り込み: ファイル（modifiedTime / md5Checksum）→ 本文ハッシュ → チャンク単位の再利用で、変更のない部分の取り込み・埋め込み・QA 生成を省く（F-334〜F-336）
 
+### Phase 21 — Linux（x64）対応
+
+仕様書 12.6 節に対応。
+
+- [x] 21-1 `scripts/lib/platform.sh`（OS・アーキテクチャ判定、`sed_inplace` による GNU / BSD sed の使い分け、pandoc・Ollama・sqlite-vec・OTP/Elixir の OS 別導入）
+- [x] 21-2 `initial-setup.sh` の Linux 分岐（apt パッケージは初回のみ sudo、Homebrew は macOS のみ）
+- [x] 21-3 `app.sh service *` を systemd システムサービスに対応（unit と sudoers の生成・検証、`sudo -n` による start/stop/restart）、`deploy.sh` は OS を問わず登録済みサービスを再起動
+- [x] 21-4 GitHub Actions の Linux CI（mix test・導入・systemd 登録・HTTPS 応答・deploy による再起動）
+- [ ] 21-5 実機の Ubuntu / Debian サーバーで `app.sh setup` → `service install` → 初回セットアップ画面を確認する
+
 ### Phase 20 — 初回セットアップ（Web）
 
 仕様書 6.12 節に対応。

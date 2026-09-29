@@ -97,7 +97,7 @@ Google Drive に蓄積されたドキュメントに対して、自然文で質�
 
 | 区分 | 初期 | 増設後 |
 |---|---|---|
-| 機種 | Mac mini（Apple Silicon） | Mac mini / Mac Studio |
+| 機種 | Mac mini（Apple Silicon）。または Linux サーバー（x64 / arm64、Ubuntu 22.04 / 24.04・Debian 12 以降、12.6 節） | Mac mini / Mac Studio |
 | RAM | 8GB | 16GB / 32GB 以上 |
 | ストレージ | **空き 100GB 以上** | 空き 200GB 以上 |
 
@@ -1555,7 +1555,7 @@ Tier 0+1 到達率は運用とともに上がる。未回答質問が翌夜に�
 
 ## 12. デプロイと運用手順
 
-Mac mini（Apple Silicon / macOS）へのデプロイおよび運用管理は、統一管理スクリプト **`./app.sh`** を通じて行います。
+Mac mini（Apple Silicon / macOS）または Linux（x64 / arm64、Ubuntu / Debian、12.6 節）へのデプロイおよび運用管理は、統一管理スクリプト **`./app.sh`** を通じて行います。
 
 ### 12.1 統合管理スクリプト（`app.sh`）
 
@@ -1569,19 +1569,19 @@ Mac mini（Apple Silicon / macOS）へのデプロイおよび運用管理は、
 ./app.sh start              # フォアグラウンド起動（非デーモン）
 ./app.sh stop               # 停止
 ./app.sh restart            # 再起動
-./app.sh status             # Ollama・プロセス・launchd・HTTPステータス確認
+./app.sh status             # Ollama・プロセス・常駐サービス（launchd / systemd）・HTTPステータス確認
 
 # デプロイ・初期設定
 ./app.sh setup              # 初期環境構築（scripts/initial-setup.sh 実行）
 ./app.sh deploy             # 最新コード取得・マイグレーション・再ビルド（scripts/deploy.sh 実行）
 
-# macOS 常駐サービス管理（launchd）
-./app.sh service install    # launchd plist 登録・常駐化
-./app.sh service start      # launchd サービス開始
-./app.sh service stop       # launchd サービス停止
-./app.sh service restart    # launchd サービス再起動
-./app.sh service status     # launchd サービス稼働確認
-./app.sh service uninstall  # launchd 登録解除
+# 常駐サービス管理（macOS: launchd / Linux: systemd）
+./app.sh service install    # 登録・常駐化（Linux は sudo が必要）
+./app.sh service start      # サービス開始
+./app.sh service stop       # サービス停止
+./app.sh service restart    # サービス再起動
+./app.sh service status     # サービス稼働確認
+./app.sh service uninstall  # 登録解除
 ```
 
 ### 12.2 デプロイ方式の概要
@@ -1684,7 +1684,26 @@ echo "デプロイが正常に完了しました。"
 
 環境変数は**初期値**として扱う。管理画面で値を保存すると DB の `settings` が優先され、以後は環境変数を編集しても反映されない。
 
-### 12.5 macOS 常駐（launchd）とスリープ管理
+### 12.6 Linux 対応（x64 / arm64、systemd）
+
+対象は Ubuntu 22.04 / 24.04、Debian 12 以降（apt と systemd がある環境）。macOS との差異は `scripts/lib/platform.sh` に集約し、`app.sh`・`initial-setup.sh`・`deploy.sh` がこれを読み込む。
+
+| 項目 | macOS | Linux |
+|---|---|---|
+| OS 判定 | `uname -s` = Darwin → `ASKDRIVE_OS=macos` | Linux → `linux`（それ以外は setup を中止） |
+| 常駐 | launchd（`~/Library/LaunchAgents/com.askdrive.server.plist`、sudo 不要） | systemd システムサービス `/etc/systemd/system/askdrive.service`（`User=` は install を実行したユーザー、`Restart=on-failure`、`WantedBy=multi-user.target`、ログは `log/` に append） |
+| 権限 | 不要 | **sudo は初回のみ**: apt パッケージ導入と `service install`。install 時に `/etc/sudoers.d/askdrive` を作り（`visudo -cf` で検証してから配置）、`systemctl start/stop/restart askdrive.service` だけを NOPASSWD で許可する。以後の start/stop/restart は `sudo -n` で実行し、許可が無ければ即失敗する |
+| Erlang/OTP・Elixir | Homebrew（`.runtime/homebrew`）または mise/asdf | hex.pm の Ubuntu 向けビルド済み OTP 28（`builds.hex.pm/builds/otp/{amd64,arm64}/ubuntu-{22.04,24.04}`、`./Install -minimal`）と Elixir 1.19 の zip を `.runtime/otp`・`.runtime/elixir` に配置 |
+| poppler・その他 | Homebrew | apt: `poppler-utils zstd unzip git curl openssl build-essential ca-certificates` |
+| pandoc | `pandoc-<ver>-{arm64,x86_64}-macOS.zip` | `pandoc-<ver>-linux-{amd64,arm64}.tar.gz` |
+| Ollama | `ollama-darwin.tgz` を `.runtime/bin` へ（`llama-server` を含む） | `ollama-linux-{amd64,arm64}.tar.zst` を `.runtime/` へ展開（`bin/ollama` と `lib/ollama`、zstd が必要） |
+| sqlite-vec | `vec0.dylib`（`loadable-macos-{aarch64,x86_64}`） | `vec0.so`（`loadable-linux-{x86_64,aarch64}`）。Repo は拡張子なしの `priv/sqlite_vec/vec0` を読み込み、SQLite が OS に応じた拡張子を補う |
+| sed | BSD sed | GNU sed。スクリプトは `sed -n` / `sed -E` のみ（両者共通）を使い、インプレース編集が必要な場合は `sed_inplace`（`sed --version` が通れば GNU の `sed -i`、通らなければ BSD の `sed -i ''`）を使う |
+| スリープ抑止 | `caffeinate` | 不要（サーバー用途を前提。`caffeinate` が無ければ何もしない） |
+
+検証は GitHub Actions（`.github/workflows/ci.yml`、ubuntu-latest x64）で行う: `mix test`、各スクリプトの `bash -n`、`.runtime` への導入と実行確認、systemd unit の `systemd-analyze verify` と sudoers の `visudo -c`、リリースビルド → `service install` → HTTPS 応答 → `deploy.sh` による再起動（MainPID の変化）。
+
+### 12.7 macOS 常駐（launchd）とスリープ管理
 
 1. **常駐 plist の設定例（`com.askdrive.server.plist`）**:
    - 標準出力・標準エラーログを `log/ask_drive.log` にローテーション出力

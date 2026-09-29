@@ -175,7 +175,10 @@ install_beam_linux() {
     id="$(. /etc/os-release && echo "${ID:-}")"
     version_id="$(. /etc/os-release && echo "${VERSION_ID:-}")"
   fi
-  [[ "${id}" == "ubuntu" && "${version_id}" == 24.* ]] && distro="ubuntu-24.04"
+  # Ubuntu 24.04 以降（26.04 等）は 24.04 向けビルド、Ubuntu 22.04 と Debian 12 以降は 22.04 向けビルド
+  if [[ "${id}" == "ubuntu" && "${version_id%%.*}" =~ ^[0-9]+$ && "${version_id%%.*}" -ge 24 ]]; then
+    distro="ubuntu-24.04"
+  fi
   [[ "${ASKDRIVE_ARCH}" == "arm64" ]] && arch="arm64"
   base="https://builds.hex.pm/builds/otp/${arch}/${distro}"
 
