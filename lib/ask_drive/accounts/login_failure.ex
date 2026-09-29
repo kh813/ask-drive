@@ -6,6 +6,8 @@ defmodule AskDrive.Accounts.LoginFailure do
     field :email, :string
     field :ip, :string
     field :reason, :string
+    field :env_key, :string
+    field :user_agent, :string
     timestamps(type: :utc_datetime, updated_at: false)
   end
 end

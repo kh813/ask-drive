@@ -46,11 +46,63 @@ defmodule AskDriveWeb.LdapLoginTest do
     # the e-mail is kept in the form
     assert Phoenix.Flash.get(conn.assigns.flash, :ldap_email) == "taro@example.com"
 
-    for _ <- 1..4, do: sign_in(build_conn(), "taro@example.com", "wrong")
+    # from different browsers: the account lock is about the account
+    for _ <- 1..4, do: sign_in(browser(), "taro@example.com", "wrong")
 
-    conn = sign_in(build_conn(), "taro@example.com", "correct-horse")
+    conn = sign_in(browser(), "taro@example.com", "correct-horse")
     assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "まで受け付けません"
+    assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "管理者にロックの解除"
     refute get_session(conn, :user_id)
+  end
+
+  # a browser that has opened the login page, so it carries its own device cookie
+  defp browser do
+    conn = get(build_conn(), ~p"/login")
+    cookie = conn.resp_cookies["_askdrive_device"].value
+    build_conn() |> put_req_cookie("_askdrive_device", cookie)
+  end
+
+  test "the login page gives the browser a device cookie (signed, http-only)", %{conn: conn} do
+    conn = get(conn, ~p"/login")
+    cookie = conn.resp_cookies["_askdrive_device"]
+    assert cookie.http_only
+    assert cookie.max_age > 365 * 86_400
+  end
+
+  test "10 failures from one browser lock that browser for 24 hours, not a colleague's", %{
+    conn: _conn
+  } do
+    enable_ldap!()
+    attacker = browser()
+    colleague = browser()
+
+    # 10 accounts, 1 failure each: no account lock, but the environment reaches its limit
+    for i <- 1..10, do: sign_in(attacker, "u#{i}@example.com", "guess")
+
+    conn = sign_in(attacker, "taro@example.com", "correct-horse")
+    assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "まで受け付けません"
+
+    # same address (the test conn is 127.0.0.1 for both), another browser: signs in
+    conn = sign_in(colleague, "taro@example.com", "correct-horse")
+    assert get_session(conn, :user_id)
+  end
+
+  test "a client without cookies is one environment by address + User-Agent", %{conn: _conn} do
+    enable_ldap!()
+    script = fn -> build_conn() |> put_req_header("user-agent", "curl/8.0") end
+    for i <- 1..10, do: sign_in(script.(), "u#{i}@example.com", "guess")
+
+    conn = sign_in(script.(), "taro@example.com", "correct-horse")
+    assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "まで受け付けません"
+
+    conn =
+      sign_in(
+        build_conn() |> put_req_header("user-agent", "Mozilla/5.0 Chrome/131"),
+        "taro@example.com",
+        "correct-horse"
+      )
+
+    assert get_session(conn, :user_id)
   end
 
   test "another domain is refused without asking the directory", %{conn: conn} do
@@ -113,6 +165,27 @@ defmodule AskDriveWeb.LdapLoginTest do
 
       view |> element("#test-ldap-btn") |> render_click()
       assert has_element?(view, "#ldap-test-result", "接続できました")
+    end
+
+    test "active locks are listed and can be lifted", %{conn: conn} do
+      env = %{
+        key: "device:x",
+        ip: "203.0.113.5",
+        user_agent: "Mozilla/5.0 (Windows NT 10.0) Chrome/131.0"
+      }
+
+      for _ <- 1..5,
+          do: AskDrive.Accounts.LoginThrottle.record_failure("taro@example.com", env, "x")
+
+      [lock] = AskDrive.Accounts.LoginThrottle.active_locks()
+
+      {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
+      assert has_element?(view, "#login-lock-#{lock.id}", "taro@example.com")
+      assert has_element?(view, "#login-lock-#{lock.id}", "Chrome 131 / Windows・203.0.113.5")
+
+      view |> element("#unlock-#{lock.id}") |> render_click()
+      refute has_element?(view, "#login-lock-#{lock.id}")
+      assert AskDrive.Accounts.LoginThrottle.check("taro@example.com", "device:x") == :ok
     end
   end
 end

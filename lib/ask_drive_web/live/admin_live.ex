@@ -240,6 +240,20 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
+  def handle_event("unlock_login", %{"id" => id}, socket) do
+    socket =
+      case AskDrive.Accounts.LoginThrottle.unlock(String.to_integer(id)) do
+        {:ok, lock} ->
+          Logger.info("AdminLive: login lock lifted (#{lock.scope} #{lock.email || lock.ip})")
+          put_flash(socket, :info, "ロックを解除しました。")
+
+        {:error, :not_found} ->
+          put_flash(socket, :error, "このロックはすでに解除されています。")
+      end
+
+    {:noreply, load_dashboard_data(socket)}
+  end
+
   def handle_event("test_ldap", _params, socket) do
     result = AskDrive.Ldap.test_connection(socket.assigns.setting)
     {:noreply, assign(socket, :ldap_test, result)}
@@ -647,6 +661,13 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:auto_status, auto_status)
     |> assign(:running_run, running_run)
     |> assign(:remaining, Scheduler.remaining())
+    |> assign(
+      :login_locks,
+      if(socket.assigns[:scope] == :platform,
+        do: AskDrive.Accounts.LoginThrottle.active_locks(),
+        else: []
+      )
+    )
     |> assign(:given_up_chunks, Scheduler.given_up_chunks(50))
     |> assign(:running_progress, running_run && progress_view(running_run))
     |> assign(:selected_progress, latest_run && progress_view(latest_run))
@@ -2036,7 +2057,7 @@ defmodule AskDriveWeb.AdminLive do
                   ログイン画面に「メールアドレスとパスワード」の欄を出し、Google Workspace のパスワードを Secure LDAP で確認します（パスワードは AskDrive に保存しません）。外部公開の URL がなくても使えます。Google 管理コンソールで LDAP クライアントを追加し、「ユーザー認証情報の確認」と「ユーザー情報の読み取り」を許可して、発行された証明書（.crt）と秘密鍵（.key）をここに登録してください。
                 </p>
                 <p class="text-xs text-amber-700 dark:text-amber-300 mt-1 leading-relaxed">
-                  LDAP でのパスワード確認には Google の 2 段階認証がかかりません。同じアカウントで 5 回、同じ接続元から 20 回失敗すると 15 分間ロックします。
+                  LDAP でのパスワード確認には Google の 2 段階認証がかかりません。同じアカウントで 5 分間に 5 回失敗すると 15 分、同じ接続環境（ブラウザ）から 24 時間に 10 回失敗すると 24 時間ロックします。
                 </p>
               </div>
 
@@ -2177,6 +2198,56 @@ defmodule AskDriveWeb.AdminLive do
                   </button>
                 </div>
               </form>
+
+              <%!-- Active sign-in locks (spec F-1305), liftable by an administrator --%>
+              <div
+                id="login-locks"
+                class="pt-3 border-t border-zinc-200/60 dark:border-zinc-800 space-y-2"
+              >
+                <h3 class="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                  ロック中のログイン（{length(@login_locks)} 件）
+                </h3>
+                <p :if={@login_locks == []} class="text-xs text-zinc-400">ロック中のアカウント・接続環境はありません。</p>
+                <table
+                  :if={@login_locks != []}
+                  class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400"
+                >
+                  <thead class="text-[11px] text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                    <tr>
+                      <th class="py-1.5 px-2">対象</th>
+                      <th class="py-1.5 px-2">接続環境</th>
+                      <th class="py-1.5 px-2">解除予定</th>
+                      <th class="py-1.5 px-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                    <tr :for={lock <- @login_locks} id={"login-lock-#{lock.id}"}>
+                      <td class="py-1.5 px-2">
+                        {if lock.scope == "account",
+                          do: "アカウント: #{lock.email}（5 分間に 5 回失敗）",
+                          else: "接続環境（24 時間に 10 回失敗）"}
+                      </td>
+                      <td class="py-1.5 px-2">
+                        {AskDrive.Accounts.LoginThrottle.describe_user_agent(lock.user_agent)}・{lock.ip}
+                      </td>
+                      <td class="py-1.5 px-2 font-mono whitespace-nowrap">
+                        {AskDrive.Clock.format(lock.locked_until, "%m/%d %H:%M")}
+                      </td>
+                      <td class="py-1.5 px-2 text-right">
+                        <button
+                          id={"unlock-#{lock.id}"}
+                          phx-click="unlock_login"
+                          phx-value-id={lock.id}
+                          data-confirm="このロックを解除しますか？"
+                          class="px-2.5 py-1 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium"
+                        >
+                          解除
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
 
               <p
                 :if={@ldap_test}
