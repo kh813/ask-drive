@@ -10,7 +10,11 @@ defmodule AskDrive.Ldap.Client do
   @callback open(host :: String.t(), port :: pos_integer(), sslopts :: keyword(), timeout()) ::
               {:ok, handle} | {:error, term()}
   @callback bind(handle, dn :: String.t(), password :: String.t()) :: :ok | {:error, term()}
-  @callback search(handle, base :: String.t(), filter :: {:mail, String.t()} | :base) ::
+  @callback search(
+              handle,
+              base :: String.t(),
+              filter :: {:mail, String.t()} | {:query, String.t()} | :base
+            ) ::
               {:ok, [entry]} | {:error, term()}
   @callback close(handle) :: :ok
 
@@ -38,6 +42,16 @@ defmodule AskDrive.Ldap.Client do
         {:mail, email} ->
           {:eldap.equalityMatch(~c"mail", String.to_charlist(email)), :eldap.wholeSubtree()}
 
+        # suggestions while typing (F-1115): mail starting with, or a name containing, q
+        {:query, q} ->
+          q = String.to_charlist(q)
+
+          {:eldap.or([
+             :eldap.substrings(~c"mail", initial: q),
+             :eldap.substrings(~c"displayName", any: q),
+             :eldap.substrings(~c"cn", any: q)
+           ]), :eldap.wholeSubtree()}
+
         :base ->
           {:eldap.present(~c"objectClass"), :eldap.baseObject()}
       end
@@ -47,7 +61,8 @@ defmodule AskDrive.Ldap.Client do
            filter: filter,
            scope: scope,
            attributes: [~c"mail", ~c"cn", ~c"displayName", ~c"uid"],
-           size_limit: 2
+           # an exact lookup expects one entry; suggestions are trimmed afterwards
+           size_limit: if(match?({:mail, _}, filter), do: 2, else: 0)
          ) do
       {:ok, result} -> {:ok, result |> elem(1) |> Enum.map(&entry/1)}
       {:error, reason} -> {:error, reason}

@@ -52,6 +52,16 @@ defmodule AskDrive.LdapIntegrationTest do
     assert {:error, :invalid_credentials} = Ldap.authenticate(setting, "taro@example.com", "")
   end
 
+  test "suggestions and the existence check against the real directory (F-1115)", %{
+    setting: setting
+  } do
+    assert [%{email: "taro@example.com", name: "Taro Yamada"}] = Ldap.search_users(setting, "tar")
+    assert [%{email: "taro@example.com"}] = Ldap.search_users(setting, "Yama")
+
+    assert Ldap.unknown_emails(setting, ["taro@example.com", "ghost@example.com"]) ==
+             {:ok, ["ghost@example.com"]}
+  end
+
   test "the server refuses a client without its certificate", %{setting: setting} do
     other = AskDrive.CertHelper.ca_signed(["someone-else"])
     stranger = %{setting | ldap_client_cert: other.cert, ldap_client_key: other.key}

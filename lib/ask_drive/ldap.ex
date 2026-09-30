@@ -111,6 +111,66 @@ defmodule AskDrive.Ldap do
   end
 
   @doc """
+  Directory entries matching what is being typed (spec F-1115): mail starting with `q`, or
+  a name containing it. `[%{email:, name:}]`, at most `limit`, [] when LDAP is off,
+  unreachable or `q` is shorter than 2 characters.
+  """
+  def search_users(%Setting{} = setting, q, limit \\ 8) do
+    q = q |> to_string() |> String.trim()
+
+    if enabled?(setting) and String.length(q) >= 2 do
+      with_connection(setting, fn client, handle ->
+        with :ok <- service_bind(client, handle, setting),
+             {:ok, entries} <- client.search(handle, base_dn(setting), {:query, q}) do
+          {:ok,
+           entries
+           |> Enum.flat_map(fn e ->
+             case Map.get(e.attrs, "mail", []) do
+               [mail | _] -> [%{email: String.downcase(mail), name: name_of(e)}]
+               _ -> []
+             end
+           end)
+           |> Enum.uniq_by(& &1.email)
+           |> Enum.sort_by(&{not String.starts_with?(&1.email, String.downcase(q)), &1.email})
+           |> Enum.take(limit)}
+        end
+      end)
+      |> case do
+        {:ok, users} -> users
+        _ -> []
+      end
+    else
+      []
+    end
+  end
+
+  @doc """
+  Which of `emails` the directory doesn't know (typos, spec F-1115). `{:ok, missing}`;
+  `:skip` when LDAP is off or can't be reached (the addresses are then taken as typed).
+  """
+  def unknown_emails(%Setting{} = setting, emails) do
+    if enabled?(setting) do
+      with_connection(setting, fn client, handle ->
+        with :ok <- service_bind(client, handle, setting) do
+          Enum.reduce_while(emails, {:ok, []}, fn email, {:ok, missing} ->
+            case client.search(handle, base_dn(setting), {:mail, email}) do
+              {:ok, [_ | _]} -> {:cont, {:ok, missing}}
+              {:ok, []} -> {:cont, {:ok, missing ++ [email]}}
+              {:error, reason} -> {:halt, {:error, {:unavailable, inspect(reason)}}}
+            end
+          end)
+        end
+      end)
+      |> case do
+        {:ok, missing} -> {:ok, missing}
+        _ -> :skip
+      end
+    else
+      :skip
+    end
+  end
+
+  @doc """
   Checks the settings against the directory: TLS with the client certificate, the optional
   service bind, and reading the base DN. `:ok` or `{:error, message}`.
   """

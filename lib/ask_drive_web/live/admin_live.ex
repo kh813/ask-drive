@@ -51,6 +51,7 @@ defmodule AskDriveWeb.AdminLive do
       |> allow_upload(:ldap_key, accept: :any, max_entries: 1, max_file_size: 200_000)
       |> allow_upload(:ldap_ca, accept: :any, max_entries: 1, max_file_size: 500_000)
       |> assign(:ldap_test, nil)
+      |> assign(:ac, %{})
       |> assign(:peer_ip, peer_ip(socket))
       |> assign(:ldap_pending, %{})
       |> assign(:ssl_check, nil)
@@ -162,9 +163,10 @@ defmodule AskDriveWeb.AdminLive do
 
     # an app always has an administrator (F-1114), named at creation
     with {:ok, emails} <- parse_admin_emails(params["admin_emails"], domain),
+         :ok <- check_directory(emails),
          {:ok, app} <- AskDrive.Apps.create(Map.delete(params, "admin_emails")) do
       :ok = AppAdminAccess.add_admins(socket.assigns.current_user, app, emails)
-      create_app_done(socket, app)
+      socket |> clear_ac("new-app-admin-emails") |> create_app_done(app)
     else
       {:error, message} when is_binary(message) ->
         {:noreply,
@@ -268,7 +270,11 @@ defmodule AskDriveWeb.AdminLive do
   # sign in (LDAP or Google), the administrator password, and an administrator account.
   def handle_event("enable_auth", %{"admin_email" => text}, socket) do
     setting = Settings.platform_setting!()
-    parsed = parse_admin_emails(text, setting.allowed_domain)
+
+    parsed =
+      with {:ok, emails} <- parse_admin_emails(text, setting.allowed_domain),
+           :ok <- check_directory(emails),
+           do: {:ok, emails}
 
     problem =
       cond do
@@ -312,13 +318,18 @@ defmodule AskDriveWeb.AdminLive do
   # Administrators by e-mail, including people who have never signed in (they appear in the
   # list once registered, and elevate after their first sign-in)
   def handle_event("grant_admin_emails", %{"emails" => text}, socket) do
-    case parse_admin_emails(text, Settings.platform_setting!().allowed_domain) do
+    with {:ok, emails} <- parse_admin_emails(text, Settings.platform_setting!().allowed_domain),
+         :ok <- check_directory(emails) do
+      {:ok, emails}
+    end
+    |> case do
       {:ok, emails} ->
         Enum.each(emails, fn email -> {:ok, _} = Accounts.grant_admin(email) end)
         Logger.info("AdminLive: administrators added: #{Enum.join(emails, ", ")}")
 
         {:noreply,
          socket
+         |> clear_ac("grant-admin-emails")
          |> put_flash(:info, "#{Enum.join(emails, "、")} を昇格可にしました。")
          |> load_dashboard_data()}
 
@@ -723,6 +734,32 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
+  # suggestions for the address being typed (F-1115)
+  @impl true
+  def handle_event("ac_suggest", %{"field" => field, "value" => value}, socket) do
+    {_head, last} = split_last_address(value)
+    suggestions = AskDrive.Ldap.search_users(Settings.platform_setting!(), last)
+
+    {:noreply,
+     Phoenix.Component.update(
+       socket,
+       :ac,
+       &Map.put(&1, field, %{value: value, suggestions: suggestions})
+     )}
+  end
+
+  def handle_event("ac_pick", %{"field" => field, "email" => email}, socket) do
+    value = get_in(socket.assigns.ac, [field, :value]) || ""
+    {head, _last} = split_last_address(value)
+
+    {:noreply,
+     Phoenix.Component.update(
+       socket,
+       :ac,
+       &Map.put(&1, field, %{value: head <> email <> ", ", suggestions: []})
+     )}
+  end
+
   # The app's administrators (F-1114): added by e-mail (before their first sign-in too) by
   # an administrator of the app, or by a platform administrator recovering it
   @impl true
@@ -730,9 +767,11 @@ defmodule AskDriveWeb.AdminLive do
     app = AskDrive.Apps.get_by_slug!(slug)
 
     with {:ok, emails} <- parse_admin_emails(text, Settings.platform_setting!().allowed_domain),
+         :ok <- check_directory(emails),
          :ok <- AppAdminAccess.add_admins(socket.assigns.current_user, app, emails) do
       {:noreply,
        socket
+       |> clear_ac("add-app-admins-emails")
        |> put_flash(:info, "#{Enum.join(emails, "、")} を窓口「#{app.name}」の担当者にしました。")
        |> load_dashboard_data()}
     else
@@ -1998,18 +2037,15 @@ defmodule AskDriveWeb.AdminLive do
                     <span class="block font-medium text-zinc-700 dark:text-zinc-300">
                       担当者（窓口管理者）のメールアドレス（必須・複数可・カンマ区切り）
                     </span>
-                    <input
-                      type="text"
-                      name="app[admin_emails]"
+                    <.email_input
                       id="new-app-admin-emails"
-                      value={@app_form.params["admin_emails"]}
-                      required
+                      name="app[admin_emails]"
+                      ac={@ac}
                       placeholder={
                         if @setting.allowed_domain,
                           do: "name@#{@setting.allowed_domain}",
                           else: "name@company.com"
                       }
-                      class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
                     />
                     <span class="block text-zinc-500">
                       窓口の設定（Drive・API キー等）は担当者が行います。全体管理者は窓口の管理画面に入れません。
@@ -2191,16 +2227,15 @@ defmodule AskDriveWeb.AdminLive do
                   <span class="block font-medium text-zinc-700 dark:text-zinc-300">
                     メールアドレスで管理者（昇格可）を追加（複数可・カンマ区切り。まだログインしたことのない人も追加できます）
                   </span>
-                  <input
-                    type="text"
+                  <.email_input
+                    id="grant-admin-emails"
                     name="emails"
-                    required
+                    ac={@ac}
                     placeholder={
                       if @setting.allowed_domain,
                         do: "name@#{@setting.allowed_domain}, name2@#{@setting.allowed_domain}",
                         else: "name@company.com"
                     }
-                    class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
                   />
                 </label>
                 <button
@@ -3260,17 +3295,18 @@ defmodule AskDriveWeb.AdminLive do
                   <span class="block font-medium text-zinc-700 dark:text-zinc-300">
                     管理者のメールアドレス（複数可・カンマ区切り。有効にした後、このいずれかでログインして昇格します）
                   </span>
-                  <input
-                    type="text"
-                    name="admin_email"
-                    required
-                    placeholder={
-                      if @setting.allowed_domain,
-                        do: "name@#{@setting.allowed_domain}, name2@#{@setting.allowed_domain}",
-                        else: "name@company.com, name2@company.com"
-                    }
-                    class="w-full sm:w-96 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
-                  />
+                  <div class="sm:w-96">
+                    <.email_input
+                      id="enable-auth-admin-email"
+                      name="admin_email"
+                      ac={@ac}
+                      placeholder={
+                        if @setting.allowed_domain,
+                          do: "name@#{@setting.allowed_domain}, name2@#{@setting.allowed_domain}",
+                          else: "name@company.com, name2@company.com"
+                      }
+                    />
+                  </div>
                 </label>
                 <p class="text-xs text-zinc-500">
                   必要なもの: ログインの方法（Google Secure LDAP または Google ログイン）が設定済みで、管理者パスワードが設定済みであること。有効にすると、このブラウザもログイン画面に移ります。
@@ -3437,12 +3473,7 @@ defmodule AskDriveWeb.AdminLive do
                   <span class="block font-medium text-zinc-700 dark:text-zinc-300">
                     担当者を追加（メールアドレス、複数可・カンマ区切り。まだログインしたことのない人も追加できます）
                   </span>
-                  <input
-                    type="text"
-                    name="emails"
-                    required
-                    class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
-                  />
+                  <.email_input id="add-app-admins-emails" name="emails" ac={@ac} />
                 </label>
                 <button
                   type="submit"
@@ -4620,6 +4651,77 @@ defmodule AskDriveWeb.AdminLive do
        do: remaining.documents + remaining.chunks + remaining.questions > 0
 
   defp resumable?(_runs, _remaining), do: false
+
+  # --- E-mail fields completed from the directory (spec F-1115) ---------------------
+
+  attr :id, :string, required: true
+  attr :name, :string, required: true
+  attr :ac, :map, required: true
+  attr :placeholder, :string, default: nil
+  attr :required, :boolean, default: true
+
+  # an e-mail field that suggests addresses from Secure LDAP while typing (the last address
+  # when several are separated by commas); plain text otherwise
+  defp email_input(assigns) do
+    assigns =
+      assign(assigns, :state, Map.get(assigns.ac, assigns.id, %{value: nil, suggestions: []}))
+
+    ~H"""
+    <div class="relative">
+      <input
+        type="text"
+        id={@id}
+        name={@name}
+        value={@state.value}
+        required={@required}
+        placeholder={@placeholder}
+        autocomplete="off"
+        phx-keyup="ac_suggest"
+        phx-value-field={@id}
+        phx-debounce="300"
+        class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
+      />
+      <ul
+        :if={@state.suggestions != []}
+        id={@id <> "-suggestions"}
+        class="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg text-xs"
+      >
+        <li :for={u <- @state.suggestions}>
+          <button
+            type="button"
+            phx-click="ac_pick"
+            phx-value-field={@id}
+            phx-value-email={u.email}
+            class="w-full text-left px-3 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+          >
+            <span class="font-medium text-zinc-800 dark:text-zinc-200">{u.name || u.email}</span>
+            <span class="text-zinc-500 ml-1">{u.email}</span>
+          </button>
+        </li>
+      </ul>
+    </div>
+    """
+  end
+
+  # the address being typed: the part after the last separator
+  defp split_last_address(value) do
+    case Regex.run(~r/^(.*[\s,;、])?([^\s,;、]*)$/u, value || "") do
+      [_, head, last] -> {head || "", last}
+      [_, head] -> {head || "", ""}
+      _ -> {"", value || ""}
+    end
+  end
+
+  defp clear_ac(socket, field), do: Phoenix.Component.update(socket, :ac, &Map.delete(&1, field))
+
+  # typos (F-1115): with Secure LDAP on, every address must exist in the directory
+  defp check_directory(emails) do
+    case AskDrive.Ldap.unknown_emails(Settings.platform_setting!(), emails) do
+      {:ok, []} -> :ok
+      {:ok, missing} -> {:error, "ディレクトリ（Google Workspace）に見つかりません: #{Enum.join(missing, "、")}"}
+      :skip -> :ok
+    end
+  end
 
   # one or more addresses separated by commas, spaces or new lines, all in the domain
   defp parse_admin_emails(text, domain) do

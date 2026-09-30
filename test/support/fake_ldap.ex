@@ -57,6 +57,16 @@ defmodule AskDrive.FakeLdap do
       {_, :base} ->
         {:ok, [%{dn: base, attrs: %{}}]}
 
+      {_, {:query, q}} ->
+        q = String.downcase(q)
+
+        found =
+          for {email, u} <- users(),
+              String.starts_with?(email, q) or String.contains?(String.downcase(u.name), q),
+              do: %{dn: u.dn, attrs: %{"mail" => [email], "displayName" => [u.name]}}
+
+        {:ok, found}
+
       {_, {:mail, email}} ->
         case Map.get(users(), email) do
           nil -> {:ok, []}

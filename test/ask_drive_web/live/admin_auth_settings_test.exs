@@ -24,8 +24,19 @@ defmodule AskDriveWeb.AdminAuthSettingsTest do
     assert UserAuth.auth_mode() == {:disabled, :setting}
 
     enable_ldap!()
+
+    # the administrators must exist in the directory (F-1115)
+    FakeLdap.put_users(
+      Map.new(~w(boss second third), fn name ->
+        {"#{name}@example.com", %{dn: "uid=#{name},dc=example,dc=com", password: "p", name: name}}
+      end)
+    )
+
     {:ok, _} = AskDrive.Accounts.AdminAccess.force_set_password("admin-pass-1")
     {:ok, view, _html} = live(build_conn(), ~p"/admin?tab=settings")
+
+    view |> form("#enable-auth-form", %{"admin_email" => "bos@example.com"}) |> render_submit()
+    assert render(view) =~ "ディレクトリ（Google Workspace）に見つかりません: bos@example.com"
 
     # another domain is refused
     view |> form("#enable-auth-form", %{"admin_email" => "boss@other.com"}) |> render_submit()
