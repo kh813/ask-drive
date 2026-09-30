@@ -39,6 +39,10 @@ defmodule AskDriveWeb.Layouts do
   attr :app, :any, default: nil, doc: "the AskDrive app this page serves (spec 6.11), or nil"
   attr :apps, :list, default: [], doc: "all apps, for the app switcher"
 
+  attr :current, :atom,
+    default: nil,
+    doc: "the admin screen being shown (:app_admin or :platform_admin), to mark its link"
+
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -90,21 +94,23 @@ defmodule AskDriveWeb.Layouts do
           >
             {if @app, do: gettext("Chat"), else: gettext("Desk list")}
           </.link>
+          <%!-- This desk's settings only; named after the desk so it cannot be mistaken for
+                Platform Admin, which lives with the admin-mode badge on the right. --%>
           <.link
             :if={can_access_app_admin?(@current_user, @app)}
             href={"/" <> @app.slug <> "/admin"}
             id="admin-nav-link"
-            class="px-2.5 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+            aria-current={@current == :app_admin && "page"}
+            class={[
+              "px-2.5 py-1.5 rounded-lg transition",
+              if(@current == :app_admin,
+                do: "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100",
+                else: "text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              )
+            ]}
           >
-            {gettext("Admin")}
-          </.link>
-          <.link
-            :if={@admin_elevated? and is_platform_admin?(@current_user)}
-            href={~p"/admin"}
-            id="platform-admin-nav-link"
-            class="px-2.5 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
-          >
-            {gettext("Platform Admin")}
+            <span class="hidden md:inline">{gettext("Manage %{desk}", desk: @app.name)}</span>
+            <span class="md:hidden">{gettext("Desk admin")}</span>
           </.link>
           <%!-- Eligible but not elevated: the way in is the password prompt, not /admin. --%>
           <.link
@@ -141,23 +147,52 @@ defmodule AskDriveWeb.Layouts do
           )}
         </span>
 
-        <span
+        <%!-- Admin mode and what only it opens (Platform Admin, Release) form one group, so
+              platform-wide settings read as part of the elevated session, not as a desk tab. --%>
+        <div
           :if={@admin_elevated?}
-          id="admin-mode-badge"
-          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60"
+          id="admin-mode-group"
+          class="inline-flex items-stretch rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 overflow-hidden"
         >
-          <.icon name="hero-shield-check" class="w-3.5 h-3.5" />
-          {gettext("Admin mode%{remaining}", remaining: remaining_label(@admin_elevation_expires_at))}
-        </span>
-
-        <.link
-          :if={@admin_elevated?}
-          href={~p"/admin/release"}
-          id="release-admin-link"
-          class="text-[11px] px-2 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 transition"
-        >
-          {gettext("Release")}
-        </.link>
+          <span
+            id="admin-mode-badge"
+            title={
+              gettext("Admin mode%{remaining}",
+                remaining: remaining_label(@admin_elevation_expires_at)
+              )
+            }
+            class="inline-flex items-center gap-1.5 px-2.5 py-1"
+          >
+            <.icon name="hero-shield-check" class="w-3.5 h-3.5" />
+            <span class="hidden sm:inline">
+              {gettext("Admin mode%{remaining}",
+                remaining: remaining_label(@admin_elevation_expires_at)
+              )}
+            </span>
+          </span>
+          <.link
+            :if={is_platform_admin?(@current_user)}
+            href={~p"/admin"}
+            id="platform-admin-nav-link"
+            aria-current={@current == :platform_admin && "page"}
+            class={[
+              "inline-flex items-center px-2.5 py-1 border-l border-indigo-200/60 dark:border-indigo-800/60 transition",
+              if(@current == :platform_admin,
+                do: "bg-indigo-600 text-white dark:bg-indigo-500",
+                else: "hover:bg-indigo-100 dark:hover:bg-indigo-900/60"
+              )
+            ]}
+          >
+            {gettext("Platform Admin")}
+          </.link>
+          <.link
+            href={~p"/admin/release"}
+            id="release-admin-link"
+            class="inline-flex items-center px-2.5 py-1 border-l border-indigo-200/60 dark:border-indigo-800/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition"
+          >
+            {gettext("Release")}
+          </.link>
+        </div>
 
         <.locale_switcher />
 

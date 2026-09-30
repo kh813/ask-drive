@@ -1154,15 +1154,40 @@ defmodule AskDriveWeb.AdminLive do
       admin_elevation_expires_at={@admin_elevation_expires_at}
       app={@app}
       apps={@apps}
+      current={if @scope == :app, do: :app_admin, else: :platform_admin}
       wide
     >
       <div class="space-y-6 pb-12">
         <%!-- Header Bar --%>
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
+        <%!-- Which of the two admin screens this is: Platform Admin carries the indigo of the
+              admin-mode group in the header, a desk's admin screen stays neutral. --%>
+        <div class={[
+          "flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b",
+          if(@scope == :platform,
+            do: "border-indigo-200 dark:border-indigo-800 border-l-4 border-l-indigo-500 pl-4",
+            else: "border-zinc-200 dark:border-zinc-800"
+          )
+        ]}>
           <div>
+            <p
+              id="admin-scope-label"
+              class={[
+                "inline-flex items-center gap-1 text-[11px] font-semibold mb-1",
+                if(@scope == :platform,
+                  do: "text-indigo-700 dark:text-indigo-300",
+                  else: "text-zinc-500"
+                )
+              ]}
+            >
+              <%= if @scope == :platform do %>
+                <.icon name="hero-shield-check" class="w-3.5 h-3.5" /> すべての窓口に適用
+              <% else %>
+                <.icon name="hero-chat-bubble-left-right" class="w-3.5 h-3.5" /> この窓口だけに適用
+              <% end %>
+            </p>
             <div class="flex items-center gap-2">
               <h1 class="font-bold text-2xl text-zinc-900 dark:text-zinc-100">
-                {if @scope == :app, do: "管理: AskDrive for #{@app.name}", else: "全体管理"}
+                {if @scope == :app, do: "#{@app.name} の管理", else: "全体管理"}
               </h1>
               <span
                 id="app-version"

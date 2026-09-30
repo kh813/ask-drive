@@ -4,9 +4,10 @@ This document outlines planned improvements, future concepts, and the technical 
 
 ---
 
-## Current Version: `0.1.2`
+## Current Version: `0.1.3`
 - **Multi-lingual Support (i18n)**: English (default) & Japanese (`en` / `ja`) with browser `Accept-Language` auto-detection and UI switcher.
 - **Multi-app Desk Portal**: Departmental multi-desk routing (`/`, `/:app`, `/:app/admin`).
+- **Clear Admin Navigation**: A desk's admin link is named after the desk ("Manage IT-Support"); Platform Admin sits with the admin-mode badge and Release on the right, and each admin screen states whether it applies to one desk or all desks.
 - **Google Drive Sync & Ingestion Pipeline**: OAuth & Service Account, OCR & text vector extraction using Oban & SQLite-vec.
 - **3-Tier Answering Engine**: Tier 0 (exact match cache), Tier 1 (QA pairs vector search), Tier 2 (hybrid FTS5 + vector search with snippet excerpts & live LLM streaming summary), Tier 3 (unanswered query logging & nightly batch generation).
 - **Authentication & Security**: POC guest bypass, Google OAuth, Google Secure LDAP, mTLS client certificate verification gate, Admin sudo-style elevation with auto-expiry.

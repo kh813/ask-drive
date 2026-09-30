@@ -26,7 +26,7 @@ defmodule AskDriveWeb.AdminLiveTest do
 
       {:ok, view, html} = live(conn, ~p"/it-support/admin")
 
-      assert html =~ "管理: AskDrive for IT-Support"
+      assert html =~ "IT-Support の管理"
       assert html =~ "概要・バッチ状況"
       assert html =~ "未回答・解消質問"
       assert html =~ "ドキュメント一覧"
@@ -71,7 +71,7 @@ defmodule AskDriveWeb.AdminLiveTest do
       conn = build_conn() |> log_in_user(app_user) |> log_in_app_admin(app_user, "hr")
 
       {:ok, _view, html} = live(conn, "/hr/admin")
-      assert html =~ "管理: AskDrive for 人事部窓口"
+      assert html =~ "人事部窓口 の管理"
 
       # not IT-Support's (not assigned), not the platform screen
       assert {:error, {:redirect, %{to: "/it-support"}}} = live(conn, "/it-support/admin")

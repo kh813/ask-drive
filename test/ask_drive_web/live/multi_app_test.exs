@@ -76,6 +76,10 @@ defmodule AskDriveWeb.MultiAppTest do
     {:ok, view, html} = live(conn, ~p"/admin")
     assert html =~ "全体管理"
     assert has_element?(view, "#app-row-hr")
+    assert has_element?(view, "#admin-scope-label", "すべての窓口に適用")
+    # Platform Admin sits in the admin-mode group on the right, marked as the current page
+    assert has_element?(view, "#admin-mode-group #platform-admin-nav-link[aria-current='page']")
+    assert has_element?(view, "#admin-mode-group #release-admin-link")
 
     # the add form opens right above the list
     refute has_element?(view, "#new-app-form")
@@ -116,8 +120,11 @@ defmodule AskDriveWeb.MultiAppTest do
     on_exit(fn -> Apps.Repos.stop_app_repo("legal") end)
     assert File.exists?(legal.db_path)
 
-    {:ok, _view, html} = live(conn, "/legal/admin?tab=settings")
-    assert html =~ "管理: AskDrive for Legal"
+    {:ok, legal_view, html} = live(conn, "/legal/admin?tab=settings")
+    assert html =~ "Legal の管理"
+    assert has_element?(legal_view, "#admin-scope-label", "この窓口だけに適用")
+    assert has_element?(legal_view, "#admin-nav-link[aria-current='page']", "Manage Legal")
+    refute has_element?(legal_view, "#platform-admin-nav-link[aria-current]")
     assert html =~ "Google Drive"
     assert html =~ "窓口の担当者（窓口管理者）"
     assert html =~ "legal-owner@example.com"
