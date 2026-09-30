@@ -478,7 +478,14 @@ defmodule AskDriveWeb.AdminLive do
   def handle_event("issue_client_cert", %{"group_id" => id}, socket) do
     group = Enum.find(socket.assigns.client_cert_groups, &(to_string(&1.id) == id))
     {:ok, issued} = AskDrive.ClientCerts.issue(group, socket.assigns.current_user.email)
-    token = AskDrive.ClientCerts.stash_download(issued.p12, issued.filename)
+
+    token =
+      AskDrive.ClientCerts.stash_download(
+        issued.p12,
+        issued.filename,
+        group.name,
+        issued.cert.serial
+      )
 
     {:noreply,
      socket
@@ -4700,13 +4707,26 @@ defmodule AskDriveWeb.AdminLive do
                   <span id="issued-cert-password" class="font-mono text-sm select-all">{@issued_cert.password}</span>
                   （.p12 ファイルとは別の手段で伝えてください）
                 </p>
-                <a
-                  id="issued-cert-download"
-                  href={"/admin/client-certs/#{@issued_cert.token}"}
-                  class="inline-block px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
-                >
-                  {@issued_cert.filename} をダウンロード（10 分以内・1 回のみ）
-                </a>
+                <p>
+                  配る相手の端末に合わせてダウンロードしてください（発行から 10 分間。いずれも端末の管理者権限なしでインストールできます）:
+                </p>
+                <div class="flex flex-wrap gap-2">
+                  <a
+                    :for={
+                      {format, label} <- [
+                        {"windows", "Windows 用（.pfx）"},
+                        {"macos", "macOS 用（.p12）"},
+                        {"ios", "iPhone / iPad 用（.mobileconfig）"},
+                        {"android", "Android 用（.p12）"}
+                      ]
+                    }
+                    id={"issued-cert-download-#{format}"}
+                    href={"/admin/client-certs/#{@issued_cert.token}?format=#{format}"}
+                    class="inline-block px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+                  >
+                    {label}
+                  </a>
+                </div>
               </div>
 
               <div class="space-y-3">

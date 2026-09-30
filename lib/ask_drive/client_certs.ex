@@ -318,32 +318,113 @@ defmodule AskDrive.ClientCerts do
     DateTime.from_naive!(dt, "Etc/UTC")
   end
 
-  # --- One-time downloads -----------------------------------------------------------------
+  # --- Downloads, per OS ------------------------------------------------------------------
 
-  @doc "Keeps an issued `.p12` for one download within 10 minutes; returns its token."
-  def stash_download(p12, filename) do
+  @formats ~w(windows macos ios android)
+
+  def formats, do: @formats
+
+  @doc """
+  Keeps an issued certificate for downloading within 10 minutes (an administrator fetches
+  the form each OS installs most easily); returns the token.
+  """
+  def stash_download(p12, filename, group_name \\ "AskDrive", serial \\ nil) do
     token = :crypto.strong_rand_bytes(18) |> Base.url_encode64(padding: false)
+    until = System.monotonic_time(:second) + 600
 
     :persistent_term.put(
       {__MODULE__, :download, token},
-      {p12, filename, System.monotonic_time(:second) + 600}
+      {p12, filename, group_name, serial, until}
     )
 
     token
   end
 
-  @doc "Takes (and forgets) a stashed download: `{:ok, p12, filename}` or `:error`."
-  def take_download(token) do
+  @doc """
+  The stashed certificate in the form for `format` — `{:ok, body, filename, content_type}`
+  or `:error` (unknown or expired). All keep the key in the user's own store, so no
+  administrator rights on the device are needed:
+
+    * `windows` — `.pfx` (opens the import wizard; "Current User" store)
+    * `macos` / `android` — `.p12` (login keychain / "user certificates")
+    * `ios` — `.mobileconfig`: a profile carrying the .p12, installed with the device
+      passcode; the certificate's password is asked for during installation
+  """
+  def take_download(token, format \\ "macos") do
     key = {__MODULE__, :download, token}
 
     case :persistent_term.get(key, nil) do
-      {p12, filename, until} ->
-        :persistent_term.erase(key)
-        if System.monotonic_time(:second) <= until, do: {:ok, p12, filename}, else: :error
+      {p12, filename, group, serial, until} ->
+        if System.monotonic_time(:second) <= until do
+          base = Path.rootname(filename)
+
+          case format do
+            "windows" ->
+              {:ok, p12, base <> ".pfx", "application/x-pkcs12"}
+
+            "ios" ->
+              {:ok, mobileconfig(p12, group, serial), base <> ".mobileconfig",
+               "application/x-apple-aspen-config"}
+
+            _ ->
+              {:ok, p12, base <> ".p12", "application/x-pkcs12"}
+          end
+        else
+          :persistent_term.erase(key)
+          :error
+        end
 
       _ ->
         :error
     end
+  end
+
+  # An (unsigned) configuration profile with the .p12 as a pkcs12 payload, without the
+  # password, so iOS asks for it while installing
+  defp mobileconfig(p12, group, serial) do
+    id = serial || :crypto.strong_rand_bytes(6) |> Base.encode16(case: :lower)
+    esc = &(&1 |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string())
+
+    """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>PayloadContent</key>
+      <array>
+        <dict>
+          <key>PayloadType</key><string>com.apple.security.pkcs12</string>
+          <key>PayloadVersion</key><integer>1</integer>
+          <key>PayloadIdentifier</key><string>askdrive.client-cert.#{id}.pkcs12</string>
+          <key>PayloadUUID</key><string>#{uuid()}</string>
+          <key>PayloadDisplayName</key><string>#{esc.("AskDrive " <> group)}</string>
+          <key>PayloadCertificateFileName</key><string>askdrive.p12</string>
+          <key>PayloadContent</key>
+          <data>#{Base.encode64(p12)}</data>
+        </dict>
+      </array>
+      <key>PayloadDisplayName</key><string>#{esc.("AskDrive 証明書（" <> group <> "）")}</string>
+      <key>PayloadDescription</key><string>AskDrive にアクセスするための電子証明書です。インストール中に、別途伝えられたパスワードを入力してください。</string>
+      <key>PayloadIdentifier</key><string>askdrive.client-cert.#{id}</string>
+      <key>PayloadType</key><string>Configuration</string>
+      <key>PayloadUUID</key><string>#{uuid()}</string>
+      <key>PayloadVersion</key><integer>1</integer>
+    </dict>
+    </plist>
+    """
+  end
+
+  defp uuid do
+    <<a::32, b::16, c::16, d::16, e::48>> = :crypto.strong_rand_bytes(16)
+    c = Bitwise.bor(Bitwise.band(c, 0x0FFF), 0x4000)
+    d = Bitwise.bor(Bitwise.band(d, 0x3FFF), 0x8000)
+
+    [a, b, c, d, e]
+    |> Enum.zip([8, 4, 4, 4, 12])
+    |> Enum.map_join("-", fn {v, w} ->
+      v |> Integer.to_string(16) |> String.pad_leading(w, "0")
+    end)
+    |> String.upcase()
   end
 
   # --- Helpers ----------------------------------------------------------------------------

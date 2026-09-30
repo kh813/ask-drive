@@ -62,6 +62,16 @@ defmodule AskDriveWeb.Plugs.ClientCertGate do
     |> halt()
   end
 
+  # the install steps per OS / browser (AskDrive.ClientCerts.InstallGuide), collapsible
+  defp guide do
+    Enum.map_join(AskDrive.ClientCerts.InstallGuide.sections(), "\n", fn {title, steps} ->
+      items = Enum.map_join(steps, "", &"<li>#{escape(&1)}</li>")
+      "<details><summary>#{escape(title)}</summary><ol>#{items}</ol></details>"
+    end)
+  end
+
+  defp escape(text), do: text |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()
+
   defp page(reason) do
     """
     <!DOCTYPE html>
@@ -72,6 +82,7 @@ defmodule AskDriveWeb.Plugs.ClientCertGate do
       body{font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;background:#f4f4f5;color:#27272a;margin:0;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:16px}
       main{background:#fff;border:1px solid #e4e4e7;border-radius:16px;max-width:520px;padding:32px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
       h1{font-size:18px;margin:0 0 12px} p,li{font-size:14px;line-height:1.7;margin:8px 0} .reason{color:#b91c1c}
+      details{border:1px solid #e4e4e7;border-radius:10px;padding:8px 12px;margin:8px 0} summary{cursor:pointer;font-weight:600;font-size:14px} ol{padding-left:20px;margin:8px 0}
       .badge{width:40px;height:40px;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;margin-bottom:16px}
     </style></head>
     <body><main>
@@ -79,11 +90,8 @@ defmodule AskDriveWeb.Plugs.ClientCertGate do
       <h1>この端末からは AskDrive にアクセスできません</h1>
       <p class="reason">#{reason}</p>
       <p>AskDrive は、管理者が配布した電子証明書をインストールした端末からだけ利用できます。</p>
-      <ul>
-        <li>配布された証明書ファイル（.p12）を開き、案内されたパスワードでインストールしてください。</li>
-        <li>インストール後はブラウザを再起動し、証明書の選択を求められたら「AskDrive」の証明書を選んでください。</li>
-        <li>証明書をお持ちでない場合や、インストールしても表示が変わらない場合は、管理者に連絡してください。</li>
-      </ul>
+      <p>#{escape(AskDrive.ClientCerts.InstallGuide.intro())} お持ちでない場合は管理者に連絡してください。インストールの手順（お使いの端末を選んでください）:</p>
+      #{guide()}
     </main></body></html>
     """
   end

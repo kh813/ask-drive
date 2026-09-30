@@ -610,6 +610,7 @@ mix hex.audit
 - [x] 24-4 交換（同じグループで新旧を併用し、古い方を失効）と即時失効
 - [x] 24-5 `./app.sh mtls status|off|monitor|enforce|issue` と localhost の例外（締め出しからの復旧）
 - [x] 24-8 Linux CI の本番ビルドで、実際の TLS による強制を確認
+- [x] 24-11 OS ごとのダウンロード形式（Windows .pfx / macOS .p12 / iPhone・iPad .mobileconfig / Android .p12。いずれも管理者権限不要）、案内ページと README のインストール手順、初心者向けの手順書 `CLIENT_CERT_GUIDE.md`
 - [ ] 24-6 リバースプロキシ / Cloudflare で終端する場合の連携（プロキシ側で検証した結果の受け取り）
 - [ ] 24-7 Windows・macOS・iOS・Android の実機でのインストールと、ブラウザごとの証明書選択の確認。端末管理ツールで配布できる場合の手順
 - [ ] 24-9 証明書の有効期限が近づいたら管理画面で知らせる

@@ -17,9 +17,10 @@ defmodule AskDriveWeb.AdminClientCertsTest do
     %{conn: log_in_admin(conn, admin)}
   end
 
-  test "add a group, issue a certificate (password shown once, one download), revoke it", %{
-    conn: conn
-  } do
+  test "add a group, issue a certificate (password once, a file per OS for 10 minutes), revoke it",
+       %{
+         conn: conn
+       } do
     {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
     assert has_element?(view, "#client-cert-mode", "無効")
 
@@ -30,20 +31,25 @@ defmodule AskDriveWeb.AdminClientCertsTest do
     view |> element("#issue-cert-#{group.id}") |> render_click()
     assert has_element?(view, "#issued-cert-password")
 
-    href =
+    href = fn format ->
       view
-      |> element("#issued-cert-download")
+      |> element("#issued-cert-download-#{format}")
       |> render()
       |> then(&Regex.run(~r{href="([^"]+)"}, &1))
       |> List.last()
+      |> String.replace("&amp;", "&")
+    end
 
-    resp = get(conn, href)
+    resp = get(conn, href.("windows"))
     assert resp.status == 200
     assert Plug.Conn.get_resp_header(resp, "content-type") |> hd() =~ "application/x-pkcs12"
+    assert Plug.Conn.get_resp_header(resp, "content-disposition") |> hd() =~ ".pfx"
     assert byte_size(resp.resp_body) > 1000
 
-    # only once
-    assert get(conn, href) |> redirected_to() =~ "/admin"
+    # another form for another device, within the 10 minutes
+    resp = get(conn, href.("ios"))
+    assert Plug.Conn.get_resp_header(resp, "content-disposition") |> hd() =~ ".mobileconfig"
+    assert resp.resp_body =~ "com.apple.security.pkcs12"
 
     [cert] = Enum.find(ClientCerts.list_groups(), &(&1.name == "経理部")).certs
     view |> element("#revoke-cert-#{cert.id}") |> render_click()

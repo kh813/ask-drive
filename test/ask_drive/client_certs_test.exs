@@ -62,10 +62,25 @@ defmodule AskDrive.ClientCertsTest do
     assert {:ok, true} = ClientCerts.set_mode("off")
   end
 
-  test "a download is handed out once" do
-    token = ClientCerts.stash_download("P12", "a.p12")
-    assert {:ok, "P12", "a.p12"} = ClientCerts.take_download(token)
-    assert :error = ClientCerts.take_download(token)
+  test "downloads per OS within 10 minutes: .pfx, .p12, and a .mobileconfig carrying the .p12" do
+    token = ClientCerts.stash_download("P12BYTES", "askdrive-x.p12", "経理部", "abc123")
+
+    assert {:ok, "P12BYTES", "askdrive-x.pfx", "application/x-pkcs12"} =
+             ClientCerts.take_download(token, "windows")
+
+    assert {:ok, "P12BYTES", "askdrive-x.p12", _} = ClientCerts.take_download(token, "macos")
+    assert {:ok, "P12BYTES", "askdrive-x.p12", _} = ClientCerts.take_download(token, "android")
+
+    assert {:ok, profile, "askdrive-x.mobileconfig", "application/x-apple-aspen-config"} =
+             ClientCerts.take_download(token, "ios")
+
+    assert profile =~ "<string>com.apple.security.pkcs12</string>"
+    assert profile =~ Base.encode64("P12BYTES")
+    assert profile =~ "AskDrive 証明書（経理部）"
+    # the password isn't in the profile: iOS asks for it while installing
+    refute profile =~ "<key>Password</key>"
+
+    assert :error = ClientCerts.take_download("nope", "macos")
   end
 
   describe "the gate" do
@@ -85,6 +100,15 @@ defmodule AskDrive.ClientCertsTest do
       conn = request(%{address: {192, 168, 1, 20}})
       assert conn.halted and conn.status == 403
       assert conn.resp_body =~ "電子証明書がインストールされていません"
+      # the install steps, per OS, on the page the person who needs them sees
+      assert conn.resp_body =~ "<summary>Windows（Chrome / Edge）</summary>"
+      assert conn.resp_body =~ "証明書のインポート ウィザード"
+      assert conn.resp_body =~ "<summary>iPhone / iPad（Safari）</summary>"
+      assert conn.resp_body =~ "管理者権限なしで"
+      # the install steps, per OS, on the page the person who needs them sees
+      assert conn.resp_body =~ "<summary>Windows（Chrome / Edge）</summary>"
+      assert conn.resp_body =~ "証明書のインポート ウィザード"
+      assert conn.resp_body =~ "<summary>iPhone / iPad（Safari）</summary>"
 
       conn = request(%{address: {192, 168, 1, 20}, ssl_cert: der})
       refute conn.halted
@@ -110,6 +134,28 @@ defmodule AskDrive.ClientCertsTest do
       |> ClientCertGate.call([])
 
       assert Enum.map(ClientCerts.users_without_cert(), & &1.email) == ["nocert@example.com"]
+    end
+  end
+
+  test "the README carries the same install steps as the page" do
+    readme = File.read!(Path.expand("../../README.md", __DIR__))
+
+    for {title, steps} <- AskDrive.ClientCerts.InstallGuide.sections() do
+      assert readme =~ "**#{title}**"
+      for step <- steps, do: assert(readme =~ step, "README is missing: #{step}")
+    end
+  end
+
+  test "the README carries the page's install steps and links the beginners' guide" do
+    root = Path.expand("../..", __DIR__)
+    readme = File.read!(Path.join(root, "README.md"))
+    assert readme =~ AskDrive.ClientCerts.InstallGuide.intro()
+    assert readme =~ "CLIENT_CERT_GUIDE.md"
+    assert File.read!(Path.join(root, "CLIENT_CERT_GUIDE.md")) =~ "管理者権限"
+
+    for {title, steps} <- AskDrive.ClientCerts.InstallGuide.sections() do
+      assert readme =~ "**#{title}**"
+      for step <- steps, do: assert(readme =~ step, "README is missing: #{step}")
     end
   end
 
