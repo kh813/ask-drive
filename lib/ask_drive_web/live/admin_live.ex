@@ -51,6 +51,7 @@ defmodule AskDriveWeb.AdminLive do
       |> allow_upload(:ldap_key, accept: :any, max_entries: 1, max_file_size: 200_000)
       |> allow_upload(:ldap_ca, accept: :any, max_entries: 1, max_file_size: 500_000)
       |> assign(:ldap_test, nil)
+      |> assign(:peer_ip, peer_ip(socket))
       |> assign(:ldap_pending, %{})
       |> assign(:ssl_check, nil)
 
@@ -400,6 +401,33 @@ defmodule AskDriveWeb.AdminLive do
 
       _ ->
         {:noreply, put_flash(socket, :error, "先に「検証する」で証明書を検証してください。")}
+    end
+  end
+
+  # Ports and trusted proxies (spec F-1013). A port change restarts the endpoint, which drops
+  # this very connection, so it is applied in a detached process a moment later.
+  def handle_event("save_network", %{"network" => params}, socket) do
+    case AskDrive.Network.validate(params) do
+      {:ok, new} ->
+        if AskDrive.Network.ports_changed?(new) do
+          spawn(fn ->
+            Process.sleep(700)
+            AskDrive.Network.apply_settings(new)
+          end)
+
+          {:noreply,
+           put_flash(
+             socket,
+             :info,
+             "ポートを変更して再起動しています。数秒後に https://<ホスト>:#{new.https_port}/admin?tab=settings を開き直してください（起動できなければ元の設定に戻ります）。"
+           )}
+        else
+          {:ok, _, :applied} = AskDrive.Network.apply_settings(new)
+          {:noreply, put_flash(socket, :info, "リバースプロキシの設定を保存しました（すぐに反映されます）。")}
+        end
+
+      {:error, errors} ->
+        {:noreply, put_flash(socket, :error, "保存できませんでした: " <> Enum.join(errors, "／"))}
     end
   end
 
@@ -4097,10 +4125,7 @@ defmodule AskDriveWeb.AdminLive do
                   <.icon name="hero-lock-closed" class="w-5 h-5 text-indigo-600" /> HTTPS（SSL 証明書）
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  すべての通信は HTTPS（ポート {AskDrive.SSL.https_port()}）で暗号化され、HTTP（{Enum.join(
-                    AskDrive.SSL.redirect_ports(),
-                    " / "
-                  )}）へのアクセスは HTTPS に転送されます。
+                  通信は HTTPS（ポート {AskDrive.SSL.https_port()}）で暗号化されます。HTTP（ポート {AskDrive.SSL.http_port()}）へのアクセスは HTTPS に転送されます（下の「ポートとリバースプロキシ」で指定したプロキシからは、HTTP のまま受け付けます）。
                 </p>
               </div>
 
@@ -4247,6 +4272,90 @@ defmodule AskDriveWeb.AdminLive do
                   HTTPS は無効です（ASK_DRIVE_SSL=false）。HTTP で待ち受けています。
                 </p>
               <% end %>
+
+              <%!-- Ports and trusted reverse proxies (spec F-1013) --%>
+              <% net = AskDrive.Network.settings() %>
+              <div
+                id="network-settings"
+                class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3"
+              >
+                <h3 class="font-semibold text-sm text-zinc-800 dark:text-zinc-200">
+                  ポートとリバースプロキシ
+                </h3>
+                <p class="text-xs text-zinc-500 leading-relaxed">
+                  前段のリバースプロキシで HTTPS を終端する場合は、そのプロキシの IP を指定してください。指定した IP からの HTTP は転送せずに受け付け、プロキシが付ける X-Forwarded-For / X-Forwarded-Proto / X-Forwarded-Host（Cloudflare の CF-Connecting-IP）を信頼します（利用者の実際の IP をロックや記録に使います）。それ以外からの HTTP は HTTPS に転送します。判定は接続元の IP で行い、ヘッダーは信頼しません。HSTS はプロキシ側で付けてください。
+                </p>
+                <p class="text-xs text-zinc-600 dark:text-zinc-400">
+                  この画面の接続元: <span id="peer-ip" class="font-mono">{@peer_ip || "不明"}</span>
+                  <span
+                    :if={@peer_ip && AskDrive.Network.trusted?(parse_ip(@peer_ip))}
+                    class="text-emerald-700"
+                  >
+                    （信頼するプロキシに含まれています）
+                  </span>
+                </p>
+                <form id="network-form" phx-submit="save_network" class="space-y-3">
+                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <label class="space-y-1">
+                      <span class="block font-medium">HTTPS のポート</span>
+                      <input
+                        type="number"
+                        name="network[https_port]"
+                        value={net.https_port}
+                        min="1"
+                        max="65535"
+                        class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
+                      />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="block font-medium">HTTP のポート</span>
+                      <input
+                        type="number"
+                        name="network[http_port]"
+                        value={net.http_port}
+                        min="1"
+                        max="65535"
+                        class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
+                      />
+                    </label>
+                    <label class="space-y-1 col-span-2">
+                      <span class="block font-medium">
+                        HTTP を受け付けるプロキシの IP（複数可・カンマ区切り、範囲は 10.0.0.0/24 の形。空欄なら無効）
+                      </span>
+                      <input
+                        type="text"
+                        name="network[trusted_proxies]"
+                        value={Enum.join(net.trusted_proxies, ", ")}
+                        placeholder="例: 127.0.0.1, 192.168.1.10"
+                        class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 font-mono"
+                      />
+                    </label>
+                  </div>
+                  <p class="text-[11px] text-zinc-400">
+                    ポートを変更すると AskDrive の待ち受けを再起動します（数秒）。新しいポートで起動できなければ元に戻します。締め出された場合はサーバー上で
+                    <code class="font-mono">./app.sh network ports-reset</code>
+                    / <code class="font-mono">./app.sh network proxy-off</code>
+                    で戻せます。プロキシ（Cloudflare Tunnel 等）の中継先ポートも合わせて変更してください。
+                  </p>
+                  <div class="flex justify-end">
+                    <button
+                      type="submit"
+                      id="save-network-btn"
+                      data-confirm="ポート・プロキシの設定を保存しますか？ポートを変えた場合は、新しいポートの URL で開き直す必要があります。"
+                      class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                    >
+                      保存
+                    </button>
+                  </div>
+                </form>
+                <p
+                  :if={match?({:error, _}, AskDrive.Network.last_result())}
+                  id="network-last-error"
+                  class="text-xs text-red-600"
+                >
+                  {AskDrive.Network.last_result() |> elem(1) |> Enum.join("／")}
+                </p>
+              </div>
             </div>
           </div>
         <% end %>
@@ -4534,6 +4643,23 @@ defmodule AskDriveWeb.AdminLive do
 
   defp record_ssl_result({:error, message}),
     do: :persistent_term.put({__MODULE__, :ssl_result}, "前回の証明書の適用に失敗しました: #{message}")
+
+  # the TCP peer of this admin's connection (to tell whether it came through a proxy)
+  defp peer_ip(socket) do
+    case get_connect_info(socket, :peer_data) do
+      %{address: ip} -> ip |> :inet.ntoa() |> to_string()
+      _ -> nil
+    end
+  end
+
+  defp parse_ip(nil), do: nil
+
+  defp parse_ip(text) do
+    case :inet.parse_address(String.to_charlist(text)) do
+      {:ok, ip} -> ip
+      _ -> nil
+    end
+  end
 
   defp last_ssl_result, do: :persistent_term.get({__MODULE__, :ssl_result}, nil)
 

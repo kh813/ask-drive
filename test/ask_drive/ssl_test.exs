@@ -95,7 +95,9 @@ defmodule AskDrive.SSLTest do
 
       https = Application.get_env(:ask_drive, AskDriveWeb.Endpoint)[:https]
       assert https[:certfile] == Path.join([dir, "active", "cert.pem"])
-      assert Application.get_env(:ask_drive, AskDriveWeb.Endpoint)[:http] == false
+      # HTTP on its own port as well: redirected to HTTPS, or served for trusted proxies
+      assert Application.get_env(:ask_drive, AskDriveWeb.Endpoint)[:http][:port] ==
+               AskDrive.Network.http_port()
 
       pem = CertHelper.ca_signed(["askdrive.example.com"])
       {:ok, info} = SSL.validate(pem)

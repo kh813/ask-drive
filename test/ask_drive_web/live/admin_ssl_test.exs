@@ -25,6 +25,9 @@ defmodule AskDriveWeb.AdminSSLTest do
     :ok
   end
 
+  # with HTTPS on, plain HTTP is redirected to it (spec F-1013): come in over HTTPS
+  @settings "https://www.example.com:4443/admin?tab=settings"
+
   defp upload(view, name, filename, content) do
     view
     |> file_input("#ssl-upload-form", name, [
@@ -34,7 +37,7 @@ defmodule AskDriveWeb.AdminSSLTest do
   end
 
   test "shows the self-signed certificate, validates an upload, then applies it", %{conn: conn} do
-    {:ok, view, html} = live(conn, ~p"/admin?tab=settings")
+    {:ok, view, html} = live(conn, @settings)
     assert html =~ "HTTPS（SSL 証明書）"
     assert html =~ "自己署名証明書"
 
@@ -57,7 +60,7 @@ defmodule AskDriveWeb.AdminSSLTest do
   end
 
   test "a failed validation lists the problems and offers no apply button", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
+    {:ok, view, _html} = live(conn, @settings)
     a = CertHelper.ca_signed(["a.example.com"])
     b = CertHelper.ca_signed(["b.example.com"])
 

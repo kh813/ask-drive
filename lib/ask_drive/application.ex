@@ -7,8 +7,8 @@ defmodule AskDrive.Application do
 
   @impl true
   def start(_type, _args) do
-    # HTTPS (spec 6.10): make sure a certificate exists and point the endpoint at it before
-    # the endpoint starts; the HTTP ports then only redirect.
+    # HTTPS (spec 6.10): make sure a certificate exists and point the endpoint at it (and at
+    # the configured ports, F-1013) before the endpoint starts.
     AskDrive.SSL.configure_endpoint!()
 
     children =
@@ -29,7 +29,7 @@ defmodule AskDrive.Application do
         AskDrive.LLM.OllamaModels,
         # Start to serve requests, typically the last entry
         AskDriveWeb.Endpoint
-      ] ++ https_redirect_servers()
+      ]
 
     # See https://elixir.hexdocs.pm/Supervisor.html
     # for other strategies and supported options
@@ -43,20 +43,6 @@ defmodule AskDrive.Application do
   def config_change(changed, _new, removed) do
     AskDriveWeb.Endpoint.config_change(changed, removed)
     :ok
-  end
-
-  # One redirect-only listener per HTTP port (4080, and 4000 during the transition)
-  defp https_redirect_servers do
-    if AskDrive.SSL.enabled?() and Application.get_env(:ask_drive, AskDriveWeb.Endpoint)[:server] do
-      for port <- AskDrive.SSL.redirect_ports() do
-        Supervisor.child_spec(
-          {Bandit, plug: AskDriveWeb.HTTPSRedirect, port: port, ip: {0, 0, 0, 0, 0, 0, 0, 0}},
-          id: {:https_redirect, port}
-        )
-      end
-    else
-      []
-    end
   end
 
   defp skip_migrations?() do

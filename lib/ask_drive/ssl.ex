@@ -2,10 +2,10 @@ defmodule AskDrive.SSL do
   @moduledoc """
   HTTPS for AskDrive (spec 6.10).
 
-  All traffic is encrypted: the Phoenix endpoint listens only on HTTPS
-  (`ASK_DRIVE_HTTPS_PORT`, default 4443), and small redirect-only servers on the HTTP ports
-  (`ASK_DRIVE_HTTP_PORT`, default 4080, plus the old 4000 during the transition) send every
-  request there (`AskDriveWeb.HTTPSRedirect`).
+  The endpoint listens on HTTPS (default 4443) and HTTP (default 4000). HTTP is redirected
+  to HTTPS (`AskDriveWeb.HTTPSRedirect`) unless it comes from a trusted reverse proxy that
+  terminates TLS itself (`AskDrive.Network`, spec F-1013); the ports and proxies are set on
+  the admin screen.
 
   Certificates live in files, not the database — the endpoint needs them before the Repo is
   up. `<ssl_dir>/active/` holds what is served (`cert.pem`, `key.pem`, optional
@@ -25,18 +25,8 @@ defmodule AskDrive.SSL do
   @doc "Whether HTTPS is on (prod default; ASK_DRIVE_SSL=false restores plain HTTP)."
   def enabled?, do: Application.get_env(:ask_drive, :ssl_enabled, false)
 
-  def https_port, do: Application.get_env(:ask_drive, :https_port, 4443)
-
-  @doc "HTTP ports that only redirect to HTTPS (new default and the legacy one)."
-  def redirect_ports do
-    [
-      Application.get_env(:ask_drive, :http_port, 4080),
-      Application.get_env(:ask_drive, :legacy_http_port)
-    ]
-    |> Enum.reject(&is_nil/1)
-    |> Enum.uniq()
-    |> Enum.reject(&(&1 == https_port()))
-  end
+  def https_port, do: AskDrive.Network.https_port()
+  def http_port, do: AskDrive.Network.http_port()
 
   def ssl_dir, do: Application.get_env(:ask_drive, :ssl_dir) || Path.expand("ssl")
   def active_dir, do: Path.join(ssl_dir(), "active")
@@ -56,15 +46,30 @@ defmodule AskDrive.SSL do
         Logger.info("SSL: no certificate yet; generating a self-signed one")
         {:ok, _} = generate_self_signed(active_dir())
       end
-
-      put_endpoint_config()
     end
 
+    put_endpoint_config()
     :ok
   end
 
-  @doc "Writes the HTTPS listener settings for the endpoint into the application env."
+  @doc """
+  Writes the listener settings for the endpoint into the application env: HTTPS and HTTP
+  when HTTPS is on, HTTP only when it is off (ASK_DRIVE_SSL=false).
+  """
   def put_endpoint_config do
+    if enabled?(), do: put_https_config(), else: put_http_only_config()
+  end
+
+  defp put_http_only_config do
+    config = Application.get_env(:ask_drive, AskDriveWeb.Endpoint, [])
+
+    if config[:server] do
+      http = Keyword.merge(Keyword.get(config, :http) || [], port: http_port())
+      Application.put_env(:ask_drive, AskDriveWeb.Endpoint, Keyword.put(config, :http, http))
+    end
+  end
+
+  defp put_https_config do
     https =
       [
         ip: {0, 0, 0, 0, 0, 0, 0, 0},
@@ -86,10 +91,13 @@ defmodule AskDrive.SSL do
     config = Application.get_env(:ask_drive, AskDriveWeb.Endpoint, [])
     url = Keyword.merge(Keyword.get(config, :url, []), scheme: "https", port: https_port())
 
+    # HTTP on its own port too: redirected to HTTPS, or served for a trusted proxy
+    http = [ip: {0, 0, 0, 0, 0, 0, 0, 0}, port: http_port()]
+
     Application.put_env(
       :ask_drive,
       AskDriveWeb.Endpoint,
-      Keyword.merge(config, http: false, https: https, url: url)
+      Keyword.merge(config, http: http, https: https, url: url)
     )
 
     :persistent_term.put({__MODULE__, :meta}, read_meta(active_dir()))

@@ -65,8 +65,8 @@ if "${SCRIPT_DIR}/app.sh" service registered; then
   # kickstart は起動を待たずに戻るため、直後にステータスを出すと Ollama・AskDrive とも
   # 「停止中」と表示されてしまう。HTTP が応答するまで最大 120 秒待ってから表示する。
   case "${ASK_DRIVE_SSL:-true}" in
-    false|0|no|off) app_url="http://localhost:${PORT:-4000}/" ;;
-    *) app_url="https://localhost:${ASK_DRIVE_HTTPS_PORT:-4443}/" ;;
+    false|0|no|off) app_url="http://localhost:$(askdrive_port http)/" ;;
+    *) app_url="https://localhost:$(askdrive_port https)/" ;;
   esac
   echo -n "AskDrive の起動を待っています (${app_url})"
   for _ in $(seq 1 120); do

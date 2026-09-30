@@ -135,10 +135,27 @@ jobs:
           done
           echo "HTTPS status: $code"
           test "$code" != "000"
-          curl -s -o /dev/null -w 'HTTP 4080 -> %{http_code} %{redirect_url}\n' http://localhost:4080/
+          # HTTP is on 4000 and redirects to HTTPS; 4080 is gone (spec F-1013)
+          out="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://localhost:4000/setup)"
+          echo "HTTP 4000 -> ${out}"
+          test "${out}" = "301 https://localhost:4443/setup"
+          ! curl -s -o /dev/null --max-time 3 http://localhost:4080/
           systemctl is-active askdrive.service
           sudo cat /etc/sudoers.d/askdrive
           ./app.sh status
+
+      - name: HTTP from a trusted reverse proxy is served as HTTP; proxy-off applies at once
+        run: |
+          # the admin screen writes this file; the running service re-reads it when it changes
+          printf '{"http_port": 4000, "https_port": 4443, "trusted_proxies": ["127.0.0.1", "::1"]}' > ssl/listen.json
+          code="$(curl -s -o /dev/null -w '%{http_code}' -H 'X-Forwarded-Proto: https' -H 'X-Forwarded-For: 203.0.113.9' http://127.0.0.1:4000/setup)"
+          echo "HTTP via trusted proxy -> ${code}"
+          test "${code}" = "200"
+          ./app.sh network status
+          ./app.sh network proxy-off
+          code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4000/setup)"
+          echo "after proxy-off -> ${code}"
+          test "${code}" = "301"
 
       - name: Icons linked by the page are served by the prod build (digested assets)
         run: |

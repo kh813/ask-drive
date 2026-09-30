@@ -252,3 +252,25 @@ systemd_sudoers_content() {
 ${user} ALL=(root) NOPASSWD: ${systemctl_bin} start ${unit}, ${systemctl_bin} stop ${unit}, ${systemctl_bin} restart ${unit}
 EOF
 }
+
+# --- Listening ports (spec F-1013) ------------------------------------------------
+# The admin screen stores the ports in <ssl_dir>/listen.json; otherwise the environment's
+# defaults apply (HTTP 4000, HTTPS 4443).
+askdrive_listen_file() {
+  echo "${ASK_DRIVE_SSL_DIR:-${SCRIPT_DIR}/ssl}/listen.json"
+}
+
+askdrive_port() {
+  local kind="$1" file value=""
+  file="$(askdrive_listen_file)"
+  if [[ -f "${file}" ]]; then
+    value="$(sed -n "s/.*\"${kind}_port\"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p" "${file}" | head -n 1)"
+  fi
+  if [[ -z "${value}" ]]; then
+    case "${kind}" in
+      https) value="${ASK_DRIVE_HTTPS_PORT:-4443}" ;;
+      http) value="${ASK_DRIVE_HTTP_PORT:-${PORT:-4000}}" ;;
+    esac
+  fi
+  echo "${value}"
+}

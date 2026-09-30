@@ -57,6 +57,9 @@ AskDrive 管理スクリプト
   auth enable [mail…] ログイン認証を有効にする (mail = 管理者に昇格できるアカウント、複数可)
   auth ldap on|off   LDAP でのログインを有効 / 無効にする
   auth oauth on|off  Google ログイン（OAuth）を有効 / 無効にする
+  network status     待ち受けポートと、HTTP を受け付けるリバースプロキシの状態
+  network proxy-off  リバースプロキシの指定を解除 (HTTP はすべて HTTPS へ転送。締め出されたときの復旧)
+  network ports-reset ポートを既定 (HTTP 4000 / HTTPS 4443) に戻して再起動
   ollama <args>      アプリ専用の Ollama を操作 (例: ./app.sh ollama pull <model> / ./app.sh ollama list)
   drive service-account [key.json] [--subject user@example.com]
                      Drive 同期をサービスアカウント認証に設定 (Web 管理画面を使わずに設定)
@@ -78,8 +81,8 @@ EOF
 # アプリの URL（ヘルスチェック用）。HTTPS が既定（自己署名証明書のため curl は -k で使う）
 app_url() {
   case "${ASK_DRIVE_SSL:-true}" in
-    false|0|no|off) echo "http://localhost:${PORT:-4000}/" ;;
-    *) echo "https://localhost:${ASK_DRIVE_HTTPS_PORT:-4443}/" ;;
+    false|0|no|off) echo "http://localhost:$(askdrive_port http)/" ;;
+    *) echo "https://localhost:$(askdrive_port https)/" ;;
   esac
 }
 
@@ -327,6 +330,28 @@ cmd_admin() {
       ;;
     *)
       echo -e "${RED}使用方法: ./app.sh admin grant <email> | ./app.sh admin password${NC}"
+      exit 1
+      ;;
+  esac
+}
+
+# 待ち受けポートとリバースプロキシ（F-1013）: 管理画面で変えた設定を戻すための復旧用。
+# 設定は ssl/listen.json。プロキシの解除は再起動なしで反映、ポートは再起動で反映する。
+cmd_network() {
+  load_env
+  cd "${SCRIPT_DIR}"
+
+  case "${1:-}" in
+    status|proxy-off)
+      MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.network "$@"
+      ;;
+    ports-reset)
+      MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.network ports-reset
+      echo "再起動して反映します..."
+      if service_registered; then service_restart; else cmd_restart; fi
+      ;;
+    *)
+      echo -e "${RED}使用方法: ./app.sh network status | proxy-off | ports-reset${NC}"
       exit 1
       ;;
   esac
@@ -741,6 +766,9 @@ case "${COMMAND}" in
     ;;
   auth)
     cmd_auth "$@"
+    ;;
+  network)
+    cmd_network "$@"
     ;;
   drive)
     cmd_drive "$@"

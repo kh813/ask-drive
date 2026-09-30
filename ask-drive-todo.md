@@ -477,7 +477,7 @@ mix hex.audit
 
 - [ ] 27-1 Cloudflare Zero Trust の準備（公開ホスト名、Access アプリ、IdP に Google Workspace、許可ポリシー: ドメイン / Google グループ）
 - [ ] 27-2 LAN 内に cloudflared を設置し、Tunnel で `https://<LAN 内 IP>:4443` へ中継（自己署名証明書の検証設定）。cloudflared の常駐（launchd / systemd）
-- [ ] 27-3 AskDrive: 利用者の実際の IP を `CF-Connecting-IP` から取得（トンネルからの接続のみ信頼）
+- [x] 27-3 AskDrive: 利用者の実際の IP を `CF-Connecting-IP` から取得（トンネルからの接続のみ信頼）→ Phase 31 で実装（信頼するプロキシに cloudflared の IP を登録）
 - [ ] 27-4 ② のログイン方式を決める: A. Secure LDAP のまま / B. Google ログイン（OAuth、リダイレクト URI を公開ホスト名で登録）/ C. Cloudflare Access のトークン（`Cf-Access-Jwt-Assertion`）を検証して引き継ぐ（要実装）
 - [ ] 27-5 公開後の見直し（ロックの閾値・接続元 IP 単位の制限、管理者の絞り込み、アップデートとバックアップの運用）
 - [ ] 27-6 会社管理の端末に Cloudflare 側の端末条件（証明書・端末の状態）を段階的に適用（14.1 の代替・補完）
@@ -517,6 +517,16 @@ mix hex.audit
 - [x] 30-5 全体管理画面（`/admin?tab=metrics` または `tab=logs`）でのシステム全体の API 利用状況サマリー表示
 - [x] 30-6 単体・LiveView テスト作成と **ビルドゲート**
 - [x] 30-7 インデックス対象データ（ファイル形式別・文書個別）のトークン効率・密度（Tokens/KB）・有効テキスト比率分析および改善アドバイス表示（仕様 14.6）
+
+## Phase 31 — ポートの集約と信頼するリバースプロキシ 【完了】
+
+仕様書 6.10 節（F-1001・F-1006・F-1013）に対応。
+
+- [x] 31-1 HTTP を 4000 に集約（4080 と転送専用サーバーを廃止）。エンドポイントが HTTPS と HTTP の両方で待ち受け、HTTP は既定で HTTPS へ転送
+- [x] 31-2 信頼するリバースプロキシの IP（範囲・IPv6 対応）からの HTTP は転送せずに応答し、転送ヘッダー（X-Forwarded-*、CF-Connecting-IP）を信頼。それ以外のヘッダーは無視（`ASK_DRIVE_TRUST_FORWARDED` を廃止）
+- [x] 31-3 管理画面でポート番号（HTTPS / HTTP）とプロキシの IP を設定（`ssl/listen.json`）。ポート変更は空きを確認して再起動、失敗時は元に戻す
+- [x] 31-4 `./app.sh network status|proxy-off|ports-reset`、`./app.sh status` / `deploy` が設定されたポートを使う
+- [x] 31-5 Linux CI: HTTP 4000 → HTTPS 転送、4080 が閉じていること、プロキシからの HTTP 応答と proxy-off の即時反映
 
 ## Phase 26 — Google Authenticator（TOTP）による 2 段階目の確認 【将来 ToDo・未着手】
 

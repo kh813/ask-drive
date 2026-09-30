@@ -142,7 +142,7 @@ Anthropic API キー: ********
 - 状態・ログ: `./app.sh status`、`systemctl status askdrive`、`journalctl -u askdrive`
 - 解除: `./app.sh service uninstall`（sudo が必要）
 
-ブラウザで `https://localhost:4443/` にアクセスします（`http://localhost:4080/` や従来の `:4000` も HTTPS に転送されます。初回は自己署名証明書の警告が出ます。詳しくは「HTTPS（SSL）」を参照）。
+ブラウザで `https://localhost:4443/` にアクセスします（`http://localhost:4000/` も HTTPS に転送されます。初回は自己署名証明書の警告が出ます。詳しくは「HTTPS（SSL）」を参照）。
 
 ---
 
@@ -274,18 +274,21 @@ Google ログイン（OAuth）は、同じ「ログインの方法」の **「Go
 
 v0.0.45 以降、AskDrive の通信はすべて HTTPS で暗号化されます。
 
-| ポート | 役割 |
+| ポート（既定） | 役割 |
 |---|---|
-| **4443**（`ASK_DRIVE_HTTPS_PORT`） | HTTPS。アプリ本体 |
-| 4080（`ASK_DRIVE_HTTP_PORT`） | HTTP。すべて HTTPS へ転送 |
-| 4000（従来の `PORT`） | 移行用。HTTPS へ転送（`ASK_DRIVE_LEGACY_REDIRECT=false` で停止） |
+| **4443** | HTTPS。アプリ本体（自己署名証明書が既定） |
+| 4000 | HTTP。HTTPS へ転送。ただし「ポートとリバースプロキシ」で指定したプロキシからは HTTP のまま応答 |
+
+ポート番号は、管理画面の設定タブ **「HTTPS（SSL 証明書）」→「ポートとリバースプロキシ」** で変更できます（ほかのソフトとポートが競合したとき用）。変更すると待ち受けを再起動し、新しいポートで起動できなければ元に戻します。v0.0.68 で HTTP の 4080 は廃止し、4000 にまとめました。
 
 - **初回起動時**に自己署名証明書を自動で作成します（`localhost`・PC のホスト名・LAN の IP アドレス向け、`ssl/active/` に保存。秘密鍵は所有者のみ読み取り可）。自己署名証明書のため、ブラウザに「この接続ではプライバシーが保護されません」等の警告が出ます。社内検証中は「詳細」から続行してください。
 - **独自の証明書**（認証局が発行した証明書）は、管理画面の設定タブ **「HTTPS（SSL 証明書）」** で設定します。
   1. 証明書・秘密鍵（パスフレーズなし）・中間証明書（任意）の PEM ファイルを選び、公開するホスト名を入力して **「検証する」** を押します。形式、証明書と鍵の対応、有効期限、中間証明書のつながり、ホスト名を確認し、実際に TLS 接続を試します。
   2. 検証に成功したら **「保存して適用」** を押します。証明書を保存して HTTPS を再起動し、数秒後にページが自動で再接続します。新しい証明書で起動できなかった場合は、自動的に元の証明書へ戻します。
   3. 独自の証明書を設定すると **HSTS** が有効になります（自己署名証明書の間は送りません）。「自己署名証明書に戻す」で元に戻せます。
-- **リバースプロキシ（Cloudflare・nginx 等）を前段に置く場合**は、プロキシから `https://<ホスト>:4443` に接続させ、`.env.prod` に `ASK_DRIVE_TRUST_FORWARDED=true` を設定してください（`X-Forwarded-Proto/Host/Port` を信頼し、Google ログインのリダイレクト URI 等を公開 URL で組み立てます）。プロキシを使わない場合は設定しないでください。
+- **リバースプロキシ（Cloudflare Tunnel・nginx 等）で HTTPS を終端する場合**は、「ポートとリバースプロキシ」にそのプロキシの IP（例: 同じマシンなら `127.0.0.1`）を登録し、プロキシから `http://<ホスト>:4000` に中継させてください。登録した IP からの HTTP だけを受け付け、プロキシが付ける `X-Forwarded-Proto/Host/Port`・`X-Forwarded-For`（Cloudflare の `CF-Connecting-IP`）を信頼します（Google ログインのリダイレクト URI を公開 URL で組み立て、ロックや記録には利用者の実際の IP を使います）。それ以外からの HTTP は HTTPS に転送します。HSTS はプロキシ側で付けてください。プロキシから `https://<ホスト>:4443` に中継しても構いません。
+- 以前の `ASK_DRIVE_TRUST_FORWARDED`・`ASK_DRIVE_LEGACY_REDIRECT` は廃止しました。`ASK_DRIVE_TRUST_FORWARDED=true` を使っていた場合は、プロキシの IP を管理画面で登録してください。
+- 設定を誤って入れなくなった場合は、サーバー上で `./app.sh network status`（確認）、`./app.sh network proxy-off`（プロキシの指定を解除）、`./app.sh network ports-reset`（ポートを 4000 / 4443 に戻して再起動）を実行します。
 - HTTPS を使わない従来の HTTP 運用に戻すには `.env.prod` に `ASK_DRIVE_SSL=false` を設定して再起動します。
 - **Google ログイン**（OAuth）のリダイレクト URI は `https://<ホスト名>:4443/auth/google/callback` になります。Google Cloud Console に登録してください。
 
