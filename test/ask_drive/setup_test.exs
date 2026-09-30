@@ -28,7 +28,8 @@ defmodule AskDrive.SetupTest do
       "password" => "correct horse",
       "password_confirmation" => "correct horse",
       "domain" => "@Example.COM ",
-      "app_name" => "情シス相談窓口"
+      "app_name" => "情シス相談窓口",
+      "admin_emails" => "Owner@example.com, second@example.com"
     }
   end
 
@@ -51,6 +52,10 @@ defmodule AskDrive.SetupTest do
     assert setting.allowed_domain == "example.com"
     assert setting.setup_completed_at
     assert Apps.primary().name == "情シス相談窓口"
+    # the first app's administrators (F-1114)
+    assert AskDrive.Accounts.list_app_admins(Apps.primary().slug) |> Enum.map(& &1.email) ==
+             ["owner@example.com", "second@example.com"]
+
     refute File.exists?(Setup.code_path())
 
     Setup.reset_cache()
@@ -66,13 +71,15 @@ defmodule AskDrive.SetupTest do
                "password" => "short",
                "password_confirmation" => "short",
                "domain" => "not a domain",
-               "app_name" => ""
+               "app_name" => "",
+               "admin_emails" => ""
              })
 
     assert errors.code =~ "正しくありません"
     assert errors.password =~ "文字以上"
     assert errors.domain =~ "ドメイン名"
     assert errors.app_name
+    assert errors.admin_emails =~ "担当者"
     refute Settings.get_setting!().setup_completed_at
   end
 

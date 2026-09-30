@@ -11,7 +11,8 @@ defmodule AskDrive.Accounts.AdminElevationLog do
 
   alias AskDrive.Accounts.User
 
-  @events ~w(granted denied locked_out released expired password_set password_changed password_reset)
+  @events ~w(granted denied locked_out released expired password_set password_changed password_reset
+              app_admin_added app_admin_removed)
 
   schema "admin_elevation_logs" do
     field :email, :string
@@ -21,6 +22,8 @@ defmodule AskDrive.Accounts.AdminElevationLog do
     field :occurred_at, :utc_datetime
     # the app a row is about (spec F-1113); nil = the platform
     field :app_slug, :string
+    # whose assignment an app_admin_added / app_admin_removed row is about (F-1114)
+    field :target_email, :string
 
     belongs_to :user, User
 
@@ -39,12 +42,23 @@ defmodule AskDrive.Accounts.AdminElevationLog do
   def label("password_set"), do: "パスワード初回設定"
   def label("password_changed"), do: "パスワード変更"
   def label("password_reset"), do: "パスワードのリセット（全体管理者）"
+  def label("app_admin_added"), do: "窓口管理者を追加"
+  def label("app_admin_removed"), do: "窓口管理者から削除"
   def label(other), do: other
 
   @doc false
   def changeset(log, attrs) do
     log
-    |> cast(attrs, [:user_id, :email, :event, :ip_address, :user_agent, :occurred_at, :app_slug])
+    |> cast(attrs, [
+      :user_id,
+      :email,
+      :event,
+      :ip_address,
+      :user_agent,
+      :occurred_at,
+      :app_slug,
+      :target_email
+    ])
     |> validate_required([:email, :event, :occurred_at])
     |> validate_inclusion(:event, @events)
     # A long User-Agent must never be the reason an audit write fails.

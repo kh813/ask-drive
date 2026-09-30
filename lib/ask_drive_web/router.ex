@@ -107,7 +107,7 @@ defmodule AskDriveWeb.Router do
 
     get "/:app/admin/elevate", AppAdminAccessController, :new
     post "/:app/admin/elevate", AppAdminAccessController, :create
-    post "/:app/admin/password", AppAdminAccessController, :set_initial
+    get "/:app/admin/reauth", AppAdminAccessController, :reauth
     get "/:app/admin/release", AppAdminAccessController, :release
   end
 

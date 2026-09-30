@@ -90,8 +90,23 @@ defmodule AskDriveWeb.MultiAppTest do
     view |> form("#new-app-form", app: %{name: "Legal", slug: "legal"}) |> render_change()
     assert has_element?(view, "#new-app-url", "/legal")
 
+    # the administrator's e-mail is required (F-1114)
     view
-    |> form("#new-app-form", app: %{name: "Legal", slug: "legal", description: "法務の相談窓口"})
+    |> form("#new-app-form", app: %{name: "Legal", slug: "legal", admin_emails: ""})
+    |> render_submit()
+
+    assert render(view) =~ "担当者: 管理者のメールアドレスを入力してください"
+    refute Apps.get_by_slug("legal")
+
+    view
+    |> form("#new-app-form",
+      app: %{
+        name: "Legal",
+        slug: "legal",
+        description: "法務の相談窓口",
+        admin_emails: "legal-owner@example.com"
+      }
+    )
     |> render_submit()
 
     assert has_element?(view, "#app-row-legal")
@@ -104,7 +119,8 @@ defmodule AskDriveWeb.MultiAppTest do
     {:ok, _view, html} = live(conn, "/legal/admin?tab=settings")
     assert html =~ "管理: AskDrive for Legal"
     assert html =~ "Google Drive"
-    assert html =~ "窓口管理者パスワード"
+    assert html =~ "窓口の担当者（窓口管理者）"
+    assert html =~ "legal-owner@example.com"
     refute html =~ "HTTPS（SSL 証明書）"
     refute html =~ "Google Secure LDAP でのログイン"
 

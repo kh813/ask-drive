@@ -412,6 +412,39 @@ defmodule AskDrive.Accounts do
 
   def assigned_app_admin?(_, _), do: false
 
+  @doc "The app's administrators (spec F-1114), by e-mail."
+  def list_app_admins(app_slug) do
+    slug = app_slug |> String.downcase() |> String.trim()
+
+    on_platform(fn ->
+      Repo.all(
+        from u in User,
+          join: aa in AppAdmin,
+          on: aa.user_id == u.id,
+          where: aa.app_slug == ^slug,
+          order_by: u.email
+      )
+    end)
+  end
+
+  @doc """
+  The user with this e-mail, created (active, not a platform administrator) if they have
+  never signed in — so an app's administrators can be named before their first sign-in.
+  """
+  def ensure_user(email) do
+    email = User.normalize_email(email)
+
+    case get_user_by_email(email) do
+      nil ->
+        on_platform(fn ->
+          %User{} |> User.changeset(%{email: email, status: "active"}) |> Repo.insert()
+        end)
+
+      user ->
+        {:ok, user}
+    end
+  end
+
   @doc """
   Checks if a user can elevate to ANY administration role (platform or at least one app).
   """

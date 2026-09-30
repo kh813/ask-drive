@@ -106,6 +106,9 @@ defmodule AskDriveWeb.UserAuth do
     conn
     |> renew_session()
     |> put_session(@session_key, user.id)
+    # when this sign-in happened: an app's admin screen accepts a recent one as proof of
+    # identity when there is no password to ask for (F-1113)
+    |> put_session(:authenticated_at, System.system_time(:second))
     |> put_session(:live_socket_id, "users_sessions:#{user.id}")
     |> redirect(to: return_to || params[:return_to] || ~p"/")
   end

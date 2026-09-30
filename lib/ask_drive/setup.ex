@@ -159,7 +159,8 @@ defmodule AskDrive.Setup do
 
   @doc """
   Validates and applies the setup form: `%{"code", "password", "password_confirmation",
-  "domain", "app_name"}`. Returns `:ok` or `{:error, %{field => message}}`.
+  "domain", "app_name", "admin_emails"}` (the first app's administrators, F-1114).
+  Returns `:ok` or `{:error, %{field => message}}`.
   """
   def complete(params) do
     errors =
@@ -168,6 +169,7 @@ defmodule AskDrive.Setup do
       |> check(:password, password_error(params["password"], params["password_confirmation"]))
       |> check(:domain, domain_error(params["domain"]))
       |> check(:app_name, if(present?(params["app_name"]), do: nil, else: "窓口名を入力してください"))
+      |> check(:admin_emails, admin_emails_error(params["admin_emails"], params["domain"]))
 
     if errors == %{} do
       {:ok, _} = AdminAccess.force_set_password(params["password"])
@@ -179,6 +181,13 @@ defmodule AskDrive.Setup do
 
       Apps.ensure_primary!()
       {:ok, _} = Apps.update(Apps.primary(), %{name: String.trim(params["app_name"])})
+
+      # the first app's administrators (F-1114), named before their first sign-in
+      for email <- admin_emails(params["admin_emails"]) do
+        {:ok, user} = AskDrive.Accounts.ensure_user(email)
+        {:ok, _} = AskDrive.Accounts.add_app_admin(user, Apps.primary().slug)
+      end
+
       {:ok, _} = complete!(setting)
       :ok
     else
@@ -230,6 +239,35 @@ defmodule AskDrive.Setup do
       not present?(domain) -> "組織の Google Workspace ドメインを入力してください"
       cs.errors[:allowed_domain] -> "ドメイン名（例: company.com）で入力してください"
       true -> nil
+    end
+  end
+
+  defp admin_emails(text),
+    do:
+      text
+      |> to_string()
+      |> String.split(~r/[\s,;、]+/, trim: true)
+      |> Enum.map(&String.downcase/1)
+      |> Enum.uniq()
+
+  defp admin_emails_error(text, domain) do
+    emails = admin_emails(text)
+
+    domain =
+      domain |> to_string() |> String.trim() |> String.downcase() |> String.trim_leading("@")
+
+    cond do
+      emails == [] ->
+        "最初の窓口の担当者のメールアドレスを入力してください"
+
+      Enum.any?(emails, &(not String.match?(&1, ~r/^[^@\s]+@[^@\s]+\.[^@\s]+$/))) ->
+        "メールアドレスとして読み取れないものがあります"
+
+      domain != "" and Enum.any?(emails, &(not String.ends_with?(&1, "@" <> domain))) ->
+        "担当者は @#{domain} のアドレスにしてください"
+
+      true ->
+        nil
     end
   end
 

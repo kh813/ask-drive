@@ -158,21 +158,25 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   def handle_event("create_app", %{"app" => params}, socket) do
-    case AskDrive.Apps.create(params) do
-      {:ok, app} ->
+    domain = Settings.platform_setting!().allowed_domain
+
+    # an app always has an administrator (F-1114), named at creation
+    with {:ok, emails} <- parse_admin_emails(params["admin_emails"], domain),
+         {:ok, app} <- AskDrive.Apps.create(Map.delete(params, "admin_emails")) do
+      :ok = AppAdminAccess.add_admins(socket.assigns.current_user, app, emails)
+      create_app_done(socket, app)
+    else
+      {:error, message} when is_binary(message) ->
         {:noreply,
          socket
-         |> assign(:apps, AskDrive.Apps.list())
-         |> assign(:show_new_app, false)
-         |> assign(:last_created_app, app)
-         |> assign(:app_form, blank_app_form())
-         |> load_dashboard_data()}
+         |> assign(
+           :app_form,
+           to_form(AskDrive.Apps.App.changeset(%AskDrive.Apps.App{}, params), as: :app)
+         )
+         |> put_flash(:error, "担当者: " <> message)}
 
-      {:error, %Ecto.Changeset{} = cs} ->
-        {:noreply, assign(socket, :app_form, to_form(Map.put(cs, :action, :insert), as: :app))}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "窓口を作成できませんでした: #{inspect(reason)}")}
+      other ->
+        create_app_result(socket, other)
     end
   end
 
@@ -659,25 +663,34 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   @impl true
+  # A platform administrator changing an app's administrators from the users tab (recovery,
+  # F-1114): recorded and shown on the app's screen; the last one can't be removed
   def handle_event("toggle_user_app_admin", %{"user_id" => user_id, "app_slug" => slug}, socket) do
     user = Accounts.get_user(user_id)
+    app = AskDrive.Apps.get_by_slug(slug)
 
-    if user do
-      current_slugs = Accounts.list_user_app_slugs(user)
+    if user && app do
+      actor = socket.assigns.current_user
 
-      new_slugs =
-        if slug in current_slugs do
-          current_slugs -- [slug]
-        else
-          [slug | current_slugs]
-        end
+      result =
+        if Accounts.assigned_app_admin?(user, slug),
+          do: AppAdminAccess.remove_admin(actor, app, user),
+          else: AppAdminAccess.add_admins(actor, app, [user.email])
 
-      :ok = Accounts.set_user_apps(user, new_slugs)
+      case result do
+        :ok ->
+          {:noreply,
+           socket
+           |> put_flash(:info, "#{user.email} の窓口管理者権限を更新しました。")
+           |> load_dashboard_data()}
 
-      {:noreply,
-       socket
-       |> put_flash(:info, "#{user.email} の窓口管理者権限を更新しました。")
-       |> load_dashboard_data()}
+        {:error, :last_admin} ->
+          {:noreply,
+           put_flash(socket, :error, "窓口「#{app.name}」の担当者を 0 人にはできません。先にほかの担当者を追加してください。")}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "更新できませんでした。")}
+      end
     else
       {:noreply, put_flash(socket, :error, "ユーザーが見つかりません。")}
     end
@@ -695,20 +708,6 @@ defmodule AskDriveWeb.AdminLive do
       new_password != confirmation ->
         {:noreply, put_flash(socket, :error, password_error_message(:mismatch))}
 
-      # an app's own password (F-1113): the session was elevated with the old one, so sign
-      # in to the app's admin screen again with the new one
-      socket.assigns.scope == :app ->
-        case AppAdminAccess.change(user, socket.assigns.app, current, new_password, context) do
-          :ok ->
-            {:noreply,
-             socket
-             |> put_flash(:info, "窓口の管理者パスワードを変更しました。新しいパスワードで入り直してください。")
-             |> redirect(to: "/#{socket.assigns.app.slug}/admin/elevate")}
-
-          {:error, reason} ->
-            {:noreply, put_flash(socket, :error, password_error_message(reason))}
-        end
-
       true ->
         case AdminAccess.change_password(user, current, new_password, context) do
           {:ok, updated} ->
@@ -724,24 +723,49 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
-  # A platform administrator clears an app's password in an emergency (F-1113): recorded and
-  # shown to the app's administrators, the next of whom sets a new one
+  # The app's administrators (F-1114): added by e-mail (before their first sign-in too) by
+  # an administrator of the app, or by a platform administrator recovering it
   @impl true
-  def handle_event("reset_app_admin_password", %{"app_slug" => app_slug}, socket) do
-    app = AskDrive.Apps.get_by_slug!(app_slug)
+  def handle_event("add_app_admins", %{"app_slug" => slug, "emails" => text}, socket) do
+    app = AskDrive.Apps.get_by_slug!(slug)
 
-    case AppAdminAccess.reset(socket.assigns.current_user, app, %{}) do
+    with {:ok, emails} <- parse_admin_emails(text, Settings.platform_setting!().allowed_domain),
+         :ok <- AppAdminAccess.add_admins(socket.assigns.current_user, app, emails) do
+      {:noreply,
+       socket
+       |> put_flash(:info, "#{Enum.join(emails, "、")} を窓口「#{app.name}」の担当者にしました。")
+       |> load_dashboard_data()}
+    else
+      {:error, :not_authorized} -> {:noreply, put_flash(socket, :error, "担当者を変更する権限がありません。")}
+      {:error, message} -> {:noreply, put_flash(socket, :error, message)}
+    end
+  end
+
+  @impl true
+  def handle_event("remove_app_admin", %{"app_slug" => slug, "user_id" => id}, socket) do
+    app = AskDrive.Apps.get_by_slug!(slug)
+    actor = socket.assigns.current_user
+    user = Accounts.get_user(String.to_integer(id))
+
+    case AppAdminAccess.remove_admin(actor, app, user) do
+      # gave up their own role: the screen closes at once
+      :ok when user.id == actor.id and socket.assigns.scope == :app ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "窓口「#{app.name}」の担当者から外れました。")
+         |> redirect(to: "/" <> app.slug)}
+
       :ok ->
         {:noreply,
          socket
-         |> put_flash(
-           :info,
-           "窓口「#{app.name}」の管理者パスワードをリセットしました。次に窓口管理者が管理画面を開いたときに、新しいパスワードを設定します。"
-         )
+         |> put_flash(:info, "#{user.email} を窓口「#{app.name}」の担当者から外しました。")
          |> load_dashboard_data()}
 
+      {:error, :last_admin} ->
+        {:noreply, put_flash(socket, :error, "担当者を 0 人にはできません。先にほかの担当者を追加してください。")}
+
       {:error, :not_authorized} ->
-        {:noreply, put_flash(socket, :error, "リセットできるのは全体管理者だけです。")}
+        {:noreply, put_flash(socket, :error, "担当者を変更する権限がありません。")}
     end
   end
 
@@ -922,12 +946,19 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:auto_status, auto_status)
     |> assign(:running_run, running_run)
     |> assign(:remaining, Scheduler.remaining())
-    # whether each app has its own admin password (F-1113), for the platform's app list
+    # each app's administrators (F-1114): the platform's app list, and the app's own card
     |> assign(
-      :app_password_set,
-      if(socket.assigns[:scope] == :platform,
-        do: Map.new(AskDrive.Apps.list(), &{&1.slug, AppAdminAccess.password_set?(&1)}),
-        else: %{}
+      :app_admins,
+      case socket.assigns[:scope] do
+        :platform -> Map.new(AskDrive.Apps.list(), &{&1.slug, AppAdminAccess.admins(&1)})
+        _ -> %{socket.assigns.app.slug => AppAdminAccess.admins(socket.assigns.app)}
+      end
+    )
+    |> assign(
+      :app_admin_changes,
+      if(socket.assigns[:scope] == :app,
+        do: AppAdminAccess.admin_changes(socket.assigns.app),
+        else: []
       )
     )
     |> assign(
@@ -1962,6 +1993,28 @@ defmodule AskDriveWeb.AdminLive do
                     type="text"
                     label="説明（任意・窓口の一覧に表示）"
                   />
+                  <%!-- required (F-1114): an app always has an administrator --%>
+                  <label class="sm:col-span-3 text-xs space-y-1">
+                    <span class="block font-medium text-zinc-700 dark:text-zinc-300">
+                      担当者（窓口管理者）のメールアドレス（必須・複数可・カンマ区切り）
+                    </span>
+                    <input
+                      type="text"
+                      name="app[admin_emails]"
+                      id="new-app-admin-emails"
+                      value={@app_form.params["admin_emails"]}
+                      required
+                      placeholder={
+                        if @setting.allowed_domain,
+                          do: "name@#{@setting.allowed_domain}",
+                          else: "name@company.com"
+                      }
+                      class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
+                    />
+                    <span class="block text-zinc-500">
+                      窓口の設定（Drive・API キー等）は担当者が行います。全体管理者は窓口の管理画面に入れません。
+                    </span>
+                  </label>
                   <p class="sm:col-span-3 text-xs text-zinc-600 dark:text-zinc-400">
                     チャットの URL:
                     <span id="new-app-url" class="font-mono text-indigo-700 dark:text-indigo-300">
@@ -2076,22 +2129,22 @@ defmodule AskDriveWeb.AdminLive do
                           <% end %>
                         </td>
                         <td class="py-2 px-2 text-right whitespace-nowrap space-x-2">
-                          <span class="text-[11px] text-zinc-500">
-                            管理者PW: {if @app_password_set[app.slug],
-                              do: "設定済み",
-                              else: "未設定（担当者が初回に設定）"}
-                          </span>
-                          <button
-                            :if={@app_password_set[app.slug]}
-                            type="button"
-                            id={"reset-app-password-#{app.slug}"}
-                            phx-click="reset_app_admin_password"
-                            phx-value-app_slug={app.slug}
-                            data-confirm={"窓口「#{app.name}」の管理者パスワードをリセット（消去）しますか？リセットは記録され、窓口管理者の画面に表示されます。次に窓口管理者が管理画面を開いたときに、新しいパスワードを設定します。"}
-                            class="text-[11px] text-indigo-600 dark:text-indigo-400 underline"
+                          <%!-- the app's administrators (F-1114); none = nobody can administer it --%>
+                          <span
+                            id={"app-admins-#{app.slug}"}
+                            class={[
+                              "text-[11px]",
+                              if(@app_admins[app.slug] == [],
+                                do: "text-red-600 font-medium",
+                                else: "text-zinc-500"
+                              )
+                            ]}
                           >
-                            管理者PWをリセット
-                          </button>
+                            {case @app_admins[app.slug] || [] do
+                              [] -> "担当者未設定（ユーザー管理で割り当ててください）"
+                              admins -> "担当者: " <> Enum.map_join(admins, "、", & &1.email)
+                            end}
+                          </span>
                           <button
                             :if={not app.primary and app.id}
                             type="button"
@@ -3329,69 +3382,96 @@ defmodule AskDriveWeb.AdminLive do
               </p>
             </div>
 
-            <%!-- Card 1b: App Administrator Password (for App scope) --%>
+            <%!-- The app's administrators (spec F-1114) --%>
             <div
               :if={@scope == :app}
+              id="app-admins-card"
               class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
             >
               <div>
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-shield-check" class="w-5 h-5 text-indigo-600" /> 窓口管理者パスワード
+                  <.icon name="hero-user-group" class="w-5 h-5 text-indigo-600" /> 窓口の担当者（窓口管理者）
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  この窓口（{@app.name}）の管理画面に入るためのパスワードです。この窓口の担当者（窓口管理者）だけが使い、全体管理者は知りません（全体管理者はリセット〈消去〉だけができます）。変更すると、この窓口に昇格中のすべてのセッションが終了します。
-                </p>
-                <p
-                  :if={@setting.app_admin_password_reset_at}
-                  id="app-password-reset-note"
-                  class="text-xs mt-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-900 dark:text-amber-100"
-                >
-                  最後のリセット: {AskDrive.Clock.format(
-                    @setting.app_admin_password_reset_at,
-                    "%Y-%m-%d %H:%M"
-                  )}（全体管理者 {@setting.app_admin_password_reset_by}）
+                  この窓口の管理画面（Drive の設定・API キーを含む）に入れるのは、ここに載っている担当者だけです（全体管理者は入れません）。担当者は各自のアカウントで本人確認して入ります。担当者を追加し、自分を外して引き継ぐこともできます（最後の 1 人は外せません）。
                 </p>
               </div>
 
-              <.form
-                for={@password_form}
-                id="app-admin-password-form"
-                phx-submit="change_admin_password"
-                class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end"
-              >
-                <.input
-                  field={@password_form[:current]}
-                  type="password"
-                  value=""
-                  label="現在のパスワード"
-                  autocomplete="current-password"
-                />
-                <.input
-                  field={@password_form[:new]}
-                  type="password"
-                  value=""
-                  label={"新しいパスワード（#{AdminAccess.min_password_length()} 文字以上）"}
-                  autocomplete="new-password"
-                />
-                <div class="flex items-end gap-3">
-                  <div class="flex-1">
-                    <.input
-                      field={@password_form[:confirmation]}
-                      type="password"
-                      value=""
-                      label="確認"
-                      autocomplete="new-password"
-                    />
-                  </div>
+              <ul class="divide-y divide-zinc-200/60 dark:divide-zinc-800 text-xs">
+                <li
+                  :for={admin <- @app_admins[@app.slug] || []}
+                  id={"app-admin-#{admin.id}"}
+                  class="flex items-center justify-between py-2"
+                >
+                  <span class="text-zinc-800 dark:text-zinc-200">
+                    {admin.email}
+                    <span :if={admin.id == @current_user.id} class="text-zinc-400">（あなた）</span>
+                    <span :if={is_nil(admin.last_login_at)} class="text-zinc-400">（未ログイン）</span>
+                  </span>
                   <button
-                    type="submit"
-                    id="change-app-admin-password-btn"
-                    class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition whitespace-nowrap"
+                    :if={length(@app_admins[@app.slug] || []) > 1}
+                    id={"remove-app-admin-#{admin.id}"}
+                    phx-click="remove_app_admin"
+                    phx-value-app_slug={@app.slug}
+                    phx-value-user_id={admin.id}
+                    data-confirm={
+                      if(admin.id == @current_user.id,
+                        do: "あなたをこの窓口の担当者から外しますか？以後、この窓口の管理画面には入れなくなります。",
+                        else: "#{admin.email} をこの窓口の担当者から外しますか？"
+                      )
+                    }
+                    class="px-2.5 py-1 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[11px] font-medium"
                   >
-                    変更
+                    {if admin.id == @current_user.id, do: "自分を外す", else: "外す"}
                   </button>
-                </div>
-              </.form>
+                </li>
+              </ul>
+
+              <form
+                id="add-app-admins-form"
+                phx-submit="add_app_admins"
+                class="flex flex-col sm:flex-row gap-2 sm:items-end"
+              >
+                <input type="hidden" name="app_slug" value={@app.slug} />
+                <label class="flex-1 text-xs space-y-1">
+                  <span class="block font-medium text-zinc-700 dark:text-zinc-300">
+                    担当者を追加（メールアドレス、複数可・カンマ区切り。まだログインしたことのない人も追加できます）
+                  </span>
+                  <input
+                    type="text"
+                    name="emails"
+                    required
+                    class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  id="add-app-admins-btn"
+                  class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                >
+                  追加
+                </button>
+              </form>
+
+              <div
+                :if={@app_admin_changes != []}
+                id="app-admin-changes"
+                class="text-[11px] text-zinc-500 space-y-0.5"
+              >
+                <p class="font-medium text-zinc-600 dark:text-zinc-400">担当者の変更履歴</p>
+                <p
+                  :for={c <- @app_admin_changes}
+                  class={c.by_platform? && "text-amber-700 dark:text-amber-300"}
+                >
+                  {AskDrive.Clock.format(c.at, "%m/%d %H:%M") <>
+                    " " <>
+                    c.actor <>
+                    if(c.by_platform?, do: "（全体管理者）", else: "") <>
+                    " が " <>
+                    (c.target || "") <>
+                    if(c.event == "app_admin_added", do: " を追加", else: " を削除")}
+                </p>
+              </div>
             </div>
 
             <%!-- Card 1c: App Access Password (合言葉 / 利用制限) --%>
@@ -4741,6 +4821,29 @@ defmodule AskDriveWeb.AdminLive do
       "file:bg-indigo-600 file:text-white file:text-xs file:font-medium",
       "hover:file:bg-indigo-700"
     ]
+  end
+
+  defp create_app_done(socket, app) do
+    create_app_result(socket, {:ok, app})
+  end
+
+  defp create_app_result(socket, result) do
+    case result do
+      {:ok, app} ->
+        {:noreply,
+         socket
+         |> assign(:apps, AskDrive.Apps.list())
+         |> assign(:show_new_app, false)
+         |> assign(:last_created_app, app)
+         |> assign(:app_form, blank_app_form())
+         |> load_dashboard_data()}
+
+      {:error, %Ecto.Changeset{} = cs} ->
+        {:noreply, assign(socket, :app_form, to_form(Map.put(cs, :action, :insert), as: :app))}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "窓口を作成できませんでした: #{inspect(reason)}")}
+    end
   end
 
   defp blank_app_form,

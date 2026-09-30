@@ -106,37 +106,30 @@ defmodule AskDrive.AccountsTest do
     assert AdminAccess.verify_access_password("wrongpassword", disabled) == true
   end
 
-  test "AppAdminAccess: only a platform admin resets (clears) an app's password" do
+  test "AppAdminAccess: app admins add others and may leave, but never the last one" do
     alias AskDrive.Accounts.AppAdminAccess
     alias AskDrive.Apps
 
-    super_admin =
-      %AskDrive.Accounts.User{}
-      |> AskDrive.Accounts.User.changeset(%{
-        email: "super@example.com",
-        name: "Super",
-        admin_eligible: true,
-        status: "active"
-      })
-      |> AskDrive.Repo.insert!()
-
-    owner =
-      %AskDrive.Accounts.User{}
-      |> AskDrive.Accounts.User.changeset(%{
-        email: "owner@example.com",
-        name: "Owner",
-        admin_eligible: false,
-        status: "active"
-      })
-      |> AskDrive.Repo.insert!()
-
     app = Apps.get_by_slug!("it-support")
+    {:ok, owner} = AskDrive.Accounts.ensure_user("owner@example.com")
+    {:ok, stranger} = AskDrive.Accounts.ensure_user("stranger@example.com")
     {:ok, _} = AskDrive.Accounts.add_app_admin(owner, "it-support")
-    :ok = AppAdminAccess.set_initial(owner, app, "owner-pass-1")
 
-    assert {:error, :not_authorized} = AppAdminAccess.reset(owner, app)
-    assert :ok = AppAdminAccess.reset(super_admin, app)
-    refute AppAdminAccess.password_set?(app)
-    assert AppAdminAccess.setting(app).app_admin_password_reset_by == "super@example.com"
+    assert {:error, :not_authorized} = AppAdminAccess.add_admins(stranger, app, ["x@example.com"])
+    assert {:error, :last_admin} = AppAdminAccess.remove_admin(owner, app, owner)
+
+    :ok = AppAdminAccess.add_admins(owner, app, ["next@example.com"])
+    successor = AskDrive.Accounts.get_user_by_email("next@example.com")
+    assert AskDrive.Accounts.assigned_app_admin?(successor, "it-support")
+
+    assert :ok = AppAdminAccess.remove_admin(owner, app, owner)
+    refute AskDrive.Accounts.assigned_app_admin?(owner, "it-support")
+
+    changes = AppAdminAccess.admin_changes(app)
+
+    assert [
+             %{event: "app_admin_removed", target: "owner@example.com"},
+             %{event: "app_admin_added"} | _
+           ] = changes
   end
 end

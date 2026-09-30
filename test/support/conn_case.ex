@@ -74,24 +74,14 @@ defmodule AskDriveWeb.ConnCase do
   pass `user_fixture(admin_eligible: true)`.
   """
   @doc """
-  Makes `user` an administrator of the app and elevates the session with the app's own
-  password (spec F-1113), which it sets to `password`.
+  Makes `user` an administrator of the app and elevates the session for it (spec F-1113;
+  in tests LDAP is off, so a fresh sign-in is the proof of identity).
   """
-  def log_in_app_admin(conn, user, slug \\ "it-support", password \\ "app-pass-123") do
+  def log_in_app_admin(conn, user, slug \\ "it-support") do
     alias AskDrive.Accounts.AppAdminAccess
     {:ok, _} = AskDrive.Accounts.add_app_admin(user, slug)
     app = AskDrive.Apps.get_by_slug!(slug)
-
-    # app databases aren't rolled back between tests: set the password outright
-    AskDrive.Apps.with_app(app, fn ->
-      AskDrive.Settings.get_setting!()
-      |> Ecto.Changeset.change(
-        app_admin_password_hash: AskDrive.Accounts.AdminAccess.hash_password(password)
-      )
-      |> AskDrive.Repo.update!()
-    end)
-
-    {:ok, token} = AppAdminAccess.elevate(user, app, password)
+    {:ok, token} = AppAdminAccess.elevate_with_fresh_login(user, app, System.system_time(:second))
 
     tokens = Plug.Conn.get_session(conn, AppAdminAccess.session_key()) || %{}
     Plug.Conn.put_session(conn, AppAdminAccess.session_key(), Map.put(tokens, slug, token))

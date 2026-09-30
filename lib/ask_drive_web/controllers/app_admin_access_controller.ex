@@ -1,82 +1,78 @@
 defmodule AskDriveWeb.AppAdminAccessController do
   @moduledoc """
-  Elevation to an app's admin screen with the app's own password (spec F-1113): only for
-  the app's assigned administrators. While the password is unset, the first of them to
-  arrive sets it here. Elevation is remembered per app in the session.
+  Getting into an app's admin screen (spec F-1113): only the app's administrators, after
+  confirming it is them — their own password through Secure LDAP, or (without LDAP) a
+  sign-in within the last 10 minutes. Elevation is remembered per app in the session.
   """
   use AskDriveWeb, :controller
 
   plug :put_view, html: AskDriveWeb.AdminAccessHTML
 
   alias AskDrive.Accounts
-  alias AskDrive.Accounts.{AdminAccess, AppAdminAccess}
+  alias AskDrive.Accounts.AppAdminAccess
   alias AskDrive.Apps
+  alias AskDriveWeb.ConnectionEnv
 
-  plug :load_app
+  plug :load_app when action in [:new, :create, :release]
 
-  def new(conn, _params), do: render_prompt(conn, nil)
+  def new(conn, _params) do
+    app = conn.assigns.app
+
+    case AppAdminAccess.confirmation_method() do
+      :ldap_password ->
+        render_prompt(conn, nil)
+
+      :fresh_login ->
+        at = get_session(conn, :authenticated_at)
+
+        case AppAdminAccess.elevate_with_fresh_login(
+               conn.assigns.current_user,
+               app,
+               at,
+               context(conn)
+             ) do
+          {:ok, token} -> enter(conn, app, token)
+          {:error, _} -> render_prompt(conn, nil)
+        end
+    end
+  end
 
   def create(conn, params) do
     app = conn.assigns.app
     password = get_in(params, ["admin", "password"]) || ""
+    env = ConnectionEnv.env(conn)
 
-    case AppAdminAccess.elevate(conn.assigns.current_user, app, password, context(conn)) do
+    case AppAdminAccess.elevate_with_password(
+           conn.assigns.current_user,
+           app,
+           password,
+           env,
+           context(conn)
+         ) do
       {:ok, token} ->
-        conn
-        |> put_token(app, token)
-        |> put_flash(:info, "窓口「#{app.name}」の管理画面に入りました。")
-        |> redirect(to: back_to(conn, app))
+        enter(conn, app, token)
 
       {:error, :invalid_password} ->
-        left = AppAdminAccess.attempts_remaining(conn.assigns.current_user, app)
+        left = Accounts.LoginThrottle.remaining(conn.assigns.current_user.email)
         render_prompt(conn, "パスワードが正しくありません。（あと #{left} 回失敗すると一時的にロックされます）")
 
-      {:error, {:locked_out, until}} ->
-        render_prompt(conn, "失敗が続いたため、#{AskDrive.Clock.format(until, "%H:%M")} まで受け付けません。")
+      {:error, {:locked, until}} ->
+        render_prompt(conn, "失敗が続いたため、#{AskDrive.Clock.format(until, "%m/%d %H:%M")} まで受け付けません。")
 
-      {:error, :no_password} ->
-        render_prompt(conn, nil)
+      {:error, {:unavailable, message}} ->
+        render_prompt(conn, "LDAP サーバーで確認できませんでした: #{message}")
 
       {:error, :not_assigned} ->
         not_assigned(conn, app)
     end
   end
 
-  def set_initial(conn, params) do
-    app = conn.assigns.app
-    user = conn.assigns.current_user
-    password = get_in(params, ["admin", "password"]) || ""
-    confirmation = get_in(params, ["admin", "confirmation"]) || ""
-
-    result =
-      if password != confirmation,
-        do: {:error, :mismatch},
-        else: AppAdminAccess.set_initial(user, app, password, context(conn))
-
-    case result do
-      :ok ->
-        {:ok, token} = AppAdminAccess.elevate(user, app, password, context(conn))
-
-        conn
-        |> put_token(app, token)
-        |> put_flash(:info, "窓口「#{app.name}」の管理者パスワードを設定しました。")
-        |> redirect(to: back_to(conn, app))
-
-      {:error, :mismatch} ->
-        render_prompt(conn, "確認のパスワードが一致しません。")
-
-      {:error, :too_short} ->
-        render_prompt(conn, "パスワードは #{AdminAccess.min_password_length()} 文字以上にしてください。")
-
-      {:error, :surrounding_whitespace} ->
-        render_prompt(conn, "パスワードの前後に空白は使えません。")
-
-      {:error, :already_set} ->
-        render_prompt(conn, "パスワードはすでに設定されています。")
-
-      {:error, :not_assigned} ->
-        not_assigned(conn, app)
-    end
+  @doc "Sign in again (the proof of identity without LDAP), then back to the app's admin screen."
+  def reauth(conn, %{"app" => slug}) do
+    conn
+    |> configure_session(renew: true)
+    |> clear_session()
+    |> redirect(to: "/login?" <> URI.encode_query(%{return_to: "/#{slug}/admin/elevate"}))
   end
 
   def release(conn, _params) do
@@ -87,6 +83,15 @@ defmodule AskDriveWeb.AppAdminAccessController do
     |> put_session(AppAdminAccess.session_key(), Map.delete(tokens, app.slug))
     |> put_flash(:info, "窓口「#{app.name}」の管理画面から出ました。")
     |> redirect(to: "/" <> app.slug)
+  end
+
+  defp enter(conn, app, token) do
+    tokens = get_session(conn, AppAdminAccess.session_key()) || %{}
+
+    conn
+    |> put_session(AppAdminAccess.session_key(), Map.put(tokens, app.slug, token))
+    |> put_flash(:info, "窓口「#{app.name}」の管理画面に入りました。")
+    |> redirect(to: back_to(conn, app))
   end
 
   defp load_app(conn, _opts) do
@@ -105,28 +110,20 @@ defmodule AskDriveWeb.AppAdminAccessController do
     conn
     |> put_flash(
       :error,
-      "窓口「#{app.name}」の管理画面は、この窓口の担当者（窓口管理者）だけが使えます。担当者の割り当ては全体管理者に依頼してください。"
+      "窓口「#{app.name}」の管理画面は、この窓口の担当者（窓口管理者）だけが使えます。担当者の追加は、この窓口の担当者か全体管理者に依頼してください。"
     )
     |> redirect(to: "/" <> app.slug)
   end
 
   defp render_prompt(conn, error) do
     app = conn.assigns.app
-    setting = AppAdminAccess.setting(app)
 
     conn
     |> assign(:error_message, error)
-    |> assign(:password_set?, is_binary(setting.app_admin_password_hash))
-    |> assign(:reset_at, setting.app_admin_password_reset_at)
-    |> assign(:reset_by, setting.app_admin_password_reset_by)
-    |> assign(:min_length, AdminAccess.min_password_length())
+    |> assign(:method, AppAdminAccess.confirmation_method())
+    |> assign(:fresh_minutes, AppAdminAccess.fresh_login_minutes())
     |> assign(:page_title, "#{app.name} の管理画面へ")
     |> render(:app_elevate)
-  end
-
-  defp put_token(conn, app, token) do
-    tokens = get_session(conn, AppAdminAccess.session_key()) || %{}
-    put_session(conn, AppAdminAccess.session_key(), Map.put(tokens, app.slug, token))
   end
 
   defp back_to(conn, app) do

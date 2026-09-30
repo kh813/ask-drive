@@ -33,7 +33,7 @@ defmodule AskDriveWeb.SetupLive do
         {:noreply,
          socket
          |> assign(:errors, errors)
-         |> assign(:values, Map.take(params, ["domain", "app_name"]))}
+         |> assign(:values, Map.take(params, ["domain", "app_name", "admin_emails"]))}
     end
   end
 
@@ -105,6 +105,16 @@ defmodule AskDriveWeb.SetupLive do
             value={@values["app_name"]}
           >
             チャット画面に「AskDrive for（この名前）」と表示されます。あとから変更でき、窓口は全体管理で追加できます。
+          </.setup_field>
+
+          <.setup_field
+            name="admin_emails"
+            label="5. 最初の窓口の担当者（窓口管理者）のメールアドレス"
+            errors={@errors}
+            value={@values["admin_emails"]}
+            placeholder="name@company.com"
+          >
+            この窓口の設定（Google Drive・API キー等）を行う人です（複数ならカンマ区切り）。窓口の管理画面に入れるのは担当者だけで、全体管理者は入れません。担当者はあとから追加・引き継ぎできます。
           </.setup_field>
 
           <button

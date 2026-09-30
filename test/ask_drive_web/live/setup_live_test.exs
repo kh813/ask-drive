@@ -57,7 +57,8 @@ defmodule AskDriveWeb.SetupLiveTest do
         "password" => "correct horse",
         "password_confirmation" => "correct horse",
         "domain" => "example.com",
-        "app_name" => "IT-Support"
+        "app_name" => "IT-Support",
+        "admin_emails" => "owner@example.com"
       })
       |> render_submit()
 
