@@ -49,7 +49,7 @@ AskDrive 管理スクリプト
   setup              初回セットアップを実行 (依存ツール確認、DB初期化、ビルド)
   deploy             最新コードを取得し、マイグレーションと再ビルド・再起動を実行
   update [options]   Git/Release から自己アップデート (--yes, --ver <version>)
-  repair-ollama      .runtime の Ollama を再インストール (llama-server 欠落の修復)
+  repair-ollama      .runtime に Ollama をインストール / 再インストール (あとで Ollama に切り替えるとき・llama-server 欠落の修復)
   admin grant <mail> 指定メールアドレスに管理者への昇格を許可 (ロックアウト時の復旧)
   admin password     管理者パスワードを再設定 (対話入力)
   auth status        ログイン認証・LDAP・管理者アカウントの状態

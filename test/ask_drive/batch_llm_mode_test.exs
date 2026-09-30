@@ -33,14 +33,14 @@ defmodule AskDrive.BatchLlmModeTest do
     assert LLM.generation_model(back) == back.batch_model
   end
 
-  test "cloud mode requires an API key and a model name" do
+  test "cloud mode requires a model name; the API key may come later (F-343)" do
     assert {:error, cs} =
              Settings.update_setting(Settings.get_setting!(), %{
                batch_llm_mode: "cloud",
                cloud_llm_provider: "gemini"
              })
 
-    assert cs.errors[:gemini_api_key]
+    refute cs.errors[:gemini_api_key]
     assert cs.errors[:cloud_llm_model]
   end
 

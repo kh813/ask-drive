@@ -326,6 +326,52 @@ defmodule AskDrive.Batch.SchedulerTest do
     end
   end
 
+  describe "a provider's API key not issued yet (F-343)" do
+    setup do
+      on_exit(fn -> AskDrive.Runtime.Mode.set_mode(:daytime) end)
+      :ok
+    end
+
+    test "no embedding key: the batch is skipped and says why; nothing is touched" do
+      {:ok, _} =
+        AskDrive.Settings.update_setting(AskDrive.Settings.get_setting!(), %{
+          llm_provider: "gemini",
+          embed_provider: "gemini",
+          embed_model: "gemini-embedding-001",
+          embedding_dim: 768
+        })
+
+      assert {:ok, run} = Scheduler.run_batch(trigger: "auto")
+      assert run.status == "skipped"
+      assert run.error =~ "埋め込み（Google Gemini API）の API キーが未設定"
+      assert Repo.aggregate(BatchPhaseStat, :count) == 0
+      # the night counts as run: not retried every minute
+      assert Scheduler.ran_since?(DateTime.add(DateTime.utc_now(), -60))
+    end
+
+    test "only the generation key missing: documents are indexed, QA generation is skipped" do
+      {server, url} = AskDrive.StubOllama.start!(self())
+      on_exit(fn -> Process.exit(server, :normal) end)
+
+      {:ok, _} =
+        AskDrive.Settings.update_setting(AskDrive.Settings.get_setting!(), %{
+          llm_provider: "gemini",
+          embed_provider: "ollama",
+          ollama_host: url
+        })
+
+      assert {:ok, run} = Scheduler.run_batch()
+      assert run.status == "completed"
+      assert run.error =~ "生成（Google Gemini API）の API キーが未設定のため、QA 生成を行いませんでした"
+
+      phases =
+        Repo.all(from s in BatchPhaseStat, where: s.batch_run_id == ^run.id, select: s.phase_name)
+
+      assert "embed_chunks" in phases
+      refute "generate" in phases
+    end
+  end
+
   defp flush_messages(acc \\ []) do
     receive do
       msg -> flush_messages([msg | acc])

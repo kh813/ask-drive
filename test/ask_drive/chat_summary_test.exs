@@ -66,7 +66,8 @@ defmodule AskDrive.ChatSummaryTest do
     assert ChatSummary.provider_and_model(setting) == {"ollama", setting.batch_model}
 
     assert {:error, cs} = Settings.update_setting(setting, %{chat_summary_provider: "gemini"})
-    assert cs.errors[:gemini_api_key]
+    # the API key may come later (F-343); a model name is still needed
+    refute cs.errors[:gemini_api_key]
     assert cs.errors[:chat_summary_model]
 
     {:ok, updated} =

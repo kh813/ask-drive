@@ -90,11 +90,19 @@ defmodule AskDrive.Batch.Scheduler do
   def run_batch(opts \\ []) do
     # The nightly cron and a manual run — in this app or another — could otherwise overlap
     # and fight over the one local model.
-    if running_anywhere?() do
-      Logger.warning("Batch requested while another is running; skipped")
-      {:error, :already_running}
-    else
-      do_run_batch(opts)
+    cond do
+      running_anywhere?() ->
+        Logger.warning("Batch requested while another is running; skipped")
+        {:error, :already_running}
+
+      provider = LLM.missing_api_key(:embedding) ->
+        record_skipped(
+          opts,
+          "埋め込み（#{provider}）の API キーが未設定のため、実行しませんでした。窓口の管理画面の「設定」で API キーを登録してください。"
+        )
+
+      true ->
+        do_run_batch(opts)
     end
   rescue
     # A crash before the batch_runs row exists (or outside the phases' own rescue) used to
@@ -179,6 +187,25 @@ defmodule AskDrive.Batch.Scheduler do
     }
   end
 
+  # Nothing can be indexed without the embedding provider's key (e.g. not issued yet, spec
+  # F-343): record the night as skipped, with why, instead of marking every document failed.
+  # A skipped automatic run counts as the night's run, so it isn't retried every minute.
+  defp record_skipped(opts, reason) do
+    Logger.warning("Batch skipped: #{reason}")
+    now = DateTime.utc_now()
+
+    %BatchRun{}
+    |> BatchRun.changeset(%{
+      started_at: now,
+      finished_at: now,
+      status: "skipped",
+      error: reason,
+      kind: if(Keyword.get(opts, :ingest_only, false), do: "ingest_only", else: "full"),
+      trigger: if(Keyword.get(opts, :trigger) == "auto", do: "auto", else: "manual")
+    })
+    |> Repo.insert()
+  end
+
   defp do_run_batch(opts) do
     force_all = Keyword.get(opts, :force, false)
     ingest_only? = Keyword.get(opts, :ingest_only, false)
@@ -232,18 +259,31 @@ defmodule AskDrive.Batch.Scheduler do
       # --- Phase 3: Embed Chunks ---
       {_p3_stat, batch_run} = run_phase_3_embed_chunks(batch_run, setting)
 
-      {batch_run, deadline_reached?} =
-        if ingest_only? do
-          Logger.info("Batch ##{batch_run.id} - ingest only: skipping Phase 4 (Generate) and 5")
-          {batch_run, false}
-        else
-          # --- Phase 4: Generate (Deadline-controlled) ---
-          {_p4_stat, batch_run, deadline_reached?} =
-            run_phase_4_generate(batch_run, setting, deadline, force_all)
+      missing_generation_key = LLM.missing_api_key(:generation, setting)
 
-          # --- Phase 5: Embed Questions ---
-          {_p5_stat, batch_run} = run_phase_5_embed_questions(batch_run, setting)
-          {batch_run, deadline_reached?}
+      {batch_run, deadline_reached?} =
+        cond do
+          ingest_only? ->
+            Logger.info("Batch ##{batch_run.id} - ingest only: skipping Phase 4 (Generate) and 5")
+            {batch_run, false}
+
+          # the embedding key is there but not the generation one (spec F-343): index, and
+          # say why no QA was generated
+          missing_generation_key ->
+            note =
+              "生成（#{missing_generation_key}）の API キーが未設定のため、QA 生成を行いませんでした（取り込みのみ実行）。"
+
+            Logger.warning("Batch ##{batch_run.id} - #{note}")
+            {batch_run |> BatchRun.changeset(%{error: note}) |> Repo.update!(), false}
+
+          true ->
+            # --- Phase 4: Generate (Deadline-controlled) ---
+            {_p4_stat, batch_run, deadline_reached?} =
+              run_phase_4_generate(batch_run, setting, deadline, force_all)
+
+            # --- Phase 5: Embed Questions ---
+            {_p5_stat, batch_run} = run_phase_5_embed_questions(batch_run, setting)
+            {batch_run, deadline_reached?}
         end
 
       # --- Phase 6: Verify & Finish ---

@@ -66,21 +66,27 @@ fi
 # で失敗する。そのため .app の zip から ollama を 1 個だけ抜き出すのではなく、
 # 公式のスタンドアロン tarball を丸ごと RUNTIME_BIN へ展開する。
 # install_ollama_runtime / ollama_runtime_complete は scripts/lib/platform.sh
-OLLAMA_PATH="$(command -v ollama || true)"
-if [[ -z "${OLLAMA_PATH}" ]]; then
-  echo "ollama が見つかりません。Ollama スタンドアロン配布物を取得中..."
-  if install_ollama_runtime; then
-    echo -e "${GREEN}ollama と推論ランナーを ${RUNTIME_DIR} に配置しました。${NC}"
+#
+# 生成・埋め込みのどちらかに Ollama を選んだ場合だけ、手順 4 で呼ぶ（外部 API だけで使う
+# 構成に数百 MB の Ollama を入れない。あとで Ollama に切り替えるときは ./app.sh repair-ollama）。
+ensure_ollama_runtime() {
+  local ollama_path
+  ollama_path="$(command -v ollama || true)"
+  if [[ -z "${ollama_path}" ]]; then
+    echo "ollama が見つかりません。Ollama スタンドアロン配布物を取得中..."
+    if install_ollama_runtime; then
+      echo -e "${GREEN}ollama と推論ランナーを ${RUNTIME_DIR} に配置しました。${NC}"
+    else
+      echo -e "${RED}Ollama のインストールに失敗しました。${NC}"
+    fi
+  elif [[ "${ollama_path}" == "${RUNTIME_BIN}/ollama" ]] && ! ollama_runtime_complete; then
+    # 旧バージョンのセットアップが ollama 本体だけを配置した状態。ランナーを補って修復する。
+    echo -e "${YELLOW}ollama はありますが推論ランナーが欠落しています。再インストールします。${NC}"
+    install_ollama_runtime || echo -e "${RED}Ollama の再インストールに失敗しました。${NC}"
   else
-    echo -e "${RED}Ollama のインストールに失敗しました。${NC}"
+    echo "ollama: OK (${ollama_path})"
   fi
-elif [[ "${OLLAMA_PATH}" == "${RUNTIME_BIN}/ollama" ]] && ! ollama_runtime_complete; then
-  # 旧バージョンのセットアップが ollama 本体だけを配置した状態。ランナーを補って修復する。
-  echo -e "${YELLOW}ollama はありますが推論ランナーが欠落しています。再インストールします。${NC}"
-  install_ollama_runtime || echo -e "${RED}Ollama の再インストールに失敗しました。${NC}"
-else
-  echo "ollama: OK (${OLLAMA_PATH})"
-fi
+}
 
 # (C) Poppler (pdftotext) / Erlang & Elixir の確認・インストール
 #   macOS: Homebrew（ユーザー領域 .runtime/homebrew に導入可）
@@ -215,11 +221,21 @@ BANNER
   read -r -p "生成モデル名 (既定: ${DEFAULT_GEN_MODEL:-ロード中のモデル}): " LLM_MODEL
   LLM_MODEL="${LLM_MODEL:-${DEFAULT_GEN_MODEL}}"
 
+  # 埋め込みの既定は、回答生成と同じプロバイダ（Gemini / OpenAI / LM Studio は埋め込みにも
+  # 対応）。Claude は埋め込み非対応のためローカル（Ollama）。Enter だけで Ollama になって、
+  # Ollama を動かせないマシンで詰まることがないようにする。
+  case "${LLM_PROVIDER}" in
+    lmstudio) DEFAULT_EMB_CHOICE=2 ;;
+    gemini) DEFAULT_EMB_CHOICE=3 ;;
+    openai) DEFAULT_EMB_CHOICE=5 ;;
+    *) DEFAULT_EMB_CHOICE=1 ;;
+  esac
+
   echo ""
   echo "  ※ 埋め込みは Claude API 非対応のため選択肢から除外されます。"
-  echo "  ※ 埋め込みを変更すると全ドキュメントの再インデックスが必要です。ローカルのままを推奨します。"
-  read -r -p "埋め込みに使うプロバイダ [1,2,3,5] (既定: 1): " EMB_CHOICE
-  EMBED_PROVIDER="$(provider_from_choice "${EMB_CHOICE:-1}")"
+  echo "  ※ 埋め込みを後から変更すると、全ドキュメントの再インデックスが必要です。"
+  read -r -p "埋め込みに使うプロバイダ [1,2,3,5] (既定: ${DEFAULT_EMB_CHOICE}): " EMB_CHOICE
+  EMBED_PROVIDER="$(provider_from_choice "${EMB_CHOICE:-${DEFAULT_EMB_CHOICE}}")"
   if [[ "${EMBED_PROVIDER}" == "anthropic" ]]; then
     echo -e "${YELLOW}Claude API は埋め込みに対応していません。ollama を使用します。${NC}"
     EMBED_PROVIDER="ollama"
@@ -231,10 +247,17 @@ BANNER
   read -r -p "埋め込み次元 (既定: ${DEFAULT_EMBED_DIM}): " EMBED_DIM
   EMBED_DIM="${EMBED_DIM:-${DEFAULT_EMBED_DIM}}"
 
-  # API キーは入力中に画面へ出さない。
+  # API キーは入力中に画面へ出さない。未発行なら空欄のまま進め、あとで管理画面で登録できる
+  # （キーがない間、夜間バッチは実行せずにその旨を記録する）。
   ANTHROPIC_KEY=""
   GEMINI_KEY=""
   OPENAI_KEY=""
+  case " ${LLM_PROVIDER} ${EMBED_PROVIDER} " in
+    *" gemini "*|*" anthropic "*|*" openai "*)
+      echo ""
+      echo "  ※ API キーが未発行なら、空欄のまま Enter で進めます（あとで管理画面で登録できます）。"
+      ;;
+  esac
   for needed in "${LLM_PROVIDER}" "${EMBED_PROVIDER}"; do
     case "${needed}" in
       anthropic)
@@ -253,6 +276,20 @@ BANNER
         fi
         ;;
     esac
+  done
+
+  # 空欄のまま進めたキー（完了時に案内する）
+  MISSING_KEYS=""
+  for needed in "${LLM_PROVIDER}" "${EMBED_PROVIDER}"; do
+    missing=""
+    case "${needed}" in
+      anthropic) if [[ -z "${ANTHROPIC_KEY}" ]]; then missing="Anthropic"; fi ;;
+      gemini) if [[ -z "${GEMINI_KEY}" ]]; then missing="Gemini"; fi ;;
+      openai) if [[ -z "${OPENAI_KEY}" ]]; then missing="OpenAI"; fi ;;
+    esac
+    if [[ -n "${missing}" && " ${MISSING_KEYS} " != *" ${missing} "* ]]; then
+      MISSING_KEYS="${MISSING_KEYS:+${MISSING_KEYS} }${missing}"
+    fi
   done
 
   # 管理者パスワードと Google Workspace ドメインは、ここでは聞かない（spec 6.12）。
@@ -311,6 +348,7 @@ set +a
 # 生成・埋め込みのどちらも外部 API を使う構成なら、数 GB のモデルを落とす意味がない。
 if [[ "${ASK_DRIVE_LLM_PROVIDER:-ollama}" == "ollama" || "${ASK_DRIVE_EMBED_PROVIDER:-ollama}" == "ollama" ]]; then
   echo -e "\n${YELLOW}[4/7] Ollama サービスとモデルの確認中...${NC}"
+  ensure_ollama_runtime
   OLLAMA_PID=""
   if ! curl -s "${OLLAMA_HOST:-http://localhost:11434}/api/tags" >/dev/null 2>&1; then
     echo "Ollama サーバーを一時起動中..."
@@ -336,7 +374,8 @@ if [[ "${ASK_DRIVE_LLM_PROVIDER:-ollama}" == "ollama" || "${ASK_DRIVE_EMBED_PROV
     kill -TERM "${OLLAMA_PID}" 2>/dev/null || true
   fi
 else
-  echo -e "\n${YELLOW}[4/7] 生成・埋め込みともに外部 API のため、Ollama モデルの取得をスキップします。${NC}"
+  echo -e "\n${YELLOW}[4/7] 生成・埋め込みともに外部 API のため、Ollama のインストールとモデルの取得をスキップします。${NC}"
+  echo "  （あとで Ollama に切り替える場合は ./app.sh repair-ollama で Ollama をインストールできます）"
 fi
 
 # 5. Elixir 依存関係の取得とコンパイル
@@ -357,6 +396,10 @@ MIX_ENV=prod mix assets.deploy
 MIX_ENV=prod mix release --overwrite
 
 echo -e "\n${GREEN}=== 初期セットアップが完了しました！ ===${NC}"
+if [[ -n "${MISSING_KEYS:-}" ]]; then
+  echo -e "${YELLOW}※ ${MISSING_KEYS} の API キーは未登録です。キーが発行されたら、窓口の管理画面の「設定」タブで登録してください。${NC}"
+  echo -e "${YELLOW}  登録するまで、夜間バッチ（文書の取り込み・QA 生成）は実行されません。${NC}"
+fi
 echo "起動方法:"
 echo "  ./app.sh start              (直接実行)"
 echo "  ./app.sh service install    (OS 常駐サービス登録)"

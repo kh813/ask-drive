@@ -159,6 +159,20 @@ defmodule AskDriveWeb.AdminBatchHistoryTest do
     assert has_element?(view, "#batch-resume", "QA 未生成 2 チャンク")
   end
 
+  test "a run skipped for a missing API key shows why (F-343)", %{conn: conn} do
+    run =
+      run!(~N[2026-09-30 00:00:05], %{
+        status: "skipped",
+        trigger: "auto",
+        error: "埋め込み（Google Gemini API）の API キーが未設定のため、実行しませんでした。"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/it-support/admin")
+    assert has_element?(view, "#batch-run-#{run.id}", "未実行（API キー未設定）")
+    assert has_element?(view, "#batch-note", "API キーが未設定")
+    refute has_element?(view, "#batch-error")
+  end
+
   test "auto_status: missed, done (automatic only), due, next start" do
     assert %{state: :missed} = Scheduler.auto_status(~N[2026-09-29 09:00:00])
 

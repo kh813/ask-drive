@@ -552,6 +552,21 @@ defmodule AskDrive.LLM do
     end
   end
 
+  @doc """
+  The label of the provider for `role` when it needs an API key that isn't set (e.g. the
+  key isn't issued yet, spec F-343), else nil. Checked locally, without a request.
+  """
+  def missing_api_key(role, setting \\ nil) when role in [:generation, :embedding] do
+    setting = resolve_setting(setting)
+
+    provider =
+      if role == :generation, do: generation_provider(setting), else: embedding_provider(setting)
+
+    if requires_api_key?(provider) and api_key(provider, setting) in [nil, ""],
+      do: label(provider),
+      else: nil
+  end
+
   defp check_api_key(provider, setting) do
     if requires_api_key?(provider) and api_key(provider, setting) in [nil, ""] do
       {:error, {:unauthorized, "#{label(provider)} の API キーが未設定です。"}}

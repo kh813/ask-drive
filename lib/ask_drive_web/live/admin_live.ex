@@ -1048,6 +1048,28 @@ defmodule AskDriveWeb.AdminLive do
           </div>
         </div>
 
+        <%!-- An API key not registered yet (spec F-343): say so, and what it holds back --%>
+        <% missing_embed = @scope == :app && AskDrive.LLM.missing_api_key(:embedding, @setting) %>
+        <% missing_gen = @scope == :app && AskDrive.LLM.missing_api_key(:generation, @setting) %>
+        <div
+          :if={missing_embed || missing_gen}
+          id="missing-api-key"
+          class="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-xs text-amber-900 dark:text-amber-100 space-y-1"
+        >
+          <p class="font-semibold flex items-center gap-1.5">
+            <.icon name="hero-key" class="w-4 h-4" /> API キーが未登録です
+          </p>
+          <p :if={missing_embed}>
+            埋め込み（{missing_embed}）の API キーがないため、夜間バッチ（文書の取り込み）を実行しません。チャットは原文のキーワード検索だけになります。
+          </p>
+          <p :if={!missing_embed && missing_gen}>
+            回答生成（{missing_gen}）の API キーがないため、夜間バッチは文書の取り込みだけを行い、想定QA を生成しません。
+          </p>
+          <p>
+            キーが発行されたら、<.link patch={"/#{@app.slug}/admin?tab=settings"} class="underline font-medium">「設定」タブ</.link>で登録してください。
+          </p>
+        </div>
+
         <%!-- Tab Navigation (per scope, spec 6.11) --%>
         <div class="flex border-b border-zinc-200 dark:border-zinc-800 gap-6 text-sm font-medium">
           <button
@@ -1266,6 +1288,9 @@ defmodule AskDriveWeb.AdminLive do
                       "stopped" ->
                         "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-200/50"
 
+                      "skipped" ->
+                        "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/50"
+
                       _ ->
                         "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300 border border-red-200/50"
                     end
@@ -1336,6 +1361,16 @@ defmodule AskDriveWeb.AdminLive do
                     失敗の原因（エラー内容）
                   </p>
                   <pre class="text-[11px] leading-relaxed text-red-900 dark:text-red-100 whitespace-pre-wrap break-all max-h-60 overflow-y-auto">{@latest_run.error}</pre>
+                </div>
+
+                <%!-- A note on a run that didn't do everything (spec F-343): skipped for a missing
+                      API key, or indexed without generating QA --%>
+                <div
+                  :if={@latest_run.status != "failed" && @latest_run.error}
+                  id="batch-note"
+                  class="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-xs text-amber-900 dark:text-amber-100"
+                >
+                  {@latest_run.error}
                 </div>
 
                 <%!-- Resume (spec F-342): a re-run continues from the data — only what is left is
@@ -4449,6 +4484,7 @@ defmodule AskDriveWeb.AdminLive do
   defp status_label("failed"), do: "失敗"
   defp status_label("deadline_reached"), do: "時間切れ"
   defp status_label("stopped"), do: "停止（手動）"
+  defp status_label("skipped"), do: "未実行（API キー未設定）"
   defp status_label(other), do: other
 
   defp status_class("completed"),
@@ -4458,6 +4494,9 @@ defmodule AskDriveWeb.AdminLive do
     do: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 animate-pulse"
 
   defp status_class("deadline_reached"),
+    do: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+
+  defp status_class("skipped"),
     do: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
 
   defp status_class("stopped"),

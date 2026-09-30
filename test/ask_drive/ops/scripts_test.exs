@@ -167,6 +167,20 @@ defmodule AskDrive.Ops.ScriptsTest do
     assert File.read!(@app_sh) =~ "インストール済みバージョン"
   end
 
+  test "initial setup: LLM keys can wait; Ollama only when it is chosen (F-343)" do
+    setup = File.read!(@initial_setup_sh)
+    # a key left blank is fine, and the end of the setup says where to register it
+    assert setup =~ "空欄のまま Enter で進めます"
+    assert setup =~ "API キーは未登録です"
+    # the embedding default follows the generation provider (no silent Ollama on a cloud setup)
+    assert setup =~ "gemini) DEFAULT_EMB_CHOICE=3"
+    # Ollama is installed in step 4, only in the branch that needs it
+    [before_step4, step4] = String.split(setup, "[4/7] Ollama サービスとモデルの確認中", parts: 2)
+    refute before_step4 =~ ~r/^ensure_ollama_runtime$/m
+    assert step4 =~ "ensure_ollama_runtime"
+    assert setup =~ "./app.sh repair-ollama"
+  end
+
   describe "platform.sh (macOS / Linux)" do
     test "detects the OS and architecture of this machine" do
       out = run_platform(~s|echo "$ASKDRIVE_OS $ASKDRIVE_ARCH $(sqlite_vec_filename)"|)

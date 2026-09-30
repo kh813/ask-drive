@@ -62,7 +62,8 @@ defmodule AskDrive.Batch.BatchRun do
       "deadline_reached",
       "failed",
       "aborted",
-      "stopped"
+      "stopped",
+      "skipped"
     ])
   end
 end

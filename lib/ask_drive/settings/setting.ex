@@ -4,7 +4,6 @@ defmodule AskDrive.Settings.Setting do
 
   alias AskDrive.Drive.ServiceAccount
   alias AskDrive.Encrypted.Binary
-  alias AskDrive.LLM
 
   @generation_providers ~w(ollama lmstudio gemini anthropic openai)
   @embedding_providers ~w(ollama lmstudio gemini openai)
@@ -283,7 +282,6 @@ defmodule AskDrive.Settings.Setting do
     )
     |> validate_inclusion(:drive_auth_mode, @drive_auth_modes, message: "は対応していない認証方式です")
     |> validate_base_urls()
-    |> validate_api_keys()
     |> validate_chat_summary_provider()
     |> update_change(:allowed_domain, &normalize_domain/1)
     |> validate_format(
@@ -318,36 +316,9 @@ defmodule AskDrive.Settings.Setting do
     end)
   end
 
-  # A provider is only usable once its key is present; catching it here keeps the nightly
-  # batch from starting a run it cannot finish (spec 10 章).
-  defp validate_api_keys(changeset) do
-    changeset
-    |> then(fn cs ->
-      # In cloud mode the batch doesn't use llm_provider, so its key isn't required
-      if get_field(cs, :batch_llm_mode) == "cloud",
-        do: cs,
-        else: validate_api_key(cs, :llm_provider, "回答生成プロバイダ")
-    end)
-    |> validate_api_key(:embed_provider, "埋め込みプロバイダ")
-  end
-
-  defp validate_api_key(changeset, provider_field, label) do
-    provider = get_field(changeset, provider_field)
-    field = key_field(provider)
-
-    # The key may legitimately live in the environment instead of the DB (F-812), so only
-    # complain when neither source has one.
-    if LLM.requires_api_key?(provider) and blank?(get_field(changeset, field)) and
-         blank?(System.get_env(key_env_var(provider))) do
-      add_error(
-        changeset,
-        field,
-        "#{label}に #{LLM.label(provider)} を選んだため、API キーが必要です"
-      )
-    else
-      changeset
-    end
-  end
+  # A provider without its API key is allowed (the key may not be issued yet, spec F-343):
+  # the admin screen says it is missing, and the nightly batch skips the run and records why
+  # instead of starting one it cannot finish.
 
   # A service account key is only usable once it actually parses; catching a malformed
   # paste here (missing client_email/private_key, broken JSON) beats discovering it during
@@ -391,7 +362,6 @@ defmodule AskDrive.Settings.Setting do
     if get_field(changeset, :batch_llm_mode) == "cloud" do
       changeset
       |> validate_inclusion(:cloud_llm_provider, @cloud_providers, message: "はクラウドのプロバイダを選んでください")
-      |> validate_api_key(:cloud_llm_provider, "夜間バッチのクラウドプロバイダ")
       |> then(fn cs ->
         if blank?(get_field(cs, :cloud_llm_model)),
           do: add_error(cs, :cloud_llm_model, "クラウドで実行する場合はモデル名を指定してください"),
@@ -422,7 +392,6 @@ defmodule AskDrive.Settings.Setting do
       |> validate_inclusion(:chat_summary_provider, @generation_providers,
         message: "は対応していないプロバイダです"
       )
-      |> validate_api_key(:chat_summary_provider, "チャット要約プロバイダ")
       |> then(fn cs ->
         if provider != get_field(cs, :llm_provider) and blank?(get_field(cs, :chat_summary_model)) do
           add_error(cs, :chat_summary_model, "チャット要約プロバイダを回答生成と別にする場合は、モデル名を指定してください")
@@ -432,16 +401,6 @@ defmodule AskDrive.Settings.Setting do
       end)
     end
   end
-
-  defp key_field("openai"), do: :openai_api_key
-  defp key_field("anthropic"), do: :anthropic_api_key
-  defp key_field("gemini"), do: :gemini_api_key
-  defp key_field(_), do: :openai_api_key
-
-  defp key_env_var("openai"), do: "OPENAI_API_KEY"
-  defp key_env_var("anthropic"), do: "ANTHROPIC_API_KEY"
-  defp key_env_var("gemini"), do: "GEMINI_API_KEY"
-  defp key_env_var(_), do: "OPENAI_API_KEY"
 
   defp blank?(nil), do: true
   defp blank?(value) when is_binary(value), do: String.trim(value) == ""
