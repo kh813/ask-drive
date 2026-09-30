@@ -8,7 +8,8 @@ defmodule Mix.Tasks.AskDrive.Mtls do
       mix ask_drive.mtls status
       mix ask_drive.mtls off       # everyone gets in again (at once, no restart needed)
       mix ask_drive.mtls monitor | enforce
-      mix ask_drive.mtls issue <group> <file.p12>   # issue from the server (prints the password)
+      mix ask_drive.mtls issue <group> <file.p12> [--expires YYYY-MM-DD] [--label TEXT] [--password TEXT]
+                                    # issue from the server (prints the password)
 
   The running service re-reads the mode when the file changes, so `off` applies at once;
   the HTTPS listener stops asking for certificates at the next restart.
@@ -41,22 +42,43 @@ defmodule Mix.Tasks.AskDrive.Mtls do
     Mix.shell().info("#{label(mode)}にしました（証明書の要求を始めるには ./app.sh restart が必要です）。")
   end
 
-  defp run_task(["issue", name, file]) do
-    group =
-      Enum.find(ClientCerts.list_groups(), &(&1.name == name)) ||
-        elem(ClientCerts.create_group(name), 1)
+  defp run_task(["issue" | rest]) do
+    {opts, args, _} =
+      OptionParser.parse(rest, strict: [expires: :string, label: :string, password: :string])
 
-    {:ok, issued} = ClientCerts.issue(group, "cli")
-    File.write!(file, issued.p12)
-    File.chmod!(file, 0o600)
-    Mix.shell().info("#{file} に発行しました。パスワード: #{issued.password}")
+    case args do
+      [name, file] -> issue(name, file, opts)
+      _ -> run_task([])
+    end
   end
 
   defp run_task(_),
     do:
       Mix.raise(
-        "使用方法: mix ask_drive.mtls status | off | monitor | enforce | issue <グループ> <ファイル.p12>"
+        "使用方法: mix ask_drive.mtls status | off | monitor | enforce | issue <グループ> <ファイル.p12> [--expires YYYY-MM-DD] [--label メモ] [--password パスワード]"
       )
+
+  defp issue(name, file, opts) do
+    group =
+      Enum.find(ClientCerts.list_groups(), &(&1.name == name)) ||
+        elem(ClientCerts.create_group(name), 1)
+
+    params = %{expires_on: opts[:expires], label: opts[:label], password: opts[:password]}
+
+    case ClientCerts.issue(group, "cli", params) do
+      {:ok, issued} ->
+        File.write!(file, issued.p12)
+        File.chmod!(file, 0o600)
+
+        Mix.shell().info("""
+        #{file} に発行しました（表示名: #{ClientCerts.display_name(group.name, issued.cert.label)}、有効期限: #{AskDrive.Clock.format(issued.cert.not_after, "%Y-%m-%d")}）。
+        パスワード: #{issued.password}
+        """)
+
+      {:error, message} ->
+        Mix.raise(message)
+    end
+  end
 
   defp label("enforce"), do: "強制"
   defp label("monitor"), do: "監視"

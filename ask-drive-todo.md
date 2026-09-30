@@ -618,6 +618,7 @@ mix hex.audit
 - [x] 24-4 交換（同じグループで新旧を併用し、古い方を失効）と即時失効
 - [x] 24-5 `./app.sh mtls status|off|monitor|enforce|issue` と localhost の例外（締め出しからの復旧）
 - [x] 24-8 Linux CI の本番ビルドで、実際の TLS による強制を確認
+- [x] 24-13 発行時にメモ・有効期限・パスワードを指定、証明書名を「AskDrive（グループ / メモ）」に、暗号化して保存し一覧から再ダウンロード（F-1409）
 - [x] 24-12 社内 LAN の IP・範囲からは証明書不要（F-1408）。全体設定に設定欄、信頼するプロキシ経由は実際の IP で判定、監視の一覧から除外、社内 LAN からなら強制にできる
 - [x] 24-11 OS ごとのダウンロード形式（Windows .pfx / macOS .p12 / iPhone・iPad .mobileconfig / Android .p12。いずれも管理者権限不要）、案内ページと README のインストール手順、初心者向けの手順書 `CLIENT_CERT_GUIDE.md`
 - [ ] 24-6 リバースプロキシ / Cloudflare で終端する場合の連携（プロキシ側で検証した結果の受け取り）

@@ -156,7 +156,14 @@ defmodule AskDrive.ClientCerts do
     PlatformRepo.all(
       from g in Group,
         order_by: g.name,
-        preload: [certs: ^from(c in Cert, order_by: [desc: c.inserted_at])]
+        preload: [
+          certs:
+            ^from(c in Cert,
+              order_by: [desc: c.inserted_at],
+              # the list only needs to know whether a certificate can be downloaded again
+              select_merge: %{p12: nil, password: nil, kept?: not is_nil(c.p12)}
+            )
+        ]
     )
   end
 
@@ -172,15 +179,98 @@ defmodule AskDrive.ClientCerts do
   end
 
   @doc """
-  Issues a certificate for the group: `{:ok, %{cert:, p12:, password:, filename:}}`. The
-  key exists only inside the `.p12`, which is handed out once; nothing of it is kept.
+  The options for `issue/3`, checked: `{:ok, %{password:, days:, label:}}` or
+  `{:error, message}`. A blank password means "generate one"; a blank expiry means a year.
   """
-  def issue(%Group{} = group, issued_by) do
+  def issue_options(params \\ %{}) do
+    params = Map.new(params, fn {k, v} -> {to_string(k), v} end)
+    password = params["password"] |> to_string() |> String.trim()
+    label = params["label"] |> to_string() |> String.trim()
+    # dates are the office's: a certificate made to expire on a day is still valid all
+    # of that (local) day's working hours — it lapses at the time of day it was issued
+    today = AskDrive.Clock.local_today()
+
+    with {:ok, expires_on} <- parse_expiry(params["expires_on"], today),
+         :ok <- check_password(password),
+         :ok <- check_expiry(expires_on, today),
+         :ok <- check_label(label) do
+      {:ok,
+       %{
+         password: if(password == "", do: nil, else: password),
+         days: Date.diff(expires_on, today),
+         label: if(label == "", do: nil, else: label)
+       }}
+    end
+  end
+
+  defp parse_expiry(%Date{} = date, _today), do: {:ok, date}
+  defp parse_expiry(blank, today) when blank in [nil, ""], do: {:ok, Date.add(today, @cert_days)}
+
+  defp parse_expiry(text, _today) when is_binary(text) do
+    case Date.from_iso8601(String.trim(text)) do
+      {:ok, date} -> {:ok, date}
+      _ -> {:error, "有効期限の日付が正しくありません。"}
+    end
+  end
+
+  # ASCII only: every OS's importer takes it the same way (non-ASCII .p12 passwords are
+  # encoded differently by Windows, macOS and OpenSSL)
+  defp check_password(""), do: :ok
+
+  defp check_password(password) do
+    if String.length(password) in 8..64 and password =~ ~r/\A[\x21-\x7e]+\z/,
+      do: :ok,
+      else: {:error, "パスワードは 8〜64 文字の半角英数字・記号（空白なし）で入力してください。"}
+  end
+
+  defp check_expiry(expires_on, today) do
+    latest = latest_expiry()
+
+    cond do
+      Date.compare(expires_on, today) != :gt ->
+        {:error, "有効期限は明日以降の日付を指定してください。"}
+
+      latest && Date.compare(expires_on, latest) == :gt ->
+        {:error, "有効期限は #{latest}（AskDrive の認証局の期限）までの日付を指定してください。"}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp check_label(label) do
+    if String.length(label) <= 40, do: :ok, else: {:error, "メモは 40 文字以内で入力してください。"}
+  end
+
+  @doc "The last day a certificate can be valid: the CA's own expiry (nil before the CA exists)."
+  def latest_expiry do
+    case File.read(ca_cert_path()) do
+      {:ok, pem} ->
+        pem |> validity() |> elem(1) |> AskDrive.Clock.to_local() |> NaiveDateTime.to_date()
+
+      _ ->
+        nil
+    end
+  end
+
+  @doc """
+  Issues a certificate for the group: `{:ok, %{cert:, p12:, password:, filename:}}` or
+  `{:error, message}` for bad options (see `issue_options/1`). The certificate is named
+  "AskDrive（group）" — or "AskDrive（group / label）" — which is what browsers' pickers
+  and the keychain show. The `.p12` and its password are kept encrypted for downloading
+  again (F-1409).
+  """
+  def issue(%Group{} = group, issued_by, params \\ %{}) do
+    with {:ok, opts} <- issue_options(params), do: do_issue(group, issued_by, opts)
+  end
+
+  defp do_issue(group, issued_by, opts) do
     ensure_ca!()
     tmp = Path.join(System.tmp_dir!(), "askdrive_cc_#{System.unique_integer([:positive])}")
     File.mkdir_p!(tmp)
     serial = :crypto.strong_rand_bytes(12) |> Base.encode16(case: :lower)
-    password = password()
+    password = opts.password || password()
+    name = display_name(group.name, opts.label)
     path = &Path.join(tmp, &1)
 
     try do
@@ -197,51 +287,92 @@ defmodule AskDrive.ClientCerts do
             "-out",
             path.("req.csr"),
             "-subj",
-            "/CN=#{group.name}/O=AskDrive"
+            "/CN=#{subj_escape(name)}/O=AskDrive"
           ]
       )
 
       openssl!(
         ["x509", "-req", "-in", path.("req.csr"), "-CA", ca_cert_path(), "-CAkey", ca_key_path()] ++
-          ["-set_serial", "0x" <> serial, "-days", to_string(@cert_days), "-sha256"] ++
+          ["-set_serial", "0x" <> serial, "-days", to_string(opts.days), "-sha256"] ++
           ["-extfile", path.("ext.cnf"), "-out", path.("cert.pem")]
       )
 
-      # 3DES / SHA-1: the encryption iOS, older macOS and Windows can import
+      # 3DES / SHA-1: the encryption iOS, older macOS and Windows can import. The password
+      # goes through the environment, not the command line (visible in `ps`).
       openssl!(
         ["pkcs12", "-export", "-inkey", path.("key.pem"), "-in", path.("cert.pem")] ++
-          ["-certfile", ca_cert_path(), "-name", "AskDrive #{group.name}"] ++
+          ["-certfile", ca_cert_path(), "-name", name] ++
           [
             "-passout",
-            "pass:" <> password,
+            "env:ASKDRIVE_P12_PASS",
             "-keypbe",
             "PBE-SHA1-3DES",
             "-certpbe",
             "PBE-SHA1-3DES"
           ] ++
-          ["-macalg", "sha1", "-out", path.("cert.p12")]
+          ["-macalg", "sha1", "-out", path.("cert.p12")],
+        [{"ASKDRIVE_P12_PASS", password}]
       )
 
       {not_before, not_after} = validity(File.read!(path.("cert.pem")))
+      p12 = File.read!(path.("cert.p12"))
 
       {:ok, cert} =
         PlatformRepo.insert(%Cert{
           group_id: group.id,
           serial: serial,
+          label: opts.label,
+          p12: p12,
+          password: password,
           not_before: not_before,
           not_after: not_after,
           issued_by: issued_by
         })
 
-      {:ok,
-       %{
-         cert: cert,
-         p12: File.read!(path.("cert.p12")),
-         password: password,
-         filename: "askdrive-#{Date.utc_today()}-#{String.slice(serial, 0, 8)}.p12"
-       }}
+      {:ok, %{cert: cert, p12: p12, password: password, filename: filename(cert)}}
     after
       File.rm_rf!(tmp)
+    end
+  end
+
+  @doc "What the certificate is called in browsers' pickers and the keychain."
+  def display_name(group_name, nil), do: "AskDrive（#{group_name}）"
+  def display_name(group_name, label), do: "AskDrive（#{group_name} / #{label}）"
+
+  # `-subj` separates fields with "/" and "=", so escape those (and the escape itself)
+  defp subj_escape(text), do: String.replace(text, ["\\", "/", "=", "+"], &("\\" <> &1))
+
+  defp filename(%Cert{} = cert),
+    do: "askdrive-#{DateTime.to_date(cert.inserted_at)}-#{String.slice(cert.serial, 0, 8)}.p12"
+
+  @doc """
+  Makes an issued certificate downloadable again (F-1409): `{:ok, %{token:, password:,
+  cert:}}`, or `{:error, reason}` — `:not_kept` (issued before certificates were kept),
+  `:revoked`, `:expired` or `:not_found`.
+  """
+  def redownload(cert_id, by) do
+    cert = PlatformRepo.one(from c in Cert, where: c.id == ^cert_id, preload: :group)
+
+    cond do
+      is_nil(cert) ->
+        {:error, :not_found}
+
+      cert.revoked_at ->
+        {:error, :revoked}
+
+      cert.not_after && DateTime.compare(cert.not_after, now()) == :lt ->
+        {:error, :expired}
+
+      is_nil(cert.p12) or is_nil(cert.password) ->
+        {:error, :not_kept}
+
+      true ->
+        Logger.warning(
+          "ClientCerts: certificate #{cert.serial} (#{cert.group.name}) made downloadable again by #{by}"
+        )
+
+        token = stash_download(cert.p12, filename(cert), cert.group.name, cert.serial)
+        {:ok, %{token: token, password: cert.password, cert: cert}}
     end
   end
 
@@ -469,8 +600,8 @@ defmodule AskDrive.ClientCerts do
     for _ <- 1..16, into: "", do: <<Enum.random(alphabet)>>
   end
 
-  defp openssl!(args) do
-    case System.cmd("openssl", args, stderr_to_stdout: true) do
+  defp openssl!(args, env \\ []) do
+    case System.cmd("openssl", args, stderr_to_stdout: true, env: env) do
       {_, 0} -> :ok
       {out, code} -> raise "openssl #{hd(args)} failed (#{code}): #{String.slice(out, 0, 300)}"
     end

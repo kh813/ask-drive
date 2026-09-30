@@ -17,7 +17,7 @@ defmodule AskDriveWeb.AdminClientCertsTest do
     %{conn: log_in_admin(conn, admin)}
   end
 
-  test "add a group, issue a certificate (password once, a file per OS for 10 minutes), revoke it",
+  test "add a group, issue a certificate (name, expiry, password), download per OS and again, revoke it",
        %{
          conn: conn
        } do
@@ -28,8 +28,27 @@ defmodule AskDriveWeb.AdminClientCertsTest do
     group = Enum.find(ClientCerts.list_groups(), &(&1.name == "経理部"))
     assert has_element?(view, "#cert-group-#{group.id}", "経理部")
 
-    view |> element("#issue-cert-#{group.id}") |> render_click()
-    assert has_element?(view, "#issued-cert-password")
+    # a bad password is refused with the reason, nothing issued
+    view
+    |> form("#issue-cert-form-#{group.id}", %{"password" => "short"})
+    |> render_submit()
+
+    assert render(view) =~ "パスワードは 8〜64 文字"
+    assert Enum.find(ClientCerts.list_groups(), &(&1.name == "経理部")).certs == []
+
+    expires = Date.add(AskDrive.Clock.local_today(), 90)
+
+    view
+    |> form("#issue-cert-form-#{group.id}", %{
+      "label" => "受付の PC",
+      "expires_on" => Date.to_iso8601(expires),
+      "password" => "Uketsuke-2026"
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#issued-cert-password", "Uketsuke-2026")
+    assert has_element?(view, "#issued-cert", "AskDrive（経理部 / 受付の PC）")
+    assert has_element?(view, "#issued-cert", Date.to_iso8601(expires))
 
     href = fn format ->
       view
@@ -52,8 +71,18 @@ defmodule AskDriveWeb.AdminClientCertsTest do
     assert resp.resp_body =~ "com.apple.security.pkcs12"
 
     [cert] = Enum.find(ClientCerts.list_groups(), &(&1.name == "経理部")).certs
+    assert has_element?(view, "#client-cert-#{cert.id}", "受付の PC")
+
+    # downloaded again later: the same certificate and password (F-1409)
+    first = get(conn, href.("macos")).resp_body
+    view |> element("#redownload-cert-#{cert.id}") |> render_click()
+    assert has_element?(view, "#issued-cert", "ダウンロードできます")
+    assert has_element?(view, "#issued-cert-password", "Uketsuke-2026")
+    assert get(conn, href.("macos")).resp_body == first
+
     view |> element("#revoke-cert-#{cert.id}") |> render_click()
     assert has_element?(view, "#client-cert-#{cert.id}", "失効")
+    refute has_element?(view, "#redownload-cert-#{cert.id}")
   end
 
   test "the office LAN is set on the screen", %{conn: conn} do

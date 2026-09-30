@@ -488,27 +488,50 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
-  def handle_event("issue_client_cert", %{"group_id" => id}, socket) do
+  def handle_event("issue_client_cert", %{"group_id" => id} = params, socket) do
     group = Enum.find(socket.assigns.client_cert_groups, &(to_string(&1.id) == id))
-    {:ok, issued} = AskDrive.ClientCerts.issue(group, socket.assigns.current_user.email)
 
-    token =
-      AskDrive.ClientCerts.stash_download(
-        issued.p12,
-        issued.filename,
-        group.name,
-        issued.cert.serial
-      )
+    case AskDrive.ClientCerts.issue(group, socket.assigns.current_user.email, params) do
+      {:ok, issued} ->
+        token =
+          AskDrive.ClientCerts.stash_download(
+            issued.p12,
+            issued.filename,
+            group.name,
+            issued.cert.serial
+          )
 
-    {:noreply,
-     socket
-     |> assign(:issued_cert, %{
-       group: group.name,
-       password: issued.password,
-       token: token,
-       filename: issued.filename
-     })
-     |> load_dashboard_data()}
+        {:noreply,
+         socket
+         |> assign(:issued_cert, issued_panel(group, issued.cert, issued.password, token, false))
+         |> load_dashboard_data()}
+
+      {:error, message} ->
+        {:noreply, put_flash(socket, :error, message)}
+    end
+  end
+
+  # F-1409: the same certificate again (a lost file, another device of the same person)
+  def handle_event("redownload_client_cert", %{"id" => id}, socket) do
+    case AskDrive.ClientCerts.redownload(
+           String.to_integer(id),
+           socket.assigns.current_user.email
+         ) do
+      {:ok, %{token: token, password: password, cert: cert}} ->
+        {:noreply,
+         assign(socket, :issued_cert, issued_panel(cert.group, cert, password, token, true))}
+
+      {:error, reason} ->
+        message =
+          case reason do
+            :not_kept -> "この証明書は再ダウンロードに対応する前に発行したため、ダウンロードできません。新しく発行してください。"
+            :revoked -> "失効した証明書はダウンロードできません。"
+            :expired -> "有効期限が切れた証明書はダウンロードできません。"
+            :not_found -> "証明書が見つかりません。"
+          end
+
+        {:noreply, put_flash(socket, :error, message)}
+    end
   end
 
   def handle_event("revoke_client_cert", %{"id" => id}, socket) do
@@ -4784,7 +4807,13 @@ defmodule AskDriveWeb.AdminLive do
                 class="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 text-xs space-y-1"
               >
                 <p class="font-semibold">
-                  グループ「{@issued_cert.group}」の証明書を発行しました（この表示は一度だけです）
+                  {if @issued_cert.again?,
+                    do: "証明書「#{@issued_cert.name}」をダウンロードできます",
+                    else: "証明書「#{@issued_cert.name}」を発行しました"}
+                </p>
+                <p class="text-zinc-600 dark:text-zinc-400">
+                  端末やブラウザでは「{@issued_cert.name}」という名前で表示されます。有効期限: {@issued_cert.expires &&
+                    AskDrive.Clock.format(@issued_cert.expires, "%Y-%m-%d")}
                 </p>
                 <p>
                   パスワード:
@@ -4792,7 +4821,7 @@ defmodule AskDriveWeb.AdminLive do
                   （.p12 ファイルとは別の手段で伝えてください）
                 </p>
                 <p>
-                  配る相手の端末に合わせてダウンロードしてください（発行から 10 分間。いずれも端末の管理者権限なしでインストールできます）:
+                  配る相手の端末に合わせてダウンロードしてください（10 分間有効。いずれも端末の管理者権限なしでインストールできます。あとから一覧の「再ダウンロード」でも取得できます）:
                 </p>
                 <div class="flex flex-wrap gap-2">
                   <a
@@ -4825,11 +4854,11 @@ defmodule AskDriveWeb.AdminLive do
                     <div class="flex gap-2">
                       <button
                         id={"issue-cert-#{group.id}"}
-                        phx-click="issue_client_cert"
-                        phx-value-group_id={group.id}
+                        type="button"
+                        phx-click={JS.toggle(to: "#issue-cert-form-#{group.id}")}
                         class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
                       >
-                        証明書を発行
+                        証明書を発行…
                       </button>
                       <button
                         :if={Enum.all?(group.certs, & &1.revoked_at)}
@@ -4842,10 +4871,72 @@ defmodule AskDriveWeb.AdminLive do
                       </button>
                     </div>
                   </div>
+                  <% today = AskDrive.Clock.local_today()
+                  latest = AskDrive.ClientCerts.latest_expiry() %>
+                  <form
+                    id={"issue-cert-form-#{group.id}"}
+                    phx-submit="issue_client_cert"
+                    class="hidden p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/60 grid gap-2 sm:grid-cols-3"
+                  >
+                    <input type="hidden" name="group_id" value={group.id} />
+                    <label class="space-y-1">
+                      <span class="block text-zinc-600 dark:text-zinc-400">メモ（任意・40 文字まで）</span>
+                      <input
+                        type="text"
+                        name="label"
+                        maxlength="40"
+                        placeholder="例: 受付の PC"
+                        class="w-full px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
+                      />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="block text-zinc-600 dark:text-zinc-400">有効期限</span>
+                      <input
+                        type="date"
+                        name="expires_on"
+                        required
+                        value={Date.add(today, 365)}
+                        min={Date.add(today, 1)}
+                        max={latest}
+                        class="w-full px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
+                      />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="block text-zinc-600 dark:text-zinc-400">パスワード（任意）</span>
+                      <input
+                        type="text"
+                        name="password"
+                        autocomplete="off"
+                        spellcheck="false"
+                        placeholder="空欄なら自動生成（16 文字）"
+                        class="w-full px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 font-mono"
+                      />
+                    </label>
+                    <p class="sm:col-span-3 text-[11px] text-zinc-500">
+                      端末やブラウザでは「{AskDrive.ClientCerts.display_name(group.name, nil)}」（メモを入れると「{AskDrive.ClientCerts.display_name(
+                        group.name,
+                        "メモ"
+                      )}」）と表示されます。パスワードは 8〜64 文字の半角英数字・記号です。
+                    </p>
+                    <div class="sm:col-span-3">
+                      <button
+                        type="submit"
+                        id={"issue-cert-submit-#{group.id}"}
+                        class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+                      >
+                        発行する
+                      </button>
+                    </div>
+                  </form>
                   <table :if={group.certs != []} class="w-full text-left">
                     <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
                       <tr :for={cert <- group.certs} id={"client-cert-#{cert.id}"}>
-                        <td class="py-1 font-mono">{String.slice(cert.serial, 0, 8)}</td>
+                        <td class="py-1">
+                          <span class="font-mono">{String.slice(cert.serial, 0, 8)}</span>
+                          <span :if={cert.label} class="ml-1 text-zinc-600 dark:text-zinc-300">
+                            {cert.label}
+                          </span>
+                        </td>
                         <td class="py-1">
                           発行 {AskDrive.Clock.format(cert.inserted_at, "%Y-%m-%d")}・期限 {cert.not_after &&
                             AskDrive.Clock.format(cert.not_after, "%Y-%m-%d")}
@@ -4862,6 +4953,19 @@ defmodule AskDriveWeb.AdminLive do
                               "%m/%d"
                             )}</span>
                           <% else %>
+                            <button
+                              :if={
+                                cert.kept? &&
+                                  (is_nil(cert.not_after) ||
+                                     DateTime.compare(cert.not_after, DateTime.utc_now()) == :gt)
+                              }
+                              id={"redownload-cert-#{cert.id}"}
+                              phx-click="redownload_client_cert"
+                              phx-value-id={cert.id}
+                              class="px-2 py-0.5 mr-1 rounded border border-indigo-300 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                            >
+                              再ダウンロード
+                            </button>
                             <button
                               id={"revoke-cert-#{cert.id}"}
                               phx-click="revoke_client_cert"
@@ -5293,6 +5397,17 @@ defmodule AskDriveWeb.AdminLive do
       %{address: ip} -> ip |> :inet.ntoa() |> to_string()
       _ -> nil
     end
+  end
+
+  defp issued_panel(group, cert, password, token, again?) do
+    %{
+      group: group.name,
+      name: AskDrive.ClientCerts.display_name(group.name, cert.label),
+      expires: cert.not_after,
+      password: password,
+      token: token,
+      again?: again?
+    }
   end
 
   defp parse_ip(text) when is_binary(text) do

@@ -11,6 +11,9 @@ defmodule AskDrive.Clock do
   @doc "Current local time, as a NaiveDateTime (seconds precision)."
   def local_now, do: :calendar.local_time() |> NaiveDateTime.from_erl!()
 
+  @doc "Today's date in local time."
+  def local_today, do: local_now() |> NaiveDateTime.to_date()
+
   @doc "Offset of local time from UTC in seconds (e.g. 32400 for JST), rounded to minutes."
   def utc_offset_seconds do
     utc = :calendar.universal_time() |> NaiveDateTime.from_erl!()

@@ -59,7 +59,8 @@ AskDrive 管理スクリプト
   auth oauth on|off  Google ログイン（OAuth）を有効 / 無効にする
   mtls status        端末の電子証明書によるアクセス制限の状態
   mtls off           電子証明書によるアクセス制限を無効にする (締め出されたときの復旧)
-  mtls issue <group> <file.p12>  サーバー上で証明書を発行 (パスワードを表示)
+  mtls issue <group> <file.p12> [--expires YYYY-MM-DD] [--label メモ] [--password パスワード]
+                     サーバー上で証明書を発行 (パスワードを表示)
   network status     待ち受けポートと、HTTP を受け付けるリバースプロキシの状態
   network proxy-off  リバースプロキシの指定を解除 (HTTP はすべて HTTPS へ転送。締め出されたときの復旧)
   network ports-reset ポートを既定 (HTTP 4000 / HTTPS 4443) に戻して再起動

@@ -53,6 +53,117 @@ defmodule AskDrive.ClientCertsTest do
     assert ClientCerts.check(nil) == :none
   end
 
+  # the friendly name (the .p12's bag attribute) and the subject's CN the keychain and
+  # browsers show
+  defp names_of(issued) do
+    p12 = Path.join(CertHelper.tmp_dir(), "n.p12")
+    File.write!(p12, issued.p12)
+
+    {out, 0} =
+      System.cmd(
+        "openssl",
+        ~w(pkcs12 -in #{p12} -clcerts -nokeys -passin pass:#{issued.password})
+      )
+
+    [_, friendly] = Regex.run(~r/friendlyName: (.+)/, out)
+    {:OTPCertificate, tbs, _, _} = :public_key.pkix_decode_cert(der_of(issued), :otp)
+    {:rdnSequence, rdns} = elem(tbs, 6)
+
+    cn =
+      for [{:AttributeTypeAndValue, {2, 5, 4, 3}, value}] <- rdns do
+        case value do
+          {:utf8String, v} -> to_string(v)
+          {_, v} -> to_string(v)
+        end
+      end
+
+    {friendly, hd(cn)}
+  end
+
+  # Some OpenSSL versions print a BMPString friendlyName by the low byte of each character
+  defp printed_forms(name),
+    do: [name, for(<<cp::utf8 <- name>>, into: <<>>, do: <<rem(cp, 256)>>)]
+
+  defp local_date(dt), do: dt |> AskDrive.Clock.to_local() |> NaiveDateTime.to_date()
+
+  test "issuing with a name, an expiry and a password of one's own", %{group: group} do
+    expires = Date.add(AskDrive.Clock.local_today(), 30)
+
+    {:ok, issued} =
+      ClientCerts.issue(group, "boss@example.com", %{
+        "label" => "受付の PC",
+        "expires_on" => Date.to_iso8601(expires),
+        "password" => "Uketsuke-2026"
+      })
+
+    assert issued.password == "Uketsuke-2026"
+    assert local_date(issued.cert.not_after) == expires
+    {friendly, cn} = names_of(issued)
+    assert cn == "AskDrive（経理部 / 受付の PC）"
+    assert friendly in printed_forms("AskDrive（経理部 / 受付の PC）")
+    assert {:ok, _} = ClientCerts.check(der_of(issued))
+
+    # without options: generated password, a year, "AskDrive（group）"
+    {:ok, plain} = ClientCerts.issue(group, "boss@example.com")
+    assert {_, "AskDrive（経理部）"} = names_of(plain)
+    assert local_date(plain.cert.not_after) == Date.add(AskDrive.Clock.local_today(), 365)
+  end
+
+  test "issue options are checked", %{group: group} do
+    today = AskDrive.Clock.local_today()
+    assert {:error, msg} = ClientCerts.issue(group, "x", %{"password" => "short"})
+    assert msg =~ "8〜64 文字"
+    assert {:error, _} = ClientCerts.issue(group, "x", %{"password" => "has space 123"})
+    assert {:error, _} = ClientCerts.issue(group, "x", %{"password" => "パスワードパスワード"})
+
+    assert {:error, msg} =
+             ClientCerts.issue(group, "x", %{"expires_on" => Date.to_iso8601(today)})
+
+    assert msg =~ "明日以降"
+    assert {:error, _} = ClientCerts.issue(group, "x", %{"expires_on" => "2026-13-40"})
+    assert {:error, _} = ClientCerts.issue(group, "x", %{"label" => String.duplicate("あ", 41)})
+
+    # not past the CA's own expiry
+    ClientCerts.ensure_ca!()
+    later = ClientCerts.latest_expiry() |> Date.add(1) |> Date.to_iso8601()
+    assert {:error, msg} = ClientCerts.issue(group, "x", %{"expires_on" => later})
+    assert msg =~ "認証局の期限"
+  end
+
+  test "downloading again: the same .p12 and password, kept encrypted; not once revoked", %{
+    group: group
+  } do
+    {:ok, issued} = ClientCerts.issue(group, "boss@example.com")
+
+    {:ok, %{token: token, password: password}} =
+      ClientCerts.redownload(issued.cert.id, "boss@example.com")
+
+    assert password == issued.password
+    assert {:ok, body, _, _} = ClientCerts.take_download(token, "macos")
+    assert body == issued.p12
+
+    # stored encrypted, not as the .p12 itself
+    %{rows: [[raw]]} =
+      AskDrive.Apps.platform(fn ->
+        AskDrive.Repo.query!("SELECT p12 FROM client_certs WHERE id = ?", [issued.cert.id])
+      end)
+
+    refute raw == issued.p12
+    refute :binary.match(raw, issued.password) != :nomatch
+
+    [listed] = Enum.find(ClientCerts.list_groups(), &(&1.id == group.id)).certs
+    assert listed.kept? and is_nil(listed.p12)
+
+    {:ok, _} = ClientCerts.revoke(issued.cert.id, "boss@example.com")
+    assert ClientCerts.redownload(issued.cert.id, "x") == {:error, :revoked}
+
+    # certificates issued before they were kept
+    {:ok, old} =
+      AskDrive.PlatformRepo.insert(%AskDrive.ClientCerts.Cert{group_id: group.id, serial: "0ld"})
+
+    assert ClientCerts.redownload(old.id, "x") == {:error, :not_kept}
+  end
+
   test "modes: off by default; starting / stopping asking for certificates needs a restart" do
     assert ClientCerts.mode() == "off"
     assert {:ok, true} = ClientCerts.set_mode("monitor")
