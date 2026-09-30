@@ -84,9 +84,13 @@ defmodule AskDrive.ClientCertsTest do
   end
 
   describe "the gate" do
+    # a request from peer.address (Bandit sets remote_ip to the TCP peer; Plug.Test doesn't)
     defp request(peer) do
+      peer = Map.merge(%{port: 1, ssl_cert: nil}, peer)
+
       conn(:get, "/login")
-      |> put_peer_data(Map.merge(%{port: 1, ssl_cert: nil}, peer))
+      |> put_peer_data(peer)
+      |> Map.put(:remote_ip, peer.address)
       |> ClientCertGate.call([])
     end
 
@@ -117,6 +121,38 @@ defmodule AskDrive.ClientCertsTest do
       refute request(%{address: {127, 0, 0, 1}}).halted
     end
 
+    test "the office LAN needs no certificate; the setting survives a mode change (F-1408)" do
+      {:ok, _} = ClientCerts.set_mode("enforce")
+      assert {:error, ["bogus"]} = ClientCerts.set_lan_ranges("10.0.0.0/8, bogus")
+      :ok = ClientCerts.set_lan_ranges("192.168.0.0/16  10.20.0.5")
+
+      conn = request(%{address: {192, 168, 5, 9}})
+      refute conn.halted
+      assert conn.assigns.client_cert_lan
+      refute request(%{address: {10, 20, 0, 5}}).halted
+      assert request(%{address: {203, 0, 113, 7}}).status == 403
+
+      {:ok, _} = ClientCerts.set_mode("monitor")
+      assert ClientCerts.lan_ranges() == ["192.168.0.0/16", "10.20.0.5"]
+    end
+
+    test "through a trusted proxy, the LAN check uses the address the proxy reports" do
+      {:ok, _} = ClientCerts.set_mode("enforce")
+      :ok = ClientCerts.set_lan_ranges("192.168.0.0/16")
+      {:ok, _, :applied} = AskDrive.Network.update(%{"trusted_proxies" => "192.168.1.1"})
+
+      # the proxy is on the LAN, the client isn't: refused
+      conn =
+        conn(:get, "/login")
+        |> put_peer_data(%{address: {192, 168, 1, 1}, port: 1, ssl_cert: nil})
+        |> Map.put(:remote_ip, {192, 168, 1, 1})
+        |> Plug.Conn.put_req_header("x-forwarded-for", "203.0.113.7")
+        |> AskDriveWeb.Plugs.SSLHeaders.call([])
+        |> ClientCertGate.call([])
+
+      assert conn.status == 403
+    end
+
     test "monitor: nobody refused; off: nothing checked" do
       {:ok, _} = ClientCerts.set_mode("monitor")
       refute request(%{address: {192, 168, 1, 20}}).halted
@@ -134,6 +170,18 @@ defmodule AskDrive.ClientCertsTest do
       |> ClientCertGate.call([])
 
       assert Enum.map(ClientCerts.users_without_cert(), & &1.email) == ["nocert@example.com"]
+
+      # from the office LAN: not listed (nobody there needs one)
+      :ok = ClientCerts.set_lan_ranges("192.168.0.0/16")
+      {:ok, lan_user} = AskDrive.Accounts.ensure_user("lan@example.com")
+
+      conn(:get, "/")
+      |> put_peer_data(%{address: {192, 168, 1, 30}, port: 1, ssl_cert: nil})
+      |> Map.put(:remote_ip, {192, 168, 1, 30})
+      |> Plug.Conn.assign(:current_user, lan_user)
+      |> ClientCertGate.call([])
+
+      refute "lan@example.com" in Enum.map(ClientCerts.users_without_cert(), & &1.email)
     end
   end
 

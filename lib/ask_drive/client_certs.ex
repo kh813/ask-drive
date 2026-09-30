@@ -37,24 +37,53 @@ defmodule AskDrive.ClientCerts do
   # --- Mode ---------------------------------------------------------------------------
 
   @doc "The mode in force: \"off\", \"monitor\" or \"enforce\"."
-  def mode do
-    key = {__MODULE__, :mode}
+  def mode, do: config().mode
+
+  @doc """
+  The office LAN (spec F-1408): addresses / ranges from which no certificate is needed.
+  The client's address is the TCP peer, or — through a trusted reverse proxy (F-1013) —
+  the address the proxy reports.
+  """
+  def lan_ranges, do: config().lan
+
+  def lan?(ip), do: AskDrive.Network.in_ranges?(ip, lan_ranges())
+
+  # `<ssl_dir>/mtls.json`, re-read when it changes (./app.sh mtls off applies at once)
+  defp config do
+    key = {__MODULE__, :config}
     stat = {mode_file(), File.stat(mode_file())}
 
     case :persistent_term.get(key, nil) do
-      {^stat, mode} ->
-        mode
+      {^stat, config} ->
+        config
 
       _ ->
-        mode =
+        stored =
           with {:ok, json} <- File.read(mode_file()),
-               {:ok, %{"mode" => m}} when m in @modes <- Jason.decode(json),
-               do: m,
-               else: (_ -> "off")
+               {:ok, map} when is_map(map) <- Jason.decode(json),
+               do: map,
+               else: (_ -> %{})
 
-        :persistent_term.put(key, {stat, mode})
-        mode
+        config = %{
+          mode: if(stored["mode"] in @modes, do: stored["mode"], else: "off"),
+          lan: if(is_list(stored["lan"]), do: stored["lan"], else: [])
+        }
+
+        :persistent_term.put(key, {stat, config})
+        config
     end
+  end
+
+  defp write_config!(config) do
+    File.mkdir_p!(Path.dirname(mode_file()))
+
+    File.write!(
+      mode_file(),
+      Jason.encode!(%{"mode" => config.mode, "lan" => config.lan}, pretty: true)
+    )
+
+    :persistent_term.erase({__MODULE__, :config})
+    :ok
   end
 
   @doc "Whether the HTTPS listener must ask for certificates (restart when this changes)."
@@ -64,10 +93,15 @@ defmodule AskDrive.ClientCerts do
   def set_mode(mode) when mode in @modes do
     before = request_certs?()
     if mode != "off", do: ensure_ca!()
-    File.mkdir_p!(Path.dirname(mode_file()))
-    File.write!(mode_file(), Jason.encode!(%{"mode" => mode}))
-    :persistent_term.erase({__MODULE__, :mode})
+    :ok = write_config!(%{config() | mode: mode})
     {:ok, before != request_certs?()}
+  end
+
+  @doc "Sets the office LAN ranges from text (commas / spaces / new lines): `:ok` or `{:error, invalid}`."
+  def set_lan_ranges(text) do
+    with {:ok, entries} <- AskDrive.Network.parse_ranges(to_string(text)) do
+      write_config!(%{config() | lan: entries})
+    end
   end
 
   # --- The certificate authority ------------------------------------------------------

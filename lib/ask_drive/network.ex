@@ -71,13 +71,22 @@ defmodule AskDrive.Network do
 
   @doc "Whether `ip` (a tuple, the TCP peer) is one of the trusted proxies."
   def trusted?(nil), do: false
+  def trusted?(ip), do: in_ranges?(ip, trusted_proxies())
 
-  def trusted?(ip) do
+  @doc "Whether `ip` (a tuple) falls in any of `entries` (\"10.0.0.1\", \"10.0.0.0/24\", IPv6 too)."
+  def in_ranges?(nil, _entries), do: false
+
+  def in_ranges?(ip, entries) do
     ip = normalize(ip)
 
-    Enum.any?(trusted_proxies(), fn entry ->
-      match?({:ok, _}, parse_cidr(entry)) and in_cidr?(ip, entry)
-    end)
+    Enum.any?(entries, fn entry -> match?({:ok, _}, parse_cidr(entry)) and in_cidr?(ip, entry) end)
+  end
+
+  @doc "Splits text into address / range entries: `{:ok, entries}` or `{:error, invalid}`."
+  def parse_ranges(text) when is_binary(text) do
+    entries = text |> String.split(~r/[\s,;、]+/, trim: true) |> Enum.uniq()
+    bad = Enum.reject(entries, &match?({:ok, _}, parse_cidr(&1)))
+    if bad == [], do: {:ok, entries}, else: {:error, bad}
   end
 
   defp in_cidr?(ip, entry) do

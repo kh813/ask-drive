@@ -56,6 +56,19 @@ defmodule AskDriveWeb.AdminClientCertsTest do
     assert has_element?(view, "#client-cert-#{cert.id}", "失効")
   end
 
+  test "the office LAN is set on the screen", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
+    view |> form("#client-cert-lan-form", %{"lan" => "192.168.0.0/16, nope"}) |> render_submit()
+    assert render(view) =~ "IP アドレス・範囲として読み取れません: nope"
+
+    view
+    |> form("#client-cert-lan-form", %{"lan" => "192.168.0.0/16, 10.0.0.0/8"})
+    |> render_submit()
+
+    assert ClientCerts.lan_ranges() == ["192.168.0.0/16", "10.0.0.0/8"]
+    assert has_element?(view, ~s(#client-cert-lan-form input[value="192.168.0.0/16, 10.0.0.0/8"]))
+  end
+
   test "modes from the screen: monitor, then enforce (allowed from the server itself)", %{
     conn: conn
   } do

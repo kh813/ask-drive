@@ -428,7 +428,8 @@ defmodule AskDriveWeb.AdminLive do
   def handle_event("set_client_cert_mode", %{"mode" => mode}, socket) do
     ok_here? =
       match?({:ok, _}, AskDrive.ClientCerts.check(socket.assigns.peer_cert)) or
-        socket.assigns.peer_ip in ["127.0.0.1", "::1", "::ffff:127.0.0.1"]
+        socket.assigns.peer_ip in ["127.0.0.1", "::1", "::ffff:127.0.0.1"] or
+        AskDrive.ClientCerts.lan?(parse_ip(socket.assigns.peer_ip))
 
     cond do
       mode == "enforce" and not ok_here? ->
@@ -436,7 +437,7 @@ defmodule AskDriveWeb.AdminLive do
          put_flash(
            socket,
            :error,
-           "この接続には有効な証明書がありません。先にこの端末に証明書をインストールし、監視のまま「この接続の証明書: 有効」と表示されることを確認してから強制にしてください。"
+           "この接続には有効な証明書がなく、社内 LAN からの接続でもありません。先にこの端末に証明書をインストールし、監視のまま「この接続の証明書: 有効」と表示されることを確認するか、社内 LAN から操作してください。"
          )}
 
       true ->
@@ -461,6 +462,18 @@ defmodule AskDriveWeb.AdminLive do
            )
          )
          |> load_dashboard_data()}
+    end
+  end
+
+  # the office LAN (F-1408): no certificate needed from these addresses / ranges
+  def handle_event("save_client_cert_lan", %{"lan" => text}, socket) do
+    case AskDrive.ClientCerts.set_lan_ranges(text) do
+      :ok ->
+        {:noreply,
+         socket |> put_flash(:info, "社内 LAN の設定を保存しました（すぐに反映されます）。") |> load_dashboard_data()}
+
+      {:error, bad} ->
+        {:noreply, put_flash(socket, :error, "IP アドレス・範囲として読み取れません: #{Enum.join(bad, "、")}")}
     end
   end
 
@@ -1078,6 +1091,7 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:running_run, running_run)
     |> assign(:remaining, Scheduler.remaining())
     |> assign(:client_cert_mode, AskDrive.ClientCerts.mode())
+    |> assign(:client_cert_lan, AskDrive.ClientCerts.lan_ranges())
     |> assign(
       :client_cert_groups,
       if(socket.assigns[:scope] == :platform, do: AskDrive.ClientCerts.list_groups(), else: [])
@@ -4664,6 +4678,38 @@ defmodule AskDriveWeb.AdminLive do
                 </p>
               </div>
 
+              <%!-- The office LAN (F-1408): no certificate needed from there --%>
+              <form
+                id="client-cert-lan-form"
+                phx-submit="save_client_cert_lan"
+                class="space-y-2 text-xs"
+              >
+                <label class="block space-y-1">
+                  <span class="block font-medium text-zinc-700 dark:text-zinc-300">
+                    社内 LAN の IP アドレス・範囲（ここからの接続は、証明書がなくてもログイン画面とログイン後の画面に入れます。複数可・カンマ区切り、範囲は 192.168.0.0/16 の形）
+                  </span>
+                  <input
+                    type="text"
+                    name="lan"
+                    value={Enum.join(@client_cert_lan, ", ")}
+                    placeholder="例: 192.168.0.0/16, 10.0.0.0/8"
+                    class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 font-mono"
+                  />
+                </label>
+                <p class="text-zinc-500">
+                  リバースプロキシ経由の構成では、「ポートとリバースプロキシ」にプロキシを登録してください。登録しないと、すべての接続がプロキシ（社内 LAN）からに見え、証明書なしで入れてしまいます。
+                </p>
+                <div class="flex justify-end">
+                  <button
+                    type="submit"
+                    id="save-client-cert-lan-btn"
+                    class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium"
+                  >
+                    保存
+                  </button>
+                </div>
+              </form>
+
               <p id="this-connection-cert" class="text-xs text-zinc-600 dark:text-zinc-400">
                 この接続の証明書: {case AskDrive.ClientCerts.check(@peer_cert) do
                   {:ok, cert} -> "有効（グループ「#{cert.group.name}」）"
@@ -4672,6 +4718,13 @@ defmodule AskDriveWeb.AdminLive do
                   :expired -> "期限切れ"
                   :unknown -> "この AskDrive が発行したものではありません"
                 end}
+                <span
+                  :if={AskDrive.Network.in_ranges?(parse_ip(@peer_ip), @client_cert_lan)}
+                  id="this-connection-lan"
+                  class="text-emerald-700"
+                >
+                  （社内 LAN からの接続のため、証明書なしでも入れます）
+                </span>
               </p>
 
               <div class="flex flex-wrap gap-2">
@@ -5211,12 +5264,14 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
-  defp parse_ip(text) do
+  defp parse_ip(text) when is_binary(text) do
     case :inet.parse_address(String.to_charlist(text)) do
       {:ok, ip} -> ip
       _ -> nil
     end
   end
+
+  defp parse_ip(_unknown), do: nil
 
   defp last_ssl_result, do: :persistent_term.get({__MODULE__, :ssl_result}, nil)
 

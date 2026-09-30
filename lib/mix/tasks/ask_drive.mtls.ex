@@ -25,6 +25,7 @@ defmodule Mix.Tasks.AskDrive.Mtls do
 
     Mix.shell().info("""
     端末の電子証明書によるアクセス制限: #{label(ClientCerts.mode())}
+    社内 LAN（証明書不要）: #{if ClientCerts.lan_ranges() == [], do: "なし", else: Enum.join(ClientCerts.lan_ranges(), ", ")}
     グループ: #{length(groups)} 件・有効な証明書: #{length(active)} 件
     認証局: #{if File.exists?(ClientCerts.ca_cert_path()), do: ClientCerts.ca_cert_path(), else: "未作成"}
     """)

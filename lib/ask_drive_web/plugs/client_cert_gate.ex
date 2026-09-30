@@ -2,8 +2,10 @@ defmodule AskDriveWeb.Plugs.ClientCertGate do
   @moduledoc """
   The entrance for devices with a certificate issued by AskDrive (spec 6.14), before the
   login page. `monitor` records who comes with and without one; `enforce` answers a
-  request without a valid certificate with an explanation page (403). The server itself
-  (localhost) always gets in, as a way back.
+  request without a valid certificate with an explanation page (403). The office LAN
+  (F-1408) needs no certificate; the server itself (localhost) always gets in, as a way
+  back. The client's address is `conn.remote_ip` — through a trusted reverse proxy, the
+  one the proxy reported (SSLHeaders runs first in the endpoint).
   """
   import Plug.Conn
   alias AskDrive.ClientCerts
@@ -28,10 +30,13 @@ defmodule AskDriveWeb.Plugs.ClientCertGate do
         assign(conn, :client_cert, cert)
 
       problem ->
-        if user, do: ClientCerts.note_user(user, false)
+        lan? = ClientCerts.lan?(conn.remote_ip)
+        # from the office LAN nobody needs one: not someone to chase up before enforcing
+        if user && not lan?, do: ClientCerts.note_user(user, false)
 
         cond do
           mode == "monitor" -> conn
+          lan? -> assign(conn, :client_cert_lan, true)
           loopback?(conn) -> conn
           true -> refuse(conn, problem)
         end
