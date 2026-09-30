@@ -19,7 +19,7 @@ defmodule AskDriveWeb.PageControllerTest do
     test "signed in, the portal lists the apps and the chat opens", %{conn: conn} do
       conn = log_in_user(conn, user_fixture())
       html = conn |> get(~p"/") |> html_response(200)
-      assert html =~ "相談したい窓口を選んでください"
+      assert html =~ "Select a desk to ask questions." or html =~ "相談したい窓口を選んでください"
       assert html =~ "AskDrive for IT-Support"
       assert conn |> get(~p"/it-support") |> html_response(200) =~ "chat-form"
     end

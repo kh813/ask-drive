@@ -5,10 +5,12 @@
         <.icon name="hero-shield-check" class="w-6 h-6" />
       </div>
       <h1 class="font-bold text-xl text-zinc-900 dark:text-zinc-100">
-        窓口「{@app.name}」の管理画面へ
+        {gettext("Enter Desk Admin for \"%{name}\"", name: @app.name)}
       </h1>
       <p class="text-xs text-zinc-500 leading-relaxed">
-        {@current_user.email} として入ります。本人確認のうえ入り、記録は監査ログに残ります。
+        {gettext("Entering as %{email}. Identity verification required. Recorded in audit log.",
+          email: @current_user.email
+        )}
       </p>
     </div>
 
@@ -33,7 +35,7 @@
           <.input
             field={f[:password]}
             type="password"
-            label="あなたの Google Workspace のパスワード（本人確認）"
+            label={gettext("Your Google Workspace Password (identity verification)")}
             required
             autocomplete="current-password"
           />
@@ -42,19 +44,22 @@
             id="app-elevate-btn"
             class="w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
           >
-            管理画面に入る
+            {gettext("Enter Admin Screen")}
           </button>
         </.form>
       <% else %>
         <p class="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-          本人確認のため、もう一度ログインしてください（ログインから {@fresh_minutes} 分以内なら、そのまま管理画面に入れます）。
+          {gettext(
+            "Please sign in again for verification (direct access allowed if signed in within %{minutes} minutes).",
+            minutes: @fresh_minutes
+          )}
         </p>
         <a
           id="app-reauth-btn"
           href={"/#{@app.slug}/admin/reauth"}
           class="block text-center w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
         >
-          ログインし直して管理画面に入る
+          {gettext("Sign in again to enter Admin")}
         </a>
       <% end %>
     </div>

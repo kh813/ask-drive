@@ -48,9 +48,13 @@ defmodule AskDriveWeb.SetupLive do
     >
       <div class="max-w-xl mx-auto space-y-6">
         <div>
-          <h1 class="font-bold text-2xl text-zinc-900 dark:text-zinc-100">AskDrive 初回セットアップ</h1>
+          <h1 class="font-bold text-2xl text-zinc-900 dark:text-zinc-100">
+            {gettext("AskDrive Initial Setup")}
+          </h1>
           <p class="text-sm text-zinc-500 mt-1 leading-relaxed">
-            最初に、管理者パスワードと組織の情報を設定します。この画面はセットアップが終わるまで表示されます。
+            {gettext(
+              "Set up your administrator password and organization settings. This screen will remain until setup is finished."
+            )}
           </p>
         </div>
 
@@ -61,60 +65,65 @@ defmodule AskDriveWeb.SetupLive do
         >
           <.setup_field
             name="code"
-            label="1. セットアップコード"
+            label={gettext("1. Setup Code")}
             errors={@errors}
             placeholder="XXXX-XXXX-XXXX"
             autocomplete="off"
           >
-            サーバーを操作できる人だけが最初の管理者になれるよう、サーバー上で確認できるコードを入力します。
+            {gettext("Enter the setup code found on the server.")}
             <code class="font-mono">./app.sh status</code>
-            の表示、またはサーバーの起動ログ（「セットアップコード」）で確認できます。
           </.setup_field>
 
           <.setup_field
             name="password"
             type="password"
-            label="2. 管理者パスワード"
+            label={gettext("2. Administrator Password")}
             errors={@errors}
             autocomplete="new-password"
           >
-            管理画面に入る（管理者に昇格する）ときに入力します。{AskDrive.Accounts.AdminAccess.min_password_length()} 文字以上。
+            {gettext("Required when elevating to administrator. Minimum %{length} characters.",
+              length: AskDrive.Accounts.AdminAccess.min_password_length()
+            )}
           </.setup_field>
           <.setup_field
             name="password_confirmation"
             type="password"
-            label="管理者パスワード（確認）"
+            label={gettext("Administrator Password (Confirm)")}
             errors={@errors}
             autocomplete="new-password"
           />
 
           <.setup_field
             name="domain"
-            label="3. 組織の Google Workspace ドメイン"
+            label={gettext("3. Organization Google Workspace Domain")}
             errors={@errors}
             value={@values["domain"]}
             placeholder="company.com"
           >
-            Google ログイン（SSO）と Google Drive の連携で、このドメインのアカウントだけを受け付けます。
+            {gettext(
+              "Only accounts from this domain will be accepted for Google Login (SSO) and Google Drive."
+            )}
           </.setup_field>
 
           <.setup_field
             name="app_name"
-            label="4. 最初の窓口の名前"
+            label={gettext("4. First Desk Name")}
             errors={@errors}
             value={@values["app_name"]}
           >
-            チャット画面に「AskDrive for（この名前）」と表示されます。あとから変更でき、窓口は全体管理で追加できます。
+            {gettext(
+              "Will appear in the chat header as \"AskDrive for (this name)\". Can be changed later."
+            )}
           </.setup_field>
 
           <.setup_field
             name="admin_emails"
-            label="5. 全体管理者のメールアドレス"
+            label={gettext("5. Platform Administrator Email Addresses")}
             errors={@errors}
             value={@values["admin_emails"]}
             placeholder="name@company.com"
           >
-            AskDrive 全体を管理する人です（複数ならカンマ区切り）。最初の窓口の担当者（窓口管理者）にもなり、その窓口の設定（Google Drive・API キー等）を行います。全体管理者・窓口の担当者とも、あとから追加・引き継ぎできます。
+            {gettext("Email addresses for initial platform administrators (comma-separated).")}
           </.setup_field>
 
           <button
@@ -122,10 +131,10 @@ defmodule AskDriveWeb.SetupLive do
             id="setup-submit"
             class="w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm"
           >
-            セットアップを完了する
+            {gettext("Complete Setup")}
           </button>
           <p class="text-[11px] text-zinc-500">
-            Google ログインの OAuth クライアント ID / シークレットは、あとで全体管理の「全体設定」で設定できます。
+            {gettext("OAuth Client ID / Secret can be configured later in Platform Settings.")}
           </p>
         </form>
       </div>

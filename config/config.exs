@@ -13,6 +13,10 @@ config :ask_drive,
   # POC (spec 6.9.6): login and admin elevation are off unless ASK_DRIVE_DISABLE_AUTH=false.
   auth_disabled_by_default: true
 
+config :ask_drive, AskDriveWeb.Gettext,
+  default_locale: "en",
+  locales: ~w(en ja)
+
 # Oban configuration for SQLite3
 config :ask_drive, Oban,
   engine: Oban.Engines.Lite,

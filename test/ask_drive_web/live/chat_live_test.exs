@@ -1,5 +1,5 @@
 defmodule AskDriveWeb.ChatLiveTest do
-  use AskDriveWeb.ConnCase
+  use AskDriveWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
   setup %{conn: conn} do
@@ -29,7 +29,7 @@ defmodule AskDriveWeb.ChatLiveTest do
 
     html = render_async(view, 20_000)
     assert html =~ "USBメモリの利用ルールは？"
-    assert html =~ "未回答"
+    assert html =~ "Unanswered" or html =~ "未回答"
     refute has_element?(view, "#answer-loading")
   end
 
@@ -69,7 +69,7 @@ defmodule AskDriveWeb.ChatLiveTest do
     |> render_submit()
 
     html = render_async(view, 20_000)
-    assert html =~ "関連しそうな箇所"
+    assert html =~ "Relevant excerpts" or html =~ "関連しそうな箇所"
     assert html =~ ~r{<mark[^>]*>USB メモリ</mark>}
     refute html =~ "じ じ"
     assert html =~ "p.33"
@@ -148,7 +148,7 @@ defmodule AskDriveWeb.ChatLiveTest do
     render_async(view, 20_000)
     html = render_async(view, 20_000)
 
-    assert html =~ "AI による要約"
+    assert html =~ "AI Summary" or html =~ "AI による要約"
     assert html =~ "外部記憶媒体の接続は禁止されています"
     assert html =~ ~r{<a href="#src-\d+-1"[^>]*>\[1\]</a>}
     assert html =~ ~r{id="src-\d+-1"}
@@ -204,12 +204,15 @@ defmodule AskDriveWeb.ChatLiveTest do
     html = render_async(view, 20_000)
 
     assert html =~ "持ち出しは許可制です"
-    assert html =~ "AI の思考過程を表示"
+    assert html =~ "Show AI thinking process" or html =~ "AI の思考過程を表示"
     # the thinking sits inside a <details> (collapsed), after the answer
     assert html =~
-             ~r{<details[^>]*>\s*<summary[^>]*>\s*AI の思考過程を表示.*Okay, let&#39;s tackle this query\.}s
+             ~r{<details[^>]*>\s*<summary[^>]*>\s*(Show AI thinking process|AI の思考過程を表示).*Okay, let&#39;s tackle this query\.}s
 
-    [answer_part | _] = String.split(html, "AI の思考過程を表示")
+    thinking_label =
+      if html =~ "Show AI thinking process", do: "Show AI thinking process", else: "AI の思考過程を表示"
+
+    [answer_part | _] = String.split(html, thinking_label)
     refute answer_part =~ "Okay, let"
   end
 
@@ -227,7 +230,7 @@ defmodule AskDriveWeb.ChatLiveTest do
 
     test "locked until the passphrase is given; the unlock holds across reloads", %{conn: conn} do
       {:ok, view, html} = live(conn, ~p"/it-support")
-      assert html =~ "合言葉を入力してください"
+      assert html =~ "chat-access-form"
       assert has_element?(view, ~s(#chat-access-form[action="/it-support/unlock"][method="post"]))
 
       # wrong: back to the app with a message, still locked
@@ -242,9 +245,9 @@ defmodule AskDriveWeb.ChatLiveTest do
       assert Phoenix.Flash.get(good.assigns.flash, :info) =~ "解除しました"
 
       conn = recycle(good)
-      {:ok, _view, html} = live(conn, ~p"/it-support")
+      {:ok, view, html} = live(conn, ~p"/it-support")
       assert html =~ "chat-form"
-      refute html =~ "合言葉を入力してください"
+      refute has_element?(view, "#chat-access-form")
 
       {:ok, _view, html} = live(recycle(conn), ~p"/it-support")
       assert html =~ "chat-form"
@@ -254,8 +257,9 @@ defmodule AskDriveWeb.ChatLiveTest do
       conn = conn |> unlock("pass12345") |> recycle()
       {:ok, _} = AdminAccess.set_access_password(Settings.get_setting!(), "new-pass-678")
 
-      {:ok, _view, html} = live(conn, ~p"/it-support")
-      assert html =~ "合言葉を入力してください"
+      {:ok, view, html} = live(conn, ~p"/it-support")
+      assert has_element?(view, "#chat-access-form")
+      assert html =~ "chat-access-form"
     end
 
     test "5 wrong guesses within 5 minutes lock this browser out of the app, not everyone", %{

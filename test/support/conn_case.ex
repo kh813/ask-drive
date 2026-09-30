@@ -68,12 +68,6 @@ defmodule AskDriveWeb.ConnCase do
   end
 
   @doc """
-  Like `log_in_user/2`, but the session is also elevated to administrator — the sudo-style
-  state `AskDriveWeb.UserAuth` checks before allowing anything under `/admin` (spec 6.9.1).
-  The user must be `admin_eligible` for this to mean anything to the app; callers typically
-  pass `user_fixture(admin_eligible: true)`.
-  """
-  @doc """
   Makes `user` an administrator of the app and elevates the session for it (spec F-1113;
   in tests LDAP is off, so a fresh sign-in is the proof of identity).
   """
@@ -87,6 +81,12 @@ defmodule AskDriveWeb.ConnCase do
     Plug.Conn.put_session(conn, AppAdminAccess.session_key(), Map.put(tokens, slug, token))
   end
 
+  @doc """
+  Like `log_in_user/2`, but the session is also elevated to administrator — the sudo-style
+  state `AskDriveWeb.UserAuth` checks before allowing anything under `/admin` (spec 6.9.1).
+  The user must be `admin_eligible` for this to mean anything to the app; callers typically
+  pass `user_fixture(admin_eligible: true)`.
+  """
   def log_in_admin(conn, user) do
     conn
     |> log_in_user(user)

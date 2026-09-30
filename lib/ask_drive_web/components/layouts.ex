@@ -65,7 +65,7 @@ defmodule AskDriveWeb.Layouts do
             :if={length(@apps) > 1}
             class="absolute left-0 mt-1 w-64 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg p-1 z-50"
           >
-            <p class="px-3 py-1.5 text-[11px] text-zinc-400">ほかの窓口</p>
+            <p class="px-3 py-1.5 text-[11px] text-zinc-400">{gettext("Other desks")}</p>
             <a
               :for={other <- @apps}
               :if={other.slug != @app.slug}
@@ -78,7 +78,7 @@ defmodule AskDriveWeb.Layouts do
               href="/"
               class="block px-3 py-2 rounded-lg text-xs text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
             >
-              窓口の一覧
+              {gettext("All desks")}
             </a>
           </div>
         </details>
@@ -88,7 +88,7 @@ defmodule AskDriveWeb.Layouts do
             href={if @app, do: "/" <> @app.slug, else: "/"}
             class="px-2.5 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
           >
-            {if @app, do: "チャット", else: "窓口一覧"}
+            {if @app, do: gettext("Chat"), else: gettext("Desk list")}
           </.link>
           <.link
             :if={can_access_app_admin?(@current_user, @app)}
@@ -96,7 +96,7 @@ defmodule AskDriveWeb.Layouts do
             id="admin-nav-link"
             class="px-2.5 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
           >
-            管理
+            {gettext("Admin")}
           </.link>
           <.link
             :if={@admin_elevated? and is_platform_admin?(@current_user)}
@@ -104,7 +104,7 @@ defmodule AskDriveWeb.Layouts do
             id="platform-admin-nav-link"
             class="px-2.5 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
           >
-            全体管理
+            {gettext("Platform Admin")}
           </.link>
           <%!-- Eligible but not elevated: the way in is the password prompt, not /admin. --%>
           <.link
@@ -113,7 +113,7 @@ defmodule AskDriveWeb.Layouts do
             id="elevate-link"
             class="px-2.5 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-1"
           >
-            <.icon name="hero-shield-check" class="w-3.5 h-3.5" /> 管理者として操作
+            <.icon name="hero-shield-check" class="w-3.5 h-3.5" /> {gettext("Act as administrator")}
           </.link>
         </nav>
 
@@ -125,7 +125,7 @@ defmodule AskDriveWeb.Layouts do
           id="admin-login-link"
           class="text-[11px] px-2.5 py-1 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-1"
         >
-          <.icon name="hero-shield-check" class="w-3.5 h-3.5" /> 管理者ログイン
+          <.icon name="hero-shield-check" class="w-3.5 h-3.5" /> {gettext("Admin login")}
         </.link>
 
         <%!-- Document text leaves the building when generation runs on a cloud API, so say
@@ -133,10 +133,12 @@ defmodule AskDriveWeb.Layouts do
         <span
           :if={@remote_provider}
           id="external-llm-badge"
-          title="回答生成に外部 API を使用しています。文書本文が送信されます。"
+          title={gettext("External API is used for answering. Document content is sent externally.")}
           class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200 border border-amber-200/60 dark:border-amber-800/50"
         >
-          <.icon name="hero-cloud" class="w-3.5 h-3.5" /> 外部AI: {@remote_provider}
+          <.icon name="hero-cloud" class="w-3.5 h-3.5" /> {gettext("External AI: %{provider}",
+            provider: @remote_provider
+          )}
         </span>
 
         <span
@@ -145,7 +147,7 @@ defmodule AskDriveWeb.Layouts do
           class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60"
         >
           <.icon name="hero-shield-check" class="w-3.5 h-3.5" />
-          管理者モード{remaining_label(@admin_elevation_expires_at)}
+          {gettext("Admin mode%{remaining}", remaining: remaining_label(@admin_elevation_expires_at))}
         </span>
 
         <.link
@@ -154,8 +156,10 @@ defmodule AskDriveWeb.Layouts do
           id="release-admin-link"
           class="text-[11px] px-2 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 transition"
         >
-          解除
+          {gettext("Release")}
         </.link>
+
+        <.locale_switcher />
 
         <.theme_toggle />
 
@@ -174,7 +178,7 @@ defmodule AskDriveWeb.Layouts do
           <.link
             href={~p"/logout"}
             id="logout-link"
-            title="ログアウト"
+            title={gettext("Log out")}
             class="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
           >
             <.icon name="hero-arrow-left-on-rectangle" class="w-4 h-4" />
@@ -209,16 +213,18 @@ defmodule AskDriveWeb.Layouts do
 
   defp can_access_app_admin?(_, _), do: false
 
-  defp role_label(_user, true), do: "管理者（昇格中）"
+  defp role_label(_user, true), do: gettext("Administrator (Elevated)")
 
   defp role_label(user, _elevated?),
-    do: if(admin_eligible?(user), do: "一般ユーザー（昇格可）", else: "一般ユーザー")
+    do: if(admin_eligible?(user), do: gettext("User (Eligible for admin)"), else: gettext("User"))
 
   # Minutes left, so an operator can see at a glance whether they are about to be dropped.
   defp remaining_label(%DateTime{} = expires_at) do
     seconds = DateTime.diff(expires_at, DateTime.utc_now(), :second)
 
-    if seconds > 0, do: "（残り #{max(div(seconds, 60), 1)} 分）", else: ""
+    if seconds > 0,
+      do: " " <> gettext("(%{minutes} min remaining)", minutes: max(div(seconds, 60), 1)),
+      else: ""
   end
 
   defp remaining_label(_), do: ""
@@ -314,6 +320,50 @@ defmodule AskDriveWeb.Layouts do
       >
         <.icon name="hero-moon-micro" class="size-4 opacity-75 hover:opacity-100" />
       </button>
+    </div>
+    """
+  end
+
+  @doc """
+  Provides language switcher (EN / 日本語).
+  """
+  attr :locale, :string, default: nil
+
+  def locale_switcher(assigns) do
+    assigns =
+      assign_new(assigns, :current_locale, fn -> Gettext.get_locale(AskDriveWeb.Gettext) end)
+
+    ~H"""
+    <div
+      id="locale-switcher"
+      class="flex items-center text-xs font-semibold rounded-full border border-zinc-200 dark:border-zinc-700 p-0.5 bg-zinc-100 dark:bg-zinc-800"
+    >
+      <.link
+        href={~p"/locale/en"}
+        id="lang-en-btn"
+        class={[
+          "px-2 py-0.5 rounded-full transition text-[11px]",
+          if(@current_locale == "en",
+            do: "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-xs font-bold",
+            else: "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+          )
+        ]}
+      >
+        EN
+      </.link>
+      <.link
+        href={~p"/locale/ja"}
+        id="lang-ja-btn"
+        class={[
+          "px-2 py-0.5 rounded-full transition text-[11px]",
+          if(@current_locale == "ja",
+            do: "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-xs font-bold",
+            else: "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+          )
+        ]}
+      >
+        JA
+      </.link>
     </div>
     """
   end

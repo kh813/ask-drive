@@ -42,8 +42,18 @@ defmodule AskDrive.Accounts.LoginThrottle do
     |> Enum.filter(fn {scope, key, _} -> {scope, key} in keys end)
     |> Enum.max_by(fn {_, _, until} -> DateTime.to_unix(until) end, fn -> nil end)
     |> case do
-      nil -> :ok
-      {scope, _, until} -> {:locked, until, String.to_existing_atom(scope)}
+      nil ->
+        :ok
+
+      {scope, _, until} ->
+        scope_atom =
+          case scope do
+            "account" -> :account
+            "env" -> :env
+            _ -> :env
+          end
+
+        {:locked, until, scope_atom}
     end
   end
 

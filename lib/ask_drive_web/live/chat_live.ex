@@ -190,10 +190,12 @@ defmodule AskDriveWeb.ChatLive do
             </div>
             <div>
               <h2 class="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-                合言葉を入力してください
+                {gettext("Enter passphrase")}
               </h2>
               <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2 leading-relaxed">
-                窓口「{@app.name}」のチャットを利用するにはアクセスパスワード（合言葉）が必要です。
+                {gettext("A passphrase is required to use the chat for desk \"%{name}\".",
+                  name: @app.name
+                )}
               </p>
             </div>
             <%!-- a plain POST: the unlock is written to the session (30 days) --%>
@@ -207,7 +209,7 @@ defmodule AskDriveWeb.ChatLive do
               <.input
                 field={@access_password_form[:password]}
                 type="password"
-                placeholder="合言葉を入力"
+                placeholder={gettext("Enter passphrase")}
                 autocomplete="current-password"
                 value=""
                 required
@@ -217,7 +219,7 @@ defmodule AskDriveWeb.ChatLive do
                 id="chat-unlock-btn"
                 class="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
               >
-                解除してチャットを開始
+                {gettext("Unlock and start chat")}
               </button>
             </.form>
           </div>
@@ -230,17 +232,19 @@ defmodule AskDriveWeb.ChatLive do
               <%= if @drive_connected? do %>
                 <span class="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
                   <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
-                  {format_number(@chunk_count)} チャンクを検索対象にしています
+                  {gettext("%{count} chunks indexed for search", count: format_number(@chunk_count))}
                 </span>
               <% else %>
                 <span class="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
-                  <span class="w-1.5 h-1.5 rounded-full bg-current"></span> Google Drive 未連携
+                  <span class="w-1.5 h-1.5 rounded-full bg-current"></span> {gettext(
+                    "Google Drive disconnected"
+                  )}
                 </span>
               <% end %>
 
               <%= if not @embedding_ok? do %>
                 <span class="px-2 py-0.5 rounded-md bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300 border border-red-200 dark:border-red-800">
-                  {@embedding_provider_label} に接続できません
+                  {gettext("Cannot connect to %{provider}", provider: @embedding_provider_label)}
                 </span>
               <% end %>
             </div>
@@ -251,7 +255,7 @@ defmodule AskDriveWeb.ChatLive do
                 phx-click="reset_chat"
                 class="text-xs px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 flex items-center gap-1 transition"
               >
-                <.icon name="hero-trash" class="w-3.5 h-3.5" /> 会話をリセット
+                <.icon name="hero-trash" class="w-3.5 h-3.5" /> {gettext("Reset conversation")}
               </button>
             <% end %>
           </div>
@@ -264,10 +268,11 @@ defmodule AskDriveWeb.ChatLive do
               </div>
               <div>
                 <h2 class="font-bold text-base text-amber-900 dark:text-amber-100">
-                  現在システムメンテナンス中です
+                  {gettext("System is currently under maintenance")}
                 </h2>
                 <p class="text-xs text-amber-700 dark:text-amber-300 mt-1 max-w-md mx-auto">
-                  {@setting.maintenance_message || "データベースの更新またはアップデート作業を行っています。完了までしばらくお待ちください。"}
+                  {@setting.maintenance_message ||
+                    gettext("Database updates or maintenance are in progress. Please wait a moment.")}
                 </p>
               </div>
             </div>
@@ -279,15 +284,21 @@ defmodule AskDriveWeb.ChatLive do
               <div class="flex items-start gap-3">
                 <.icon name="hero-information-circle" class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                 <div>
-                  <p class="font-medium text-sm">Google Drive が連携されていません</p>
+                  <p class="font-medium text-sm">{gettext("Google Drive is not connected")}</p>
                   <p class="text-xs mt-0.5 text-amber-700 dark:text-amber-300">
                     <%= cond do %>
                       <% @admin_elevated? -> %>
-                        ドキュメントを取り込んで検索・回答を行うには、管理画面で Drive 連携を設定してください。
+                        {gettext(
+                          "To ingest documents and search/answer, please configure Google Drive integration in Admin."
+                        )}
                       <% @admin_eligible? -> %>
-                        Drive を連携するには、まず管理者権限に昇格してください。
+                        {gettext(
+                          "To connect Drive, please elevate to administrator privileges first."
+                        )}
                       <% true -> %>
-                        まだドキュメントが取り込まれていません。管理者に Drive 連携を依頼してください。
+                        {gettext(
+                          "No documents have been ingested yet. Please ask an administrator to connect Google Drive."
+                        )}
                     <% end %>
                   </p>
                 </div>
@@ -299,14 +310,14 @@ defmodule AskDriveWeb.ChatLive do
                 href={@base_path <> "/admin?tab=settings"}
                 class="text-xs px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium shrink-0 transition"
               >
-                今すぐ連携する
+                {gettext("Connect now")}
               </.link>
               <.link
                 :if={not @admin_elevated? and @admin_eligible?}
                 href={~p"/admin/elevate"}
                 class="text-xs px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium shrink-0 transition"
               >
-                管理者として操作
+                {gettext("Act as administrator")}
               </.link>
             </div>
           <% end %>
@@ -319,10 +330,12 @@ defmodule AskDriveWeb.ChatLive do
                   <.icon name="hero-chat-bubble-left-right" class="w-6 h-6 text-zinc-400" />
                 </div>
                 <h3 class="font-medium text-zinc-700 dark:text-zinc-300 text-sm">
-                  Google Drive ドキュメントについて質問してください
+                  {gettext("Ask questions about your Google Drive documents")}
                 </h3>
                 <p class="text-xs max-w-sm mt-1 text-zinc-500">
-                  社内規定、マニュアル、議事録など、取り込まれた文書から即座に原文抜粋を探索して回答します。
+                  {gettext(
+                    "Instant answers and document excerpts from your internal policies, manuals, and notes."
+                  )}
                 </p>
               </div>
             <% else %>
@@ -345,18 +358,22 @@ defmodule AskDriveWeb.ChatLive do
                           <% 2 -> %>
                             <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/50">
                               <.icon name="hero-document-magnifying-glass" class="w-3.5 h-3.5" />
-                              {if msg[:summary], do: "AI 要約と引用元", else: "関連しそうな箇所（原文抜粋）"}
+                              {if msg[:summary],
+                                do: gettext("AI Summary & Sources"),
+                                else: gettext("Relevant excerpts")}
                             </span>
                           <% 3 -> %>
                             <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50">
                               <.icon name="hero-clock" class="w-3.5 h-3.5" />
                               {if msg[:index_empty?],
-                                do: "未回答（文書が未取り込み）",
-                                else: "未回答（今夜のバッチで回答生成予定）"}
+                                do: gettext("Unanswered (no documents ingested)"),
+                                else: gettext("Unanswered (will generate in nightly batch)")}
                             </span>
                           <% _ -> %>
                             <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                              <.icon name="hero-check-circle" class="w-3.5 h-3.5" /> 回答
+                              <.icon name="hero-check-circle" class="w-3.5 h-3.5" /> {gettext(
+                                "Answer"
+                              )}
                             </span>
                         <% end %>
                         <span class="text-[10px] text-zinc-400">
@@ -385,7 +402,7 @@ defmodule AskDriveWeb.ChatLive do
                                       target="_blank"
                                       class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center gap-0.5"
                                     >
-                                      Drive で開く
+                                      {gettext("Open in Drive")}
                                       <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
                                     </.link>
                                   <% end %>
@@ -394,9 +411,12 @@ defmodule AskDriveWeb.ChatLive do
 
                               <%= if msg.qa_pair.generated_at do %>
                                 <span class="text-zinc-400">
-                                  生成日時: {AskDrive.Clock.format(
-                                    msg.qa_pair.generated_at,
-                                    "%Y-%m-%d %H:%M"
+                                  {gettext("Generated at: %{date}",
+                                    date:
+                                      AskDrive.Clock.format(
+                                        msg.qa_pair.generated_at,
+                                        "%Y-%m-%d %H:%M"
+                                      )
                                   )}
                                 </span>
                               <% end %>
@@ -411,18 +431,26 @@ defmodule AskDriveWeb.ChatLive do
                           :if={msg[:index_empty?]}
                           class="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed space-y-1"
                         >
-                          <p>検索対象の文書がまだ1件も取り込まれていません。</p>
+                          <p>{gettext("No searchable documents have been ingested yet.")}</p>
                           <p class="text-zinc-500">
-                            Google Drive の同期・取り込みが完了していない可能性があります。管理者に確認してください（管理画面のドキュメント一覧で各文書の状態とエラーを確認できます）。質問内容は記録され、取り込み後の夜間バッチで回答生成の対象になります。
+                            {gettext(
+                              "Google Drive synchronization or ingestion may not be finished. Please check with an administrator."
+                            )}
                           </p>
                         </div>
                         <div
                           :if={!msg[:index_empty?]}
                           class="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed space-y-1"
                         >
-                          <p>この質問に関する明確な記載を現在のインデックスから特定できませんでした。</p>
+                          <p>
+                            {gettext(
+                              "Could not find a clear statement for this question in the current index."
+                            )}
+                          </p>
                           <p class="text-zinc-500">
-                            質問内容はシステムに記録されました。今夜の夜間バッチで全ドキュメントを対象に回答データを生成し、翌朝から即答できるようになります。
+                            {gettext(
+                              "Your question has been logged. Answers will be generated during the nightly batch."
+                            )}
                           </p>
                         </div>
                       <% end %>
@@ -437,26 +465,30 @@ defmodule AskDriveWeb.ChatLive do
                             class="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-900/60 space-y-2"
                           >
                             <div class="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
-                              <.icon name="hero-sparkles" class="w-4 h-4" /> AI による要約
+                              <.icon name="hero-sparkles" class="w-4 h-4" /> {gettext("AI Summary")}
                               <span class="font-normal text-[10px] text-indigo-500/80">
-                                （下の引用元の抜粋だけを根拠に生成）
+                                {gettext("(Grounded solely on the cited excerpts below)")}
                               </span>
                             </div>
                             <%= case msg.summary do %>
                               <% %{status: :failed} -> %>
                                 <p class="text-xs text-zinc-500">
-                                  要約を作成できませんでした。下の引用元の抜粋をご確認ください。
+                                  {gettext(
+                                    "Could not create summary. Please check the excerpts below."
+                                  )}
                                 </p>
                               <% %{status: :running, text: "", thinking: thinking} when thinking != "" -> %>
                                 <p class="text-xs text-zinc-500 flex items-center gap-1.5">
                                   <.icon name="hero-arrow-path" class="w-3.5 h-3.5 animate-spin" />
-                                  考えています…（{String.length(thinking)}字）
+                                  {gettext("Thinking… (%{count} chars)",
+                                    count: String.length(thinking)
+                                  )}
                                 </p>
                               <% %{status: :running, text: ""} -> %>
                                 <p class="text-xs text-zinc-500 flex items-center gap-1.5">
                                   <.icon name="hero-arrow-path" class="w-3.5 h-3.5 animate-spin" />
-                                  要約を作成しています…{if @summary_local?,
-                                    do: "（ローカルの生成 AI では数十秒かかることがあります）"}
+                                  {gettext("Generating summary…")}{if @summary_local?,
+                                    do: gettext(" (local LLMs may take several seconds)")}
                                 </p>
                               <% summary -> %>
                                 <div class="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed">
@@ -466,7 +498,9 @@ defmodule AskDriveWeb.ChatLive do
                                   ></span>
                                 </div>
                                 <p :if={summary.status == :done} class="text-[10px] text-zinc-400">
-                                  生成 AI の要約は誤りを含むことがあります。重要な判断の前に、必ず引用元をご確認ください。
+                                  {gettext(
+                                    "AI summaries may contain errors. Always verify key details against the cited sources."
+                                  )}
                                 </p>
                             <% end %>
                             <%!-- A reasoning model's thinking: kept, but collapsed by default --%>
@@ -475,7 +509,9 @@ defmodule AskDriveWeb.ChatLive do
                               class="text-xs"
                             >
                               <summary class="cursor-pointer text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 select-none">
-                                AI の思考過程を表示（{String.length(msg.summary.thinking)}字）
+                                {gettext("Show AI thinking process (%{count} chars)",
+                                  count: String.length(msg.summary.thinking)
+                                )}
                               </summary>
                               <div class="mt-1.5 text-[11px] text-zinc-500 bg-white/60 dark:bg-zinc-900/60 p-2 rounded-md leading-relaxed max-h-60 overflow-y-auto">
                                 {excerpt_html([{:text, msg.summary.thinking}])}
@@ -484,7 +520,11 @@ defmodule AskDriveWeb.ChatLive do
                           </div>
 
                           <p class="text-xs text-zinc-500">
-                            {if msg[:summary], do: "引用元", else: "関連しそうな箇所です"}（原文の抜粋。質問の語を<mark class="bg-yellow-200 dark:bg-yellow-700/60 text-inherit rounded px-0.5">ハイライト</mark>しています）:
+                            {if msg[:summary],
+                              do: gettext("Sources"),
+                              else: gettext("Relevant excerpts")} {gettext(
+                              "(Excerpts with search terms highlighted):"
+                            )}
                           </p>
                           <div class="space-y-2">
                             <%= for {chunk, n} <- Enum.with_index(msg.chunks, 1) do %>
@@ -498,7 +538,7 @@ defmodule AskDriveWeb.ChatLive do
                                       [{n}]
                                     </span>
                                     <.icon name="hero-document-text" class="w-4 h-4 shrink-0" />
-                                    {(chunk.document && chunk.document.name) || "ドキュメント"}
+                                    {(chunk.document && chunk.document.name) || gettext("Document")}
                                     <span
                                       :if={chunk.page}
                                       class="ml-1 px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-[10px] font-semibold text-indigo-700 dark:text-indigo-300"
@@ -512,13 +552,13 @@ defmodule AskDriveWeb.ChatLive do
                                       target="_blank"
                                       title={
                                         chunk.page &&
-                                          "p.#{chunk.page} を開きます。Drive のビューアがページ指定に対応していない場合は、ビューアのページ欄で #{chunk.page} を指定してください"
+                                          "p.#{chunk.page}"
                                       }
                                       class="text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center gap-0.5 transition shrink-0"
                                     >
                                       {if chunk.page,
-                                        do: "Drive で開く（p.#{chunk.page}）",
-                                        else: "Drive で開く"}
+                                        do: gettext("Open in Drive (p.%{page})", page: chunk.page),
+                                        else: gettext("Open in Drive")}
                                       <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
                                     </.link>
                                   <% end %>
@@ -536,7 +576,7 @@ defmodule AskDriveWeb.ChatLive do
                                 </div>
                                 <details class="text-xs">
                                   <summary class="cursor-pointer text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 select-none">
-                                    全文を表示
+                                    {gettext("Show full text")}
                                   </summary>
                                   <div class="mt-1.5 text-xs text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-900 p-2 rounded-md leading-relaxed max-h-72 overflow-y-auto">
                                     {excerpt_html(Snippet.full(chunk.content, msg[:question]))}
@@ -553,7 +593,9 @@ defmodule AskDriveWeb.ChatLive do
               <% end %>
               <div :if={@loading} id="answer-loading" class="flex justify-start">
                 <div class="rounded-2xl rounded-tl-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-4 py-3 text-xs text-zinc-500 flex items-center gap-2 shadow-sm">
-                  <.icon name="hero-arrow-path" class="w-4 h-4 animate-spin" /> 回答を検索しています…
+                  <.icon name="hero-arrow-path" class="w-4 h-4 animate-spin" /> {gettext(
+                    "Searching for answers…"
+                  )}
                 </div>
               </div>
             <% end %>
@@ -574,7 +616,7 @@ defmodule AskDriveWeb.ChatLive do
                   name="question"
                   id="chat-input"
                   value={@form[:question].value}
-                  placeholder="Google Drive の文書について質問を入力してください..."
+                  placeholder={gettext("Ask a question about Google Drive documents...")}
                   class="w-full px-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition"
                   autocomplete="off"
                 />
@@ -585,7 +627,7 @@ defmodule AskDriveWeb.ChatLive do
                 disabled={@loading}
                 class="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm flex items-center gap-1.5 shadow-sm transition disabled:opacity-50"
               >
-                <span>送信</span>
+                <span>{gettext("Send")}</span>
                 <.icon name="hero-paper-airplane" class="w-4 h-4" />
               </button>
             </.form>

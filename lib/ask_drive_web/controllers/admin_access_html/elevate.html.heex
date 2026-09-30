@@ -4,9 +4,13 @@
       <div class="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-sm">
         <.icon name="hero-shield-check" class="w-6 h-6" />
       </div>
-      <h1 class="font-bold text-xl text-zinc-900 dark:text-zinc-100">管理者権限への昇格</h1>
+      <h1 class="font-bold text-xl text-zinc-900 dark:text-zinc-100">
+        {gettext("Elevate to Administrator")}
+      </h1>
       <p class="text-xs text-zinc-500 leading-relaxed">
-        {@current_user.email} として昇格します。<br /> 昇格した記録は監査ログに残ります。
+        {gettext("Elevating as %{email}. This action is recorded in the audit log.",
+          email: @current_user.email
+        )}
       </p>
     </div>
 
@@ -24,20 +28,24 @@
           <div class="text-center space-y-2 py-4">
             <.icon name="hero-lock-closed" class="w-8 h-8 text-red-500 mx-auto" />
             <p class="font-medium text-sm text-zinc-900 dark:text-zinc-100">
-              一時的にロックされています
+              {gettext("Temporarily Locked")}
             </p>
             <p class="text-xs text-zinc-500">
-              {Calendar.strftime(@locked_until, "%H:%M")} 以降に再度お試しください。
+              {gettext("Please try again after %{time}.",
+                time: Calendar.strftime(@locked_until, "%H:%M")
+              )}
             </p>
           </div>
         <% not @password_set? -> %>
           <%!-- First run: an eligible account sets the shared password here (F-917). --%>
           <div class="space-y-1">
             <h2 class="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
-              管理者パスワードの初回設定
+              {gettext("Initial Administrator Password Setup")}
             </h2>
             <p class="text-xs text-zinc-500 leading-relaxed">
-              まだ管理者パスワードが設定されていません。以後、管理画面に入るたびにこのパスワードの入力を求めます。
+              {gettext(
+                "An administrator password has not been set yet. You will be prompted for this password when entering the admin area."
+              )}
             </p>
           </div>
 
@@ -45,14 +53,18 @@
             <.input
               field={f[:password]}
               type="password"
-              label={"新しい管理者パスワード（#{@min_length} 文字以上）"}
+              label={
+                gettext("New administrator password (at least %{count} characters)",
+                  count: @min_length
+                )
+              }
               required
               autocomplete="new-password"
             />
             <.input
               field={f[:confirmation]}
               type="password"
-              label="確認のためもう一度入力"
+              label={gettext("Confirm password")}
               required
               autocomplete="new-password"
             />
@@ -61,7 +73,7 @@
               id="set-admin-password-btn"
               class="w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
             >
-              パスワードを設定
+              {gettext("Set Password")}
             </button>
           </.form>
         <% true -> %>
@@ -69,7 +81,7 @@
             <.input
               field={f[:password]}
               type="password"
-              label="管理者パスワード"
+              label={gettext("Administrator Password")}
               required
               autocomplete="current-password"
             />
@@ -78,10 +90,10 @@
               id="elevate-btn"
               class="w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
             >
-              管理者として続行
+              {gettext("Continue as Administrator")}
             </button>
             <p class="text-[11px] text-zinc-400 text-center">
-              残り試行回数: {@attempts_remaining} 回
+              {gettext("Attempts remaining: %{count}", count: @attempts_remaining)}
             </p>
           </.form>
       <% end %>
@@ -92,7 +104,7 @@
         navigate={~p"/"}
         class="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition"
       >
-        チャットに戻る
+        {gettext("Return to Chat")}
       </.link>
     </p>
   </div>

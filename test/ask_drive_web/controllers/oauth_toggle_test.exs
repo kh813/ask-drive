@@ -32,7 +32,10 @@ defmodule AskDriveWeb.OAuthToggleTest do
     assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Google ログインは無効"
 
     # the intro speaks of the LDAP password only, not of Google accounts
-    assert html =~ "メールアドレスと Google Workspace のパスワードでログインしてください"
+    assert html =~ "Please sign in with your email address" or
+             html =~ "メールアドレスと Google Workspace のパスワードでログインしてください"
+
+    refute html =~ "Please sign in with your Google account"
     refute html =~ "Google アカウントでログインしてください"
     refute html =~ "login-divider"
 
@@ -76,7 +79,7 @@ defmodule AskDriveWeb.OAuthToggleTest do
   test "only Google login on: the intro speaks of Google accounts, no LDAP form", %{conn: conn} do
     html = conn |> get(~p"/login") |> html_response(200)
     assert html =~ "google-login-btn"
-    assert html =~ "Google アカウントでログインしてください"
+    assert html =~ "Please sign in with your Google account" or html =~ "Google アカウントでログインしてください"
     refute html =~ "ldap-login-form"
   end
 
@@ -87,7 +90,8 @@ defmodule AskDriveWeb.OAuthToggleTest do
     html = conn |> get(~p"/login") |> html_response(200)
     refute html =~ "google-login-btn"
     refute html =~ "ldap-login-form"
-    assert html =~ "ログインの方法が設定されていません"
+    assert html =~ "no-login-method"
+    assert html =~ "No login method configured" or html =~ "ログインの方法が設定されていません"
     refute html =~ "OAuth が未設定です"
   end
 end

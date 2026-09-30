@@ -1,5 +1,9 @@
 <Layouts.flash_group flash={@flash} />
 
+<div class="fixed top-4 right-4 z-50">
+  <Layouts.locale_switcher />
+</div>
+
 <main class="min-h-screen flex items-center justify-center px-4 py-12 bg-zinc-50 dark:bg-zinc-950">
   <div class="w-full max-w-md space-y-6">
     <div class="text-center space-y-3">
@@ -8,33 +12,37 @@
       </div>
       <div>
         <h1 class="font-bold text-2xl text-zinc-900 dark:text-zinc-100">AskDrive</h1>
-        <p class="text-sm text-zinc-500 mt-1">社内文書ナレッジ回答ボット</p>
+        <p class="text-sm text-zinc-500 mt-1">
+          {gettext("Internal Document Knowledge Assistant")}
+        </p>
       </div>
     </div>
 
     <div class="p-8 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-6">
       <div class="space-y-1.5 text-center">
-        <h2 class="font-semibold text-base text-zinc-900 dark:text-zinc-100">ログイン</h2>
+        <h2 class="font-semibold text-base text-zinc-900 dark:text-zinc-100">
+          {gettext("Sign In")}
+        </h2>
         <%!-- worded for the sign-in methods that are switched on (spec F-1310) --%>
         <p id="login-intro" class="text-xs text-zinc-500 leading-relaxed">
           <span
             :if={@allowed_domain && (@ldap_enabled? || @oauth_configured?)}
             class="font-medium text-zinc-700 dark:text-zinc-300"
           >
-            @{@allowed_domain} の
+            @{@allowed_domain}
           </span>
           {cond do
             @ldap_enabled? && @oauth_configured? ->
-              "Google Workspace アカウントでログインしてください。"
+              gettext("Please sign in with your Google Workspace account.")
 
             @ldap_enabled? ->
-              "メールアドレスと Google Workspace のパスワードでログインしてください。"
+              gettext("Please sign in with your email address and Google Workspace password.")
 
             @oauth_configured? ->
-              "Google アカウントでログインしてください。"
+              gettext("Please sign in with your Google account.")
 
             true ->
-              "現在ログインできる方法がありません。"
+              gettext("No sign-in method is currently available.")
           end}
         </p>
       </div>
@@ -54,7 +62,7 @@
             for="ldap_email"
             class="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1"
           >
-            メールアドレス
+            {gettext("Email address")}
           </label>
           <input
             type="email"
@@ -74,7 +82,7 @@
             for="ldap_password"
             class="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1"
           >
-            パスワード（Google Workspace のパスワード）
+            {gettext("Password (Google Workspace password)")}
           </label>
           <input
             type="password"
@@ -90,7 +98,7 @@
           id="ldap-login-btn"
           class="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
         >
-          <.icon name="hero-lock-closed" class="w-4 h-4" /> ログイン
+          <.icon name="hero-lock-closed" class="w-4 h-4" /> {gettext("Sign in")}
         </button>
       </.form>
 
@@ -100,7 +108,7 @@
         class="flex items-center gap-3 text-[11px] text-zinc-400"
       >
         <span class="flex-1 h-px bg-zinc-200 dark:bg-zinc-800"></span>
-        または <span class="flex-1 h-px bg-zinc-200 dark:bg-zinc-800"></span>
+        {gettext("or")} <span class="flex-1 h-px bg-zinc-200 dark:bg-zinc-800"></span>
       </div>
 
       <%= if @oauth_configured? do %>
@@ -109,7 +117,9 @@
           href={~p"/auth/google"}
           class="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
         >
-          <.icon name="hero-arrow-right-on-rectangle" class="w-4 h-4" /> Google でログイン
+          <.icon name="hero-arrow-right-on-rectangle" class="w-4 h-4" /> {gettext(
+            "Sign in with Google"
+          )}
         </a>
       <% end %>
       <%= if !@oauth_configured? && !@ldap_enabled? do %>
@@ -118,20 +128,22 @@
           class="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 space-y-2"
         >
           <p class="font-medium text-sm flex items-center gap-1.5">
-            <.icon name="hero-exclamation-triangle" class="w-4 h-4" /> ログインの方法が設定されていません
+            <.icon name="hero-exclamation-triangle" class="w-4 h-4" /> {gettext(
+              "No login method configured"
+            )}
           </p>
           <p class="text-xs leading-relaxed">
-            管理者は、全体管理の「全体設定」→「組織（Google Workspace）」→「ログインの方法」で Google Secure LDAP または Google ログイン（OAuth）を有効にしてください。管理画面に入れない場合は、サーバー上で
-            <code class="font-mono text-[11px] bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded">
-              ./app.sh auth status
-            </code>
-            で状態を確認できます。
+            {gettext(
+              "An administrator needs to configure Google Secure LDAP or Google Login (OAuth) in Platform Settings."
+            )}
           </p>
         </div>
       <% end %>
 
       <p class="text-[11px] text-zinc-400 text-center leading-relaxed">
-        初回ログイン時に自動で登録されます。管理者権限は初期セットアップで指定したアドレス、または管理画面から付与されます。
+        {gettext(
+          "New users are automatically registered on first login. Admin permissions can be granted in Platform Settings."
+        )}
       </p>
     </div>
   </div>

@@ -58,7 +58,7 @@ defmodule AskDriveWeb.AppAdminAccessTest do
 
     test "the right password lets in; a wrong one says so", %{owner: owner} do
       conn = build_conn() |> log_in_user(owner)
-      assert conn |> get("/hr/admin/elevate") |> html_response(200) =~ "Google Workspace のパスワード"
+      assert conn |> get("/hr/admin/elevate") |> html_response(200) =~ "Google Workspace"
 
       bad = post(conn, "/hr/admin/elevate", %{"admin" => %{"password" => "nope"}})
       assert html_response(bad, 200) =~ "パスワードが正しくありません"

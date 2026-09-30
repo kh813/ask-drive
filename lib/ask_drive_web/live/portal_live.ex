@@ -25,7 +25,7 @@ defmodule AskDriveWeb.PortalLive do
       <div class="space-y-6">
         <div>
           <h1 class="font-bold text-2xl text-zinc-900 dark:text-zinc-100">AskDrive</h1>
-          <p class="text-sm text-zinc-500 mt-1">相談したい窓口を選んでください。</p>
+          <p class="text-sm text-zinc-500 mt-1">{gettext("Select a desk to ask questions.")}</p>
         </div>
 
         <div id="app-list" class="grid grid-cols-1 sm:grid-cols-2 gap-4">

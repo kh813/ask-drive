@@ -10,6 +10,7 @@ defmodule AskDriveWeb.Router do
     plug :put_root_layout, html: {AskDriveWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug AskDriveWeb.Plugs.SetLocale
     plug :fetch_current_user
     # only devices with a certificate issued here, when restricted (spec 6.14) — before the
     # login page and everything else
@@ -20,6 +21,13 @@ defmodule AskDriveWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+  end
+
+  # --- Locale switcher ------------------------------------------------------
+  scope "/", AskDriveWeb do
+    pipe_through :browser
+
+    get "/locale/:locale", LocaleController, :set_locale
   end
 
   # --- Public: sign-in only (spec 6.9) --------------------------------------
@@ -41,12 +49,18 @@ defmodule AskDriveWeb.Router do
     pipe_through :browser
 
     live_session :setup,
-      on_mount: [{AskDriveWeb.UserAuth, :mount_current_user}] do
+      on_mount: [
+        {AskDriveWeb.Plugs.SetLocale, :default},
+        {AskDriveWeb.UserAuth, :mount_current_user}
+      ] do
       live "/setup", SetupLive
     end
 
     live_session :portal,
-      on_mount: [{AskDriveWeb.UserAuth, :require_login_when_enabled}] do
+      on_mount: [
+        {AskDriveWeb.Plugs.SetLocale, :default},
+        {AskDriveWeb.UserAuth, :require_login_when_enabled}
+      ] do
       live "/", PortalLive
     end
   end
@@ -77,7 +91,10 @@ defmodule AskDriveWeb.Router do
 
     # Platform administration: apps, users, SSL, Ollama, the nightly window (spec 6.11)
     live_session :admin,
-      on_mount: [{AskDriveWeb.UserAuth, :require_admin_session}] do
+      on_mount: [
+        {AskDriveWeb.Plugs.SetLocale, :default},
+        {AskDriveWeb.UserAuth, :require_admin_session}
+      ] do
       live "/admin", AdminLive, :platform
     end
 
@@ -124,6 +141,7 @@ defmodule AskDriveWeb.Router do
 
     live_session :app_admin,
       on_mount: [
+        {AskDriveWeb.Plugs.SetLocale, :default},
         {AskDriveWeb.UserAuth, :require_app_admin_session},
         {AskDriveWeb.AppScope, :app}
       ] do
@@ -139,6 +157,7 @@ defmodule AskDriveWeb.Router do
 
     live_session :app_chat,
       on_mount: [
+        {AskDriveWeb.Plugs.SetLocale, :default},
         {AskDriveWeb.UserAuth, :require_login_when_enabled},
         {AskDriveWeb.AppScope, :app}
       ] do
