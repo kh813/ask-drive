@@ -188,6 +188,29 @@ jobs:
           test "$before" != "$after"
           systemctl is-active askdrive.service
 
+      - name: Client certificates enforced over real TLS (spec 6.14)
+        run: |
+          out="$(./app.sh mtls issue CI /tmp/ci.p12)"
+          echo "$out" | sed 's/パスワード: .*/パスワード: (hidden)/'
+          pw="$(echo "$out" | sed -n 's/.*パスワード: //p')"
+          ./app.sh mtls enforce
+          ./app.sh service restart
+          for i in $(seq 1 60); do curl -sk -o /dev/null https://localhost:4443/ && break; sleep 1; done
+          ip="$(hostname -I | awk '{print $1}')"
+          echo "LAN address: ${ip}"
+          no_cert="$(curl -sk -o /dev/null -w '%{http_code}' "https://${ip}:4443/login")"
+          echo "without a certificate -> ${no_cert}"
+          test "${no_cert}" = "403"
+          openssl pkcs12 -in /tmp/ci.p12 -passin "pass:${pw}" -nodes -out /tmp/ci.pem
+          with_cert="$(curl -sk -o /dev/null -w '%{http_code}' --cert /tmp/ci.pem "https://${ip}:4443/login")"
+          echo "with the certificate -> ${with_cert}"
+          test "${with_cert}" != "403" && test "${with_cert}" != "000"
+          local_code="$(curl -sk -o /dev/null -w '%{http_code}' https://localhost:4443/login)"
+          echo "from the server itself -> ${local_code}"
+          test "${local_code}" != "403"
+          ./app.sh mtls off
+          ./app.sh mtls status
+
       - name: Logs on failure
         if: failure()
         run: |

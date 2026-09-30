@@ -11,6 +11,9 @@ defmodule AskDriveWeb.Router do
     plug :protect_from_forgery
     plug :put_secure_browser_headers
     plug :fetch_current_user
+    # only devices with a certificate issued here, when restricted (spec 6.14) — before the
+    # login page and everything else
+    plug AskDriveWeb.Plugs.ClientCertGate
     # until the first-access setup is done, every page leads to /setup (spec 6.12)
     plug AskDriveWeb.Plugs.RequireSetup
   end
@@ -68,6 +71,9 @@ defmodule AskDriveWeb.Router do
   # --- Elevated sessions only (spec 6.9 F-911) ------------------------------
   scope "/", AskDriveWeb do
     pipe_through [:browser, :require_admin_session]
+
+    # an issued client certificate, downloaded once (spec 6.14)
+    get "/admin/client-certs/:token", ClientCertController, :download
 
     # Platform administration: apps, users, SSL, Ollama, the nightly window (spec 6.11)
     live_session :admin,

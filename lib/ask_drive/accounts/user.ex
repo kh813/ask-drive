@@ -19,6 +19,9 @@ defmodule AskDrive.Accounts.User do
     field :email, :string
     field :name, :string
     field :picture_url, :string
+    # client certificates (spec 6.14, monitor mode): last access with / without one
+    field :client_cert_seen_at, :utc_datetime
+    field :no_client_cert_seen_at, :utc_datetime
     field :admin_eligible, :boolean, default: false
     field :status, :string, default: "active"
     field :last_login_at, :utc_datetime

@@ -53,6 +53,8 @@ defmodule AskDriveWeb.AdminLive do
       |> assign(:ldap_test, nil)
       |> assign(:ac, %{})
       |> assign(:peer_ip, peer_ip(socket))
+      |> assign(:peer_cert, peer_cert(socket))
+      |> assign(:issued_cert, nil)
       |> assign(:ldap_pending, %{})
       |> assign(:ssl_check, nil)
 
@@ -417,6 +419,88 @@ defmodule AskDriveWeb.AdminLive do
       _ ->
         {:noreply, put_flash(socket, :error, "先に「検証する」で証明書を検証してください。")}
     end
+  end
+
+  # Access only from devices with a certificate issued here (spec 6.14). "enforce" only from
+  # a connection that has a valid certificate (or from the server itself), so the admin
+  # can't lock themselves out; starting / stopping asking for certificates restarts the
+  # HTTPS listener, detached, as for a certificate change.
+  def handle_event("set_client_cert_mode", %{"mode" => mode}, socket) do
+    ok_here? =
+      match?({:ok, _}, AskDrive.ClientCerts.check(socket.assigns.peer_cert)) or
+        socket.assigns.peer_ip in ["127.0.0.1", "::1", "::ffff:127.0.0.1"]
+
+    cond do
+      mode == "enforce" and not ok_here? ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "この接続には有効な証明書がありません。先にこの端末に証明書をインストールし、監視のまま「この接続の証明書: 有効」と表示されることを確認してから強制にしてください。"
+         )}
+
+      true ->
+        {:ok, restart?} = AskDrive.ClientCerts.set_mode(mode)
+        Logger.warning("AdminLive: client-certificate access mode set to #{mode}")
+
+        if restart? do
+          spawn(fn ->
+            Process.sleep(700)
+            AskDrive.SSL.restart_endpoint()
+          end)
+        end
+
+        {:noreply,
+         socket
+         |> put_flash(
+           :info,
+           if(restart?,
+             do:
+               "設定しました。HTTPS の待ち受けを再起動しています（数秒後に自動で再接続します。証明書の選択を求められたら AskDrive の証明書を選んでください）。",
+             else: "設定しました。"
+           )
+         )
+         |> load_dashboard_data()}
+    end
+  end
+
+  def handle_event("create_client_cert_group", %{"name" => name}, socket) do
+    case AskDrive.ClientCerts.create_group(name) do
+      {:ok, group} ->
+        {:noreply,
+         socket |> put_flash(:info, "グループ「#{group.name}」を追加しました。") |> load_dashboard_data()}
+
+      {:error, cs} ->
+        {:noreply, put_flash(socket, :error, "グループ名" <> changeset_messages(cs))}
+    end
+  end
+
+  def handle_event("issue_client_cert", %{"group_id" => id}, socket) do
+    group = Enum.find(socket.assigns.client_cert_groups, &(to_string(&1.id) == id))
+    {:ok, issued} = AskDrive.ClientCerts.issue(group, socket.assigns.current_user.email)
+    token = AskDrive.ClientCerts.stash_download(issued.p12, issued.filename)
+
+    {:noreply,
+     socket
+     |> assign(:issued_cert, %{
+       group: group.name,
+       password: issued.password,
+       token: token,
+       filename: issued.filename
+     })
+     |> load_dashboard_data()}
+  end
+
+  def handle_event("revoke_client_cert", %{"id" => id}, socket) do
+    {:ok, _} =
+      AskDrive.ClientCerts.revoke(String.to_integer(id), socket.assigns.current_user.email)
+
+    {:noreply, socket |> put_flash(:info, "証明書を失効させました。") |> load_dashboard_data()}
+  end
+
+  def handle_event("delete_client_cert_group", %{"group_id" => id}, socket) do
+    :ok = AskDrive.ClientCerts.delete_group(String.to_integer(id))
+    {:noreply, socket |> put_flash(:info, "グループを削除しました。") |> load_dashboard_data()}
   end
 
   # Ports and trusted proxies (spec F-1013). A port change restarts the endpoint, which drops
@@ -986,6 +1070,18 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:auto_status, auto_status)
     |> assign(:running_run, running_run)
     |> assign(:remaining, Scheduler.remaining())
+    |> assign(:client_cert_mode, AskDrive.ClientCerts.mode())
+    |> assign(
+      :client_cert_groups,
+      if(socket.assigns[:scope] == :platform, do: AskDrive.ClientCerts.list_groups(), else: [])
+    )
+    |> assign(
+      :users_without_cert,
+      if(socket.assigns[:scope] == :platform,
+        do: AskDrive.ClientCerts.users_without_cert(),
+        else: []
+      )
+    )
     # each app's administrators (F-1114): the platform's app list, and the app's own card
     |> assign(
       :app_admins,
@@ -4517,6 +4613,206 @@ defmodule AskDriveWeb.AdminLive do
                 </p>
               </div>
             </div>
+
+            <%!-- Access only from devices with a certificate issued here (spec 6.14) --%>
+            <% cc_mode = @client_cert_mode %>
+            <div
+              :if={@scope == :platform}
+              id="client-cert-settings"
+              class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
+            >
+              <div>
+                <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-finger-print" class="w-5 h-5 text-indigo-600" /> 端末の電子証明書によるアクセス制限
+                  <span
+                    id="client-cert-mode"
+                    class={[
+                      "text-[11px] font-medium px-2 py-0.5 rounded-full",
+                      case cc_mode do
+                        "enforce" ->
+                          "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+
+                        "monitor" ->
+                          "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+
+                        _ ->
+                          "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
+                      end
+                    ]}
+                  >
+                    {case cc_mode do
+                      "enforce" -> "強制"
+                      "monitor" -> "監視"
+                      _ -> "無効"
+                    end}
+                  </span>
+                </h2>
+                <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  AskDrive が発行した電子証明書をインストールした端末（ブラウザ）だけが、ログイン画面を含むすべての画面に入れるようにします。証明書はグループ（部署など）ごとに発行し、パスワード付きの .p12 ファイルで配布します。誰であるかは従来どおりログインで確認し、証明書は「配布した端末であること」を確かめる追加の対策です。導入は「無効 → 監視 → 強制」の順に進めてください。監視では証明書を求めて記録するだけで、誰も拒否しません。
+                </p>
+                <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  HTTPS で直接つなぐ構成が前提です（リバースプロキシで TLS を終端する場合は、プロキシ経由のアクセスには証明書が届きません）。締め出された場合は、サーバー上で
+                  <code class="font-mono">./app.sh mtls off</code>
+                  を実行するか、サーバー自身（localhost）から開いてください。
+                </p>
+              </div>
+
+              <p id="this-connection-cert" class="text-xs text-zinc-600 dark:text-zinc-400">
+                この接続の証明書: {case AskDrive.ClientCerts.check(@peer_cert) do
+                  {:ok, cert} -> "有効（グループ「#{cert.group.name}」）"
+                  :none -> if(cc_mode == "off", do: "（無効の間は確認しません）", else: "なし")
+                  :revoked -> "失効済み"
+                  :expired -> "期限切れ"
+                  :unknown -> "この AskDrive が発行したものではありません"
+                end}
+              </p>
+
+              <div class="flex flex-wrap gap-2">
+                <button
+                  :for={{mode, label} <- [{"off", "無効"}, {"monitor", "監視"}, {"enforce", "強制"}]}
+                  :if={mode != cc_mode}
+                  id={"client-cert-mode-#{mode}"}
+                  phx-click="set_client_cert_mode"
+                  phx-value-mode={mode}
+                  data-confirm={
+                    case mode do
+                      "enforce" -> "強制にしますか？証明書のない端末は、ログイン画面にも入れなくなります。"
+                      "off" -> "無効にしますか？証明書のない端末からも入れるようになります。"
+                      _ -> "監視にしますか？証明書を求めて記録しますが、誰も拒否しません。"
+                    end
+                  }
+                  class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium"
+                >
+                  {label}にする
+                </button>
+              </div>
+
+              <div
+                :if={@issued_cert}
+                id="issued-cert"
+                class="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 text-xs space-y-1"
+              >
+                <p class="font-semibold">
+                  グループ「{@issued_cert.group}」の証明書を発行しました（この表示は一度だけです）
+                </p>
+                <p>
+                  パスワード:
+                  <span id="issued-cert-password" class="font-mono text-sm select-all">{@issued_cert.password}</span>
+                  （.p12 ファイルとは別の手段で伝えてください）
+                </p>
+                <a
+                  id="issued-cert-download"
+                  href={"/admin/client-certs/#{@issued_cert.token}"}
+                  class="inline-block px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+                >
+                  {@issued_cert.filename} をダウンロード（10 分以内・1 回のみ）
+                </a>
+              </div>
+
+              <div class="space-y-3">
+                <h3 class="font-semibold text-sm text-zinc-800 dark:text-zinc-200">グループと証明書</h3>
+                <div
+                  :for={group <- @client_cert_groups}
+                  id={"cert-group-#{group.id}"}
+                  class="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800 space-y-2 text-xs"
+                >
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="font-medium text-zinc-800 dark:text-zinc-200">{group.name}</span>
+                    <div class="flex gap-2">
+                      <button
+                        id={"issue-cert-#{group.id}"}
+                        phx-click="issue_client_cert"
+                        phx-value-group_id={group.id}
+                        class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+                      >
+                        証明書を発行
+                      </button>
+                      <button
+                        :if={Enum.all?(group.certs, & &1.revoked_at)}
+                        phx-click="delete_client_cert_group"
+                        phx-value-group_id={group.id}
+                        data-confirm={"グループ「#{group.name}」を削除しますか？"}
+                        class="px-2.5 py-1 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      >
+                        削除
+                      </button>
+                    </div>
+                  </div>
+                  <table :if={group.certs != []} class="w-full text-left">
+                    <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                      <tr :for={cert <- group.certs} id={"client-cert-#{cert.id}"}>
+                        <td class="py-1 font-mono">{String.slice(cert.serial, 0, 8)}</td>
+                        <td class="py-1">
+                          発行 {AskDrive.Clock.format(cert.inserted_at, "%Y-%m-%d")}・期限 {cert.not_after &&
+                            AskDrive.Clock.format(cert.not_after, "%Y-%m-%d")}
+                        </td>
+                        <td class="py-1">
+                          最終利用 {if cert.last_seen_at,
+                            do: AskDrive.Clock.format(cert.last_seen_at, "%m/%d %H:%M"),
+                            else: "—"}
+                        </td>
+                        <td class="py-1 text-right">
+                          <%= if cert.revoked_at do %>
+                            <span class="text-red-600">失効 {AskDrive.Clock.format(
+                              cert.revoked_at,
+                              "%m/%d"
+                            )}</span>
+                          <% else %>
+                            <button
+                              id={"revoke-cert-#{cert.id}"}
+                              phx-click="revoke_client_cert"
+                              phx-value-id={cert.id}
+                              data-confirm="この証明書を失効させますか？インストール済みの端末からはすぐに入れなくなります。"
+                              class="px-2 py-0.5 rounded border border-red-300 text-red-700 hover:bg-red-50"
+                            >
+                              失効
+                            </button>
+                          <% end %>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <form
+                  id="new-cert-group-form"
+                  phx-submit="create_client_cert_group"
+                  class="flex gap-2 text-xs"
+                >
+                  <input
+                    type="text"
+                    name="name"
+                    required
+                    placeholder="グループ名（例: 経理部）"
+                    class="flex-1 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
+                  />
+                  <button
+                    type="submit"
+                    class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium"
+                  >
+                    グループを追加
+                  </button>
+                </form>
+                <p class="text-[11px] text-zinc-400">
+                  交換するときは、同じグループで新しい証明書を発行して配り、入れ替えが済んだら古い証明書を失効させます（その間は新旧どちらでも入れます）。漏洩した場合はすぐに失効させてください。
+                </p>
+              </div>
+
+              <div
+                :if={cc_mode == "monitor" and @users_without_cert != []}
+                id="users-without-cert"
+                class="space-y-1"
+              >
+                <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300">
+                  証明書なしでアクセスしたユーザー（監視中・強制にする前に確認）
+                </h3>
+                <p
+                  :for={u <- @users_without_cert}
+                  class="text-[11px] text-zinc-600 dark:text-zinc-400"
+                >
+                  {u.email}（{AskDrive.Clock.format(u.no_client_cert_seen_at, "%m/%d %H:%M")}）
+                </p>
+              </div>
+            </div>
           </div>
         <% end %>
       </div>
@@ -4878,6 +5174,14 @@ defmodule AskDriveWeb.AdminLive do
 
   defp record_ssl_result({:error, message}),
     do: :persistent_term.put({__MODULE__, :ssl_result}, "前回の証明書の適用に失敗しました: #{message}")
+
+  # the client certificate this admin's browser presented, if any (spec 6.14)
+  defp peer_cert(socket) do
+    case get_connect_info(socket, :peer_data) do
+      %{ssl_cert: der} when is_binary(der) -> der
+      _ -> nil
+    end
+  end
 
   # the TCP peer of this admin's connection (to tell whether it came through a proxy)
   defp peer_ip(socket) do

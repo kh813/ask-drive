@@ -13,4 +13,7 @@ defmodule AskDrive.PlatformRepo do
   def insert(cs, opts \\ []), do: Apps.platform(fn -> Repo.insert(cs, opts) end)
   def update(cs, opts \\ []), do: Apps.platform(fn -> Repo.update(cs, opts) end)
   def delete(s, opts \\ []), do: Apps.platform(fn -> Repo.delete(s, opts) end)
+
+  def update_all(q, updates, opts \\ []),
+    do: Apps.platform(fn -> Repo.update_all(q, updates, opts) end)
 end

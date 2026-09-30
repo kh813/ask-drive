@@ -78,15 +78,12 @@ defmodule AskDrive.SSL do
         certfile: path(active_dir(), "cert.pem"),
         keyfile: path(active_dir(), "key.pem")
       ] ++
-        if File.exists?(path(active_dir(), "chain.pem")),
+        case transport_options() do
           # Bandit takes only certfile/keyfile at the top level; other :ssl options (the
-          # intermediate chain) go to the TLS transport underneath
-          do: [
-            thousand_island_options: [
-              transport_options: [cacertfile: path(active_dir(), "chain.pem")]
-            ]
-          ],
-          else: []
+          # intermediate chain, client certificates) go to the TLS transport underneath
+          [] -> []
+          opts -> [thousand_island_options: [transport_options: opts]]
+        end
 
     config = Application.get_env(:ask_drive, AskDriveWeb.Endpoint, [])
     url = Keyword.merge(Keyword.get(config, :url, []), scheme: "https", port: https_port())
@@ -101,6 +98,32 @@ defmodule AskDrive.SSL do
     )
 
     :persistent_term.put({__MODULE__, :meta}, read_meta(active_dir()))
+  end
+
+  # The intermediate chain, and — when access is restricted to devices with a certificate
+  # issued here (spec 6.14) — asking the browser for one: optional (fail_if_no_peer_cert:
+  # false), so a device without one reaches the app's explanation page instead of a bare
+  # TLS error. The CA list serves both the chain and the check of client certificates;
+  # the app then accepts only certificates it issued (by serial).
+  defp transport_options do
+    chain = path(active_dir(), "chain.pem")
+    ca = AskDrive.ClientCerts.request_certs?() && AskDrive.ClientCerts.ca_der()
+
+    cond do
+      ca ->
+        chain_ders =
+          if File.exists?(chain),
+            do: for({:Certificate, der, _} <- :public_key.pem_decode(File.read!(chain)), do: der),
+            else: []
+
+        [verify: :verify_peer, fail_if_no_peer_cert: false, cacerts: chain_ders ++ [ca]]
+
+      File.exists?(chain) ->
+        [cacertfile: chain]
+
+      true ->
+        []
+    end
   end
 
   @doc "Metadata of the certificate being served (cached; see `put_endpoint_config/0`)."
