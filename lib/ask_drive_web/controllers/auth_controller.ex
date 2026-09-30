@@ -25,7 +25,7 @@ defmodule AskDriveWeb.AuthController do
     else
       conn
       |> remember_return_to(params["return_to"])
-      |> ensure_device_cookie()
+      |> AskDriveWeb.ConnectionEnv.ensure_device_cookie()
       |> assign(:oauth_configured?, OAuth.login_enabled?())
       |> assign(:ldap_enabled?, ldap_enabled?())
       |> assign(:allowed_domain, allowed_domain())
@@ -44,7 +44,7 @@ defmodule AskDriveWeb.AuthController do
       params |> get_in(["ldap", "email"]) |> to_string() |> String.trim() |> String.downcase()
 
     password = params |> get_in(["ldap", "password"]) |> to_string()
-    env = connection_env(conn)
+    env = AskDriveWeb.ConnectionEnv.env(conn)
     setting = Settings.platform_setting!()
 
     cond do
@@ -109,35 +109,6 @@ defmodule AskDriveWeb.AuthController do
     |> put_flash(:error, message)
     |> put_flash(:ldap_email, email)
     |> redirect(to: ~p"/login")
-  end
-
-  # The browser's device cookie (spec F-1305): a random id set on the login page, so the
-  # 24-hour lock applies to one browser, not to everyone behind the office NAT.
-  @device_cookie "_askdrive_device"
-  @device_cookie_opts [sign: true, max_age: 400 * 86_400, http_only: true, same_site: "Lax"]
-
-  defp ensure_device_cookie(conn) do
-    conn = fetch_cookies(conn, signed: [@device_cookie])
-
-    if conn.cookies[@device_cookie] do
-      conn
-    else
-      id = :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
-      put_resp_cookie(conn, @device_cookie, id, @device_cookie_opts)
-    end
-  end
-
-  defp connection_env(conn) do
-    conn = fetch_cookies(conn, signed: [@device_cookie])
-    ip = conn.remote_ip |> :inet.ntoa() |> to_string()
-    ua = conn |> get_req_header("user-agent") |> List.first()
-    lang = conn |> get_req_header("accept-language") |> List.first()
-
-    %{
-      key: LoginThrottle.env_key(conn.cookies[@device_cookie], ip, ua, lang),
-      ip: ip,
-      user_agent: ua
-    }
   end
 
   # only a path on this site (not "//host" or a full URL), so it can't redirect elsewhere

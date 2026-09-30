@@ -213,34 +213,74 @@ defmodule AskDriveWeb.ChatLiveTest do
     refute answer_part =~ "Okay, let"
   end
 
-  test "locks chat when access password is enabled, unlocks with correct password", %{conn: conn} do
-    alias AskDrive.Accounts.AdminAccess
+  describe "the app's passphrase (spec F-1112)" do
+    alias AskDrive.Accounts.{AdminAccess, LoginThrottle}
     alias AskDrive.Settings
 
-    setting = Settings.get_setting!()
-    {:ok, _} = AdminAccess.set_access_password(setting, "pass12345")
+    setup do
+      {:ok, _} = AdminAccess.set_access_password(Settings.get_setting!(), "pass12345")
+      :ok
+    end
 
-    # Regular user visiting chat should see access lock
-    {:ok, view, html} = live(conn, ~p"/it-support")
-    assert html =~ "合言葉を入力してください"
-    assert has_element?(view, "#chat-access-form")
+    defp unlock(conn, password),
+      do: post(conn, "/it-support/unlock", %{"chat_access" => %{"password" => password}})
 
-    # Submit wrong password
-    html =
-      view
-      |> form("#chat-access-form", %{"chat_access" => %{"password" => "wrongpwd"}})
-      |> render_submit()
+    test "locked until the passphrase is given; the unlock holds across reloads", %{conn: conn} do
+      {:ok, view, html} = live(conn, ~p"/it-support")
+      assert html =~ "合言葉を入力してください"
+      assert has_element?(view, ~s(#chat-access-form[action="/it-support/unlock"][method="post"]))
 
-    assert html =~ "合言葉（アクセスパスワード）が正しくありません。"
-    assert has_element?(view, "#chat-access-form")
+      # wrong: back to the app with a message, still locked
+      bad = unlock(conn, "wrongpwd")
+      assert redirected_to(bad) == "/it-support"
+      assert Phoenix.Flash.get(bad.assigns.flash, :error) =~ "正しくありません"
+      assert Phoenix.Flash.get(bad.assigns.flash, :error) =~ "あと 4 回"
 
-    # Submit correct password
-    html =
-      view
-      |> form("#chat-access-form", %{"chat_access" => %{"password" => "pass12345"}})
-      |> render_submit()
+      # right: remembered in the session, so this and later visits open the chat
+      good = unlock(conn, "pass12345")
+      assert redirected_to(good) == "/it-support"
+      assert Phoenix.Flash.get(good.assigns.flash, :info) =~ "解除しました"
 
-    assert html =~ "アクセス制限を解除しました。"
-    assert html =~ "chat-form"
+      conn = recycle(good)
+      {:ok, _view, html} = live(conn, ~p"/it-support")
+      assert html =~ "chat-form"
+      refute html =~ "合言葉を入力してください"
+
+      {:ok, _view, html} = live(recycle(conn), ~p"/it-support")
+      assert html =~ "chat-form"
+    end
+
+    test "changing the passphrase invalidates earlier unlocks", %{conn: conn} do
+      conn = conn |> unlock("pass12345") |> recycle()
+      {:ok, _} = AdminAccess.set_access_password(Settings.get_setting!(), "new-pass-678")
+
+      {:ok, _view, html} = live(conn, ~p"/it-support")
+      assert html =~ "合言葉を入力してください"
+    end
+
+    test "5 wrong guesses within 5 minutes lock this browser out of the app, not everyone", %{
+      conn: conn
+    } do
+      attacker =
+        conn |> put_req_cookie("_askdrive_device", "x") |> Map.put(:remote_ip, {10, 0, 0, 9})
+
+      for _ <- 1..5, do: unlock(attacker, "guess")
+
+      locked = unlock(attacker, "pass12345")
+      assert Phoenix.Flash.get(locked.assigns.flash, :error) =~ "まで受け付けません"
+      refute get_session(locked, "unlocked_app_it-support")
+
+      # another browser still gets in
+      other = conn |> Map.put(:remote_ip, {10, 0, 0, 10}) |> unlock("pass12345")
+      assert get_session(other, "unlocked_app_it-support")
+
+      [lock | _] = LoginThrottle.active_locks()
+      assert lock.key =~ "access:it-support|"
+    end
+
+    test "with login required, an anonymous visitor is sent to the login page" do
+      conn = unlock(build_conn(), "pass12345")
+      assert redirected_to(conn) =~ "/login"
+    end
   end
 end

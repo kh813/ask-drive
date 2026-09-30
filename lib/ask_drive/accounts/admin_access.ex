@@ -145,6 +145,34 @@ defmodule AskDrive.Accounts.AdminAccess do
 
   # --- Access password (合言葉・チャットアクセス制限, spec F-1112) ---
 
+  # An unlocked passphrase is remembered in the session for this long (spec F-1112)
+  @access_unlock_days 30
+
+  @doc """
+  The session value that remembers an unlocked passphrase: when, and which passphrase (a
+  fingerprint of its hash, so changing the passphrase invalidates every unlock).
+  """
+  def access_unlock_token(%Settings.Setting{} = setting) do
+    %{"at" => System.system_time(:second), "v" => access_password_fingerprint(setting)}
+  end
+
+  @doc "Whether `token` (from the session) still unlocks the app's current passphrase."
+  def access_unlocked?(%{"at" => at, "v" => v}, %Settings.Setting{} = setting)
+      when is_integer(at) and is_binary(v) do
+    fingerprint = access_password_fingerprint(setting)
+
+    is_binary(fingerprint) and Plug.Crypto.secure_compare(v, fingerprint) and
+      System.system_time(:second) - at < @access_unlock_days * 86_400
+  end
+
+  def access_unlocked?(_token, _setting), do: false
+
+  defp access_password_fingerprint(%{access_password_hash: hash}) when is_binary(hash) do
+    :crypto.hash(:sha256, hash) |> Base.url_encode64(padding: false) |> binary_part(0, 22)
+  end
+
+  defp access_password_fingerprint(_), do: nil
+
   @doc """
   Verifies if candidate password matches the app access password.
   """

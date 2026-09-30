@@ -118,6 +118,9 @@ defmodule AskDriveWeb.Router do
   scope "/", AskDriveWeb do
     pipe_through :browser
 
+    # the per-app passphrase (spec F-1112): a plain POST so the unlock goes into the session
+    post "/:app/unlock", AppAccessController, :unlock
+
     live_session :app_chat,
       on_mount: [
         {AskDriveWeb.UserAuth, :require_login_when_enabled},

@@ -12,7 +12,9 @@ defmodule AskDriveWeb.ChatLive do
     health = HealthCheck.check()
 
     access_password_enabled = setting.access_password_enabled == true
-    unlocked_in_session = session["unlocked_app_#{socket.assigns.app.slug}"] == true
+
+    unlocked_in_session =
+      AdminAccess.access_unlocked?(session["unlocked_app_#{socket.assigns.app.slug}"], setting)
 
     is_admin =
       User.admin_eligible?(socket.assigns.current_user) or
@@ -73,25 +75,6 @@ defmodule AskDriveWeb.ChatLive do
   @impl true
   def handle_event("reset_chat", _params, socket) do
     {:noreply, assign(socket, :messages, [])}
-  end
-
-  @impl true
-  def handle_event("unlock_access", params, socket) do
-    candidate =
-      case params do
-        %{"chat_access" => %{"password" => pwd}} -> pwd
-        %{"password" => pwd} -> pwd
-        _ -> ""
-      end
-
-    if AdminAccess.verify_access_password(candidate, socket.assigns.setting) do
-      {:noreply,
-       socket
-       |> assign(:access_locked?, false)
-       |> put_flash(:info, "アクセス制限を解除しました。")}
-    else
-      {:noreply, put_flash(socket, :error, "合言葉（アクセスパスワード）が正しくありません。")}
-    end
   end
 
   @impl true
@@ -213,10 +196,12 @@ defmodule AskDriveWeb.ChatLive do
                 窓口「{@app.name}」のチャットを利用するにはアクセスパスワード（合言葉）が必要です。
               </p>
             </div>
+            <%!-- a plain POST: the unlock is written to the session (30 days) --%>
             <.form
               for={@access_password_form}
               id="chat-access-form"
-              phx-submit="unlock_access"
+              action={"/#{@app.slug}/unlock"}
+              method="post"
               class="space-y-4 text-left"
             >
               <.input

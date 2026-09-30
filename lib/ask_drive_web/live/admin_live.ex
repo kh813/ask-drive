@@ -3041,9 +3041,16 @@ defmodule AskDriveWeb.AdminLive do
                     <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
                       <tr :for={lock <- @login_locks} id={"login-lock-#{lock.id}"}>
                         <td class="py-1.5 px-2">
-                          {if lock.scope == "account",
-                            do: "アカウント: #{lock.email}（5 分間に 5 回失敗）",
-                            else: "接続環境（24 時間に 10 回失敗）"}
+                          {cond do
+                            lock.scope == "account" and String.starts_with?(lock.key, "access:") ->
+                              "窓口「#{lock.key |> String.trim_leading("access:") |> String.split("|") |> hd()}」の合言葉（5 分間に 5 回失敗）"
+
+                            lock.scope == "account" ->
+                              "アカウント: #{lock.email}（5 分間に 5 回失敗）"
+
+                            true ->
+                              "接続環境（24 時間に 10 回失敗）"
+                          end}
                         </td>
                         <td class="py-1.5 px-2">
                           {AskDrive.Accounts.LoginThrottle.describe_user_agent(lock.user_agent)}・{lock.ip}
