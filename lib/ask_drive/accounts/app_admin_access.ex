@@ -144,6 +144,34 @@ defmodule AskDrive.Accounts.AppAdminAccess do
     do: Accounts.assigned_app_admin?(actor, app.slug) or User.admin_eligible?(actor)
 
   @doc """
+  The default app (it-support, the primary one) is the IT desk, set up by the platform
+  administrators (spec F-1116): while it has no administrator, the platform administrators
+  become its administrators — at boot (installs from before F-1114) and whenever platform
+  administrators are registered. Recorded as an automatic change.
+  """
+  def ensure_primary_admins do
+    app = AskDrive.Apps.primary()
+
+    if admins(app) == [] do
+      for user <- Accounts.list_eligible_admins() do
+        {:ok, _} = Accounts.add_app_admin(user, app.slug)
+
+        %AdminElevationLog{}
+        |> AdminElevationLog.changeset(%{
+          email: "AskDrive（自動設定）",
+          event: "app_admin_added",
+          app_slug: app.slug,
+          target_email: user.email,
+          occurred_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> PlatformRepo.insert()
+      end
+    end
+
+    :ok
+  end
+
+  @doc """
   Recent changes to the app's administrators, newest first:
   `%{at:, event:, actor:, target:, by_platform?:}` (by_platform? = the actor wasn't one of
   the app's administrators then — a platform administrator recovering the app).

@@ -132,4 +132,22 @@ defmodule AskDrive.AccountsTest do
              %{event: "app_admin_added"} | _
            ] = changes
   end
+
+  test "the default app gets the platform administrators while it has none (F-1116)" do
+    alias AskDrive.Accounts.AppAdminAccess
+    alias AskDrive.Apps
+
+    app = Apps.primary()
+    {:ok, a} = AskDrive.Accounts.grant_admin("it-a@example.com")
+    {:ok, b} = AskDrive.Accounts.grant_admin("it-b@example.com")
+
+    :ok = AppAdminAccess.ensure_primary_admins()
+    assert AppAdminAccess.admins(app) |> Enum.map(& &1.email) == [a.email, b.email]
+    assert [%{actor: "AskDrive（自動設定）"} | _] = AppAdminAccess.admin_changes(app)
+
+    # once it has administrators, later platform administrators aren't added
+    {:ok, _} = AskDrive.Accounts.grant_admin("it-c@example.com")
+    :ok = AppAdminAccess.ensure_primary_admins()
+    assert length(AppAdminAccess.admins(app)) == 2
+  end
 end

@@ -52,8 +52,11 @@ defmodule AskDrive.SetupTest do
     assert setting.allowed_domain == "example.com"
     assert setting.setup_completed_at
     assert Apps.primary().name == "情シス相談窓口"
-    # the first app's administrators (F-1114)
+    # the platform administrators, also the default app's administrators (F-1116)
     assert AskDrive.Accounts.list_app_admins(Apps.primary().slug) |> Enum.map(& &1.email) ==
+             ["owner@example.com", "second@example.com"]
+
+    assert AskDrive.Accounts.list_eligible_admins() |> Enum.map(& &1.email) ==
              ["owner@example.com", "second@example.com"]
 
     refute File.exists?(Setup.code_path())
@@ -79,7 +82,7 @@ defmodule AskDrive.SetupTest do
     assert errors.password =~ "文字以上"
     assert errors.domain =~ "ドメイン名"
     assert errors.app_name
-    assert errors.admin_emails =~ "担当者"
+    assert errors.admin_emails =~ "全体管理者"
     refute Settings.get_setting!().setup_completed_at
   end
 

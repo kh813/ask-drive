@@ -159,7 +159,8 @@ defmodule AskDrive.Setup do
 
   @doc """
   Validates and applies the setup form: `%{"code", "password", "password_confirmation",
-  "domain", "app_name", "admin_emails"}` (the first app's administrators, F-1114).
+  "domain", "app_name", "admin_emails"}` (the platform administrators, who also become the
+  default app's administrators, F-1116).
   Returns `:ok` or `{:error, %{field => message}}`.
   """
   def complete(params) do
@@ -182,9 +183,10 @@ defmodule AskDrive.Setup do
       Apps.ensure_primary!()
       {:ok, _} = Apps.update(Apps.primary(), %{name: String.trim(params["app_name"])})
 
-      # the first app's administrators (F-1114), named before their first sign-in
+      # the platform administrators, also the default app's administrators (F-1116),
+      # named before their first sign-in
       for email <- admin_emails(params["admin_emails"]) do
-        {:ok, user} = AskDrive.Accounts.ensure_user(email)
+        {:ok, user} = AskDrive.Accounts.grant_admin(email)
         {:ok, _} = AskDrive.Accounts.add_app_admin(user, Apps.primary().slug)
       end
 
@@ -258,13 +260,13 @@ defmodule AskDrive.Setup do
 
     cond do
       emails == [] ->
-        "最初の窓口の担当者のメールアドレスを入力してください"
+        "全体管理者のメールアドレスを入力してください"
 
       Enum.any?(emails, &(not String.match?(&1, ~r/^[^@\s]+@[^@\s]+\.[^@\s]+$/))) ->
         "メールアドレスとして読み取れないものがあります"
 
       domain != "" and Enum.any?(emails, &(not String.ends_with?(&1, "@" <> domain))) ->
-        "担当者は @#{domain} のアドレスにしてください"
+        "全体管理者は @#{domain} のアドレスにしてください"
 
       true ->
         nil

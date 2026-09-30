@@ -109,12 +109,12 @@ defmodule AskDriveWeb.SetupLive do
 
           <.setup_field
             name="admin_emails"
-            label="5. 最初の窓口の担当者（窓口管理者）のメールアドレス"
+            label="5. 全体管理者のメールアドレス"
             errors={@errors}
             value={@values["admin_emails"]}
             placeholder="name@company.com"
           >
-            この窓口の設定（Google Drive・API キー等）を行う人です（複数ならカンマ区切り）。窓口の管理画面に入れるのは担当者だけで、全体管理者は入れません。担当者はあとから追加・引き継ぎできます。
+            AskDrive 全体を管理する人です（複数ならカンマ区切り）。最初の窓口の担当者（窓口管理者）にもなり、その窓口の設定（Google Drive・API キー等）を行います。全体管理者・窓口の担当者とも、あとから追加・引き継ぎできます。
           </.setup_field>
 
           <button

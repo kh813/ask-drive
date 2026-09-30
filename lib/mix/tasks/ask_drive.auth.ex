@@ -42,6 +42,7 @@ defmodule Mix.Tasks.AskDrive.Auth do
       Mix.raise("管理者に昇格できるアカウントがありません。mix ask_drive.auth enable <email> で指定してください。")
     end
 
+    AskDrive.Accounts.AppAdminAccess.ensure_primary_admins()
     {:ok, _} = Settings.set_auth_required(true)
     Mix.shell().info("ログイン認証を有効にしました。")
     warn_env()

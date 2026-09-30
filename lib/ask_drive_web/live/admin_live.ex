@@ -299,6 +299,7 @@ defmodule AskDriveWeb.AdminLive do
     else
       {:ok, emails} = parsed
       Enum.each(emails, fn email -> {:ok, _} = Accounts.grant_admin(email) end)
+      AppAdminAccess.ensure_primary_admins()
       {:ok, _} = Settings.set_auth_required(true)
 
       Logger.info(

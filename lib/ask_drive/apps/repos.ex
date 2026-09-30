@@ -45,6 +45,9 @@ defmodule AskDrive.Apps.Repos do
             Logger.error("Apps: could not start #{app.slug}: #{inspect(reason)}")
         end
       end
+
+      # the default app's administrators from the platform ones, when it has none (F-1116)
+      AskDrive.Accounts.AppAdminAccess.ensure_primary_admins()
     end
 
     {:ok, %{}}

@@ -239,6 +239,17 @@ defmodule AskDrive.Accounts do
     end)
   end
 
+  @doc "Active platform administrators."
+  def list_eligible_admins do
+    on_platform(fn ->
+      Repo.all(
+        from u in User,
+          where: u.admin_eligible == true and u.status == "active",
+          order_by: u.email
+      )
+    end)
+  end
+
   @doc """
   Number of accounts that can still elevate to administrator.
   """
