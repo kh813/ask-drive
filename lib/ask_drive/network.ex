@@ -306,8 +306,13 @@ defmodule AskDrive.Network do
     :ok
   end
 
-  defp restore!({:ok, json}),
-    do: File.write!(file(), json) && :persistent_term.erase({__MODULE__, :cache})
+  defp restore!({:ok, json}) do
+    File.write!(file(), json)
+    :persistent_term.erase({__MODULE__, :cache})
+  end
 
-  defp restore!(_), do: File.rm(file()) && :persistent_term.erase({__MODULE__, :cache})
+  defp restore!(_) do
+    File.rm(file())
+    :persistent_term.erase({__MODULE__, :cache})
+  end
 end

@@ -4886,8 +4886,6 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
-  defp parse_ip(nil), do: nil
-
   defp parse_ip(text) do
     case :inet.parse_address(String.to_charlist(text)) do
       {:ok, ip} -> ip
