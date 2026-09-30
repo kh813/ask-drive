@@ -310,11 +310,15 @@ defmodule AskDrive.Accounts do
   @doc """
   Grants or revokes the ability to elevate. `actor` is the administrator making the change.
 
-  Refuses to revoke the actor's own eligibility or the last remaining one, which would
-  leave nobody able to reach the settings screen (F-913).
+  Refuses to revoke the last remaining one, which would leave nobody able to reach the
+  settings screen (F-913). An administrator may give up their own eligibility once another
+  one exists — handing over after the initial setup (F-921). An address listed in
+  `ASK_DRIVE_ADMIN_EMAILS` can't be revoked here: it would be granted again at the next
+  sign-in, so it has to be removed from `.env.prod`.
   """
   def set_admin_eligible(%User{} = actor, %User{} = user, eligible) when is_boolean(eligible) do
-    with :ok <- ensure_not_self(actor, user),
+    with :ok <- if(eligible, do: ensure_not_self(actor, user), else: :ok),
+         :ok <- ensure_not_fixed_by_env(user, eligible),
          :ok <- ensure_eligible_remains(user, eligible, user.status) do
       on_platform(fn -> user |> User.changeset(%{admin_eligible: eligible}) |> Repo.update() end)
     end
@@ -394,6 +398,21 @@ defmodule AskDrive.Accounts do
   def app_admin_eligible?(_, _), do: false
 
   @doc """
+  Whether `user` is assigned as an administrator of the app (spec F-1113) — the app_admins
+  table only. Platform administrators are *not* included: an app's admin screen, with its
+  API keys, is for the people the app is assigned to.
+  """
+  def assigned_app_admin?(%User{status: "active", id: id}, app_slug) when is_binary(app_slug) do
+    slug = app_slug |> String.downcase() |> String.trim()
+
+    on_platform(fn ->
+      Repo.exists?(from aa in AppAdmin, where: aa.user_id == ^id and aa.app_slug == ^slug)
+    end)
+  end
+
+  def assigned_app_admin?(_, _), do: false
+
+  @doc """
   Checks if a user can elevate to ANY administration role (platform or at least one app).
   """
   def any_admin_eligible?(%User{status: "active"} = user) do
@@ -469,6 +488,15 @@ defmodule AskDrive.Accounts do
       :ok
     end)
   end
+
+  defp ensure_not_fixed_by_env(%User{email: email}, false) do
+    if email in configured_admin_emails(), do: {:error, :fixed_by_env}, else: :ok
+  end
+
+  defp ensure_not_fixed_by_env(_user, _eligible), do: :ok
+
+  @doc "Whether the address is always eligible through `ASK_DRIVE_ADMIN_EMAILS`."
+  def admin_fixed_by_env?(%User{email: email}), do: email in configured_admin_emails()
 
   defp ensure_not_self(%User{id: id}, %User{id: id}), do: {:error, :cannot_modify_self}
   defp ensure_not_self(_actor, _user), do: :ok

@@ -91,7 +91,7 @@ defmodule AskDriveWeb.Layouts do
             {if @app, do: "チャット", else: "窓口一覧"}
           </.link>
           <.link
-            :if={@admin_elevated? and can_access_app_admin?(@current_user, @app)}
+            :if={can_access_app_admin?(@current_user, @app)}
             href={"/" <> @app.slug <> "/admin"}
             id="admin-nav-link"
             class="px-2.5 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
@@ -201,8 +201,11 @@ defmodule AskDriveWeb.Layouts do
 
   defp can_access_app_admin?(_user, nil), do: false
 
+  # the app's assigned administrators (F-1113); the POC guest (id 0) everywhere
+  defp can_access_app_admin?(%{id: 0}, _app), do: true
+
   defp can_access_app_admin?(%{status: "active"} = user, %{slug: slug}),
-    do: AskDrive.Accounts.app_admin_eligible?(user, slug)
+    do: AskDrive.Accounts.assigned_app_admin?(user, slug)
 
   defp can_access_app_admin?(_, _), do: false
 

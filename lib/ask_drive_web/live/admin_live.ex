@@ -17,7 +17,7 @@ defmodule AskDriveWeb.AdminLive do
   require Logger
   import Ecto.Query, warn: false
 
-  alias AskDrive.Accounts.{AdminAccess, AdminElevationLog}
+  alias AskDrive.Accounts.{AdminAccess, AdminElevationLog, AppAdminAccess}
   alias AskDrive.Batch.{ItemLog, Progress, Scheduler}
   alias AskDrive.Documents.{Chunk, Document}
   alias AskDrive.Drive.{Client, ServiceAccount}
@@ -81,7 +81,6 @@ defmodule AskDriveWeb.AdminLive do
      |> assign(:service_account_test, nil)
      |> assign(:password_form, to_form(%{}, as: :admin_password))
      |> assign(:access_password_form, to_form(%{}, as: :access_password))
-     |> assign(:resetting_app_slug, nil)
      |> load_dashboard_data()}
   end
 
@@ -643,9 +642,20 @@ defmodule AskDriveWeb.AdminLive do
 
   @impl true
   def handle_event("set_admin_eligible", %{"id" => id, "eligible" => eligible}, socket) do
-    socket.assigns.current_user
-    |> Accounts.set_admin_eligible(Accounts.get_user(id), eligible == "true")
-    |> handle_user_change(socket)
+    actor = socket.assigns.current_user
+    target = Accounts.get_user(id)
+
+    case Accounts.set_admin_eligible(actor, target, eligible == "true") do
+      # handing over (F-921): the elevation ends at the next request; leave the admin screen
+      {:ok, %{id: id}} when id == actor.id ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "あなたの全体管理者の権限を外しました。一般ユーザーになりました。")
+         |> redirect(to: ~p"/")}
+
+      result ->
+        handle_user_change(result, socket)
+    end
   end
 
   @impl true
@@ -679,74 +689,59 @@ defmodule AskDriveWeb.AdminLive do
       Map.merge(%{"current" => "", "new" => "", "confirmation" => ""}, params)
 
     context = %{ip_address: nil, user_agent: nil}
+    user = socket.assigns.current_user
 
-    result =
-      if new_password != confirmation do
-        {:error, :mismatch}
-      else
-        AdminAccess.change_password(
-          socket.assigns.current_user,
-          current,
-          new_password,
-          context,
-          socket.assigns.setting
-        )
-      end
+    cond do
+      new_password != confirmation ->
+        {:noreply, put_flash(socket, :error, password_error_message(:mismatch))}
 
-    case result do
-      {:ok, updated} ->
-        {:noreply,
-         socket
-         |> assign(:setting, updated)
-         |> put_flash(:info, "管理者パスワードを変更しました。")
-         |> load_dashboard_data()}
+      # an app's own password (F-1113): the session was elevated with the old one, so sign
+      # in to the app's admin screen again with the new one
+      socket.assigns.scope == :app ->
+        case AppAdminAccess.change(user, socket.assigns.app, current, new_password, context) do
+          :ok ->
+            {:noreply,
+             socket
+             |> put_flash(:info, "窓口の管理者パスワードを変更しました。新しいパスワードで入り直してください。")
+             |> redirect(to: "/#{socket.assigns.app.slug}/admin/elevate")}
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, password_error_message(reason))}
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, password_error_message(reason))}
+        end
+
+      true ->
+        case AdminAccess.change_password(user, current, new_password, context) do
+          {:ok, updated} ->
+            {:noreply,
+             socket
+             |> assign(:setting, updated)
+             |> put_flash(:info, "管理者パスワードを変更しました。")
+             |> load_dashboard_data()}
+
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, password_error_message(reason))}
+        end
     end
   end
 
+  # A platform administrator clears an app's password in an emergency (F-1113): recorded and
+  # shown to the app's administrators, the next of whom sets a new one
   @impl true
-  def handle_event("toggle_reset_app_password", %{"app_slug" => app_slug}, socket) do
-    next_slug =
-      if is_binary(app_slug) and app_slug != "" and socket.assigns.resetting_app_slug != app_slug,
-        do: app_slug,
-        else: nil
-
-    {:noreply, assign(socket, :resetting_app_slug, next_slug)}
-  end
-
-  @impl true
-  def handle_event(
-        "reset_app_admin_password",
-        %{"app_slug" => app_slug, "new_password" => new_password, "confirmation" => confirmation},
-        socket
-      ) do
+  def handle_event("reset_app_admin_password", %{"app_slug" => app_slug}, socket) do
     app = AskDrive.Apps.get_by_slug!(app_slug)
-    context = %{ip_address: nil, user_agent: nil}
 
-    result =
-      if new_password != confirmation do
-        {:error, :mismatch}
-      else
-        AdminAccess.reset_app_admin_password(
-          socket.assigns.current_user,
-          app,
-          new_password,
-          context
-        )
-      end
-
-    case result do
-      {:ok, _} ->
+    case AppAdminAccess.reset(socket.assigns.current_user, app, %{}) do
+      :ok ->
         {:noreply,
          socket
-         |> assign(:resetting_app_slug, nil)
-         |> put_flash(:info, "窓口「#{app.name}」の管理者パスワードを再設定しました。")
+         |> put_flash(
+           :info,
+           "窓口「#{app.name}」の管理者パスワードをリセットしました。次に窓口管理者が管理画面を開いたときに、新しいパスワードを設定します。"
+         )
          |> load_dashboard_data()}
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, password_error_message(reason))}
+      {:error, :not_authorized} ->
+        {:noreply, put_flash(socket, :error, "リセットできるのは全体管理者だけです。")}
     end
   end
 
@@ -836,6 +831,15 @@ defmodule AskDriveWeb.AdminLive do
      |> load_dashboard_data()}
   end
 
+  defp handle_user_change({:error, :fixed_by_env}, socket) do
+    {:noreply,
+     put_flash(
+       socket,
+       :error,
+       "このアドレスは .env.prod の ASK_DRIVE_ADMIN_EMAILS で全体管理者に固定されています（次のログインで元に戻ります）。サーバーの .env.prod からこのアドレスを削除して ./app.sh restart したあと、もう一度操作してください。"
+     )}
+  end
+
   defp handle_user_change({:error, :cannot_modify_self}, socket) do
     {:noreply, put_flash(socket, :error, "自分自身の権限や状態は変更できません。")}
   end
@@ -918,6 +922,14 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:auto_status, auto_status)
     |> assign(:running_run, running_run)
     |> assign(:remaining, Scheduler.remaining())
+    # whether each app has its own admin password (F-1113), for the platform's app list
+    |> assign(
+      :app_password_set,
+      if(socket.assigns[:scope] == :platform,
+        do: Map.new(AskDrive.Apps.list(), &{&1.slug, AppAdminAccess.password_set?(&1)}),
+        else: %{}
+      )
+    )
     |> assign(
       :login_locks,
       if(socket.assigns[:scope] == :platform,
@@ -2064,13 +2076,21 @@ defmodule AskDriveWeb.AdminLive do
                           <% end %>
                         </td>
                         <td class="py-2 px-2 text-right whitespace-nowrap space-x-2">
+                          <span class="text-[11px] text-zinc-500">
+                            管理者PW: {if @app_password_set[app.slug],
+                              do: "設定済み",
+                              else: "未設定（担当者が初回に設定）"}
+                          </span>
                           <button
+                            :if={@app_password_set[app.slug]}
                             type="button"
-                            phx-click="toggle_reset_app_password"
+                            id={"reset-app-password-#{app.slug}"}
+                            phx-click="reset_app_admin_password"
                             phx-value-app_slug={app.slug}
+                            data-confirm={"窓口「#{app.name}」の管理者パスワードをリセット（消去）しますか？リセットは記録され、窓口管理者の画面に表示されます。次に窓口管理者が管理画面を開いたときに、新しいパスワードを設定します。"}
                             class="text-[11px] text-indigo-600 dark:text-indigo-400 underline"
                           >
-                            管理者PW再設定
+                            管理者PWをリセット
                           </button>
                           <button
                             :if={not app.primary and app.id}
@@ -2082,50 +2102,6 @@ defmodule AskDriveWeb.AdminLive do
                           >
                             削除
                           </button>
-                        </td>
-                      </tr>
-                      <tr
-                        :if={@resetting_app_slug == app.slug}
-                        class="bg-indigo-50/50 dark:bg-indigo-950/30"
-                      >
-                        <td colspan="6" class="p-3">
-                          <form
-                            phx-submit="reset_app_admin_password"
-                            class="flex flex-wrap items-center gap-3 text-xs"
-                          >
-                            <input type="hidden" name="app_slug" value={app.slug} />
-                            <span class="font-medium text-zinc-800 dark:text-zinc-200">
-                              「{app.name}」の管理者パスワードを再設定:
-                            </span>
-                            <input
-                              type="password"
-                              name="new_password"
-                              placeholder="新しいパスワード（8文字以上）"
-                              required
-                              class="px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs w-48"
-                            />
-                            <input
-                              type="password"
-                              name="confirmation"
-                              placeholder="確認用パスワード"
-                              required
-                              class="px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs w-48"
-                            />
-                            <button
-                              type="submit"
-                              class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
-                            >
-                              再設定を実行
-                            </button>
-                            <button
-                              type="button"
-                              phx-click="toggle_reset_app_password"
-                              phx-value-app_slug=""
-                              class="px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-xs transition"
-                            >
-                              キャンセル
-                            </button>
-                          </form>
                         </td>
                       </tr>
                     <% end %>
@@ -2302,6 +2278,33 @@ defmodule AskDriveWeb.AdminLive do
                         <td class="py-3 px-2">
                           <%!-- Self-modification and last-admin removal are rejected server
                                 side too; hiding the buttons just avoids a pointless error. --%>
+                          <%!-- Handing over (F-921): an administrator may give up their own
+                                rights once another one exists --%>
+                          <div
+                            :if={
+                              user.id == @current_user.id and user.admin_eligible and
+                                Accounts.count_eligible_admins() > 1 and
+                                not Accounts.admin_fixed_by_env?(user)
+                            }
+                            class="flex justify-end"
+                          >
+                            <button
+                              id={"give-up-admin-#{user.id}"}
+                              phx-click="set_admin_eligible"
+                              phx-value-id={user.id}
+                              phx-value-eligible="false"
+                              data-confirm="あなたの全体管理者の権限を外して、一般ユーザーに戻りますか？以後は全体管理の画面に入れなくなります（元に戻すには、ほかの全体管理者に依頼してください）。"
+                              class="px-2.5 py-1 rounded-lg border border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/40 text-[11px] font-medium transition"
+                            >
+                              自分の全体管理者権限を外す
+                            </button>
+                          </div>
+                          <p
+                            :if={user.admin_eligible and Accounts.admin_fixed_by_env?(user)}
+                            class="text-[11px] text-zinc-500 text-right"
+                          >
+                            .env.prod の ASK_DRIVE_ADMIN_EMAILS で固定（画面からは外せません）
+                          </p>
                           <div
                             :if={user.id != @current_user.id}
                             class="flex items-center justify-end gap-2"
@@ -3336,7 +3339,17 @@ defmodule AskDriveWeb.AdminLive do
                   <.icon name="hero-shield-check" class="w-5 h-5 text-indigo-600" /> 窓口管理者パスワード
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  この窓口（{@app.name}）の管理画面へ昇格する際に入力するパスワードです。未設定時はプラットフォーム管理者パスワードで昇格できます。
+                  この窓口（{@app.name}）の管理画面に入るためのパスワードです。この窓口の担当者（窓口管理者）だけが使い、全体管理者は知りません（全体管理者はリセット〈消去〉だけができます）。変更すると、この窓口に昇格中のすべてのセッションが終了します。
+                </p>
+                <p
+                  :if={@setting.app_admin_password_reset_at}
+                  id="app-password-reset-note"
+                  class="text-xs mt-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-900 dark:text-amber-100"
+                >
+                  最後のリセット: {AskDrive.Clock.format(
+                    @setting.app_admin_password_reset_at,
+                    "%Y-%m-%d %H:%M"
+                  )}（全体管理者 {@setting.app_admin_password_reset_by}）
                 </p>
               </div>
 

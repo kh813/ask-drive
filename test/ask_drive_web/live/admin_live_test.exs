@@ -8,8 +8,9 @@ defmodule AskDriveWeb.AdminLiveTest do
 
   describe "AdminLive Dashboard" do
     setup %{conn: conn} do
+      # a platform admin who is also IT-Support's assigned administrator (F-1113)
       admin = user_fixture(admin_eligible: true)
-      %{conn: log_in_admin(conn, admin)}
+      %{conn: conn |> log_in_admin(admin) |> log_in_app_admin(admin), admin: admin}
     end
 
     test "renders dashboard, tabs, and document list", %{conn: conn} do
@@ -63,42 +64,54 @@ defmodule AskDriveWeb.AdminLiveTest do
       assert html =~ "プロバイダ接続情報"
     end
 
-    test "app-level admin access restriction", %{conn: _conn} do
-      # Create normal user assigned only to hr app
-      app_user = user_fixture(email: "hr_admin@example.com", admin_eligible: false)
-      {:ok, _} = AskDrive.Accounts.add_app_admin(app_user, "hr")
-
-      # Create an app for hr
+    test "an app admin gets into their app's admin screen only, not /admin", %{conn: _conn} do
       {:ok, _app} = AskDrive.Apps.create(%{slug: "hr", name: "人事部窓口"})
+      app_user = user_fixture(email: "hr_admin@example.com", admin_eligible: false)
 
-      conn = Phoenix.ConnTest.build_conn()
-      app_admin_conn = log_in_admin(conn, app_user)
+      conn = build_conn() |> log_in_user(app_user) |> log_in_app_admin(app_user, "hr")
 
-      # Allowed to access /hr/admin
-      {:ok, _view, html} = live(app_admin_conn, "/hr/admin")
+      {:ok, _view, html} = live(conn, "/hr/admin")
       assert html =~ "管理: AskDrive for 人事部窓口"
 
-      # Not allowed to access /admin (redirects to / because user is not super admin)
-      assert {:error, {:redirect, %{to: "/"}}} = live(app_admin_conn, "/admin")
+      # not IT-Support's (not assigned), not the platform screen
+      assert {:error, {:redirect, %{to: "/it-support"}}} = live(conn, "/it-support/admin")
+      assert {:error, {:redirect, %{to: "/"}}} = live(conn, "/admin")
     end
 
-    test "app admin password change and access password setting", %{conn: conn} do
-      {:ok, _} = AskDrive.Accounts.AdminAccess.force_set_password("password12345")
+    test "app admin password change (the app's own) and access password setting", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/it-support/admin?tab=settings")
 
-      # Change app admin password
-      html =
-        view
-        |> form("#app-admin-password-form", %{
-          "admin_password" => %{
-            "current" => "password12345",
-            "new" => "newapppwd888",
-            "confirmation" => "newapppwd888"
-          }
-        })
-        |> render_submit()
+      # Change the app's admin password: back to the elevation prompt with the new one
+      assert {:error, {:redirect, %{to: "/it-support/admin/elevate"}}} =
+               view
+               |> form("#app-admin-password-form", %{
+                 "admin_password" => %{
+                   "current" => "app-pass-123",
+                   "new" => "newapppwd888",
+                   "confirmation" => "newapppwd888"
+                 }
+               })
+               |> render_submit()
 
-      assert html =~ "管理者パスワードを変更しました。"
+      app = AskDrive.Apps.get_by_slug!("it-support")
+
+      admin =
+        AskDrive.Accounts.get_user_by_email(
+          conn
+          |> Plug.Conn.get_session(:user_id)
+          |> AskDrive.Accounts.get_user()
+          |> Map.fetch!(:email)
+        )
+
+      assert {:ok, _} = AskDrive.Accounts.AppAdminAccess.elevate(admin, app, "newapppwd888")
+      # the platform password is untouched and unrelated
+      refute AskDrive.Accounts.AdminAccess.password_matches?(
+               AskDrive.Settings.platform_setting!().admin_password_hash,
+               "newapppwd888"
+             )
+
+      conn = log_in_app_admin(conn, admin, "it-support", "newapppwd888")
+      {:ok, view, _html} = live(conn, ~p"/it-support/admin?tab=settings")
 
       # Set access password
       html =
@@ -125,30 +138,18 @@ defmodule AskDriveWeb.AdminLiveTest do
       assert html =~ "利用制限: 無効"
     end
 
-    test "super admin resets app admin password from /admin", %{conn: conn} do
+    test "a platform admin resets (clears) an app's password from /admin; it is recorded",
+         %{conn: conn} do
       {:ok, view, html} = live(conn, ~p"/admin?tab=apps")
-      assert html =~ "管理者PW再設定"
+      assert html =~ "管理者PW: 設定済み"
 
-      # Click toggle reset
+      view |> element("#reset-app-password-it-support") |> render_click()
+      assert render(view) =~ "管理者パスワードをリセットしました"
+      assert render(view) =~ "未設定（担当者が初回に設定）"
+
       app = AskDrive.Apps.get_by_slug!("it-support")
-
-      view
-      |> element(
-        "button[phx-click='toggle_reset_app_password'][phx-value-app_slug='#{app.slug}']"
-      )
-      |> render_click()
-
-      # Submit reset password form
-      html =
-        view
-        |> form("form[phx-submit='reset_app_admin_password']", %{
-          "app_slug" => app.slug,
-          "new_password" => "resetpwd9999",
-          "confirmation" => "resetpwd9999"
-        })
-        |> render_submit()
-
-      assert html =~ "窓口「#{app.name}」の管理者パスワードを再設定しました。"
+      refute AskDrive.Accounts.AppAdminAccess.password_set?(app)
+      assert AskDrive.Accounts.AppAdminAccess.setting(app).app_admin_password_reset_at
     end
 
     test "renders API usage and logs tab", %{conn: conn} do

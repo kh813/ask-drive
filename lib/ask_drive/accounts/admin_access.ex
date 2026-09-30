@@ -92,27 +92,24 @@ defmodule AskDrive.Accounts.AdminAccess do
   `{:error, :not_eligible}`, `{:error, :no_password}` or `{:error, :invalid_password}`.
   Every outcome is written to the audit log before returning.
   """
+  # The platform password only: an app's admin screen has its own (AppAdminAccess, F-1113)
   def elevate(%User{} = user, password, context \\ %{}) do
-    setting = Settings.get_setting() || Settings.platform_setting!()
     platform_setting = Settings.platform_setting!()
 
     cond do
-      not password_set?(setting) and not password_set?(platform_setting) ->
+      not password_set?(platform_setting) ->
         {:error, :no_password}
 
       true ->
         case locked_out_until(user, platform_setting) do
-          nil -> verify_and_elevate(user, password, setting, platform_setting, context)
+          nil -> verify_and_elevate(user, password, platform_setting, context)
           unlock_at -> deny_locked_out(user, unlock_at, context)
         end
     end
   end
 
-  defp verify_and_elevate(user, password, setting, platform_setting, context) do
-    # App-specific password if set, otherwise fallback to platform admin password
-    hash = setting.admin_password_hash || platform_setting.admin_password_hash
-
-    if password_matches?(hash, password) do
+  defp verify_and_elevate(user, password, platform_setting, context) do
+    if password_matches?(platform_setting.admin_password_hash, password) do
       {:ok, user} = touch_elevated_at(user)
       log(user, "granted", context)
       {:ok, user}
@@ -279,55 +276,17 @@ defmodule AskDrive.Accounts.AdminAccess do
   end
 
   @doc """
-  Changes the administrator password. The current password must be supplied (F-914).
-  Supports passing an app-specific setting struct.
+  Changes the platform administrator password. The current password must be supplied
+  (F-914). An app's own password is changed with `AppAdminAccess.change/5` (F-1113).
   """
-  def change_password(
-        %User{} = user,
-        current_password,
-        new_password,
-        context \\ %{},
-        setting \\ nil
-      ) do
-    target_setting = setting || Settings.get_setting() || Settings.platform_setting!()
-    platform_setting = Settings.platform_setting!()
-    current_hash = target_setting.admin_password_hash || platform_setting.admin_password_hash
+  def change_password(%User{} = user, current_password, new_password, context \\ %{}) do
+    setting = Settings.platform_setting!()
 
-    # Platform super admin can change with either current password or platform admin password
-    if password_matches?(current_hash, current_password) or
-         (User.admin_eligible?(user) and
-            password_matches?(platform_setting.admin_password_hash, current_password)) do
-      store_password(target_setting, new_password, user, "password_changed", context)
+    if password_matches?(setting.admin_password_hash, current_password) do
+      store_password(setting, new_password, user, "password_changed", context)
     else
       log(user, "denied", context)
       {:error, :invalid_password}
-    end
-  end
-
-  @doc """
-  Resets the admin password for an app (called by Super Admin).
-  """
-  def reset_app_admin_password(
-        %User{} = actor,
-        %AskDrive.Apps.App{} = app,
-        new_password,
-        context \\ %{}
-      ) do
-    if User.admin_eligible?(actor) do
-      AskDrive.Apps.with_app(app, fn ->
-        setting = Settings.get_setting!()
-
-        with :ok <- validate_password(new_password),
-             {:ok, updated} <-
-               setting
-               |> Ecto.Changeset.change(admin_password_hash: hash_password(new_password))
-               |> AskDrive.Repo.update() do
-          log(actor, "password_changed", context)
-          {:ok, updated}
-        end
-      end)
-    else
-      {:error, :not_authorized}
     end
   end
 
@@ -355,7 +314,8 @@ defmodule AskDrive.Accounts.AdminAccess do
     end
   end
 
-  defp validate_password(password) when is_binary(password) do
+  @doc "Minimum length, no surrounding whitespace: `:ok` or `{:error, reason}`."
+  def validate_password(password) when is_binary(password) do
     trimmed = String.trim(password)
 
     cond do
@@ -370,7 +330,7 @@ defmodule AskDrive.Accounts.AdminAccess do
     end
   end
 
-  defp validate_password(_), do: {:error, :too_short}
+  def validate_password(_), do: {:error, :too_short}
 
   # --- Audit log ------------------------------------------------------------
 

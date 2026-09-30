@@ -272,24 +272,49 @@ defmodule AskDriveWeb.UserAuth do
   end
 
   @doc """
-  Halts unless the session currently holds administrator rights for the app in params.
+  Halts unless the session is elevated for the app in the path with the app's own password
+  (spec F-1113). Only the app's assigned administrators get there; platform administrators
+  don't (they can only reset the app's password). While login is off (the POC) the guest
+  gets in, as everywhere.
   """
   def require_app_admin_session(conn, _opts) do
     user = conn.assigns[:current_user]
+    slug = conn.path_params["app"]
 
-    cond do
-      conn.assigns[:admin_elevated?] ->
+    case app_admin_check(
+           user,
+           slug,
+           get_session(conn, AskDrive.Accounts.AppAdminAccess.session_key())
+         ) do
+      :ok ->
         conn
 
-      is_nil(user) ->
+      :login ->
         require_authenticated_user(conn, [])
 
-      true ->
+      :elevate ->
         conn
-        |> put_flash(:info, "管理操作を行うには管理者パスワードを入力してください。")
         |> maybe_store_return_to()
-        |> redirect(to: ~p"/admin/elevate")
+        |> redirect(to: "/#{slug}/admin/elevate")
         |> halt()
+
+      {:denied, message} ->
+        conn |> put_flash(:error, message) |> redirect(to: "/" <> (slug || "")) |> halt()
+    end
+  end
+
+  @doc false
+  # :ok | :login | :elevate | {:denied, message}
+  def app_admin_check(user, slug, tokens) do
+    app = AskDrive.Apps.get_by_slug(slug)
+
+    cond do
+      auth_disabled?() -> :ok
+      is_nil(user) -> :login
+      is_nil(app) -> {:denied, "窓口が見つかりません。"}
+      AskDrive.Accounts.AppAdminAccess.elevated?((tokens || %{})[app.slug], user, app) -> :ok
+      Accounts.assigned_app_admin?(user, app.slug) -> :elevate
+      true -> {:denied, "窓口「#{app.name}」の管理画面は、この窓口の担当者（窓口管理者）だけが使えます。"}
     end
   end
 
@@ -415,42 +440,20 @@ defmodule AskDriveWeb.UserAuth do
 
   def on_mount(:require_app_admin_session, %{"app" => slug}, session, socket) do
     socket = assign_current_user(socket, session)
-    user = socket.assigns.current_user
+    tokens = session[AskDrive.Accounts.AppAdminAccess.session_key()]
 
-    cond do
-      socket.assigns.admin_elevated? ->
-        if Accounts.app_admin_eligible?(user, slug) do
-          {:cont, socket}
-        else
-          {:halt,
-           redirect_with(
-             socket,
-             :error,
-             "窓口「#{slug}」の管理権限がありません。",
-             "/" <> slug
-           )}
-        end
+    case app_admin_check(socket.assigns.current_user, slug, tokens) do
+      :ok ->
+        {:cont, Phoenix.Component.assign(socket, :app_admin_elevated?, true)}
 
-      is_nil(user) ->
+      :login ->
         {:halt, redirect_with(socket, :error, "続行するにはログインしてください。", ~p"/login")}
 
-      Accounts.app_admin_eligible?(user, slug) ->
-        {:halt,
-         redirect_with(
-           socket,
-           :info,
-           "管理操作を行うには管理者パスワードを入力してください。",
-           ~p"/admin/elevate"
-         )}
+      :elevate ->
+        {:halt, redirect_with(socket, :info, "窓口の管理者パスワードを入力してください。", "/#{slug}/admin/elevate")}
 
-      true ->
-        {:halt,
-         redirect_with(
-           socket,
-           :error,
-           "窓口「#{slug}」の管理権限がありません。",
-           "/" <> slug
-         )}
+      {:denied, message} ->
+        {:halt, redirect_with(socket, :error, message, "/" <> slug)}
     end
   end
 

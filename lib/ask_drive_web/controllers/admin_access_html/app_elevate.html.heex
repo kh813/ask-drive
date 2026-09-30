@@ -1,0 +1,98 @@
+<Layouts.app flash={@flash} current_user={@current_user} app={@app}>
+  <div class="max-w-md mx-auto space-y-6 py-8">
+    <div class="text-center space-y-2">
+      <div class="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-sm">
+        <.icon name="hero-shield-check" class="w-6 h-6" />
+      </div>
+      <h1 class="font-bold text-xl text-zinc-900 dark:text-zinc-100">
+        窓口「{@app.name}」の管理画面へ
+      </h1>
+      <p class="text-xs text-zinc-500 leading-relaxed">
+        {@current_user.email} として入ります。記録は監査ログに残ります。
+      </p>
+    </div>
+
+    <div
+      :if={@error_message}
+      id="app-elevate-error"
+      class="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-red-700 dark:text-red-300 text-xs"
+    >
+      {@error_message}
+    </div>
+
+    <div
+      :if={@reset_at && !@password_set?}
+      id="app-elevate-reset-note"
+      class="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-900 dark:text-amber-100 text-xs"
+    >
+      この窓口の管理者パスワードは {AskDrive.Clock.format(@reset_at, "%Y-%m-%d %H:%M")} に全体管理者（{@reset_by}）がリセットしました。新しいパスワードを設定してください。
+    </div>
+
+    <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-5">
+      <%= if @password_set? do %>
+        <.form
+          :let={f}
+          for={%{}}
+          as={:admin}
+          action={"/#{@app.slug}/admin/elevate"}
+          id="app-elevate-form"
+          class="space-y-4"
+        >
+          <.input
+            field={f[:password]}
+            type="password"
+            label="窓口の管理者パスワード"
+            required
+            autocomplete="current-password"
+          />
+          <button
+            type="submit"
+            id="app-elevate-btn"
+            class="w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
+          >
+            管理画面に入る
+          </button>
+        </.form>
+      <% else %>
+        <div class="space-y-1">
+          <h2 class="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
+            窓口の管理者パスワードの設定
+          </h2>
+          <p class="text-xs text-zinc-500 leading-relaxed">
+            この窓口の管理者パスワードはまだありません。この窓口の担当者（窓口管理者）で共有するパスワードを設定してください。全体管理者は知ることができません（リセットだけができます）。以後、この窓口の管理画面に入るたびに入力を求めます。
+          </p>
+        </div>
+        <.form
+          :let={f}
+          for={%{}}
+          as={:admin}
+          action={"/#{@app.slug}/admin/password"}
+          id="app-set-password-form"
+          class="space-y-4"
+        >
+          <.input
+            field={f[:password]}
+            type="password"
+            label={"新しいパスワード（#{@min_length} 文字以上）"}
+            required
+            autocomplete="new-password"
+          />
+          <.input
+            field={f[:confirmation]}
+            type="password"
+            label="確認のためもう一度入力"
+            required
+            autocomplete="new-password"
+          />
+          <button
+            type="submit"
+            id="app-set-password-btn"
+            class="w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
+          >
+            パスワードを設定して管理画面に入る
+          </button>
+        </.form>
+      <% end %>
+    </div>
+  </div>
+</Layouts.app>

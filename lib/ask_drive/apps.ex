@@ -172,9 +172,11 @@ defmodule AskDrive.Apps do
   end
 
   # Fields each app must bring itself, cleared when copying the primary's settings
+  # the app's own admin password too: set by its administrators at first access (F-1113)
   @per_app_blank ~w(drive_folder_id drive_folder_name drive_service_account_json
                     drive_impersonate_email gemini_api_key openai_api_key anthropic_api_key
-                    admin_password_hash)a
+                    admin_password_hash app_admin_password_hash app_admin_password_reset_at
+                    app_admin_password_reset_by)a
 
   defp seed_settings(app) do
     base =

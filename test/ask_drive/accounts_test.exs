@@ -106,8 +106,8 @@ defmodule AskDrive.AccountsTest do
     assert AdminAccess.verify_access_password("wrongpassword", disabled) == true
   end
 
-  test "AdminAccess: super admin resets app admin password" do
-    alias AskDrive.Accounts.AdminAccess
+  test "AppAdminAccess: only a platform admin resets (clears) an app's password" do
+    alias AskDrive.Accounts.AppAdminAccess
     alias AskDrive.Apps
 
     super_admin =
@@ -120,27 +120,23 @@ defmodule AskDrive.AccountsTest do
       })
       |> AskDrive.Repo.insert!()
 
-    normal_user =
+    owner =
       %AskDrive.Accounts.User{}
       |> AskDrive.Accounts.User.changeset(%{
-        email: "user@example.com",
-        name: "User",
+        email: "owner@example.com",
+        name: "Owner",
         admin_eligible: false,
         status: "active"
       })
       |> AskDrive.Repo.insert!()
 
     app = Apps.get_by_slug!("it-support")
+    {:ok, _} = AskDrive.Accounts.add_app_admin(owner, "it-support")
+    :ok = AppAdminAccess.set_initial(owner, app, "owner-pass-1")
 
-    # Normal user cannot reset
-    assert {:error, :not_authorized} =
-             AdminAccess.reset_app_admin_password(normal_user, app, "newsecret999")
-
-    # Super admin can reset
-    assert {:ok, _} =
-             AdminAccess.reset_app_admin_password(super_admin, app, "newsecret999")
-
-    # Verify new password elevates
-    assert {:ok, _} = AdminAccess.elevate(super_admin, "newsecret999")
+    assert {:error, :not_authorized} = AppAdminAccess.reset(owner, app)
+    assert :ok = AppAdminAccess.reset(super_admin, app)
+    refute AppAdminAccess.password_set?(app)
+    assert AppAdminAccess.setting(app).app_admin_password_reset_by == "super@example.com"
   end
 end

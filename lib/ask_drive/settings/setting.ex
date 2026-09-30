@@ -78,6 +78,12 @@ defmodule AskDrive.Settings.Setting do
     field :ldap_bind_dn, :string
     field :ldap_bind_password, Binary
 
+    # The app's own administrator password (spec F-1113): digest only, set by the app's
+    # administrator at first access; the platform admin can only clear it (reset)
+    field :app_admin_password_hash, :string
+    field :app_admin_password_reset_at, :utc_datetime
+    field :app_admin_password_reset_by, :string
+
     # --- Administrator elevation (spec 6.2.1.1) ---
     # Digest only. The password itself is never stored, cast, or rendered.
     field :admin_password_hash, :string

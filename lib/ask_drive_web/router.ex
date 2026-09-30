@@ -101,6 +101,16 @@ defmodule AskDriveWeb.Router do
     end
   end
 
+  # --- An app's admin screen: its own password, its assigned administrators (F-1113) ---
+  scope "/", AskDriveWeb do
+    pipe_through [:browser, :require_authenticated_user]
+
+    get "/:app/admin/elevate", AppAdminAccessController, :new
+    post "/:app/admin/elevate", AppAdminAccessController, :create
+    post "/:app/admin/password", AppAdminAccessController, :set_initial
+    get "/:app/admin/release", AppAdminAccessController, :release
+  end
+
   # --- Apps (spec 6.11) — last, so the "/:app" catch-all can't shadow any route above ---
   # Reserved slugs (AskDrive.Apps.App.reserved_slugs/0) keep apps from claiming those paths.
   scope "/", AskDriveWeb do
