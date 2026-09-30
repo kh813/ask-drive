@@ -64,6 +64,9 @@ AskDrive 管理スクリプト
   network proxy-off  リバースプロキシの指定を解除 (HTTP はすべて HTTPS へ転送。締め出されたときの復旧)
   network ports-reset ポートを既定 (HTTP 4000 / HTTPS 4443) に戻して再起動
   ollama <args>      アプリ専用の Ollama を操作 (例: ./app.sh ollama pull <model> / ./app.sh ollama list)
+  backup [dir]       SQLite データベースのオンラインバックアップ (VACUUM INTO) を作成
+  backup status      SQLite DB と WAL ファイルの容量・健全性を確認
+  backup checkpoint  WAL の変更内容をメインデータベースへ即時反映 (TRUNCATE)
   drive service-account [key.json] [--subject user@example.com]
                      Drive 同期をサービスアカウント認証に設定 (Web 管理画面を使わずに設定)
                      --subject: ドメイン全体の委任でなりすます社内ユーザー (社内限定の共有ドライブ用)
@@ -415,6 +418,12 @@ cmd_drive() {
       exit 1
       ;;
   esac
+}
+
+cmd_backup() {
+  load_env
+  cd "${SCRIPT_DIR}"
+  MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.backup "$@"
 }
 
 # アプリ専用の Ollama（.runtime/bin）をそのまま操作する。
@@ -794,6 +803,9 @@ case "${COMMAND}" in
     ;;
   drive)
     cmd_drive "$@"
+    ;;
+  backup)
+    cmd_backup "$@"
     ;;
   ollama)
     cmd_ollama "$@"

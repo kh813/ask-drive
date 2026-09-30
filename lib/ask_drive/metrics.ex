@@ -102,10 +102,20 @@ defmodule AskDrive.Metrics do
           order_by: [desc: count(l.id)]
       )
 
+    rate_limit_errors =
+      Repo.one(
+        from l in base_query,
+          where:
+            l.status == "error" and
+              (like(l.error_message, "%429%") or like(l.error_message, "%rate_limited%")),
+          select: count(l.id)
+      ) || 0
+
     %{
       days: days,
       total_requests: total_requests,
       error_requests: error_requests,
+      rate_limit_errors: rate_limit_errors,
       success_rate:
         if(total_requests > 0,
           do: Float.round((total_requests - error_requests) / total_requests * 100, 1),

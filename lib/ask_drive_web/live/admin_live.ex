@@ -2667,7 +2667,13 @@ defmodule AskDriveWeb.AdminLive do
                   <span class="text-xs font-normal text-zinc-500">ms</span>
                 </p>
                 <p class="text-[11px] text-zinc-400 mt-1">
-                  エラー発生数: {@metrics_summary.error_requests} 件
+                  エラー: {@metrics_summary.error_requests} 件
+                  <span
+                    :if={Map.get(@metrics_summary, :rate_limit_errors, 0) > 0}
+                    class="text-amber-600 dark:text-amber-400 ml-1 font-medium"
+                  >
+                    (429制限: {@metrics_summary.rate_limit_errors} 件)
+                  </span>
                 </p>
               </div>
             </div>

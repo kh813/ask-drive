@@ -948,6 +948,18 @@ defmodule AskDrive.Batch.Scheduler do
         resolved_count
       )
 
+    # Perform WAL checkpoint, automated database backup, and temp cleanup after batch completion
+    try do
+      AskDrive.Backup.checkpoint_wal(:truncate)
+      AskDrive.Backup.backup_all()
+      AskDrive.Cleanup.clean_temp_files()
+    rescue
+      e ->
+        Logger.warning(
+          "Phase 6 maintenance task (backup/checkpoint/cleanup) encountered non-fatal error: #{Exception.message(e)}"
+        )
+    end
+
     Logger.info(
       "Batch ##{batch_run.id} finished with status: #{final_status}, questions resolved: #{resolved_count}"
     )
