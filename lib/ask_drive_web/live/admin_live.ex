@@ -3224,51 +3224,40 @@ defmodule AskDriveWeb.AdminLive do
 
               <div
                 id="oauth-settings"
-                class="p-4 rounded-xl border border-zinc-200/80 dark:border-zinc-800 space-y-3"
+                class="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-6"
               >
-                <h3 class="font-semibold text-sm text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
-                  <.icon name="hero-key" class="w-4 h-4 text-indigo-500" />
-                  Google OAuth（ログイン / Drive 同期）
-                  <span class={[
-                    "text-[11px] font-medium px-2 py-0.5 rounded-full",
-                    if(oauth_status(@setting) == :login,
-                      do:
-                        "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
-                      else: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
-                    )
-                  ]}>
-                    {case oauth_status(@setting) do
-                      :unset -> "未設定"
-                      :login -> "ログイン: 有効"
-                      :drive_only -> "ログイン: 無効（Drive 同期のみ）"
-                    end}
-                  </span>
-                </h3>
-                <p class="text-xs text-zinc-500 leading-relaxed">
-                  クライアント ID / シークレットは、<strong>ログイン</strong>（「Google でログイン」）と、窓口の<strong>Google Drive 同期の OAuth</strong>（専用アカウントでの認可）で共通です。下の「Google ログインを有効にする」はログイン画面にだけ関係し、オフのままでも窓口の Drive 同期には OAuth を使えます（Google のログイン画面を通るため 2 段階認証がかかります）。Google Cloud Console に、承認済みのリダイレクト URI として
-                  <code class="font-mono">https://（公開ホスト名）/auth/google/callback</code>
-                  を登録してください（ログインと Drive 同期で共通）。
-                </p>
-                <.form for={@form} id="oauth-form" phx-submit="save_settings" class="space-y-3">
-                  <input type="hidden" name="setting[oauth_login_enabled]" value="false" />
-                  <label class="flex items-center gap-2 text-sm text-zinc-800 dark:text-zinc-200">
-                    <input
-                      type="checkbox"
-                      name="setting[oauth_login_enabled]"
-                      value="true"
-                      checked={@setting.oauth_login_enabled != false}
-                      class="rounded border-zinc-300"
-                    /> Google ログインを有効にする
-                  </label>
+                <.form for={@form} id="oauth-form" phx-submit="save_settings" class="space-y-6">
+                  <%!-- Section 1: Drive sync OAuth credentials --%>
                   <div class="space-y-3">
-                    <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                      <.icon name="hero-key" class="w-4 h-4 text-indigo-500" /> 認証情報
-                    </h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="flex items-center justify-between">
+                      <h3 class="font-semibold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                        <.icon name="hero-cloud-arrow-up" class="w-4 h-4 text-indigo-600" />
+                        Google Drive 同期用 OAuth クライアント（全体共通）
+                      </h3>
+                      <span class={[
+                        "text-[11px] font-medium px-2.5 py-0.5 rounded-full",
+                        if(AskDrive.Drive.OAuth.client_configured?(),
+                          do:
+                            "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200/60",
+                          else:
+                            "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/60"
+                        )
+                      ]}>
+                        {if AskDrive.Drive.OAuth.client_configured?(),
+                          do: "OAuth クライアント: 設定済み",
+                          else: "OAuth クライアント: 未設定"}
+                      </span>
+                    </div>
+
+                    <p class="text-xs text-zinc-500 leading-relaxed">
+                      すべての窓口で Google Drive を同期するために必要な Google Cloud の OAuth 認証情報です。ここで登録しておくと、各窓口で個別にクライアント ID を設定する必要がなくなります（※ Google ログインを使わない場合でも、Drive 同期のために設定が必要です）。
+                    </p>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                       <.input
                         field={@form[:google_client_id]}
                         type="text"
-                        label="OAuth クライアント ID (Client ID)"
+                        label="OAuth クライアント ID"
                         placeholder="例: xxxxxxxx.apps.googleusercontent.com"
                       />
                       <.input
@@ -3279,26 +3268,69 @@ defmodule AskDriveWeb.AdminLive do
                         placeholder="例: GOCSPX-xxxxxxxxxxxx"
                       />
                     </div>
-                    <.redirect_uri_help />
+
+                    <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+                      <div class="flex items-center gap-2">
+                        <button
+                          type="button"
+                          id="test-oauth-client-btn"
+                          phx-click="test_oauth_client"
+                          phx-value-scope="platform"
+                          class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium transition"
+                        >
+                          接続テスト
+                        </button>
+                        <.client_test_result result={@oauth_client_test[:platform]} />
+                      </div>
+                      <button
+                        type="submit"
+                        id="save-oauth-btn"
+                        class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                      >
+                        保存
+                      </button>
+                    </div>
                   </div>
-                  <div class="flex flex-wrap items-center justify-end gap-3">
-                    <.client_test_result result={@oauth_client_test[:platform]} />
-                    <button
-                      type="button"
-                      id="test-oauth-client-btn"
-                      phx-click="test_oauth_client"
-                      phx-value-scope="platform"
-                      class="px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium transition"
-                    >
-                      接続テスト
-                    </button>
-                    <button
-                      type="submit"
-                      id="save-oauth-btn"
-                      class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
-                    >
-                      保存
-                    </button>
+
+                  <%!-- Section 2: Google Login (SSO) toggle --%>
+                  <div class="pt-5 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
+                    <div class="flex items-center justify-between">
+                      <h3 class="font-semibold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                        <.icon name="hero-arrow-left-on-rectangle" class="w-4 h-4 text-indigo-600" />
+                        Google アカウントでのログイン (SSO)
+                      </h3>
+                      <span class={[
+                        "text-[11px] font-medium px-2.5 py-0.5 rounded-full",
+                        if(oauth_status(@setting) == :login,
+                          do:
+                            "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+                          else: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
+                        )
+                      ]}>
+                        {case oauth_status(@setting) do
+                          :unset -> "未設定"
+                          :login -> "ログイン: 有効"
+                          :drive_only -> "ログイン: 無効（Drive 同期のみ）"
+                        end}
+                      </span>
+                    </div>
+
+                    <p class="text-xs text-zinc-500 leading-relaxed">
+                      利用者がログイン画面から Google アカウントでサインインできるようにします（上記の OAuth クライアントを使用します）。<strong>Google ログインを無効にしていても、上記の Drive 同期は問題なく利用できます。</strong>
+                    </p>
+
+                    <input type="hidden" name="setting[oauth_login_enabled]" value="false" />
+                    <label class="flex items-center gap-2.5 text-sm font-medium text-zinc-800 dark:text-zinc-200 cursor-pointer pt-1">
+                      <input
+                        type="checkbox"
+                        name="setting[oauth_login_enabled]"
+                        value="true"
+                        checked={@setting.oauth_login_enabled != false}
+                        class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+                      /> Google ログインを有効にする
+                    </label>
+
+                    <.redirect_uri_help />
                   </div>
                 </.form>
               </div>
@@ -3994,108 +4026,160 @@ defmodule AskDriveWeb.AdminLive do
                   <%!-- Google account authentication (F-348): enter the account, press 接続.
                         From a browser on the server itself Google comes straight back to
                         AskDrive; from another PC the address Google ends on is pasted. --%>
-                  <div id="drive-google-account" class="space-y-3">
-                    <p :if={@account} class="text-xs text-emerald-700 dark:text-emerald-400">
-                      接続中: {@account.email}（このアカウントの権限で同期します）
-                    </p>
-                    <div class="flex flex-wrap items-end gap-2">
-                      <label class="block text-xs space-y-1">
-                        <span class="font-medium text-zinc-700 dark:text-zinc-300">Google アカウント</span>
-                        <input
-                          type="email"
-                          name="drive_login_hint"
-                          id="drive-login-hint"
-                          value={@drive_login_hint}
-                          placeholder="sync@example.com"
-                          class="w-72 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs"
-                        />
-                      </label>
-                      <%= cond do %>
-                        <% not @drive_oauth_ready? -> %>
-                          <button
-                            type="button"
-                            id="drive-connect-btn"
-                            phx-click="drive_connect_needs_client"
-                            class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm"
+                  <div id="drive-google-account" class="space-y-4">
+                    <%= if @account do %>
+                      <%!-- Connected state banner --%>
+                      <div class="p-4 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                        <div class="flex items-center gap-3">
+                          <div class="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-900/60 flex items-center justify-center shrink-0">
+                            <.icon
+                              name="hero-check-circle"
+                              class="w-5 h-5 text-emerald-600 dark:text-emerald-400"
+                            />
+                          </div>
+                          <div>
+                            <p class="text-xs font-semibold text-emerald-900 dark:text-emerald-200">
+                              Google Drive 接続済み
+                            </p>
+                            <p class="text-xs font-mono text-emerald-700 dark:text-emerald-300">
+                              {@account.email}
+                              <span class="text-[11px] font-sans text-emerald-600 dark:text-emerald-400">（このアカウントの権限で同期）</span>
+                            </p>
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-2 self-end sm:self-auto">
+                          <.link
+                            href={
+                              ~p"/auth/google/disconnect?#{[return_to: @base_path <> "/admin?tab=settings", app: @app && @app.slug]}"
+                            }
+                            class="px-3 py-1.5 rounded-lg border border-red-200 hover:border-red-300 bg-white dark:bg-zinc-900 hover:bg-red-50 dark:hover:bg-red-950/40 text-red-700 dark:text-red-300 font-medium text-xs transition shadow-xs"
                           >
-                            接続
-                          </button>
-                        <% true -> %>
-                          <a
-                            id="drive-connect-btn"
-                            href={@drive_auth.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm"
-                          >
-                            接続
-                          </a>
-                      <% end %>
-                      <.link
-                        :if={@account}
-                        href={
-                          ~p"/auth/google/disconnect?#{[return_to: @base_path <> "/admin?tab=settings", app: @app && @app.slug]}"
-                        }
-                        class="px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 font-medium text-xs"
-                      >
-                        連携解除
-                      </.link>
-                    </div>
+                            連携解除
+                          </.link>
+                        </div>
+                      </div>
+                    <% else %>
+                      <%!-- Not connected: 3-Step Setup Guide & Inputs --%>
+                      <div class="p-5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-950/50 border border-zinc-200/90 dark:border-zinc-800 space-y-5">
+                        <div class="flex items-center justify-between pb-1 border-b border-zinc-200/60 dark:border-zinc-800">
+                          <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                            <.icon
+                              name="hero-arrow-path-rounded-square"
+                              class="w-4 h-4 text-indigo-600"
+                            /> Google Drive 連携手順（3 ステップ）
+                          </h4>
+                          <span class="text-[11px] text-amber-700 dark:text-amber-400 font-medium bg-amber-50 dark:bg-amber-950/40 px-2.5 py-0.5 rounded-full border border-amber-200/60 dark:border-amber-900/60">
+                            未接続
+                          </span>
+                        </div>
 
-                    <p
-                      :if={@drive_oauth_ready?}
-                      id="drive-connect-target"
-                      class="text-[11px] text-zinc-500"
-                    >
-                      このボタンが使う OAuth クライアント ID:
-                      <code class="font-mono select-all">{@drive_client_id}</code>
-                      ／ リダイレクト URI: <code class="font-mono select-all">{@drive_redirect_uri}</code>
-                      <span :if={@drive_redirect_mode != :loopback}>
-                        （このクライアントが「ウェブ アプリケーション」型なら、Google Cloud Console の「承認済みのリダイレクト URI」にこの URI を<strong>完全に同じ文字列で</strong>登録してください。「デスクトップ アプリ」型なら{if @drive_redirect_mode ==
-                                                                                                                                                            :paste,
-                                                                                                                                                          do:
-                                                                                                                                                            "登録は不要です",
-                                                                                                                                                          else:
-                                                                                                                                                            "このホスト名への戻りは使えないため、ウェブ アプリケーション型のクライアントを使ってください"}）
-                      </span>
-                    </p>
+                        <%!-- Step 1 --%>
+                        <div class="flex items-start gap-3">
+                          <span class="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                            1
+                          </span>
+                          <div class="flex-1 space-y-1.5">
+                            <label class="block text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                              同期する Google アカウントを入力
+                            </label>
+                            <p class="text-[11px] text-zinc-500">
+                              同期対象の Drive フォルダを閲覧できるアカウント（Gmail または Workspace アカウント）を入力します。
+                            </p>
+                            <input
+                              type="email"
+                              name="drive_login_hint"
+                              id="drive-login-hint"
+                              value={@drive_login_hint}
+                              placeholder="例: sync-drive@gmail.com または sync@company.com"
+                              class="w-full sm:w-80 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs shadow-xs"
+                            />
+                          </div>
+                        </div>
 
-                    <p
-                      :if={@drive_oauth_ready?}
-                      id="drive-redirect-mismatch-help"
-                      class="text-[11px] text-amber-700 dark:text-amber-300"
-                    >
-                      Google に「エラー 400: redirect_uri_mismatch」と表示された場合は、OAuth クライアントの種類が「ウェブ アプリケーション」です。Google Cloud Console でそのクライアントの「承認済みのリダイレクト URI」に
-                      <code class="font-mono select-all">{@drive_redirect_uri}</code>
-                      を追加して保存し（反映まで数分かかることがあります）、もう一度「接続」を押してください。種類「デスクトップ アプリ」のクライアントなら登録は不要です。
-                    </p>
+                        <%!-- Step 2 --%>
+                        <div class="flex items-start gap-3">
+                          <span class="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                            2
+                          </span>
+                          <div class="flex-1 space-y-2">
+                            <label class="block text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                              Google の認可ページを開いて「許可」
+                            </label>
+                            <p class="text-[11px] text-zinc-500">
+                              ボタンを押すと別ウィンドウで Google ログイン画面が開きます。ログインして Drive へのアクセスを「許可」してください。
+                            </p>
+                            <div class="pt-0.5">
+                              <%= cond do %>
+                                <% not @drive_oauth_ready? -> %>
+                                  <button
+                                    type="button"
+                                    id="drive-connect-btn"
+                                    phx-click="drive_connect_needs_client"
+                                    class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                                  >
+                                    <.icon name="hero-key" class="w-4 h-4" /> OAuth クライアントを設定して接続
+                                  </button>
+                                <% true -> %>
+                                  <a
+                                    id="drive-connect-btn"
+                                    href={@drive_auth.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                                  >
+                                    <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
+                                    Google の認可画面を開く（別ウィンドウ）
+                                  </a>
+                              <% end %>
+                            </div>
+                          </div>
+                        </div>
 
-                    <div
-                      :if={@drive_oauth_ready?}
-                      id="drive-manual-auth"
-                      class="space-y-2 p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/70 dark:border-indigo-900/60 text-[11px] text-zinc-700 dark:text-zinc-300"
-                    >
-                      <p>
-                        「接続」を押すと、別ウィンドウに Google のログイン画面が開きます。同期に使うアカウントでログインして「許可」してください。
-                        <span :if={@drive_redirect_mode in [:loopback, :host]}>
-                          このブラウザからなら、別ウィンドウに「Google Drive と接続しました」と表示され、この画面も自動で「接続中」になります。
-                        </span>
-                        別ウィンドウに「このサイトにアクセスできません」などと表示された場合は（別の PC から操作しているときは正常です）、そのページの<strong>アドレス</strong>（<code class="font-mono">{@drive_redirect_uri}?state=…&amp;code=…</code>）をコピーして、ここに貼り付けてください。貼り付けると自動で保存します。
-                      </p>
-                      <input
-                        type="text"
-                        name="drive_auth_code"
-                        id="drive-auth-code"
-                        value={@drive_auth_code}
-                        autocomplete="off"
-                        spellcheck="false"
-                        placeholder={@drive_redirect_uri <> "?state=...&code=..."}
-                        class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs font-mono"
-                      />
-                      <p class="text-zinc-500">
-                        AskDrive のサーバーの PC 上のブラウザ（<code class="font-mono">https://localhost:4443/</code>）で開くと、貼り付けなしで接続できます。
-                      </p>
-                    </div>
+                        <%!-- Step 3 --%>
+                        <div class="flex items-start gap-3">
+                          <span class="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                            3
+                          </span>
+                          <div class="flex-1 space-y-2">
+                            <label class="block text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                              認可後のブラウザのアドレス（URL）を貼り付け
+                            </label>
+
+                            <div class="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-900/50 space-y-1 text-[11px]">
+                              <p class="font-semibold text-amber-900 dark:text-amber-200 flex items-center gap-1">
+                                <.icon
+                                  name="hero-information-circle"
+                                  class="w-4 h-4 text-amber-600 shrink-0"
+                                /> 「このサイトにアクセスできません」と表示された場合（正常動作）
+                              </p>
+                              <p class="text-amber-800 dark:text-amber-300 leading-relaxed">
+                                Google で「許可」を押したあと、別ウィンドウのアドレスバーが
+                                <code class="font-mono bg-white/80 dark:bg-black/30 px-1 py-0.5 rounded">http://localhost:4000/...</code>
+                                に遷移してエラー表示になるのは正常です。
+                                その<strong>ブラウザのアドレスバーの URL をすべてコピー</strong>して、下の枠に貼り付けてください（貼り付けると自動で認証が完了します）。
+                              </p>
+                            </div>
+
+                            <div class="relative">
+                              <input
+                                type="text"
+                                name="drive_auth_code"
+                                id="drive-auth-code"
+                                value={@drive_auth_code}
+                                autocomplete="off"
+                                spellcheck="false"
+                                placeholder={@drive_redirect_uri <> "?state=...&code=..."}
+                                class="w-full px-3 py-2.5 rounded-lg border-2 border-dashed border-indigo-300 dark:border-indigo-700 bg-white dark:bg-zinc-950 text-xs font-mono focus:border-indigo-500 focus:border-solid shadow-xs"
+                              />
+                            </div>
+
+                            <p :if={@drive_on_server?} class="text-[11px] text-zinc-500">
+                              ※ AskDrive サーバー上のブラウザ（<code class="font-mono">https://localhost:4443/</code>）で操作している場合は、貼り付け不要で自動的に完了します。
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    <% end %>
 
                     <%!-- The OAuth client, set up once (here for this desk, or in the platform
                           settings for every desk) --%>
@@ -4105,7 +4189,7 @@ defmodule AskDriveWeb.AdminLive do
                       class="rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
                     >
                       <summary class="cursor-pointer px-3 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                        OAuth クライアント（初回のみ）{cond do
+                        OAuth クライアント設定（全体設定を使う場合は不要 / 個別指定）{cond do
                           AskDrive.Drive.OAuth.desk_drive_client?() -> "：この窓口の設定を使用中"
                           @drive_oauth_ready? -> "：全体設定の設定を使用中"
                           true -> "：未設定"
@@ -4117,7 +4201,7 @@ defmodule AskDriveWeb.AdminLive do
                           id="drive-oauth-client-missing"
                           class="text-[11px] text-amber-700 dark:text-amber-300"
                         >
-                          「接続」するには、Google の OAuth クライアント（ID とシークレット）が必要です。情報システム部門が全体設定の「Google OAuth（ログイン / Drive 同期）」に 1 つ登録すれば、すべての窓口で使えます（Google ログインは無効のままで構いません）。この窓口だけで使う場合は、下に入力してください。
+                          「接続」するには、Google の OAuth クライアント（ID とシークレット）が必要です。全体設定の「Google Drive 同期用 OAuth クライアント」に登録すればすべての窓口で使えます。この窓口だけで個別設定する場合は、下に入力してください。
                         </p>
                         <ol class="list-decimal pl-5 text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1.5">
                           <li>
