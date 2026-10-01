@@ -64,18 +64,35 @@
           >
             {gettext("Email address")}
           </label>
+          <%!-- The organization's domain is filled in when left out (F-1312); a text field, not
+                type="email", so "name" alone passes the browser's check. Still editable for a
+                secondary domain of the same Workspace. --%>
           <input
-            type="email"
+            type="text"
+            inputmode="email"
+            autocapitalize="off"
+            spellcheck="false"
             name="ldap[email]"
             id="ldap_email"
             value={Phoenix.Flash.get(@flash, :ldap_email)}
             autocomplete="username"
             required
+            data-default-domain={@allowed_domain}
             placeholder={
               if @allowed_domain, do: "name@#{@allowed_domain}", else: "name@company.com"
             }
             class="w-full px-3 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
+          <p
+            :if={@allowed_domain}
+            id="ldap-email-domain-hint"
+            class="mt-1 text-[11px] text-zinc-500"
+          >
+            {gettext(
+              "You may leave out @%{domain}: it is filled in. For another domain of your organization, type the whole address.",
+              domain: @allowed_domain
+            )}
+          </p>
         </div>
         <div>
           <label

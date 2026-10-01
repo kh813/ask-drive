@@ -86,7 +86,7 @@ msgstr ""
 msgid "All desks"
 msgstr ""
 
-#: lib/ask_drive_web/controllers/auth_html/login.html.heex:136
+#: lib/ask_drive_web/controllers/auth_html/login.html.heex:153
 #, elixir-autogen, elixir-format
 msgid "An administrator needs to configure Google Secure LDAP or Google Login (OAuth) in Platform Settings."
 msgstr ""
@@ -245,7 +245,7 @@ msgstr ""
 msgid "Log out"
 msgstr ""
 
-#: lib/ask_drive_web/controllers/auth_html/login.html.heex:144
+#: lib/ask_drive_web/controllers/auth_html/login.html.heex:161
 #, elixir-autogen, elixir-format
 msgid "New users are automatically registered on first login. Admin permissions can be granted in Platform Settings."
 msgstr ""
@@ -255,7 +255,7 @@ msgstr ""
 msgid "No documents have been ingested yet. Please ask an administrator to connect Google Drive."
 msgstr ""
 
-#: lib/ask_drive_web/controllers/auth_html/login.html.heex:131
+#: lib/ask_drive_web/controllers/auth_html/login.html.heex:148
 #, elixir-autogen, elixir-format
 msgid "No login method configured"
 msgstr ""
@@ -296,7 +296,7 @@ msgstr ""
 msgid "Other desks"
 msgstr ""
 
-#: lib/ask_drive_web/controllers/auth_html/login.html.heex:85
+#: lib/ask_drive_web/controllers/auth_html/login.html.heex:102
 #, elixir-autogen, elixir-format
 msgid "Password (Google Workspace password)"
 msgstr ""
@@ -379,7 +379,7 @@ msgstr ""
 msgid "Sign In"
 msgstr ""
 
-#: lib/ask_drive_web/controllers/auth_html/login.html.heex:101
+#: lib/ask_drive_web/controllers/auth_html/login.html.heex:118
 #, elixir-autogen, elixir-format
 msgid "Sign in"
 msgstr ""
@@ -390,7 +390,7 @@ msgstr ""
 msgid "Sign in again to enter Admin"
 msgstr ""
 
-#: lib/ask_drive_web/controllers/auth_html/login.html.heex:120
+#: lib/ask_drive_web/controllers/auth_html/login.html.heex:137
 #, elixir-autogen, elixir-format
 msgid "Sign in with Google"
 msgstr ""
@@ -476,7 +476,7 @@ msgstr ""
 msgid "close"
 msgstr ""
 
-#: lib/ask_drive_web/controllers/auth_html/login.html.heex:111
+#: lib/ask_drive_web/controllers/auth_html/login.html.heex:128
 #, elixir-autogen, elixir-format
 msgid "or"
 msgstr ""
@@ -555,4 +555,9 @@ msgstr ""
 #: lib/ask_drive_web/components/layouts.ex:96
 #, elixir-autogen, elixir-format
 msgid "Set up login"
+msgstr ""
+
+#: lib/ask_drive_web/controllers/auth_html/login.html.heex:91
+#, elixir-autogen, elixir-format
+msgid "You may leave out @%{domain}: it is filled in. For another domain of your organization, type the whole address."
 msgstr ""

@@ -34,6 +34,20 @@ const liveSocket = new LiveSocket("/live", Socket, {
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
+// Sign-in e-mail: "name" becomes "name@<the organization's domain>" when the field is left
+// (spec F-1312). Anything with an "@" — another domain of the same Workspace — stays as typed.
+const completeDomain = input => {
+  const domain = input.dataset.defaultDomain
+  const value = input.value.trim()
+  if (domain && value !== "" && !value.includes("@")) input.value = `${value}@${domain}`
+}
+document.addEventListener("focusout", e => {
+  if (e.target.matches && e.target.matches("input[data-default-domain]")) completeDomain(e.target)
+})
+document.addEventListener("submit", e => {
+  e.target.querySelectorAll && e.target.querySelectorAll("input[data-default-domain]").forEach(completeDomain)
+}, true)
+
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 

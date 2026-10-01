@@ -41,7 +41,12 @@ defmodule AskDriveWeb.AuthController do
   """
   def ldap_login(conn, params) do
     email =
-      params |> get_in(["ldap", "email"]) |> to_string() |> String.trim() |> String.downcase()
+      params
+      |> get_in(["ldap", "email"])
+      |> to_string()
+      |> String.trim()
+      |> String.downcase()
+      |> with_default_domain()
 
     password = params |> get_in(["ldap", "password"]) |> to_string()
     env = AskDriveWeb.ConnectionEnv.env(conn)
@@ -53,9 +58,6 @@ defmodule AskDriveWeb.AuthController do
 
       email == "" or password == "" ->
         ldap_failed(conn, email, "メールアドレスとパスワードを入力してください。")
-
-      domain_denied?(email) ->
-        ldap_failed(conn, email, "アクセス拒否: 許可されたドメイン (@#{allowed_domain()}) のアカウントのみログインできます。")
 
       match?({:locked, _, _}, LoginThrottle.check(email, env.key)) ->
         {:locked, until, _scope} = LoginThrottle.check(email, env.key)
@@ -345,6 +347,18 @@ defmodule AskDriveWeb.AuthController do
     end
   rescue
     _ -> nil
+  end
+
+  # "name" alone means name@<the organization's domain> (F-1312); the page fills it in too,
+  # this covers a browser without JavaScript. Any other domain is taken as typed: the
+  # directory itself decides who exists — a Workspace may have secondary domains.
+  defp with_default_domain(""), do: ""
+
+  defp with_default_domain(email) do
+    case {String.contains?(email, "@"), allowed_domain()} do
+      {false, domain} when is_binary(domain) -> email <> "@" <> String.downcase(domain)
+      _ -> email
+    end
   end
 
   defp domain_denied?(email) do

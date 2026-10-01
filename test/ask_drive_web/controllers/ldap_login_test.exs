@@ -105,11 +105,39 @@ defmodule AskDriveWeb.LdapLoginTest do
     assert get_session(conn, :user_id)
   end
 
-  test "another domain is refused without asking the directory", %{conn: conn} do
+  # F-1312: the organization's domain may be left out; another domain of the same Workspace
+  # (a secondary domain) is up to the directory
+  test "the organization's domain can be left out", %{conn: conn} do
     enable_ldap!()
-    conn = sign_in(conn, "someone@other.com", "x")
-    assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "@example.com"
-    refute_received {:ldap, :open, _}
+    conn = sign_in(conn, "Taro", "correct-horse")
+    assert redirected_to(conn) == "/"
+    assert_received {:ldap, :search, {_, {:mail, "taro@example.com"}}}
+  end
+
+  test "a secondary domain of the Workspace signs in; a stranger is simply unknown", %{conn: conn} do
+    enable_ldap!()
+
+    FakeLdap.put_users(%{
+      "hanako@second.example.org" => %{
+        dn: "uid=hanako,ou=Users,dc=example,dc=com",
+        password: "pw-2",
+        name: "花子"
+      }
+    })
+
+    signed_in = sign_in(conn, "hanako@second.example.org", "pw-2")
+    assert redirected_to(signed_in) == "/"
+
+    refused = sign_in(build_conn(), "someone@other.com", "x")
+    assert Phoenix.Flash.get(refused.assigns.flash, :error) =~ "メールアドレスまたはパスワードが違います"
+  end
+
+  test "the login page fills in the domain and says so", %{conn: conn} do
+    enable_ldap!()
+    html = conn |> get(~p"/login") |> html_response(200)
+    assert html =~ ~s(data-default-domain="example.com")
+    assert html =~ ~s(id="ldap-email-domain-hint")
+    refute html =~ ~s(type="email" name="ldap[email]")
   end
 
   test "the directory being unreachable is explained and not counted as a failure", %{conn: conn} do
