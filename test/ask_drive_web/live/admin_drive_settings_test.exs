@@ -14,17 +14,29 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
     {:ok, view, html} = live(conn, "/it-support/admin?tab=settings")
     assert html =~ "Google Drive 同期設定"
     refute html =~ "Google Drive 同期認証"
-    assert has_element?(view, "#drive-folder-form input[name='setting[drive_folder_id]']")
+    assert has_element?(view, "#drive-settings-form input[name='setting[drive_folder_id]']")
     refute has_element?(view, "#settings-form input[name='setting[drive_folder_id]']")
 
     view
-    |> form("#drive-folder-form", %{
+    |> form("#drive-settings-form", %{
       "setting" => %{"drive_folder_id" => "1AbCdEf", "drive_folder_name" => "マニュアル"}
     })
     |> render_submit()
 
     assert Settings.get_setting!().drive_folder_id == "1AbCdEf"
     assert Settings.get_setting!().drive_folder_name == "マニュアル"
+  end
+
+  test "one save button for the whole card, at its bottom", %{conn: conn} do
+    for mode <- ["service_account", "oauth"] do
+      {:ok, _} = Settings.update_setting(Settings.get_setting!(), %{drive_auth_mode: mode})
+      {:ok, _view, html} = live(conn, "/it-support/admin?tab=settings")
+      [card] = Regex.run(~r{<form[^>]*id="drive-settings-form".*?</form>}s, html)
+      assert length(Regex.scan(~r/type="submit"/, card)) == 1
+      # the save button comes after the folder fields
+      assert :binary.match(card, "drive_folder_id") <
+               :binary.match(card, "save-drive-settings-btn")
+    end
   end
 
   test "the sync test says what's missing before it can run", %{conn: conn} do
@@ -40,12 +52,12 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
     # selectable although the platform has no OAuth client
     view |> element("#drive-auth-mode-oauth") |> render_click()
     assert Settings.get_setting!().drive_auth_mode == "oauth"
-    assert has_element?(view, "#drive-oauth-client-form")
+    assert has_element?(view, "#drive-settings-form #drive-oauth-client-fields")
     assert has_element?(view, "#drive-oauth-client-missing")
     refute has_element?(view, "a[href^='/auth/google/drive']")
 
     view
-    |> form("#drive-oauth-client-form", %{
+    |> form("#drive-settings-form", %{
       "setting" => %{
         "drive_oauth_client_id" => "desk.apps.googleusercontent.com",
         "drive_oauth_client_secret" => "desk-secret"

@@ -740,34 +740,20 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
+  # The Drive card's single save (F-345): the chosen mode's authentication and the folder
   @impl true
-  def handle_event("save_service_account", %{"setting" => params}, socket) do
-    json = String.trim(params["drive_service_account_json"] || "")
+  def handle_event("save_drive_settings", %{"setting" => params}, socket) do
+    folder = Map.take(params, ["drive_folder_id", "drive_folder_name"])
 
-    # The key field always renders empty (it is a secret), so a blank submit means "keep the
-    # stored key" — that lets the delegation user be changed without re-pasting the key.
-    attrs =
-      %{
-        drive_auth_mode: "service_account",
-        drive_impersonate_email: params["drive_impersonate_email"]
-      }
-      |> then(&if(json == "", do: &1, else: Map.put(&1, :drive_service_account_json, json)))
-
-    # Delegation acts as a user of the organization's Workspace, so the address must be in
-    # the domain set on the platform (spec 6.12)
-    domain = Settings.platform_setting!().allowed_domain
-    subject = String.trim(params["drive_impersonate_email"] || "")
-
-    if domain not in [nil, ""] and subject != "" and
-         not String.ends_with?(String.downcase(subject), "@" <> domain) do
-      {:noreply,
-       put_flash(
-         socket,
-         :error,
-         "アクセスユーザーは組織のドメイン（@#{domain}）のアドレスを指定してください。"
-       )}
+    if socket.assigns.drive_mode == "service_account" do
+      save_service_account_params(socket, params, folder)
     else
-      save_service_account(socket, attrs)
+      attrs =
+        params
+        |> Map.take(["drive_oauth_client_id", "drive_oauth_client_secret"])
+        |> Map.merge(folder)
+
+      save_drive_settings(socket, attrs)
     end
   end
 
@@ -3839,255 +3825,243 @@ defmodule AskDriveWeb.AdminLive do
                 </button>
               </div>
 
-              <%= if @drive_mode == "service_account" do %>
-                <p class="text-xs text-zinc-500 leading-relaxed">
-                  ブラウザでの認可が不要なため、Google の redirect_uri 制限（生の IP アドレスや
-                  <code
-                    class="font-mono text-[11px]"
-                    phx-no-curly-interpolation
-                  >.local</code>
-                  ホスト名の拒否）を回避できます。
-                  <a
-                    href="https://console.cloud.google.com/iam-admin/serviceaccounts"
-                    target="_blank"
-                    class="text-indigo-600 dark:text-indigo-400 underline"
-                  >
-                    Google Cloud Console
-                  </a>
-                  でサービスアカウントを作成し、JSON キーをダウンロードして貼り付けてください。作成後、同期対象の Drive フォルダをそのサービスアカウントのメールアドレス（<code
-                    class="font-mono text-[11px]"
-                    phx-no-curly-interpolation
-                  >...@...iam.gserviceaccount.com</code>
-                  ）と共有するのを忘れないでください。
-                </p>
+              <%!-- One form for the whole card — the authentication of the chosen mode and the
+                    folder — saved by the single button at its bottom --%>
+              <.form
+                for={@form}
+                id="drive-settings-form"
+                phx-submit="save_drive_settings"
+                class="space-y-4"
+              >
+                <%= if @drive_mode == "service_account" do %>
+                  <p class="text-xs text-zinc-500 leading-relaxed">
+                    ブラウザでの認可が不要なため、Google の redirect_uri 制限（生の IP アドレスや
+                    <code
+                      class="font-mono text-[11px]"
+                      phx-no-curly-interpolation
+                    >.local</code>
+                    ホスト名の拒否）を回避できます。
+                    <a
+                      href="https://console.cloud.google.com/iam-admin/serviceaccounts"
+                      target="_blank"
+                      class="text-indigo-600 dark:text-indigo-400 underline"
+                    >
+                      Google Cloud Console
+                    </a>
+                    でサービスアカウントを作成し、JSON キーをダウンロードして貼り付けてください。作成後、同期対象の Drive フォルダをそのサービスアカウントのメールアドレス（<code
+                      class="font-mono text-[11px]"
+                      phx-no-curly-interpolation
+                    >...@...iam.gserviceaccount.com</code>
+                    ）と共有するのを忘れないでください。
+                  </p>
 
-                <.form
-                  for={@form}
-                  id="service-account-form"
-                  phx-submit="save_service_account"
-                  class="space-y-3"
-                >
-                  <.input
-                    field={@form[:drive_service_account_json]}
-                    type="textarea"
-                    value=""
-                    rows="6"
-                    label={"サービスアカウントの JSON キー（#{secret_state(@setting.drive_service_account_json)}）"}
-                    placeholder={
-                      ~s({"type": "service_account", "client_email": "...", "private_key": "...", ...})
-                    }
-                    class="font-mono text-[11px]"
-                  />
-                  <p class="text-[11px] text-zinc-500 -mt-1">
-                    保存済みの場合は空欄のままで構いません（既存のキーを維持します）。
-                  </p>
-                  <.input
-                    field={@form[:drive_impersonate_email]}
-                    type="email"
-                    label="アクセスユーザー（ドメイン全体の委任・任意）"
-                    placeholder="sync@example.com"
-                  />
-                  <p class="text-[11px] text-zinc-500 leading-relaxed -mt-1">
-                    同期対象が「組織内のユーザーのみアクセス可」の共有ドライブにある場合、サービスアカウント（組織外扱い）は共有に追加できません。
-                    その場合はフォルダを閲覧できる社内ユーザーのメールアドレスを入力し、Google 管理コンソール →「セキュリティ」→「API の制御」→「ドメイン全体の委任」で
-                    クライアント ID
-                    <code class="font-mono">{service_account_client_id(@setting) ||
-                      "（JSON キーの client_id）"}</code>
-                    にスコープ
-                    <code class="font-mono" phx-no-curly-interpolation>https://www.googleapis.com/auth/drive.readonly</code>
-                    を許可してください。空欄ならサービスアカウント自身としてアクセスします。
-                  </p>
-                  <div class="flex flex-wrap items-center gap-3">
-                    <button
-                      type="submit"
-                      id="save-service-account-btn"
-                      class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
-                    >
-                      <.icon name="hero-arrow-up-tray" class="w-4 h-4" /> 保存
-                    </button>
-                    <button
-                      type="button"
-                      id="test-service-account-btn"
-                      phx-click="test_service_account"
-                      class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium transition"
-                    >
-                      接続テスト
-                    </button>
-                    <button
-                      :if={Accounts.drive_connected?()}
-                      type="button"
-                      id="disconnect-service-account-btn"
-                      phx-click="disconnect_service_account"
-                      data-confirm="保存済みのサービスアカウント認証情報を削除しますか？"
-                      class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 font-medium text-xs transition"
-                    >
-                      <.icon name="hero-x-circle" class="w-4 h-4" /> 削除
-                    </button>
-                  </div>
-                  <%= case @service_account_test do %>
-                    <% {:ok, message} -> %>
-                      <p class="text-[11px] text-emerald-600 dark:text-emerald-400">{message}</p>
-                    <% {:error, message} -> %>
-                      <p class="text-[11px] text-red-600 dark:text-red-400">{message}</p>
-                    <% _ -> %>
-                  <% end %>
-                </.form>
-              <% else %>
-                <p class="text-xs text-zinc-500 leading-relaxed">
-                  全社公開マニュアル等の Google Drive フォルダにアクセス可能な <strong>システム管理用アカウント（または専用同期アカウント）</strong>
-                  で連携してください。<br /> ※ 一般ユーザーがチャット画面で質問する際は、各自の通常アカウントで利用します。
-                </p>
-
-                <.form
-                  for={@form}
-                  id="drive-oauth-client-form"
-                  phx-submit="save_settings"
-                  class="space-y-3 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
-                >
-                  <p class="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                    この窓口の Drive 同期に使う <strong>OAuth クライアント</strong>（Google Cloud Console →「API とサービス」→「認証情報」→「OAuth クライアント ID」、種類は「ウェブ アプリケーション」）。全体設定のログイン用 OAuth とは別で、ログインには使いません。承認済みのリダイレクト URI に
-                    <code class="font-mono">https://（このページのホスト名:ポート）/auth/google/callback</code>
-                    を登録してください。{if AskDrive.Drive.OAuth.desk_drive_client?(),
-                      do: "",
-                      else:
-                        if(AskDrive.Drive.OAuth.client_configured?(),
-                          do: "空欄のままなら全体設定の OAuth クライアントを使います。",
-                          else: ""
-                        )}
-                  </p>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div id="service-account-fields" class="space-y-3">
                     <.input
-                      field={@form[:drive_oauth_client_id]}
-                      type="text"
-                      label="OAuth クライアント ID"
-                      placeholder="xxxxxxxx.apps.googleusercontent.com"
-                    />
-                    <.input
-                      field={@form[:drive_oauth_client_secret]}
-                      type="password"
+                      field={@form[:drive_service_account_json]}
+                      type="textarea"
                       value=""
-                      label={"OAuth クライアント シークレット（#{secret_state(@setting.drive_oauth_client_secret)}）"}
+                      rows="6"
+                      label={"サービスアカウントの JSON キー（#{secret_state(@setting.drive_service_account_json)}）"}
+                      placeholder={
+                        ~s({"type": "service_account", "client_email": "...", "private_key": "...", ...})
+                      }
+                      class="font-mono text-[11px]"
                     />
+                    <p class="text-[11px] text-zinc-500 -mt-1">
+                      保存済みの場合は空欄のままで構いません（既存のキーを維持します）。
+                    </p>
+                    <.input
+                      field={@form[:drive_impersonate_email]}
+                      type="email"
+                      label="アクセスユーザー（ドメイン全体の委任・任意）"
+                      placeholder="sync@example.com"
+                    />
+                    <p class="text-[11px] text-zinc-500 leading-relaxed -mt-1">
+                      同期対象が「組織内のユーザーのみアクセス可」の共有ドライブにある場合、サービスアカウント（組織外扱い）は共有に追加できません。
+                      その場合はフォルダを閲覧できる社内ユーザーのメールアドレスを入力し、Google 管理コンソール →「セキュリティ」→「API の制御」→「ドメイン全体の委任」で
+                      クライアント ID
+                      <code class="font-mono">{service_account_client_id(@setting) ||
+                        "（JSON キーの client_id）"}</code>
+                      にスコープ
+                      <code class="font-mono" phx-no-curly-interpolation>https://www.googleapis.com/auth/drive.readonly</code>
+                      を許可してください。空欄ならサービスアカウント自身としてアクセスします。
+                    </p>
+                    <div class="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        id="test-service-account-btn"
+                        phx-click="test_service_account"
+                        class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium transition"
+                      >
+                        接続テスト
+                      </button>
+                      <button
+                        :if={Accounts.drive_connected?()}
+                        type="button"
+                        id="disconnect-service-account-btn"
+                        phx-click="disconnect_service_account"
+                        data-confirm="保存済みのサービスアカウント認証情報を削除しますか？"
+                        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 font-medium text-xs transition"
+                      >
+                        <.icon name="hero-x-circle" class="w-4 h-4" /> 削除
+                      </button>
+                    </div>
+                    <%= case @service_account_test do %>
+                      <% {:ok, message} -> %>
+                        <p class="text-[11px] text-emerald-600 dark:text-emerald-400">{message}</p>
+                      <% {:error, message} -> %>
+                        <p class="text-[11px] text-red-600 dark:text-red-400">{message}</p>
+                      <% _ -> %>
+                    <% end %>
                   </div>
-                  <button
-                    type="submit"
-                    id="save-drive-oauth-client-btn"
-                    class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                <% else %>
+                  <p class="text-xs text-zinc-500 leading-relaxed">
+                    全社公開マニュアル等の Google Drive フォルダにアクセス可能な <strong>システム管理用アカウント（または専用同期アカウント）</strong>
+                    で連携してください。<br /> ※ 一般ユーザーがチャット画面で質問する際は、各自の通常アカウントで利用します。
+                  </p>
+
+                  <div
+                    id="drive-oauth-client-fields"
+                    class="space-y-3 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
                   >
-                    保存
-                  </button>
-                </.form>
+                    <p class="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                      この窓口の Drive 同期に使う <strong>OAuth クライアント</strong>（Google Cloud Console →「API とサービス」→「認証情報」→「OAuth クライアント ID」、種類は「ウェブ アプリケーション」）。全体設定のログイン用 OAuth とは別で、ログインには使いません。承認済みのリダイレクト URI に
+                      <code class="font-mono">https://（このページのホスト名:ポート）/auth/google/callback</code>
+                      を登録してください。入力したら、カードの一番下の「保存」を押します。{if AskDrive.Drive.OAuth.desk_drive_client?(),
+                        do: "",
+                        else:
+                          if(AskDrive.Drive.OAuth.client_configured?(),
+                            do: "空欄のままなら全体設定の OAuth クライアントを使います。",
+                            else: ""
+                          )}
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <.input
+                        field={@form[:drive_oauth_client_id]}
+                        type="text"
+                        label="OAuth クライアント ID"
+                        placeholder="xxxxxxxx.apps.googleusercontent.com"
+                      />
+                      <.input
+                        field={@form[:drive_oauth_client_secret]}
+                        type="password"
+                        value=""
+                        label={"OAuth クライアント シークレット（#{secret_state(@setting.drive_oauth_client_secret)}）"}
+                      />
+                    </div>
+                  </div>
 
-                <p
-                  :if={not @drive_oauth_ready?}
-                  id="drive-oauth-client-missing"
-                  class="text-[11px] text-amber-700 dark:text-amber-300"
-                >
-                  OAuth クライアント ID / シークレットを保存すると、「専用 Google アカウントで認可」ボタンが表示されます。
-                </p>
-
-                <div :if={@drive_oauth_ready?} class="flex flex-wrap items-center gap-3 pt-2">
-                  <.link
-                    href={
-                      ~p"/auth/google/drive?#{[return_to: @base_path <> "/admin?tab=settings", app: @app && @app.slug]}"
-                    }
-                    class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                  <p
+                    :if={not @drive_oauth_ready?}
+                    id="drive-oauth-client-missing"
+                    class="text-[11px] text-amber-700 dark:text-amber-300"
                   >
-                    <.icon name="hero-arrow-path-rounded-square" class="w-4 h-4" />
-                    {if @account, do: "専用 Google アカウントを再認可", else: "専用 Google アカウントで認可"}
-                  </.link>
+                    OAuth クライアント ID / シークレットを保存すると、「専用 Google アカウントで認可」ボタンが表示されます。
+                  </p>
 
-                  <%= if @account do %>
+                  <div :if={@drive_oauth_ready?} class="flex flex-wrap items-center gap-3 pt-2">
                     <.link
                       href={
-                        ~p"/auth/google/disconnect?#{[return_to: @base_path <> "/admin?tab=settings", app: @app && @app.slug]}"
+                        ~p"/auth/google/drive?#{[return_to: @base_path <> "/admin?tab=settings", app: @app && @app.slug]}"
                       }
-                      class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 font-medium text-xs transition"
+                      class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                     >
-                      <.icon name="hero-x-circle" class="w-4 h-4" /> 連携解除
+                      <.icon name="hero-arrow-path-rounded-square" class="w-4 h-4" />
+                      {if @account, do: "専用 Google アカウントを再認可", else: "専用 Google アカウントで認可"}
                     </.link>
-                  <% end %>
-                </div>
 
-                <p class="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed pt-1">
-                  <.icon name="hero-exclamation-triangle" class="w-3.5 h-3.5 inline" />
-                  この方式は Google Cloud Console にブラウザでアクセスした URL と完全一致するリダイレクト URI の登録が必要です。生の IP アドレスや
-                  <code
-                    class="font-mono text-[10px]"
-                    phx-no-curly-interpolation
-                  >.local</code>
-                  ホスト名は Google 側で拒否されます。その場合は、リダイレクト URI に
-                  <code class="font-mono text-[10px]">https://localhost:4443/auth/google/callback</code>
-                  も登録し、AskDrive のサーバーの PC のブラウザで
-                  <code class="font-mono text-[10px]">https://localhost:4443/</code>
-                  を開いて認可してください（認可は最初の 1 回だけで、その後の同期はどこからでも動きます）。
-                </p>
-              <% end %>
+                    <%= if @account do %>
+                      <.link
+                        href={
+                          ~p"/auth/google/disconnect?#{[return_to: @base_path <> "/admin?tab=settings", app: @app && @app.slug]}"
+                        }
+                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 font-medium text-xs transition"
+                      >
+                        <.icon name="hero-x-circle" class="w-4 h-4" /> 連携解除
+                      </.link>
+                    <% end %>
+                  </div>
 
-              <%!-- Which folder to sync (moved here from the general settings form) --%>
-              <div class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3">
-                <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                  <.icon name="hero-folder" class="w-4 h-4 text-indigo-500" /> 同期するフォルダ
-                </h3>
-                <.form for={@form} id="drive-folder-form" phx-submit="save_settings" class="space-y-3">
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <.input
-                      field={@form[:drive_folder_id]}
-                      type="text"
-                      label="Google Drive フォルダ ID / URL"
-                      placeholder="https://drive.google.com/drive/folders/..."
-                    />
-                    <.input
-                      field={@form[:drive_folder_name]}
-                      type="text"
-                      label="フォルダの表示名（任意）"
-                    />
+                  <p class="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed pt-1">
+                    <.icon name="hero-exclamation-triangle" class="w-3.5 h-3.5 inline" />
+                    この方式は Google Cloud Console にブラウザでアクセスした URL と完全一致するリダイレクト URI の登録が必要です。生の IP アドレスや
+                    <code
+                      class="font-mono text-[10px]"
+                      phx-no-curly-interpolation
+                    >.local</code>
+                    ホスト名は Google 側で拒否されます。その場合は、リダイレクト URI に
+                    <code class="font-mono text-[10px]">https://localhost:4443/auth/google/callback</code>
+                    も登録し、AskDrive のサーバーの PC のブラウザで
+                    <code class="font-mono text-[10px]">https://localhost:4443/</code>
+                    を開いて認可してください（認可は最初の 1 回だけで、その後の同期はどこからでも動きます）。
+                  </p>
+                <% end %>
+
+                <%!-- Which folder to sync (moved here from the general settings form) --%>
+                <div class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3">
+                  <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                    <.icon name="hero-folder" class="w-4 h-4 text-indigo-500" /> 同期するフォルダ
+                  </h3>
+                  <div class="space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <.input
+                        field={@form[:drive_folder_id]}
+                        type="text"
+                        label="Google Drive フォルダ ID / URL"
+                        placeholder="https://drive.google.com/drive/folders/..."
+                      />
+                      <.input
+                        field={@form[:drive_folder_name]}
+                        type="text"
+                        label="フォルダの表示名（任意）"
+                      />
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                      <button
+                        type="submit"
+                        id="save-drive-settings-btn"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                      >
+                        <.icon name="hero-arrow-up-tray" class="w-4 h-4" /> 保存
+                      </button>
+                      <button
+                        type="button"
+                        id="test-drive-sync-btn"
+                        phx-click="test_drive_sync"
+                        disabled={@drive_sync_test == :running}
+                        class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium transition disabled:opacity-50"
+                      >
+                        {if @drive_sync_test == :running, do: "テスト中…", else: "同期テスト"}
+                      </button>
+                      <span class="text-[11px] text-zinc-500">
+                        認証とフォルダの読み取りを確認し、同期の対象になるファイルを一覧します（取り込みはしません）。
+                      </span>
+                    </div>
                   </div>
-                  <div class="flex flex-wrap items-center gap-3">
-                    <button
-                      type="submit"
-                      id="save-drive-folder-btn"
-                      class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
-                    >
-                      保存
-                    </button>
-                    <button
-                      type="button"
-                      id="test-drive-sync-btn"
-                      phx-click="test_drive_sync"
-                      disabled={@drive_sync_test == :running}
-                      class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium transition disabled:opacity-50"
-                    >
-                      {if @drive_sync_test == :running, do: "テスト中…", else: "同期テスト"}
-                    </button>
-                    <span class="text-[11px] text-zinc-500">
-                      認証とフォルダの読み取りを確認し、同期の対象になるファイルを一覧します（取り込みはしません）。
-                    </span>
+                  <div id="drive-sync-test-result">
+                    <%= case @drive_sync_test do %>
+                      <% {:ok, %{folder: folder, count: count, sample: sample}} -> %>
+                        <div class="text-[11px] text-emerald-700 dark:text-emerald-400 space-y-1">
+                          <p>
+                            同期できます（{Accounts.drive_identity()}）。フォルダ「{folder}」の対象ファイル: {count} 件
+                          </p>
+                          <ul
+                            :if={sample != []}
+                            class="font-mono text-zinc-600 dark:text-zinc-400 list-disc pl-4"
+                          >
+                            <li :for={path <- sample}>{path}</li>
+                            <li :if={count > length(sample)} class="list-none">
+                              … ほか {count - length(sample)} 件
+                            </li>
+                          </ul>
+                        </div>
+                      <% {:error, message} -> %>
+                        <p class="text-[11px] text-red-600 dark:text-red-400">{message}</p>
+                      <% _ -> %>
+                    <% end %>
                   </div>
-                </.form>
-                <div id="drive-sync-test-result">
-                  <%= case @drive_sync_test do %>
-                    <% {:ok, %{folder: folder, count: count, sample: sample}} -> %>
-                      <div class="text-[11px] text-emerald-700 dark:text-emerald-400 space-y-1">
-                        <p>
-                          同期できます（{Accounts.drive_identity()}）。フォルダ「{folder}」の対象ファイル: {count} 件
-                        </p>
-                        <ul
-                          :if={sample != []}
-                          class="font-mono text-zinc-600 dark:text-zinc-400 list-disc pl-4"
-                        >
-                          <li :for={path <- sample}>{path}</li>
-                          <li :if={count > length(sample)} class="list-none">
-                            … ほか {count - length(sample)} 件
-                          </li>
-                        </ul>
-                      </div>
-                    <% {:error, message} -> %>
-                      <p class="text-[11px] text-red-600 dark:text-red-400">{message}</p>
-                    <% _ -> %>
-                  <% end %>
                 </div>
-              </div>
+              </.form>
             </div>
 
             <%!-- Card 3: LLM Provider Settings --%>
@@ -5681,7 +5655,38 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
-  defp save_service_account(socket, attrs) do
+  defp save_service_account_params(socket, params, folder) do
+    json = String.trim(params["drive_service_account_json"] || "")
+
+    # The key field always renders empty (it is a secret), so a blank submit means "keep the
+    # stored key" — that lets the delegation user be changed without re-pasting the key.
+    attrs =
+      %{
+        drive_auth_mode: "service_account",
+        drive_impersonate_email: params["drive_impersonate_email"]
+      }
+      |> then(&if(json == "", do: &1, else: Map.put(&1, :drive_service_account_json, json)))
+      |> Map.merge(Map.new(folder, fn {k, v} -> {String.to_existing_atom(k), v} end))
+
+    # Delegation acts as a user of the organization's Workspace, so the address must be in
+    # the domain set on the platform (spec 6.12)
+    domain = Settings.platform_setting!().allowed_domain
+    subject = String.trim(params["drive_impersonate_email"] || "")
+
+    if domain not in [nil, ""] and subject != "" and
+         not String.ends_with?(String.downcase(subject), "@" <> domain) do
+      {:noreply,
+       put_flash(
+         socket,
+         :error,
+         "アクセスユーザーは組織のドメイン（@#{domain}）のアドレスを指定してください。"
+       )}
+    else
+      save_drive_settings(socket, attrs)
+    end
+  end
+
+  defp save_drive_settings(socket, attrs) do
     case Settings.update_setting(socket.assigns.setting, attrs) do
       {:ok, updated} ->
         {:noreply,
@@ -5689,13 +5694,14 @@ defmodule AskDriveWeb.AdminLive do
          |> assign(:setting, updated)
          |> assign(:form, to_form(Settings.change_setting(updated)))
          |> assign(:service_account_test, nil)
-         |> put_flash(:info, "サービスアカウントの認証情報を保存しました。")}
+         |> assign_drive_mode()
+         |> put_flash(:info, "Google Drive 同期設定を保存しました。")}
 
       {:error, changeset} ->
         {:noreply,
          socket
          |> assign(:form, to_form(changeset))
-         |> put_flash(:error, "保存に失敗しました。JSON キーの内容を確認してください。")}
+         |> put_flash(:error, "保存に失敗しました: " <> changeset_messages(changeset))}
     end
   end
 end

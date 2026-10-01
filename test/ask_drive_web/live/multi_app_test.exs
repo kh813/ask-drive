@@ -187,7 +187,7 @@ defmodule AskDriveWeb.MultiAppTest do
 
     html =
       view
-      |> form("#service-account-form",
+      |> form("#drive-settings-form",
         setting: %{drive_service_account_json: "", drive_impersonate_email: "sync@other.org"}
       )
       |> render_submit()
