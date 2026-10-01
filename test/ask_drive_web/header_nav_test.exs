@@ -32,6 +32,10 @@ defmodule AskDriveWeb.HeaderNavTest do
              "platform-admin-nav-link",
              "locale-switcher"
            ]
+
+    # "Admin mode" with the time left on a line of its own
+    assert html =~
+             ~r{<span>Admin mode</span>\s*<span[^>]*id="admin-mode-remaining"[^>]*>\(\d+ min remaining\)</span>}
   end
 
   test "a desk's administrator gets their desk's admin link, not Platform Admin", %{conn: conn} do
@@ -41,6 +45,12 @@ defmodule AskDriveWeb.HeaderNavTest do
     html = conn |> log_in_user(owner) |> get(~p"/it-support") |> html_response(200)
     assert html =~ ~s(id="admin-nav-link")
     assert html =~ "Manage IT-Support"
+
+    # the chat stands out (grey); the desk's admin link stays plain
+    [chat] = Regex.run(~r/<a[^>]*id="chat-nav-link"[^>]*>/, html)
+    [admin] = Regex.run(~r/<a[^>]*id="admin-nav-link"[^>]*>/, html)
+    assert chat =~ "bg-zinc-100"
+    refute admin =~ ~r/(?<!hover:)bg-zinc-100/
     refute html =~ ~s(id="elevate-link")
     refute html =~ ~s(id="platform-admin-nav-link")
   end

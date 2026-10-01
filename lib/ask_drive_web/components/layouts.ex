@@ -88,26 +88,23 @@ defmodule AskDriveWeb.Layouts do
         </details>
 
         <nav :if={@current_user} class="flex items-center gap-1 text-xs font-medium">
+          <%!-- The chat is what everyone comes for, so it is the one that stands out --%>
           <.link
             href={if @app, do: "/" <> @app.slug, else: "/"}
-            class="px-2.5 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+            id="chat-nav-link"
+            class="px-2.5 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition"
           >
             {if @app, do: gettext("Chat"), else: gettext("Desk list")}
           </.link>
           <%!-- This desk's settings only; named after the desk so it cannot be mistaken for
-                Platform Admin, which lives with the admin-mode badge on the right. --%>
+                Platform Admin, which lives with the admin-mode badge on the right. Only a few
+                people use it, so it stays plain even while it is open. --%>
           <.link
             :if={can_access_app_admin?(@current_user, @app)}
             href={"/" <> @app.slug <> "/admin"}
             id="admin-nav-link"
             aria-current={@current == :app_admin && "page"}
-            class={[
-              "px-2.5 py-1.5 rounded-lg transition",
-              if(@current == :app_admin,
-                do: "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100",
-                else: "text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-              )
-            ]}
+            class="px-2.5 py-1.5 rounded-lg text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-800 dark:hover:text-zinc-200 transition"
           >
             <span class="hidden md:inline">{gettext("Manage %{desk}", desk: @app.name)}</span>
             <span class="md:hidden">{gettext("Desk admin")}</span>
@@ -145,22 +142,19 @@ defmodule AskDriveWeb.Layouts do
         <div
           :if={@admin_elevated?}
           id="admin-mode-group"
-          class="inline-flex items-stretch rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 overflow-hidden"
+          class="inline-flex items-stretch rounded-xl text-[11px] font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 overflow-hidden"
         >
+          <% remaining = remaining_label(@admin_elevation_expires_at) %>
           <span
             id="admin-mode-badge"
-            title={
-              gettext("Admin mode%{remaining}",
-                remaining: remaining_label(@admin_elevation_expires_at)
-              )
-            }
+            title={String.trim(gettext("Admin mode") <> " " <> remaining)}
             class="inline-flex items-center gap-1.5 px-2.5 py-1"
           >
             <.icon name="hero-shield-check" class="w-3.5 h-3.5" />
-            <span class="hidden sm:inline">
-              {gettext("Admin mode%{remaining}",
-                remaining: remaining_label(@admin_elevation_expires_at)
-              )}
+            <%!-- two lines: the mode, then the time left --%>
+            <span class="hidden sm:flex flex-col items-center leading-tight">
+              <span>{gettext("Admin mode")}</span>
+              <span :if={remaining != ""} id="admin-mode-remaining">{remaining}</span>
             </span>
           </span>
           <.link
@@ -260,7 +254,7 @@ defmodule AskDriveWeb.Layouts do
     seconds = DateTime.diff(expires_at, DateTime.utc_now(), :second)
 
     if seconds > 0,
-      do: " " <> gettext("(%{minutes} min remaining)", minutes: max(div(seconds, 60), 1)),
+      do: gettext("(%{minutes} min remaining)", minutes: max(div(seconds, 60), 1)),
       else: ""
   end
 
