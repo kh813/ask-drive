@@ -74,30 +74,58 @@ defmodule AskDrive.Setup do
   """
   def prepare do
     if required?() do
-      code = ensure_code()
-
-      Logger.warning("""
-      AskDrive の初回セットアップが必要です。ブラウザで AskDrive を開き、次のセットアップコードを入力してください。
-        セットアップコード: #{code}
-      （./app.sh status でも確認できます。ファイル: #{code_path()}）\
-      """)
-
-      code
+      prepare_code()
+    else
+      # done: a code file left behind (or brought back by an update) is of no use
+      File.rm(code_path())
+      nil
     end
   end
 
-  @doc "The current setup code, creating one if needed."
-  def ensure_code do
-    case File.read(code_path()) do
-      {:ok, code} when byte_size(code) > 0 ->
-        String.trim(code)
+  defp prepare_code do
+    code = ensure_code()
 
-      _ ->
+    Logger.warning("""
+    AskDrive の初回セットアップが必要です。ブラウザで AskDrive を開き、次のセットアップコードを入力してください。
+      セットアップコード: #{code}
+    （./app.sh status でも確認できます。ファイル: #{code_path()}）\
+    """)
+
+    code
+  end
+
+  # A code that was published by mistake: it was committed to the repository and shipped in
+  # the release ZIPs up to v0.1.12, so anyone could read it. Never accept it.
+  @leaked_codes ["7HXR-DVAC-UNWJ"]
+
+  @doc """
+  The current setup code, creating one if needed. A file this install didn't write itself is
+  not trusted: AskDrive creates it readable by the owner only (0600), while one unpacked from
+  an archive isn't — and the code once shipped in the release ZIPs is refused outright.
+  """
+  def ensure_code do
+    case read_own_code() do
+      {:ok, code} ->
+        code
+
+      :error ->
         code = generate_code()
         File.mkdir_p!(Path.dirname(code_path()))
         File.write!(code_path(), code <> "\n")
         File.chmod!(code_path(), 0o600)
         code
+    end
+  end
+
+  defp read_own_code do
+    with {:ok, %File.Stat{mode: mode}} <- File.stat(code_path()),
+         0 <- Bitwise.band(mode, 0o077),
+         {:ok, code} <- File.read(code_path()),
+         code = String.trim(code),
+         true <- code != "" and code not in @leaked_codes do
+      {:ok, code}
+    else
+      _ -> :error
     end
   end
 

@@ -54,3 +54,7 @@ npm-debug.log
 # OS artifacts
 .DS_Store
 
+
+# written next to the database at runtime (first-access setup code, whether Ollama is needed)
+/setup_code
+/ollama_needed

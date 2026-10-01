@@ -95,4 +95,30 @@ defmodule AskDrive.SetupTest do
     refute Setup.required?()
     assert Settings.get_setting!().setup_completed_at
   end
+
+  test "a code file AskDrive didn't write itself, or the one once published, isn't trusted" do
+    # unpacked from an archive: readable by others
+    File.write!(Setup.code_path(), "AAAA-BBBB-CCCC\n")
+    File.chmod!(Setup.code_path(), 0o644)
+    code = Setup.ensure_code()
+    refute code == "AAAA-BBBB-CCCC"
+    assert Bitwise.band(File.stat!(Setup.code_path()).mode, 0o077) == 0
+    assert Setup.ensure_code() == code
+
+    # the code shipped in the release ZIPs up to v0.1.12, even with the right mode
+    File.write!(Setup.code_path(), "7HXR-DVAC-UNWJ\n")
+    File.chmod!(Setup.code_path(), 0o600)
+    refute Setup.ensure_code() == "7HXR-DVAC-UNWJ"
+    assert {:error, :invalid} = Setup.verify_code("7HXR-DVAC-UNWJ")
+  end
+
+  test "once setup is done, a code file brought back (e.g. by an update) is removed at boot" do
+    code = Setup.ensure_code()
+    assert :ok = Setup.complete(valid_params(code))
+
+    File.write!(Setup.code_path(), "7HXR-DVAC-UNWJ\n")
+    Setup.reset_cache()
+    assert Setup.prepare() == nil
+    refute File.exists?(Setup.code_path())
+  end
 end

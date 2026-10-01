@@ -82,7 +82,15 @@ jobs:
             -x "docs/*" \
             -x "test/*" \
             -x "*.DS_Store" \
-            -x ".formatter.exs"
+            -x ".formatter.exs" \
+            -x "setup_code" \
+            -x "ollama_needed"
+
+          # runtime files of an install must never ship (a setup code once did, up to v0.1.12)
+          if unzip -Z1 "${ARCHIVE_NAME}" | grep -qxE "setup_code|ollama_needed"; then
+            echo "::error::the archive contains a runtime file (setup_code / ollama_needed)"
+            exit 1
+          fi
 
           # The list of files in this release, so a ZIP update can remove files a release
           # dropped (scripts/deploy.sh); otherwise they stay behind and still get compiled
