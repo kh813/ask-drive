@@ -36,7 +36,7 @@ defmodule AskDrive.Drive.OAuth do
   Only the Drive flow asks for offline access: sign-in needs no refresh token, and asking
   for one would store a long-lived credential per employee for no reason (N-605).
   """
-  def authorize_url(state, redirect_uri, flow \\ :drive) do
+  def authorize_url(state, redirect_uri, flow \\ :drive, extra \\ %{}) do
     base = %{
       client_id: client(flow) |> elem(0),
       redirect_uri: redirect_uri,
@@ -50,6 +50,7 @@ defmodule AskDrive.Drive.OAuth do
         :login -> Map.put(base, :prompt, "select_account")
         _drive -> Map.merge(base, %{access_type: "offline", prompt: "consent"})
       end
+      |> Map.merge(extra)
 
     @auth_endpoint <> "?" <> URI.encode_query(params)
   end

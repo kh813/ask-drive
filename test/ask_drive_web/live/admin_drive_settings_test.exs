@@ -54,7 +54,7 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
     assert Settings.get_setting!().drive_auth_mode == "oauth"
     assert has_element?(view, "#drive-settings-form #drive-oauth-client-fields")
     assert has_element?(view, "#drive-oauth-client-missing")
-    refute has_element?(view, "#drive-auth-link")
+    assert has_element?(view, "button#drive-connect-btn")
 
     view
     |> form("#drive-settings-form", %{
@@ -65,7 +65,7 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
     })
     |> render_submit()
 
-    assert has_element?(view, "#drive-auth-link")
+    assert has_element?(view, "a#drive-connect-btn")
     refute has_element?(view, "#drive-oauth-client-missing")
 
     # the platform's Google login stays unset and off
@@ -89,7 +89,7 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
     refute html =~ "なりすま"
   end
 
-  describe "authorizing Drive from the administrator's own browser, by pasting (F-347)" do
+  describe "Google アカウント認証: an account and 接続 (F-347, F-348)" do
     setup %{conn: conn} do
       {:ok, _} =
         Settings.update_setting(Settings.get_setting!(), %{
@@ -98,51 +98,47 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
           drive_oauth_client_secret: "desk-secret"
         })
 
-      {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
-      %{view: view}
+      %{conn: conn}
     end
 
-    defp auth_url(view) do
+    defp connect_href(view) do
       view
-      |> element("#drive-auth-link")
+      |> element("#drive-connect-btn")
       |> render()
       |> then(&Regex.run(~r{href="([^"]+)"}, &1))
       |> List.last()
       |> String.replace("&amp;", "&")
-      |> URI.parse()
-      |> Map.get(:query)
-      |> URI.decode_query()
     end
 
-    test "the link asks Google to come back to localhost, offline, with PKCE and the chosen account",
-         %{view: view} do
-      q = auth_url(view)
+    defp query(url), do: url |> URI.parse() |> Map.get(:query) |> URI.decode_query()
+
+    test "from another PC: 接続 opens Google in a new window (localhost, PKCE, the account) and the pasted address is saved",
+         %{conn: conn} do
+      {:ok, view, html} = live(conn, "/it-support/admin?tab=settings")
+      assert html =~ "Google アカウント認証"
+      assert has_element?(view, "#drive-connect-btn[target='_blank']")
+      assert has_element?(view, "#drive-manual-auth")
+
+      q = query(connect_href(view))
       assert q["client_id"] == "desk.apps.googleusercontent.com"
       assert q["redirect_uri"] == "http://localhost"
       assert q["access_type"] == "offline"
       assert q["code_challenge_method"] == "S256"
       assert q["scope"] =~ "drive.readonly"
-      refute Map.has_key?(q, "login_hint")
 
       view
       |> form("#drive-settings-form", %{"drive_login_hint" => "sync@example.com"})
       |> render_change()
 
-      assert auth_url(view)["login_hint"] == "sync@example.com"
-    end
+      assert query(connect_href(view))["login_hint"] == "sync@example.com"
 
-    test "what's pasted is checked before asking Google", %{view: view} do
-      view |> form("#drive-settings-form", %{"drive_auth_code" => ""}) |> render_change()
-      view |> element("#drive-auth-finish-btn") |> render_click()
-      assert render(view) =~ "認可コードが見つかりません"
-
+      # pasting is enough (no button); what's pasted is checked before asking Google
       view
       |> form("#drive-settings-form", %{
         "drive_auth_code" => "http://localhost/?state=someone-else&code=abc"
       })
       |> render_change()
 
-      view |> element("#drive-auth-finish-btn") |> render_click()
       assert render(view) =~ "別の認可のアドレスです"
 
       view
@@ -151,8 +147,41 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
       })
       |> render_change()
 
-      view |> element("#drive-auth-finish-btn") |> render_click()
       assert render(view) =~ "Google で許可されませんでした"
+    end
+
+    test "on the server itself (localhost): 接続 goes to Google and comes straight back, no pasting",
+         %{conn: conn} do
+      conn = %{conn | host: "localhost"}
+      {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
+      refute has_element?(view, "#drive-manual-auth")
+
+      view
+      |> form("#drive-settings-form", %{"drive_login_hint" => "sync@example.com"})
+      |> render_change()
+
+      href = connect_href(view)
+      assert href =~ "/auth/google/drive?"
+      assert query(href)["loopback"] == "1"
+
+      location = conn |> get(href) |> redirected_to()
+      q = query(location)
+      assert location =~ "accounts.google.com"
+      assert q["redirect_uri"] =~ ~r{^http://localhost:\d+/auth/google/callback$}
+      assert q["login_hint"] == "sync@example.com"
+      assert q["client_id"] == "desk.apps.googleusercontent.com"
+    end
+
+    test "without an OAuth client, 接続 opens the one-time client section and says what's needed",
+         %{conn: conn} do
+      {:ok, _} =
+        Settings.update_setting(Settings.get_setting!(), %{drive_oauth_client_id: ""})
+
+      {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
+      view |> element("#drive-connect-btn") |> render_click()
+      assert render(view) =~ "接続するには OAuth クライアントが必要です"
+      assert has_element?(view, "#drive-oauth-client[open]")
+      assert has_element?(view, "#drive-oauth-client-missing")
     end
   end
 

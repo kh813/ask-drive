@@ -754,41 +754,28 @@ defmodule AskDriveWeb.AdminLive do
           |> assign(:drive_auth, AskDrive.Drive.OAuth.manual_authorization(hint)),
         else: socket
 
+    pasted = params["drive_auth_code"] || socket.assigns[:drive_auth_code] || ""
+    changed? = pasted != socket.assigns[:drive_auth_code]
+    socket = assign(socket, :drive_auth_code, pasted)
+
+    # pasting the address Google ended on is enough: save straight away (F-348)
+    if changed? and pasted =~ ~r/[?&](code|error)=/,
+      do: finish_drive_auth(socket),
+      else: {:noreply, socket}
+  end
+
+  # 接続 without an OAuth client: open its section and say what's needed
+  def handle_event("drive_connect_needs_client", _params, socket) do
     {:noreply,
-     assign(
-       socket,
-       :drive_auth_code,
-       params["drive_auth_code"] || socket.assigns[:drive_auth_code] || ""
+     socket
+     |> assign(:drive_client_open, true)
+     |> put_flash(
+       :error,
+       "接続するには OAuth クライアントが必要です。全体設定の「Google OAuth（ログイン / Drive 同期）」に登録するか、下の「OAuth クライアント（初回のみ）」に入力して保存してください。"
      )}
   end
 
-  def handle_event("drive_auth_finish", _params, socket) do
-    alias AskDrive.Drive.OAuth
-    %{state: state, verifier: verifier} = socket.assigns.drive_auth
-
-    result =
-      with {:ok, code} <- OAuth.code_from_paste(socket.assigns.drive_auth_code, state),
-           {:ok, tokens} <- OAuth.exchange_manual_code(code, verifier),
-           :ok <- drive_account_allowed(tokens[:email]),
-           {:ok, account} <- Accounts.save_tokens(tokens) do
-        {:ok, account}
-      end
-
-    case result do
-      {:ok, account} ->
-        Logger.info("AdminLive: Drive sync account #{account.email} authorized by pasted code")
-
-        {:noreply,
-         socket
-         |> assign(:drive_auth_code, "")
-         |> assign(:drive_auth, OAuth.manual_authorization(socket.assigns.drive_login_hint))
-         |> put_flash(:info, "Google Drive 同期アカウント（#{account.email}）と連携しました。「同期テスト」で確認してください。")
-         |> load_dashboard_data()}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, drive_auth_error(reason))}
-    end
-  end
+  def handle_event("drive_auth_finish", _params, socket), do: finish_drive_auth(socket)
 
   # The Drive card's single save (F-345): the chosen mode's authentication and the folder
   @impl true
@@ -3856,7 +3843,7 @@ defmodule AskDriveWeb.AdminLive do
                     )
                   ]}
                 >
-                  OAuth（実在の Google アカウント）
+                  Google アカウント認証
                 </button>
                 <button
                   type="button"
@@ -3966,130 +3953,164 @@ defmodule AskDriveWeb.AdminLive do
                     <% end %>
                   </div>
                 <% else %>
-                  <p class="text-xs text-zinc-500 leading-relaxed">
-                    全社公開マニュアル等の Google Drive フォルダにアクセス可能な <strong>システム管理用アカウント（または専用同期アカウント）</strong>
-                    で連携してください。<br /> ※ 一般ユーザーがチャット画面で質問する際は、各自の通常アカウントで利用します。
-                  </p>
-
-                  <div
-                    id="drive-oauth-client-fields"
-                    class="space-y-3 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
-                  >
-                    <p class="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                      この窓口の Drive 同期に使う <strong>OAuth クライアント</strong>（Google Cloud Console →「API とサービス」→「認証情報」→「OAuth クライアント ID」、種類は「ウェブ アプリケーション」）。全体設定のログイン用 OAuth とは別で、ログインには使いません。承認済みのリダイレクト URI に
-                      <code class="font-mono">https://（このページのホスト名:ポート）/auth/google/callback</code>
-                      を登録してください。入力したら、カードの一番下の「保存」を押します。{if AskDrive.Drive.OAuth.desk_drive_client?(),
-                        do: "",
-                        else:
-                          if(AskDrive.Drive.OAuth.client_configured?(),
-                            do: "空欄のままなら全体設定の OAuth クライアントを使います。",
-                            else: ""
-                          )}
+                  <%!-- Google account authentication (F-348): enter the account, press 接続.
+                        From a browser on the server itself Google comes straight back to
+                        AskDrive; from another PC the address Google ends on is pasted. --%>
+                  <div id="drive-google-account" class="space-y-3">
+                    <p :if={@account} class="text-xs text-emerald-700 dark:text-emerald-400">
+                      接続中: {@account.email}（このアカウントの権限で同期します）
                     </p>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <.input
-                        field={@form[:drive_oauth_client_id]}
-                        type="text"
-                        label="OAuth クライアント ID"
-                        placeholder="xxxxxxxx.apps.googleusercontent.com"
-                      />
-                      <.input
-                        field={@form[:drive_oauth_client_secret]}
-                        type="password"
-                        value=""
-                        label={"OAuth クライアント シークレット（#{secret_state(@setting.drive_oauth_client_secret)}）"}
-                      />
-                    </div>
-                  </div>
-
-                  <p
-                    :if={not @drive_oauth_ready?}
-                    id="drive-oauth-client-missing"
-                    class="text-[11px] text-amber-700 dark:text-amber-300"
-                  >
-                    OAuth クライアント ID / シークレットを保存すると、同期に使う Google アカウントを認可する手順が表示されます。
-                  </p>
-
-                  <%!-- Authorized from the administrator's own browser and finished by pasting the
-                        address Google ends on (F-347): no public URL of the server is needed --%>
-                  <div
-                    :if={@drive_oauth_ready? and @drive_auth}
-                    id="drive-manual-auth"
-                    class="space-y-3 p-3 rounded-xl border border-indigo-200/70 dark:border-indigo-900/60"
-                  >
-                    <p class="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-                      {if @account,
-                        do: "同期に使う Google アカウントを認可し直す",
-                        else: "同期に使う Google アカウントを認可する"}
-                    </p>
-                    <label class="block text-[11px] space-y-1">
-                      <span class="text-zinc-600 dark:text-zinc-400">
-                        同期に使う Google アカウント（メールアドレス・任意。認可画面でこのアカウントが選ばれます）
-                      </span>
-                      <input
-                        type="email"
-                        name="drive_login_hint"
-                        value={@drive_login_hint}
-                        placeholder="sync@example.com"
-                        class="w-full sm:w-80 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs"
-                      />
-                    </label>
-                    <ol class="list-decimal pl-5 space-y-2 text-[11px] text-zinc-600 dark:text-zinc-400">
-                      <li>
-                        <a
-                          id="drive-auth-link"
-                          href={@drive_auth.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
-                        >
-                          <.icon name="hero-arrow-top-right-on-square" class="w-3.5 h-3.5" />
-                          Google の認可ページを開く（別ウィンドウ）
-                        </a>
-                        <span class="block mt-1">
-                          同期に使うアカウントでログインし、「許可」を押します。
-                        </span>
-                      </li>
-                      <li>
-                        許可すると、別ウィンドウに「このサイトにアクセスできません」などと表示されます（正常です）。そのページの<strong>アドレス</strong>（<code class="font-mono">http://localhost/?state=…&amp;code=…</code>）をコピーして、下に貼り付けます。
+                    <div class="flex flex-wrap items-end gap-2">
+                      <label class="block text-xs space-y-1">
+                        <span class="font-medium text-zinc-700 dark:text-zinc-300">Google アカウント</span>
                         <input
-                          type="text"
-                          name="drive_auth_code"
-                          id="drive-auth-code"
-                          value={@drive_auth_code}
-                          autocomplete="off"
-                          spellcheck="false"
-                          placeholder="http://localhost/?state=...&code=..."
-                          class="mt-1 w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs font-mono"
+                          type="email"
+                          name="drive_login_hint"
+                          id="drive-login-hint"
+                          value={@drive_login_hint}
+                          placeholder="sync@example.com"
+                          class="w-72 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs"
                         />
-                      </li>
-                      <li>
-                        <button
-                          type="button"
-                          id="drive-auth-finish-btn"
-                          phx-click="drive_auth_finish"
-                          class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
-                        >
-                          トークンを取得して保存
-                        </button>
-                      </li>
-                    </ol>
-                    <p class="text-[10px] text-zinc-500">
-                      OAuth クライアントは種類「デスクトップ アプリ」がおすすめです（リダイレクト URI の登録が不要）。「ウェブ アプリケーション」の場合は、承認済みのリダイレクト URI に
-                      <code class="font-mono">http://localhost</code>
-                      を登録してください。AskDrive のサーバーに Google から戻る URL は不要なので、クライアント／サーバー構成や LAN 内だけの環境でも使えます。
-                    </p>
-                  </div>
+                      </label>
+                      <%= cond do %>
+                        <% not @drive_oauth_ready? -> %>
+                          <button
+                            type="button"
+                            id="drive-connect-btn"
+                            phx-click="drive_connect_needs_client"
+                            class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm"
+                          >
+                            接続
+                          </button>
+                        <% @drive_on_server? -> %>
+                          <a
+                            id="drive-connect-btn"
+                            href={
+                              ~p"/auth/google/drive?#{[app: @app && @app.slug, loopback: "1", hint: @drive_login_hint, return_to: @base_path <> "/admin?tab=settings"]}"
+                            }
+                            class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm"
+                          >
+                            接続
+                          </a>
+                        <% true -> %>
+                          <a
+                            id="drive-connect-btn"
+                            href={@drive_auth.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm"
+                          >
+                            接続
+                          </a>
+                      <% end %>
+                      <.link
+                        :if={@account}
+                        href={
+                          ~p"/auth/google/disconnect?#{[return_to: @base_path <> "/admin?tab=settings", app: @app && @app.slug]}"
+                        }
+                        class="px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 font-medium text-xs"
+                      >
+                        連携解除
+                      </.link>
+                    </div>
 
-                  <div :if={@account} class="flex flex-wrap items-center gap-3">
-                    <.link
-                      href={
-                        ~p"/auth/google/disconnect?#{[return_to: @base_path <> "/admin?tab=settings", app: @app && @app.slug]}"
-                      }
-                      class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 font-medium text-xs transition"
+                    <p
+                      :if={@drive_oauth_ready? and @drive_on_server?}
+                      class="text-[11px] text-zinc-500"
                     >
-                      <.icon name="hero-x-circle" class="w-4 h-4" /> 連携解除
-                    </.link>
+                      「接続」を押すと Google のログイン画面に移ります。同期に使うアカウントでログインして「許可」すると、この画面に戻り、自動で保存されます。
+                    </p>
+
+                    <div
+                      :if={@drive_oauth_ready? and not @drive_on_server?}
+                      id="drive-manual-auth"
+                      class="space-y-2 p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/70 dark:border-indigo-900/60 text-[11px] text-zinc-700 dark:text-zinc-300"
+                    >
+                      <p>
+                        「接続」を押すと、別ウィンドウに Google のログイン画面が開きます。同期に使うアカウントでログインして「許可」すると、別ウィンドウに「このサイトにアクセスできません」などと表示されます（正常です）。そのページの<strong>アドレス</strong>（<code class="font-mono">http://localhost/?state=…&amp;code=…</code>）をコピーして、ここに貼り付けてください。貼り付けると自動で保存します。
+                      </p>
+                      <input
+                        type="text"
+                        name="drive_auth_code"
+                        id="drive-auth-code"
+                        value={@drive_auth_code}
+                        autocomplete="off"
+                        spellcheck="false"
+                        placeholder="http://localhost/?state=...&code=..."
+                        class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs font-mono"
+                      />
+                      <p class="text-zinc-500">
+                        AskDrive のサーバーの PC 上のブラウザ（<code class="font-mono">https://localhost:4443/</code>）で開くと、貼り付けなしで接続できます。
+                      </p>
+                    </div>
+
+                    <%!-- The OAuth client, set up once (here for this desk, or in the platform
+                          settings for every desk) --%>
+                    <details
+                      id="drive-oauth-client"
+                      open={@drive_client_open or not @drive_oauth_ready?}
+                      class="rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
+                    >
+                      <summary class="cursor-pointer px-3 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                        OAuth クライアント（初回のみ）{cond do
+                          AskDrive.Drive.OAuth.desk_drive_client?() -> "：この窓口の設定を使用中"
+                          @drive_oauth_ready? -> "：全体設定の設定を使用中"
+                          true -> "：未設定"
+                        end}
+                      </summary>
+                      <div id="drive-oauth-client-fields" class="px-3 pb-3 space-y-3">
+                        <p
+                          :if={not @drive_oauth_ready?}
+                          id="drive-oauth-client-missing"
+                          class="text-[11px] text-amber-700 dark:text-amber-300"
+                        >
+                          「接続」するには、Google の OAuth クライアント（ID とシークレット）が必要です。情報システム部門が全体設定の「Google OAuth（ログイン / Drive 同期）」に 1 つ登録すれば、すべての窓口で使えます（Google ログインは無効のままで構いません）。この窓口だけで使う場合は、下に入力してください。
+                        </p>
+                        <ol class="list-decimal pl-5 text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1">
+                          <li>
+                            <a
+                              href="https://console.cloud.google.com/apis/library/drive.googleapis.com"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="underline text-indigo-600"
+                            >Google Drive API を有効にする</a>
+                          </li>
+                          <li>
+                            <a
+                              href="https://console.cloud.google.com/apis/credentials/consent"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="underline text-indigo-600"
+                            >OAuth 同意画面</a>
+                            を作る（ユーザーの種類は「内部」）
+                          </li>
+                          <li>
+                            <a
+                              href="https://console.cloud.google.com/apis/credentials/oauthclient"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="underline text-indigo-600"
+                            >OAuth クライアント ID</a>
+                            を作る（種類は「デスクトップ アプリ」。リダイレクト URI の登録は不要）
+                          </li>
+                          <li>表示されたクライアント ID とシークレットを下に入力し、カードの一番下の「保存」を押す</li>
+                        </ol>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <.input
+                            field={@form[:drive_oauth_client_id]}
+                            type="text"
+                            label="OAuth クライアント ID"
+                            placeholder="xxxxxxxx.apps.googleusercontent.com"
+                          />
+                          <.input
+                            field={@form[:drive_oauth_client_secret]}
+                            type="password"
+                            value=""
+                            label={"OAuth クライアント シークレット（#{secret_state(@setting.drive_oauth_client_secret)}）"}
+                          />
+                        </div>
+                      </div>
+                    </details>
                   </div>
                 <% end %>
 
@@ -5290,11 +5311,15 @@ defmodule AskDriveWeb.AdminLive do
   defp assign_drive_mode(socket) do
     ready? = AskDrive.Drive.OAuth.drive_client_configured?()
     hint = socket.assigns[:drive_login_hint] || ""
+    # a browser on the server itself (opened as localhost) can be redirected straight back
+    on_server? = socket.host_uri.host in ["localhost", "127.0.0.1", "::1"]
 
     socket
     |> assign(:drive_oauth_ready?, ready?)
     |> assign(:drive_mode, socket.assigns.setting.drive_auth_mode)
     |> assign(:drive_login_hint, hint)
+    |> assign(:drive_on_server?, on_server?)
+    |> assign_new(:drive_client_open, fn -> false end)
     |> assign_new(:drive_auth_code, fn -> "" end)
     # keep an authorization in progress (its state / PKCE verifier) across refreshes
     |> assign(
@@ -5792,6 +5817,34 @@ defmodule AskDriveWeb.AdminLive do
     case form[:slug].value |> to_string() |> String.trim() |> String.downcase() do
       "" -> "（URL 名）"
       slug -> slug
+    end
+  end
+
+  defp finish_drive_auth(socket) do
+    alias AskDrive.Drive.OAuth
+    %{state: state, verifier: verifier} = socket.assigns.drive_auth
+
+    result =
+      with {:ok, code} <- OAuth.code_from_paste(socket.assigns.drive_auth_code, state),
+           {:ok, tokens} <- OAuth.exchange_manual_code(code, verifier),
+           :ok <- drive_account_allowed(tokens[:email]),
+           {:ok, account} <- Accounts.save_tokens(tokens) do
+        {:ok, account}
+      end
+
+    case result do
+      {:ok, account} ->
+        Logger.info("AdminLive: Drive sync account #{account.email} authorized by pasted code")
+
+        {:noreply,
+         socket
+         |> assign(:drive_auth_code, "")
+         |> assign(:drive_auth, OAuth.manual_authorization(socket.assigns.drive_login_hint))
+         |> put_flash(:info, "Google Drive 同期アカウント（#{account.email}）と連携しました。「同期テスト」で確認してください。")
+         |> load_dashboard_data()}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, drive_auth_error(reason))}
     end
   end
 

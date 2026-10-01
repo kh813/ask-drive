@@ -134,7 +134,9 @@ defmodule AskDriveWeb.AuthController do
   """
   def request(conn, params) do
     if OAuth.login_enabled?() do
-      start_oauth(conn, :login, params["return_to"] || "/")
+      conn
+      |> delete_session(:oauth_redirect_uri)
+      |> start_oauth(:login, params["return_to"] || "/")
     else
       conn
       |> put_flash(:error, "Google ログインは無効になっています。")
@@ -148,9 +150,24 @@ defmodule AskDriveWeb.AuthController do
   def request_drive(conn, params) do
     if drive_manager?(conn, params["app"]) do
       # The callback URL is shared by every app, so remember which app is authorizing (6.11)
+      # From a browser on the server itself, Google can come straight back to AskDrive on a
+      # loopback address (a "desktop app" OAuth client accepts any loopback port without
+      # registering it): no pasting (F-348). The address must use the host the browser is
+      # on, so the session cookie comes along.
+      redirect_uri =
+        if params["loopback"] == "1" and loopback_host?(conn.host),
+          do: "http://#{conn.host}:#{AskDrive.Network.http_port()}/auth/google/callback"
+
+      extra =
+        case String.trim(params["hint"] || "") do
+          "" -> %{}
+          hint -> %{login_hint: hint}
+        end
+
       conn
       |> put_session(:oauth_app, params["app"])
-      |> start_oauth(:drive, params["return_to"] || "/admin?tab=settings")
+      |> put_session(:oauth_redirect_uri, redirect_uri)
+      |> start_oauth(:drive, params["return_to"] || "/admin?tab=settings", extra)
     else
       not_drive_manager(conn, params["app"])
     end
@@ -179,13 +196,14 @@ defmodule AskDriveWeb.AuthController do
 
   defp desk(slug), do: AskDrive.Apps.get_by_slug(slug || "") || AskDrive.Apps.primary()
 
-  defp start_oauth(conn, flow, return_to) do
+  defp start_oauth(conn, flow, return_to, extra \\ %{}) do
     state = :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
 
     # the Drive flow uses the desk's own OAuth client when it has one (F-346)
     {client_id, url} =
       in_flow_context(conn, flow, fn ->
-        {OAuth.client(flow) |> elem(0), OAuth.authorize_url(state, callback_url(conn), flow)}
+        {OAuth.client(flow) |> elem(0),
+         OAuth.authorize_url(state, redirect_uri(conn), flow, extra)}
       end)
 
     if client_id == "" do
@@ -236,7 +254,7 @@ defmodule AskDriveWeb.AuthController do
         not_drive_manager(conn, get_session(conn, :oauth_app))
 
       true ->
-        exchange = fn -> OAuth.exchange_code(code, callback_url(conn), flow_atom(flow)) end
+        exchange = fn -> OAuth.exchange_code(code, redirect_uri(conn), flow_atom(flow)) end
 
         case in_flow_context(conn, flow, exchange) do
           {:ok, tokens} -> complete(conn, flow, tokens, return_to)
@@ -349,6 +367,7 @@ defmodule AskDriveWeb.AuthController do
     |> delete_session(:oauth_flow)
     |> delete_session(:oauth_return_to)
     |> delete_session(:oauth_app)
+    |> delete_session(:oauth_redirect_uri)
   end
 
   defp fallback_path(conn, flow) when flow in [:drive, "drive"] do
@@ -398,6 +417,12 @@ defmodule AskDriveWeb.AuthController do
   # machine, which has nothing listening on it. Whichever host ends up here must also be
   # registered as an authorized redirect URI in Google Cloud Console (it accepts more than
   # one per OAuth client, so both localhost and the LAN address can be registered together).
+  defp loopback_host?(host), do: host in ["localhost", "127.0.0.1", "::1", "[::1]"]
+
+  # the redirect URI this authorization was started with (the loopback one, F-348), else this
+  # request's own callback URL — the token exchange must name the same one
+  defp redirect_uri(conn), do: get_session(conn, :oauth_redirect_uri) || callback_url(conn)
+
   defp callback_url(conn) do
     port_suffix = if conn.port in [80, 443], do: "", else: ":#{conn.port}"
     "#{conn.scheme}://#{conn.host}#{port_suffix}/auth/google/callback"
