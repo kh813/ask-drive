@@ -139,7 +139,8 @@ defmodule AskDrive.Batch.Scheduler do
   @doc """
   What the night-window trigger will do, for the admin screen (spec F-338):
   `%{window: {start_h, end_h}, window_start: local, in_window?: bool,
-  state: :running | :done | :due | :missed, run: run | nil, next_start: local}`.
+  state: :running | :off | :done | :due | :missed, run: run | nil, next_start: local}`
+  (`:off`: this desk's automatic run is switched off, F-344).
   """
   def auto_status(now \\ AskDrive.Clock.local_now()) do
     # the window is platform-wide; the runs are this app's
@@ -171,6 +172,7 @@ defmodule AskDrive.Batch.Scheduler do
     state =
       cond do
         running_anywhere?() -> :running
+        Settings.get_setting!().auto_batch_enabled == false -> :off
         tonight -> :done
         in_window? -> :due
         true -> :missed

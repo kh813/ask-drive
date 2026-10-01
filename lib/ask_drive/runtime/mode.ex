@@ -201,7 +201,8 @@ defmodule AskDrive.Runtime.Mode do
   night's automatic one, as happened on 2026-09-28).
   """
   def nightly_due?(now \\ AskDrive.Clock.local_now()) do
-    calculate_current_mode(now) == :night_batch and
+    Settings.get_setting!().auto_batch_enabled != false and
+      calculate_current_mode(now) == :night_batch and
       not AskDrive.Batch.Scheduler.running_anywhere?() and
       not AskDrive.Batch.Scheduler.ran_since?(night_window_start_utc(now))
   end

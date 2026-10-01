@@ -508,6 +508,29 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
+  # This desk's nightly batch on / off (F-344); manual runs work either way
+  def handle_event("set_auto_batch", %{"on" => on}, socket) do
+    on? = on == "true"
+    {:ok, updated} = Settings.update_setting(socket.assigns.setting, %{auto_batch_enabled: on?})
+
+    Logger.info(
+      "AdminLive: nightly batch #{if on?, do: "enabled", else: "disabled"} for #{(socket.assigns.app && socket.assigns.app.slug) || "the primary desk"}"
+    )
+
+    {:noreply,
+     socket
+     |> assign(:setting, updated)
+     |> assign(:form, to_form(Settings.change_setting(updated)))
+     |> put_flash(
+       :info,
+       if(on?,
+         do: "夜間の自動実行をオンにしました。次の夜間枠から自動で実行します。",
+         else: "夜間の自動実行をオフにしました（手動実行はできます）。"
+       )
+     )
+     |> load_dashboard_data()}
+  end
+
   # F-1409: the same certificate again (a lost file, another device of the same person)
   def handle_event("redownload_client_cert", %{"id" => id}, socket) do
     case AskDrive.ClientCerts.redownload(
@@ -1037,6 +1060,13 @@ defmodule AskDriveWeb.AdminLive do
     item_logs = if latest_run, do: ItemLog.list_for_run(latest_run.id), else: []
     run_summaries = runs |> Enum.map(& &1.id) |> ItemLog.summaries()
     auto_status = Scheduler.auto_status()
+
+    # a desk still switched off whose Drive and AI are configured: suggest switching it on
+    setup_looks_done? =
+      auto_status.state == :off and Accounts.drive_connected?() and
+        is_nil(AskDrive.LLM.missing_api_key(:embedding)) and
+        is_nil(AskDrive.LLM.missing_api_key(:generation))
+
     # progress of the run in progress (spec F-340); the dashboard ticks every 5 s
     running_run = Enum.find(runs, &(&1.status == "running"))
 
@@ -1079,6 +1109,7 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:runs, runs)
     |> assign(:run_summaries, run_summaries)
     |> assign(:auto_status, auto_status)
+    |> assign(:setup_looks_done?, setup_looks_done?)
     |> assign(:running_run, running_run)
     |> assign(:remaining, Scheduler.remaining())
     |> assign(:client_cert_mode, AskDrive.ClientCerts.mode())
@@ -1368,10 +1399,30 @@ defmodule AskDriveWeb.AdminLive do
 
                     :missed ->
                       "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-900 dark:text-amber-200"
+
+                    :off ->
+                      "bg-zinc-50 border-zinc-200 text-zinc-700 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300"
                   end
                 ]}
               >
                 <%= case @auto_status.state do %>
+                  <% :off -> %>
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        この窓口の夜間の自動実行は<strong>オフ</strong>です（設定中）。「今すぐ実行」「取り込みのみ」は手動で実行できます。
+                        <span :if={@setup_looks_done?} id="auto-batch-ready-hint">
+                          Google Drive と AI の設定は済んでいます。準備ができたら自動実行をオンにしてください。
+                        </span>
+                      </span>
+                      <button
+                        id="auto-batch-on-btn"
+                        phx-click="set_auto_batch"
+                        phx-value-on="true"
+                        class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium"
+                      >
+                        自動実行をオンにする
+                      </button>
+                    </div>
                   <% :running -> %>
                     バッチを実行中です。<span :if={@running_progress}>
                       全体の目安 {@running_progress.overall}% ・ ステップ {@running_progress.step}/{@running_progress.steps}「{@running_progress.label}」{if @running_progress.total >
@@ -1394,6 +1445,22 @@ defmodule AskDriveWeb.AdminLive do
                     )}
                 <% end %>
               </div>
+
+              <p
+                :if={@scope == :app and @auto_status.state != :off and @setting.auto_batch_enabled}
+                class="text-[11px] text-zinc-500"
+              >
+                夜間の自動実行: オン ·
+                <button
+                  id="auto-batch-off-btn"
+                  phx-click="set_auto_batch"
+                  phx-value-on="false"
+                  data-confirm="この窓口の夜間の自動実行をオフにしますか？（手動実行はできます）"
+                  class="underline hover:text-zinc-800 dark:hover:text-zinc-200"
+                >
+                  オフにする
+                </button>
+              </p>
 
               <%= if @runs == [] do %>
                 <p class="text-xs text-zinc-500">バッチの実行履歴はまだありません。</p>
@@ -2297,6 +2364,13 @@ defmodule AskDriveWeb.AdminLive do
                           <% else %>
                             —
                           <% end %>
+                          <span
+                            :if={sum[:auto?] == false}
+                            id={"app-auto-off-#{app.slug}"}
+                            class="ml-1 px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[10px]"
+                          >
+                            自動実行: オフ（設定中）
+                          </span>
                         </td>
                         <td class="py-2 px-2 text-right whitespace-nowrap space-x-2">
                           <%!-- the app's administrators (F-1114); none = nobody can administer it --%>
@@ -4209,6 +4283,11 @@ defmodule AskDriveWeb.AdminLive do
                   class="pt-2 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3"
                 >
                   <.input
+                    field={@form[:auto_batch_enabled]}
+                    type="checkbox"
+                    label="夜間の自動実行（Google Drive の同期・取り込み・QA 生成を夜間枠に自動で行う。オフでも手動実行はできる。新しい窓口は設定中のためオフで始まる）"
+                  />
+                  <.input
                     field={@form[:maintenance_mode]}
                     type="checkbox"
                     label="メンテナンスモード（チャット画面を停止し告知を表示する）"
@@ -5368,6 +5447,7 @@ defmodule AskDriveWeb.AdminLive do
         docs: Repo.aggregate(Document, :count, :id) || 0,
         chunks: Repo.aggregate(Chunk, :count, :id) || 0,
         drive?: Accounts.drive_connected?(),
+        auto?: Settings.get_setting!().auto_batch_enabled != false,
         last_run: last
       }
     end)

@@ -47,6 +47,8 @@ defmodule AskDrive.SetupTest do
     setting = Settings.get_setting!()
     assert setting.allowed_domain == "example.com"
     assert setting.setup_completed_at
+    # the first desk is being set up: no nightly batch until it's switched on (F-344)
+    refute setting.auto_batch_enabled
     assert Apps.primary().name == "情シス相談窓口"
     # the platform administrators, also the default app's administrators (F-1116)
     assert AskDrive.Accounts.list_app_admins(Apps.primary().slug) |> Enum.map(& &1.email) ==

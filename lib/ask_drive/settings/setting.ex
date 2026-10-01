@@ -51,6 +51,8 @@ defmodule AskDrive.Settings.Setting do
     field :oauth_login_enabled, :boolean, default: true
     field :google_client_secret, Binary
     field :maintenance_mode, :boolean, default: false
+    # the nightly batch starts by itself (F-344); off while a new desk is being set up
+    field :auto_batch_enabled, :boolean, default: true
     field :maintenance_message, :string
 
     # --- Drive sync authentication (spec 6.1, F-110) ---
@@ -215,6 +217,7 @@ defmodule AskDrive.Settings.Setting do
         :chat_summary_model,
         :allowed_domain,
         :maintenance_mode,
+        :auto_batch_enabled,
         :maintenance_message,
         :drive_auth_mode,
         :drive_service_account_json,

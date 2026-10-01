@@ -202,4 +202,28 @@ defmodule AskDriveWeb.AdminBatchHistoryTest do
     assert {:error, _} = Scheduler.run_batch(trigger: "bogus")
     assert [%{status: "failed"}] = Scheduler.list_runs(5) |> Enum.filter(&(&1.status == "failed"))
   end
+
+  test "the automatic run is switched on and off from the overview (F-344)", %{conn: conn} do
+    {:ok, _} =
+      AskDrive.Settings.update_setting(AskDrive.Settings.get_setting!(), %{
+        auto_batch_enabled: false
+      })
+
+    {:ok, view, _html} = live(conn, "/it-support/admin")
+    assert has_element?(view, "#auto-batch-status", "オフ")
+    # Drive isn't connected yet: no "ready" hint
+    refute has_element?(view, "#auto-batch-ready-hint")
+
+    view |> element("#auto-batch-on-btn") |> render_click()
+    assert AskDrive.Settings.get_setting!().auto_batch_enabled
+    refute has_element?(view, "#auto-batch-on-btn")
+    assert has_element?(view, "#auto-batch-off-btn")
+
+    view |> element("#auto-batch-off-btn") |> render_click()
+    refute AskDrive.Settings.get_setting!().auto_batch_enabled
+
+    # the platform's desk list says which desks are off
+    {:ok, platform, _html} = live(conn, "/admin")
+    assert has_element?(platform, "#app-auto-off-it-support")
+  end
 end

@@ -172,7 +172,11 @@ defmodule AskDrive.Setup do
     if errors == %{} do
       {:ok, setting} =
         Apps.platform(fn ->
-          Settings.update_setting(Settings.get_setting!(), %{allowed_domain: params["domain"]})
+          # the first desk is being set up too: its nightly batch starts switched off (F-344)
+          Settings.update_setting(Settings.get_setting!(), %{
+            allowed_domain: params["domain"],
+            auto_batch_enabled: false
+          })
         end)
 
       Apps.ensure_primary!()

@@ -56,4 +56,24 @@ defmodule AskDrive.Runtime.NightlyDueTest do
     assert Mode.nightly_due?(~N[2026-09-29 06:43:00])
     refute Mode.nightly_due?(~N[2026-09-29 07:10:00])
   end
+
+  test "a desk with its automatic run switched off is never due (F-344)" do
+    {:ok, _} =
+      AskDrive.Settings.update_setting(AskDrive.Settings.get_setting!(), %{
+        auto_batch_enabled: false
+      })
+
+    refute Mode.nightly_due?(~N[2026-09-29 00:30:00])
+    assert AskDrive.Batch.Scheduler.auto_status(~N[2026-09-29 00:30:00]).state == :off
+  end
+
+  test "a new desk starts with its automatic run switched off; existing ones keep it on" do
+    assert AskDrive.Settings.get_setting!().auto_batch_enabled
+    legal = AskDrive.AppsHelper.create_app!("legal-due", "Legal")
+
+    AskDrive.Apps.with_app(legal, fn ->
+      refute AskDrive.Settings.get_setting!().auto_batch_enabled
+      refute Mode.nightly_due?(~N[2026-09-29 00:30:00])
+    end)
+  end
 end

@@ -182,6 +182,8 @@ defmodule AskDrive.Apps do
       |> Map.drop([:__meta__, :id, :inserted_at, :updated_at])
       |> Map.merge(Map.new(@per_app_blank, &{&1, nil}))
       |> Map.put(:drive_auth_mode, "service_account")
+      # a new desk is being set up: no nightly batch until its administrators switch it on
+      |> Map.put(:auto_batch_enabled, false)
 
     with_app(app, fn ->
       unless Repo.exists?(AskDrive.Settings.Setting) do
