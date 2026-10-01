@@ -4132,11 +4132,32 @@ defmodule AskDriveWeb.AdminLive do
                                   </a>
                               <% end %>
                             </div>
+
+                            <p
+                              :if={@drive_oauth_ready?}
+                              id="drive-connect-target"
+                              class="text-[11px] text-zinc-500 pt-1"
+                            >
+                              使用クライアント ID:
+                              <code class="font-mono select-all">{@drive_client_id}</code>
+                              ／ リダイレクト URI:
+                              <code class="font-mono select-all">{@drive_redirect_uri}</code>
+                            </p>
+
+                            <p
+                              :if={@drive_oauth_ready?}
+                              id="drive-redirect-mismatch-help"
+                              class="text-[11px] text-amber-700 dark:text-amber-300"
+                            >
+                              ※ Google に「エラー 400: redirect_uri_mismatch」と表示された場合は、OAuth クライアントの種類が「ウェブ アプリケーション」です。Google Cloud Console で承認済みのリダイレクト URI に
+                              <code class="font-mono select-all">{@drive_redirect_uri}</code>
+                              を追加するか、種類「デスクトップ アプリ」のクライアントを作成してください（デスクトップ アプリなら登録不要）。
+                            </p>
                           </div>
                         </div>
 
                         <%!-- Step 3 --%>
-                        <div class="flex items-start gap-3">
+                        <div id="drive-manual-auth" class="flex items-start gap-3">
                           <span class="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
                             3
                           </span>
