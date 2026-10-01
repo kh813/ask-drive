@@ -55,6 +55,7 @@ defmodule AskDriveWeb.AdminLive do
       |> assign(:peer_ip, peer_ip(socket))
       |> assign(:peer_cert, peer_cert(socket))
       |> assign(:issued_cert, nil)
+      |> assign(:drive_sync_test, nil)
       |> assign(:ldap_pending, %{})
       |> assign(:ssl_check, nil)
 
@@ -724,6 +725,12 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   @impl true
+  def handle_event("set_drive_auth_mode", %{"mode" => "oauth"}, socket)
+      when not socket.assigns.drive_oauth_ready? do
+    {:noreply,
+     put_flash(socket, :error, "OAuth は、全体設定で Google OAuth のクライアント ID / シークレットを設定すると使えます。")}
+  end
+
   def handle_event("set_drive_auth_mode", %{"mode" => mode}, socket) do
     case Settings.update_setting(socket.assigns.setting, %{drive_auth_mode: mode}) do
       {:ok, updated} ->
@@ -731,7 +738,8 @@ defmodule AskDriveWeb.AdminLive do
          socket
          |> assign(:setting, updated)
          |> assign(:form, to_form(Settings.change_setting(updated)))
-         |> assign(:service_account_test, nil)}
+         |> assign(:service_account_test, nil)
+         |> assign_drive_mode()}
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Drive 認証方式を切り替えられませんでした。")}
@@ -762,7 +770,7 @@ defmodule AskDriveWeb.AdminLive do
        put_flash(
          socket,
          :error,
-         "なりすますユーザーは組織のドメイン（@#{domain}）のアドレスを指定してください。"
+         "アクセスユーザーは組織のドメイン（@#{domain}）のアドレスを指定してください。"
        )}
     else
       save_service_account(socket, attrs)
@@ -789,6 +797,38 @@ defmodule AskDriveWeb.AdminLive do
       end
 
     {:noreply, assign(socket, :service_account_test, result)}
+  end
+
+  # A dry run of the sync (F-345): authenticate, read the folder and list what would be
+  # synced, without ingesting anything. Listing a large folder takes a while, so it's async.
+  @impl true
+  def handle_event("test_drive_sync", _params, socket) do
+    setting = socket.assigns.setting
+
+    cond do
+      not Accounts.drive_connected?() ->
+        {:noreply,
+         assign(
+           socket,
+           :drive_sync_test,
+           {:error, "先に認証（サービスアカウントの JSON キー、または OAuth の認可）を設定してください。"}
+         )}
+
+      setting.drive_folder_id in [nil, ""] ->
+        {:noreply,
+         assign(socket, :drive_sync_test, {:error, "同期するフォルダの ID / URL を入力して保存してください。"})}
+
+      true ->
+        folder_id = setting.drive_folder_id
+
+        {:noreply,
+         socket
+         |> assign(:drive_sync_test, :running)
+         |> start_async(
+           :drive_sync_test,
+           AskDrive.Apps.bind(fn -> drive_sync_dry_run(folder_id, setting) end)
+         )}
+    end
   end
 
   @impl true
@@ -954,8 +994,8 @@ defmodule AskDriveWeb.AdminLive do
          |> put_flash(
            :info,
            if(enabled,
-             do: "窓口アクセスパスワード（合言葉）を設定しました。",
-             else: "窓口アクセスパスワード（合言葉）を無効化しました。"
+             do: "窓口アクセスパスワードを設定しました。",
+             else: "窓口アクセスパスワードを無効化しました。"
            )
          )
          |> load_dashboard_data()}
@@ -972,7 +1012,7 @@ defmodule AskDriveWeb.AdminLive do
         {:noreply,
          socket
          |> assign(:setting, updated)
-         |> put_flash(:info, "窓口アクセスパスワード（合言葉）を無効化しました。")
+         |> put_flash(:info, "窓口アクセスパスワードを無効化しました。")
          |> load_dashboard_data()}
 
       {:error, reason} ->
@@ -1110,6 +1150,7 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:run_summaries, run_summaries)
     |> assign(:auto_status, auto_status)
     |> assign(:setup_looks_done?, setup_looks_done?)
+    |> assign_drive_mode()
     |> assign(:running_run, running_run)
     |> assign(:remaining, Scheduler.remaining())
     |> assign(:client_cert_mode, AskDrive.ClientCerts.mode())
@@ -3105,7 +3146,7 @@ defmodule AskDriveWeb.AdminLive do
                   組織（Google Workspace）
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  Google ログイン（SSO）と Google Drive の連携では、このドメインのアカウントだけを受け付けます。ドメイン全体の委任で「なりすますユーザー」を指定する場合も、このドメインのアドレスである必要があります。
+                  Google ログイン（SSO）と Google Drive の連携では、このドメインのアカウントだけを受け付けます。ドメイン全体の委任で「アクセスユーザー」を指定する場合も、このドメインのアドレスである必要があります。
                 </p>
               </div>
               <.form for={@form} id="org-form" phx-submit="save_settings" class="space-y-4">
@@ -3589,7 +3630,7 @@ defmodule AskDriveWeb.AdminLive do
             >
               <div>
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-user-group" class="w-5 h-5 text-indigo-600" /> 窓口の担当者（窓口管理者）
+                  <.icon name="hero-user-group" class="w-5 h-5 text-indigo-600" /> 窓口管理者
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
                   この窓口の管理画面（Drive の設定・API キーを含む）に入れるのは、ここに載っている担当者だけです（全体管理者は入れません）。担当者は各自のアカウントで本人確認して入ります。担当者を追加し、自分を外して引き継ぐこともできます（最後の 1 人は外せません）。
@@ -3676,10 +3717,10 @@ defmodule AskDriveWeb.AdminLive do
               <div class="flex items-start justify-between gap-4">
                 <div>
                   <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                    <.icon name="hero-lock-closed" class="w-5 h-5 text-indigo-600" /> 窓口アクセスパスワード（合言葉）
+                    <.icon name="hero-lock-closed" class="w-5 h-5 text-indigo-600" /> 窓口アクセスパスワード
                   </h2>
                   <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    この窓口のチャット利用を限定するための合言葉です。有効にすると、正しい合言葉を入力したユーザーのみがチャットを利用できるようになります。
+                    この窓口のチャット利用を限定するためのパスワードです。有効にすると、正しいパスワードを入力したユーザーのみがチャットを利用できるようになります。
                   </p>
                 </div>
                 <div>
@@ -3709,7 +3750,7 @@ defmodule AskDriveWeb.AdminLive do
                   field={@access_password_form[:password]}
                   type="password"
                   value=""
-                  label={"#{if @setting.access_password_enabled, do: "新しい合言葉", else: "合言葉（アクセスパスワード）"}（#{AdminAccess.min_password_length()} 文字以上）"}
+                  label={"#{if @setting.access_password_enabled, do: "新しいパスワード", else: "窓口アクセスパスワード"}（#{AdminAccess.min_password_length()} 文字以上）"}
                   autocomplete="new-password"
                   required
                 />
@@ -3729,14 +3770,14 @@ defmodule AskDriveWeb.AdminLive do
                     id="save-access-password-btn"
                     class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition whitespace-nowrap"
                   >
-                    {if @setting.access_password_enabled, do: "合言葉を変更", else: "合言葉を設定して有効化"}
+                    {if @setting.access_password_enabled, do: "パスワードを変更", else: "パスワードを設定して有効化"}
                   </button>
                   <button
                     :if={@setting.access_password_enabled}
                     type="button"
                     id="disable-access-password-btn"
                     phx-click="disable_access_password"
-                    data-confirm="合言葉による利用制限を無効化しますか？"
+                    data-confirm="窓口アクセスパスワードによる利用制限を無効化しますか？"
                     class="px-4 py-2.5 rounded-xl border border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium text-xs transition whitespace-nowrap"
                   >
                     利用制限を解除
@@ -3745,7 +3786,7 @@ defmodule AskDriveWeb.AdminLive do
               </.form>
             </div>
 
-            <%!-- Card 2: Google Drive Sync Authentication --%>
+            <%!-- Card 2: Google Drive sync — how to authenticate, which folder, and a test --%>
             <div
               :if={@scope == :app}
               class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
@@ -3753,7 +3794,7 @@ defmodule AskDriveWeb.AdminLive do
               <div class="flex items-center justify-between">
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                   <.icon name="hero-cloud-arrow-down" class="w-5 h-5 text-indigo-600" />
-                  Google Drive 同期認証
+                  Google Drive 同期設定
                 </h2>
                 <%= if Accounts.drive_connected?() do %>
                   <span class="text-xs px-2.5 py-1 rounded-full font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200/50">
@@ -3767,17 +3808,30 @@ defmodule AskDriveWeb.AdminLive do
               </div>
 
               <div class="flex gap-2 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 w-fit text-xs font-medium">
+                <%!-- OAuth uses the platform's Google OAuth client: without it there's nothing to
+                      authorize with, so the choice is greyed out (F-345) --%>
                 <button
                   type="button"
                   id="drive-auth-mode-oauth"
                   phx-click="set_drive_auth_mode"
                   phx-value-mode="oauth"
+                  disabled={not @drive_oauth_ready?}
+                  title={
+                    if not @drive_oauth_ready?,
+                      do: "全体設定で Google ログイン（OAuth）のクライアント ID / シークレットを設定すると使えます"
+                  }
                   class={[
                     "px-3 py-1.5 rounded-lg transition",
-                    if(@setting.drive_auth_mode == "oauth",
-                      do: "bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-100",
-                      else: "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-                    )
+                    cond do
+                      not @drive_oauth_ready? ->
+                        "text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
+
+                      @drive_mode == "oauth" ->
+                        "bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-100"
+
+                      true ->
+                        "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                    end
                   ]}
                 >
                   OAuth（専用アカウント）
@@ -3789,7 +3843,7 @@ defmodule AskDriveWeb.AdminLive do
                   phx-value-mode="service_account"
                   class={[
                     "px-3 py-1.5 rounded-lg transition",
-                    if(@setting.drive_auth_mode == "service_account",
+                    if(@drive_mode == "service_account",
                       do: "bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-100",
                       else: "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
                     )
@@ -3799,7 +3853,15 @@ defmodule AskDriveWeb.AdminLive do
                 </button>
               </div>
 
-              <%= if @setting.drive_auth_mode == "service_account" do %>
+              <p
+                :if={not @drive_oauth_ready?}
+                id="drive-oauth-unavailable"
+                class="text-[11px] text-zinc-500"
+              >
+                OAuth（専用アカウント）は、全体設定の「組織（Google Workspace）」→「Google ログイン（OAuth）」でクライアント ID / シークレットを設定すると選べます。
+              </p>
+
+              <%= if @drive_mode == "service_account" do %>
                 <p class="text-xs text-zinc-500 leading-relaxed">
                   ブラウザでの認可が不要なため、Google の redirect_uri 制限（生の IP アドレスや
                   <code
@@ -3844,7 +3906,7 @@ defmodule AskDriveWeb.AdminLive do
                   <.input
                     field={@form[:drive_impersonate_email]}
                     type="email"
-                    label="なりすますユーザー（ドメイン全体の委任・任意）"
+                    label="アクセスユーザー（ドメイン全体の委任・任意）"
                     placeholder="sync@example.com"
                   />
                   <p class="text-[11px] text-zinc-500 leading-relaxed -mt-1">
@@ -3898,7 +3960,7 @@ defmodule AskDriveWeb.AdminLive do
                   で連携してください。<br /> ※ 一般ユーザーがチャット画面で質問する際は、各自の通常アカウントで利用します。
                 </p>
 
-                <div class="flex flex-wrap items-center gap-3 pt-2">
+                <div :if={@drive_oauth_ready?} class="flex flex-wrap items-center gap-3 pt-2">
                   <.link
                     href={
                       ~p"/auth/google/drive?#{[return_to: @base_path <> "/admin?tab=settings", app: @app && @app.slug]}"
@@ -3931,6 +3993,71 @@ defmodule AskDriveWeb.AdminLive do
                   ホスト名は Google 側で拒否されます。LAN 内からの利用でこの制約を避けたい場合は上の「サービスアカウント」を選んでください。
                 </p>
               <% end %>
+
+              <%!-- Which folder to sync (moved here from the general settings form) --%>
+              <div class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3">
+                <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                  <.icon name="hero-folder" class="w-4 h-4 text-indigo-500" /> 同期するフォルダ
+                </h3>
+                <.form for={@form} id="drive-folder-form" phx-submit="save_settings" class="space-y-3">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <.input
+                      field={@form[:drive_folder_id]}
+                      type="text"
+                      label="Google Drive フォルダ ID / URL"
+                      placeholder="https://drive.google.com/drive/folders/..."
+                    />
+                    <.input
+                      field={@form[:drive_folder_name]}
+                      type="text"
+                      label="フォルダの表示名（任意）"
+                    />
+                  </div>
+                  <div class="flex flex-wrap items-center gap-3">
+                    <button
+                      type="submit"
+                      id="save-drive-folder-btn"
+                      class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                    >
+                      保存
+                    </button>
+                    <button
+                      type="button"
+                      id="test-drive-sync-btn"
+                      phx-click="test_drive_sync"
+                      disabled={@drive_sync_test == :running}
+                      class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium transition disabled:opacity-50"
+                    >
+                      {if @drive_sync_test == :running, do: "テスト中…", else: "同期テスト"}
+                    </button>
+                    <span class="text-[11px] text-zinc-500">
+                      認証とフォルダの読み取りを確認し、同期の対象になるファイルを一覧します（取り込みはしません）。
+                    </span>
+                  </div>
+                </.form>
+                <div id="drive-sync-test-result">
+                  <%= case @drive_sync_test do %>
+                    <% {:ok, %{folder: folder, count: count, sample: sample}} -> %>
+                      <div class="text-[11px] text-emerald-700 dark:text-emerald-400 space-y-1">
+                        <p>
+                          同期できます（{Accounts.drive_identity()}）。フォルダ「{folder}」の対象ファイル: {count} 件
+                        </p>
+                        <ul
+                          :if={sample != []}
+                          class="font-mono text-zinc-600 dark:text-zinc-400 list-disc pl-4"
+                        >
+                          <li :for={path <- sample}>{path}</li>
+                          <li :if={count > length(sample)} class="list-none">
+                            … ほか {count - length(sample)} 件
+                          </li>
+                        </ul>
+                      </div>
+                    <% {:error, message} -> %>
+                      <p class="text-[11px] text-red-600 dark:text-red-400">{message}</p>
+                    <% _ -> %>
+                  <% end %>
+                </div>
+              </div>
             </div>
 
             <%!-- Card 3: LLM Provider Settings --%>
@@ -4218,21 +4345,6 @@ defmodule AskDriveWeb.AdminLive do
                       placeholder={LLM.default_base_url("openai")}
                     />
                   </div>
-                </div>
-
-                <%!-- Drive & Domain Settings: per app (folder, threshold, chat) vs platform
-                      (allowed domain, nightly window) — spec 6.11 --%>
-                <div :if={@scope == :app} class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <.input
-                    field={@form[:drive_folder_id]}
-                    type="text"
-                    label="Google Drive フォルダ ID / URL (drive_folder_id)"
-                  />
-                  <.input
-                    field={@form[:drive_folder_name]}
-                    type="text"
-                    label="Drive フォルダ表示名 (drive_folder_name)"
-                  />
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -5026,6 +5138,41 @@ defmodule AskDriveWeb.AdminLive do
     """
   end
 
+  @impl true
+  def handle_async(:drive_sync_test, {:ok, result}, socket),
+    do: {:noreply, assign(socket, :drive_sync_test, result)}
+
+  def handle_async(:drive_sync_test, {:exit, reason}, socket),
+    do: {:noreply, assign(socket, :drive_sync_test, {:error, "同期テストに失敗しました: #{inspect(reason)}"})}
+
+  # Without the platform's OAuth client, OAuth can't be used: show the service account
+  # (saving it switches the desk over), whatever mode is stored (F-345)
+  defp assign_drive_mode(socket) do
+    ready? = AskDrive.Drive.OAuth.client_configured?()
+    stored = socket.assigns.setting.drive_auth_mode
+
+    socket
+    |> assign(:drive_oauth_ready?, ready?)
+    |> assign(:drive_mode, if(ready?, do: stored, else: "service_account"))
+  end
+
+  defp drive_sync_dry_run(folder_id, setting) do
+    with {:ok, folder} <- Client.get_metadata(folder_id),
+         {:ok, files} <- Client.list_files(folder_id) do
+      {:ok,
+       %{
+         folder: folder["name"],
+         count: length(files),
+         sample: files |> Enum.map(& &1["path"]) |> Enum.sort() |> Enum.take(5)
+       }}
+    else
+      {:error, "HTTP 404" <> _} -> {:error, folder_not_found_hint(setting)}
+      {:error, reason} -> {:error, "同期フォルダを読み取れませんでした: #{inspect(reason)}"}
+    end
+  rescue
+    e -> {:error, "同期テストに失敗しました: #{Exception.message(e)}"}
+  end
+
   # A token alone proves only that Google accepted the key (and the delegation). What sync
   # actually needs is read access to the folder, which is exactly what failed with a bare
   # 404 when an org-only shared drive refused the service account — so check that too.
@@ -5054,7 +5201,7 @@ defmodule AskDriveWeb.AdminLive do
   defp folder_not_found_hint(_setting) do
     "トークンは取得できましたが、同期フォルダを読み取れません（Drive は権限のないファイルを「見つからない」と返します）。" <>
       "フォルダをサービスアカウントに共有してください。社内限定の共有ドライブでサービスアカウントを追加できない場合は、" <>
-      "下の「なりすますユーザー」を設定してドメイン全体の委任を使ってください。"
+      "下の「アクセスユーザー」を設定してドメイン全体の委任を使ってください。"
   end
 
   defp service_account_client_id(%{drive_service_account_json: json})

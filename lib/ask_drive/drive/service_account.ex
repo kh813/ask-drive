@@ -199,7 +199,7 @@ defmodule AskDrive.Drive.ServiceAccount do
 
   def describe_exchange_error(_status, %{"error" => "invalid_grant"} = body, _account, subject)
       when is_binary(subject) do
-    "なりすまし先ユーザー #{subject} でトークンを取得できませんでした。Workspace 内に実在する有効な" <>
+    "アクセスユーザー #{subject} でトークンを取得できませんでした。Workspace 内に実在する有効な" <>
       "ユーザーのメールアドレスか確認してください（#{body["error_description"] || "invalid_grant"}）。"
   end
 

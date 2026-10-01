@@ -126,7 +126,7 @@ defmodule AskDriveWeb.MultiAppTest do
     assert has_element?(legal_view, "#admin-nav-link[aria-current='page']", "Manage Legal")
     refute has_element?(legal_view, "#platform-admin-nav-link[aria-current]")
     assert html =~ "Google Drive"
-    assert html =~ "窓口の担当者（窓口管理者）"
+    assert html =~ "窓口管理者"
     assert html =~ "legal-owner@example.com"
     refute html =~ "HTTPS（SSL 証明書）"
     refute html =~ "Google Secure LDAP でのログイン"

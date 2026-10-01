@@ -94,11 +94,11 @@ defmodule AskDriveWeb.AdminLiveTest do
         })
         |> render_submit()
 
-      assert html =~ "窓口アクセスパスワード（合言葉）を設定しました。"
+      assert html =~ "窓口アクセスパスワードを設定しました。"
       assert html =~ "利用制限: 有効"
 
       html = view |> element("#disable-access-password-btn") |> render_click()
-      assert html =~ "窓口アクセスパスワード（合言葉）を無効化しました。"
+      assert html =~ "窓口アクセスパスワードを無効化しました。"
       assert html =~ "利用制限: 無効"
     end
 

@@ -165,8 +165,16 @@ defmodule AskDrive.Drive.OAuth do
     _ -> get_client_id() != ""
   end
 
+  @doc """
+  Whether the platform's Google OAuth client (ID and secret) is configured — needed for Google
+  login and for a desk's Drive sync by OAuth (F-345).
+  """
+  def client_configured?, do: get_client_id() != "" and get_client_secret() != ""
+
+  # The OAuth client is the platform's (set in Platform Settings, spec F-1104), also when a
+  # desk authorizes Drive: a desk's own settings row only holds a copy taken at its creation.
   def get_client_id do
-    case AskDrive.Settings.get_setting() do
+    case AskDrive.Settings.platform_setting() do
       %{google_client_id: id} when is_binary(id) and id != "" ->
         id
 
@@ -181,7 +189,7 @@ defmodule AskDrive.Drive.OAuth do
   end
 
   def get_client_secret do
-    case AskDrive.Settings.get_setting() do
+    case AskDrive.Settings.platform_setting() do
       %{google_client_secret: secret} when is_binary(secret) and secret != "" ->
         secret
 
