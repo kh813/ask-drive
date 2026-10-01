@@ -72,6 +72,7 @@ defmodule AskDriveWeb.AdminLive do
       |> assign(:app_form, blank_app_form())
       |> assign(:show_new_app, false)
       |> assign(:last_created_app, nil)
+      |> prefill_enable_auth_admins()
 
     {:ok,
      socket
@@ -5072,6 +5073,27 @@ defmodule AskDriveWeb.AdminLive do
        do: remaining.documents + remaining.chunks + remaining.questions > 0
 
   defp resumable?(_runs, _remaining), do: false
+
+  # Switching login on (F-1308) registers administrators; offer the platform administrators
+  # named at setup, so turning it on is one click once a way to sign in exists (F-930)
+  defp prefill_enable_auth_admins(socket) do
+    emails =
+      if socket.assigns.scope == :platform and AskDriveWeb.UserAuth.auth_disabled?(),
+        do: Enum.map(Accounts.list_eligible_admins(), & &1.email),
+        else: []
+
+    if emails == [],
+      do: socket,
+      else:
+        Phoenix.Component.update(
+          socket,
+          :ac,
+          &Map.put(&1, "enable-auth-admin-email", %{
+            value: Enum.join(emails, ", "),
+            suggestions: []
+          })
+        )
+  end
 
   # --- E-mail fields completed from the directory (spec F-1115) ---------------------
 

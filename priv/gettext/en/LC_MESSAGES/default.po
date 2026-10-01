@@ -21,7 +21,7 @@ msgstr ""
 msgid "%{count} chunks indexed for search"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:283
+#: lib/ask_drive_web/components/layouts.ex:307
 #, elixir-autogen, elixir-format
 msgid "(%{minutes} min remaining)"
 msgstr ""
@@ -71,17 +71,17 @@ msgstr ""
 msgid "Actions"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:148
+#: lib/ask_drive_web/components/layouts.ex:172
 #, elixir-autogen, elixir-format
 msgid "Admin login"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:273
+#: lib/ask_drive_web/components/layouts.ex:297
 #, elixir-autogen, elixir-format
 msgid "Administrator (Elevated)"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:111
+#: lib/ask_drive_web/components/layouts.ex:135
 #, elixir-autogen, elixir-format
 msgid "All desks"
 msgstr ""
@@ -111,8 +111,8 @@ msgstr ""
 msgid "AskDrive Initial Setup"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:325
-#: lib/ask_drive_web/components/layouts.ex:340
+#: lib/ask_drive_web/components/layouts.ex:369
+#: lib/ask_drive_web/components/layouts.ex:384
 #, elixir-autogen, elixir-format
 msgid "Attempting to reconnect"
 msgstr ""
@@ -122,7 +122,7 @@ msgstr ""
 msgid "Cannot connect to %{provider}"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:123
+#: lib/ask_drive_web/components/layouts.ex:147
 #, elixir-autogen, elixir-format
 msgid "Chat"
 msgstr ""
@@ -152,7 +152,7 @@ msgstr ""
 msgid "Database updates or maintenance are in progress. Please wait a moment."
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:123
+#: lib/ask_drive_web/components/layouts.ex:147
 #, elixir-autogen, elixir-format
 msgid "Desk list"
 msgstr ""
@@ -195,12 +195,12 @@ msgstr ""
 msgid "Entering as %{email}. Identity verification required. Recorded in audit log."
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:159
+#: lib/ask_drive_web/components/layouts.ex:183
 #, elixir-autogen, elixir-format
 msgid "External AI: %{provider}"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:156
+#: lib/ask_drive_web/components/layouts.ex:180
 #, elixir-autogen, elixir-format
 msgid "External API is used for answering. Document content is sent externally."
 msgstr ""
@@ -240,7 +240,7 @@ msgstr ""
 msgid "Internal Document Knowledge Assistant"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:238
+#: lib/ask_drive_web/components/layouts.ex:262
 #, elixir-autogen, elixir-format
 msgid "Log out"
 msgstr ""
@@ -291,7 +291,7 @@ msgstr ""
 msgid "Open in Drive (p.%{page})"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:98
+#: lib/ask_drive_web/components/layouts.ex:122
 #, elixir-autogen, elixir-format
 msgid "Other desks"
 msgstr ""
@@ -301,8 +301,8 @@ msgstr ""
 msgid "Password (Google Workspace password)"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:206
-#: lib/ask_drive_web/components/layouts.ex:216
+#: lib/ask_drive_web/components/layouts.ex:230
+#: lib/ask_drive_web/components/layouts.ex:240
 #, elixir-autogen, elixir-format
 msgid "Platform Admin"
 msgstr ""
@@ -328,7 +328,7 @@ msgstr ""
 msgid "Please sign in with your email address and Google Workspace password."
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:191
+#: lib/ask_drive_web/components/layouts.ex:215
 #, elixir-autogen, elixir-format
 msgid "Release"
 msgstr ""
@@ -395,7 +395,7 @@ msgstr ""
 msgid "Sign in with Google"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:332
+#: lib/ask_drive_web/components/layouts.ex:376
 #, elixir-autogen, elixir-format
 msgid "Something went wrong!"
 msgstr ""
@@ -440,17 +440,17 @@ msgstr ""
 msgid "Unlock and start chat"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:276
+#: lib/ask_drive_web/components/layouts.ex:300
 #, elixir-autogen, elixir-format
 msgid "User"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:276
+#: lib/ask_drive_web/components/layouts.ex:300
 #, elixir-autogen, elixir-format
 msgid "User (Eligible for admin)"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:317
+#: lib/ask_drive_web/components/layouts.ex:361
 #, elixir-autogen, elixir-format
 msgid "We can't find the internet"
 msgstr ""
@@ -481,18 +481,18 @@ msgstr ""
 msgid "or"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:136
+#: lib/ask_drive_web/components/layouts.ex:160
 #, elixir-autogen, elixir-format
 msgid "Desk admin"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:135
+#: lib/ask_drive_web/components/layouts.ex:159
 #, elixir-autogen, elixir-format
 msgid "Manage %{desk}"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:176
-#: lib/ask_drive_web/components/layouts.ex:182
+#: lib/ask_drive_web/components/layouts.ex:200
+#: lib/ask_drive_web/components/layouts.ex:206
 #, elixir-autogen, elixir-format
 msgid "Admin mode"
 msgstr ""
@@ -512,7 +512,7 @@ msgstr ""
 msgid "4. Platform Administrator Email Addresses"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:68
+#: lib/ask_drive_web/components/layouts.ex:90
 #, elixir-autogen, elixir-format
 msgid "Anyone who can reach AskDrive can use Platform Admin."
 msgstr ""
@@ -527,7 +527,7 @@ msgstr ""
 msgid "Enter Platform Admin"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:66
+#: lib/ask_drive_web/components/layouts.ex:67
 #, elixir-autogen, elixir-format
 msgid "Login is turned off (guest mode)."
 msgstr ""
@@ -537,7 +537,22 @@ msgstr ""
 msgid "Set up your organization settings and administrators. This screen will remain until setup is finished."
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:73
+#: lib/ask_drive_web/components/layouts.ex:87
 #, elixir-autogen, elixir-format
 msgid "Turn on login"
+msgstr ""
+
+#: lib/ask_drive_web/components/layouts.ex:78
+#, elixir-autogen, elixir-format
+msgid "A way to sign in is set up, but anyone can still use Platform Admin. Turn login on to restrict it."
+msgstr ""
+
+#: lib/ask_drive_web/components/layouts.ex:72
+#, elixir-autogen, elixir-format
+msgid "Anyone who can reach AskDrive can use Platform Admin. It is fixed by ASK_DRIVE_DISABLE_AUTH in .env.prod: remove that line and restart."
+msgstr ""
+
+#: lib/ask_drive_web/components/layouts.ex:96
+#, elixir-autogen, elixir-format
+msgid "Set up login"
 msgstr ""

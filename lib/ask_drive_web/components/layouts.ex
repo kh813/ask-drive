@@ -49,13 +49,14 @@ defmodule AskDriveWeb.Layouts do
     assigns =
       assigns
       |> assign(:remote_provider, remote_generation_provider())
-      |> assign(:guest_mode?, AskDriveWeb.UserAuth.auth_disabled?())
+      |> assign(:guest_mode, guest_mode())
 
     ~H"""
     <%!-- Guest mode is for getting started: everyone can reach Platform Admin, so say so on
-          every screen until login is switched on (spec 6.9.6) --%>
+          every screen until login is switched on (spec F-929). Once a way to sign in is
+          set up, the banner asks to switch login on (F-930). --%>
     <div
-      :if={@guest_mode?}
+      :if={@guest_mode}
       id="guest-mode-banner"
       role="alert"
       class="bg-red-600 text-white text-xs"
@@ -65,13 +66,36 @@ defmodule AskDriveWeb.Layouts do
           <.icon name="hero-exclamation-triangle" class="w-4 h-4" />
           {gettext("Login is turned off (guest mode).")}
         </span>
-        <span>{gettext("Anyone who can reach AskDrive can use Platform Admin.")}</span>
-        <.link
-          href={~p"/admin?tab=settings" <> "#auth-settings"}
-          class="underline font-medium hover:text-red-100"
-        >
-          {gettext("Turn on login")}
-        </.link>
+        <%= case @guest_mode do %>
+          <% :env -> %>
+            <span id="guest-mode-env">
+              {gettext(
+                "Anyone who can reach AskDrive can use Platform Admin. It is fixed by ASK_DRIVE_DISABLE_AUTH in .env.prod: remove that line and restart."
+              )}
+            </span>
+          <% :ready -> %>
+            <span id="guest-mode-ready">
+              {gettext(
+                "A way to sign in is set up, but anyone can still use Platform Admin. Turn login on to restrict it."
+              )}
+            </span>
+            <.link
+              href={~p"/admin?tab=settings" <> "#auth-settings"}
+              id="guest-mode-enable-link"
+              class="px-2.5 py-0.5 rounded-md bg-white text-red-700 font-semibold hover:bg-red-50"
+            >
+              {gettext("Turn on login")}
+            </.link>
+          <% _ -> %>
+            <span>{gettext("Anyone who can reach AskDrive can use Platform Admin.")}</span>
+            <.link
+              href={~p"/admin?tab=settings" <> "#org-settings"}
+              id="guest-mode-setup-link"
+              class="underline font-medium hover:text-red-100"
+            >
+              {gettext("Set up login")}
+            </.link>
+        <% end %>
       </div>
     </div>
 
@@ -285,6 +309,26 @@ defmodule AskDriveWeb.Layouts do
   end
 
   defp remaining_label(_), do: ""
+
+  # nil when login is on; otherwise :env (fixed by ASK_DRIVE_DISABLE_AUTH), :ready (a way
+  # to sign in is set up, so login can be switched on) or :no_login
+  defp guest_mode do
+    case AskDriveWeb.UserAuth.auth_mode() do
+      {:enabled, _} ->
+        nil
+
+      {:disabled, :env} ->
+        :env
+
+      {:disabled, _} ->
+        if AskDrive.Ldap.enabled?(AskDrive.Settings.platform_setting!()) or
+             AskDrive.Drive.OAuth.login_enabled?(),
+           do: :ready,
+           else: :no_login
+    end
+  rescue
+    _ -> :no_login
+  end
 
   # nil when generation stays on this machine, so the banner only appears when it matters.
   defp remote_generation_provider do

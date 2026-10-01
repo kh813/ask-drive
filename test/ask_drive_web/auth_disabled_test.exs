@@ -24,8 +24,43 @@ defmodule AskDriveWeb.AuthDisabledTest do
     assert html =~ "全体管理"
 
     # said on every screen while it lasts, with the way to turn login on
-    assert has_element?(view, "#guest-mode-banner a[href='/admin?tab=settings#auth-settings']")
+    # no way to sign in yet: the banner points at setting one up
+    assert has_element?(
+             view,
+             "#guest-mode-banner #guest-mode-setup-link[href='/admin?tab=settings#org-settings']"
+           )
+
     assert conn |> get(~p"/it-support") |> html_response(200) =~ ~s(id="guest-mode-banner")
+  end
+
+  test "with a way to sign in set up, the banner asks to turn login on, the admins ready (F-930)",
+       %{conn: conn} do
+    Application.put_env(:ask_drive, :auth_disabled_by_default, true)
+    AskDrive.LdapHelper.enable_ldap!()
+    on_exit(&AskDrive.FakeLdap.reset/0)
+    user_fixture(email: "boss@example.com", admin_eligible: true)
+    user_fixture(email: "ops@example.com", admin_eligible: true)
+
+    {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
+    assert has_element?(view, "#guest-mode-ready")
+
+    assert has_element?(
+             view,
+             "#guest-mode-enable-link[href='/admin?tab=settings#auth-settings']"
+           )
+
+    # the platform administrators named at setup are filled in: one click to turn it on
+    assert has_element?(
+             view,
+             "#enable-auth-admin-email[value='boss@example.com, ops@example.com']"
+           )
+  end
+
+  test "fixed by ASK_DRIVE_DISABLE_AUTH, the banner says where", %{conn: conn} do
+    System.put_env("ASK_DRIVE_DISABLE_AUTH", "true")
+    html = conn |> get(~p"/it-support") |> html_response(200)
+    assert html =~ ~s(id="guest-mode-env")
+    assert html =~ "ASK_DRIVE_DISABLE_AUTH"
   end
 
   test "ASK_DRIVE_DISABLE_AUTH=false restores login even when the default is on", %{
