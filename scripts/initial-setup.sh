@@ -179,11 +179,23 @@ BANNER
 
   provider_from_choice() {
     case "$1" in
+      1) echo "ollama" ;;
       2) echo "lmstudio" ;;
       3) echo "gemini" ;;
       4) echo "anthropic" ;;
       5) echo "openai" ;;
-      *) echo "ollama" ;;
+      *) echo "" ;;
+    esac
+  }
+
+  provider_label() {
+    case "$1" in
+      ollama) echo "ollama (ローカル推論)" ;;
+      lmstudio) echo "lmstudio (LM Studio ローカル)" ;;
+      gemini) echo "gemini (Google Gemini API)" ;;
+      anthropic) echo "anthropic (Anthropic Claude API)" ;;
+      openai) echo "openai (OpenAI API)" ;;
+      *) echo "$1" ;;
     esac
   }
 
@@ -215,8 +227,17 @@ BANNER
     esac
   }
 
-  read -r -p "回答生成に使うプロバイダ [1-5] (既定: 1): " GEN_CHOICE
-  LLM_PROVIDER="$(provider_from_choice "${GEN_CHOICE:-1}")"
+  while true; do
+    read -r -p "回答生成に使うプロバイダ [1-5] (既定: 1): " GEN_CHOICE
+    GEN_CHOICE="${GEN_CHOICE:-1}"
+    LLM_PROVIDER="$(provider_from_choice "${GEN_CHOICE}")"
+    if [[ -n "${LLM_PROVIDER}" ]]; then
+      echo -e "  -> 選択: ${GREEN}$(provider_label "${LLM_PROVIDER}")${NC}"
+      break
+    fi
+    echo -e "${RED}1 〜 5 の番号を入力してください（1: ollama, 2: lmstudio, 3: gemini, 4: anthropic, 5: openai）。${NC}"
+  done
+
   DEFAULT_GEN_MODEL="$(default_gen_model_for "${LLM_PROVIDER}")"
   read -r -p "生成モデル名 (既定: ${DEFAULT_GEN_MODEL:-ロード中のモデル}): " LLM_MODEL
   LLM_MODEL="${LLM_MODEL:-${DEFAULT_GEN_MODEL}}"
@@ -234,12 +255,22 @@ BANNER
   echo ""
   echo "  ※ 埋め込みは Claude API 非対応のため選択肢から除外されます。"
   echo "  ※ 埋め込みを後から変更すると、全ドキュメントの再インデックスが必要です。"
-  read -r -p "埋め込みに使うプロバイダ [1,2,3,5] (既定: ${DEFAULT_EMB_CHOICE}): " EMB_CHOICE
-  EMBED_PROVIDER="$(provider_from_choice "${EMB_CHOICE:-${DEFAULT_EMB_CHOICE}}")"
-  if [[ "${EMBED_PROVIDER}" == "anthropic" ]]; then
-    echo -e "${YELLOW}Claude API は埋め込みに対応していません。ollama を使用します。${NC}"
-    EMBED_PROVIDER="ollama"
-  fi
+
+  while true; do
+    read -r -p "埋め込みに使うプロバイダ [1,2,3,5] (既定: ${DEFAULT_EMB_CHOICE}): " EMB_CHOICE
+    EMB_CHOICE="${EMB_CHOICE:-${DEFAULT_EMB_CHOICE}}"
+    if [[ "${EMB_CHOICE}" == "4" ]]; then
+      echo -e "${YELLOW}Claude API は埋め込みに対応していません。1, 2, 3, 5 のいずれかを選択してください。${NC}"
+      continue
+    fi
+    EMBED_PROVIDER="$(provider_from_choice "${EMB_CHOICE}")"
+    if [[ -n "${EMBED_PROVIDER}" && "${EMBED_PROVIDER}" != "anthropic" ]]; then
+      echo -e "  -> 選択: ${GREEN}$(provider_label "${EMBED_PROVIDER}")${NC}"
+      break
+    fi
+    echo -e "${RED}1, 2, 3, 5 のいずれかの番号を入力してください。${NC}"
+  done
+
   DEFAULT_EMBED_MODEL="$(default_embed_model_for "${EMBED_PROVIDER}")"
   read -r -p "埋め込みモデル名 (既定: ${DEFAULT_EMBED_MODEL}): " EMBED_MODEL
   EMBED_MODEL="${EMBED_MODEL:-${DEFAULT_EMBED_MODEL}}"
