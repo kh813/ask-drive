@@ -156,7 +156,7 @@ Anthropic API キー: ********
 | `./app.sh status` | Ollama, アプリ, 常駐サービス（launchd / systemd）, HTTP エンドポイントの稼働状態を表示 |
 | `./app.sh setup` | 初回環境構築・DB 初期化・リリースビルド |
 | `./app.sh deploy` | 最新コードの依存関係更新・マイグレーション・再ビルド・再起動。常駐サービス（launchd / systemd）として登録済みならサービスを再起動（停止中なら起動）し、未登録ならフォアグラウンドで起動します |
-| `./app.sh update` | Git リモートから最新版へ自己アップデート（確認ダイアログ付き） |
+| `./app.sh update` | 最新版へ自己アップデート（確認ダイアログ付き）。Git 環境は git pull、ZIP 展開環境は GitHub Release の ZIP を展開します。ZIP 展開環境では、新しいリリースで削除されたソースファイル（`lib`・`config`・`priv/repo`・`priv/gettext`・`assets/js`・`assets/css`・`scripts` 内）を、リリースに同梱のファイル一覧（`RELEASE_MANIFEST`）に基づいて削除します（`.env.prod`・DB・証明書には触れません） |
 | `./app.sh update --yes` | 確認なしで最新版へ自己アップデート |
 | `./app.sh update --ver <tag/hash>` | 指定バージョン（タグやコミット）へアップデートまたはロールバック |
 | `./app.sh service install` | 常駐サービスを登録（macOS: launchd / Linux: systemd。Linux は sudo が必要） |

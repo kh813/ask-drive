@@ -36,6 +36,20 @@ set -a
 source "${SCRIPT_DIR}/.env.prod"
 set +a
 
+# 1b. ZIP で更新した環境: 新しいリリースで削除されたファイルを消す
+# unzip は上書きするだけなので、リリースから消えたソース（例: 廃止した mix タスク）が残り、
+# コンパイルされて警告やエラーになる。リリースに同梱のファイル一覧（RELEASE_MANIFEST）にない
+# ファイルを、アプリのソースのディレクトリに限って削除する（.env.prod・DB・証明書などには触れない）。
+if [[ ! -d "${SCRIPT_DIR}/.git" && -f "${SCRIPT_DIR}/RELEASE_MANIFEST" ]]; then
+  for dir in lib config priv/repo priv/gettext assets/js assets/css scripts; do
+    [[ -d "${SCRIPT_DIR}/${dir}" ]] || continue
+    find "${dir}" -type f | sort | comm -23 - "${SCRIPT_DIR}/RELEASE_MANIFEST" | while IFS= read -r stale; do
+      echo -e "${YELLOW}  リリースから削除されたファイルを削除: ${stale}${NC}"
+      rm -f "${SCRIPT_DIR:?}/${stale:?}"
+    done
+  done
+fi
+
 # 2. 依存関係の更新
 echo -e "\n${YELLOW}[1/4] 依存関係の取得中...${NC}"
 mix local.hex --force || true
