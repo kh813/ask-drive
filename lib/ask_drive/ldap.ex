@@ -14,9 +14,14 @@ defmodule AskDrive.Ldap do
   no password as an *unauthenticated* bind, which succeeds (RFC 4513 §5.1.2).
 
   Note: a password bind does not go through Google's 2-step verification.
+
+  To answer faster (F-1311), the user's directory entry is cached so a later sign-in skips
+  the search, the TLS session is resumed, and — for signing in only (`remember: true`) — a
+  verified password is remembered for 24 hours (`AskDrive.Ldap.Cache`).
   """
 
   require Logger
+  alias AskDrive.Ldap.Cache
   alias AskDrive.Settings.Setting
 
   @timeout 10_000
@@ -47,33 +52,111 @@ defmodule AskDrive.Ldap do
   or `{:error, {:unavailable, message}}` when the directory can't be reached or refuses the
   client (certificate, permissions).
   """
-  def authenticate(%Setting{} = setting, email, password) do
+  #
+  # `remember: true` (signing in, not entering an admin screen) answers from the 24-hour
+  # password cache when the same password was verified before, and fills it on success.
+  def authenticate(%Setting{} = setting, email, password, opts \\ []) do
     email = email |> to_string() |> String.trim() |> String.downcase()
     password = to_string(password)
+    remember? = Keyword.get(opts, :remember, false)
+    fp = fingerprint(setting)
+    usable? = enabled?(setting) and email != "" and password != ""
+    remembered = if usable? and remember?, do: Cache.verified(fp, email, password)
 
     cond do
-      not enabled?(setting) -> {:error, {:unavailable, "LDAP ログインが設定されていません"}}
-      email == "" or password == "" -> {:error, :invalid_credentials}
-      true -> with_connection(setting, &verify(&1, &2, setting, email, password))
+      not enabled?(setting) ->
+        {:error, {:unavailable, "LDAP ログインが設定されていません"}}
+
+      not usable? ->
+        {:error, :invalid_credentials}
+
+      remembered ->
+        {:ok, remembered}
+
+      true ->
+        case with_connection(setting, &verify(&1, &2, setting, fp, email, password)) do
+          {:ok, result} ->
+            if remember?, do: Cache.put_verified(fp, email, password, result)
+            {:ok, result}
+
+          {:error, :invalid_credentials} = error ->
+            Cache.drop_verified(fp, email)
+            error
+
+          other ->
+            other
+        end
     end
   end
 
-  defp verify(client, handle, setting, email, password) do
-    with :ok <- service_bind(client, handle, setting),
-         {:ok, entry} <- find_user(client, handle, setting, email) do
-      case client.bind(handle, entry.dn, password) do
-        :ok ->
-          {:ok, %{email: mail_of(entry, email), name: name_of(entry)}}
+  # With the entry cached from an earlier sign-in, bind straight away; if that fails, the
+  # entry may be stale (a renamed user), so look the user up again — binding a second time
+  # only when the directory now names a different DN.
+  defp verify(client, handle, setting, fp, email, password) do
+    with :ok <- service_bind(client, handle, setting) do
+      case Cache.entry(fp, email) do
+        nil ->
+          verify_found(client, handle, setting, fp, email, password)
 
-        {:error, :invalidCredentials} ->
-          {:error, :invalid_credentials}
+        cached ->
+          case bind_as(client, handle, cached, email, password) do
+            {:ok, _} = ok ->
+              ok
 
-        {:error, reason} ->
-          # e.g. the client lacks "verify user credentials", or the account is suspended
-          Logger.warning("LDAP bind as #{entry.dn} failed: #{inspect(reason)}")
-          {:error, :invalid_credentials}
+            {:error, :invalid_credentials} = error ->
+              Cache.drop_entry(fp, email)
+
+              case find_user(client, handle, setting, email) do
+                {:ok, %{dn: dn} = entry} when dn != cached.dn ->
+                  Cache.put_entry(fp, email, entry)
+                  bind_as(client, handle, entry, email, password)
+
+                {:ok, entry} ->
+                  Cache.put_entry(fp, email, entry)
+                  error
+
+                other ->
+                  other
+              end
+          end
       end
     end
+  end
+
+  defp verify_found(client, handle, setting, fp, email, password) do
+    with {:ok, entry} <- find_user(client, handle, setting, email) do
+      Cache.put_entry(fp, email, entry)
+      bind_as(client, handle, entry, email, password)
+    end
+  end
+
+  defp bind_as(client, handle, entry, email, password) do
+    case client.bind(handle, entry.dn, password) do
+      :ok ->
+        {:ok, %{email: mail_of(entry, email), name: name_of(entry)}}
+
+      {:error, :invalidCredentials} ->
+        {:error, :invalid_credentials}
+
+      {:error, reason} ->
+        # e.g. the client lacks "verify user credentials", or the account is suspended
+        Logger.warning("LDAP bind as #{entry.dn} failed: #{inspect(reason)}")
+        {:error, :invalid_credentials}
+    end
+  end
+
+  # which directory, as whom: a change makes every cached entry stale
+  defp fingerprint(setting) do
+    [
+      host(setting),
+      to_string(port(setting)),
+      base_dn(setting) || "",
+      setting.ldap_client_cert || "",
+      setting.ldap_bind_dn || ""
+    ]
+    |> Enum.join(<<0>>)
+    |> then(&:crypto.hash(:sha256, &1))
+    |> binary_part(0, 12)
   end
 
   defp service_bind(client, handle, setting) do
@@ -234,7 +317,10 @@ defmodule AskDrive.Ldap do
          customize_hostname_check: [
            match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
          ],
-         versions: [:"tlsv1.3", :"tlsv1.2"]
+         versions: [:"tlsv1.3", :"tlsv1.2"],
+         # resume the TLS session on the next connection (shorter handshake, F-1311)
+         session_tickets: :auto,
+         reuse_sessions: true
        ]}
     end
   end

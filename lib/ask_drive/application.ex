@@ -24,6 +24,8 @@ defmodule AskDrive.Application do
         AskDrive.Apps.Repos,
         AskDrive.LLM.Semaphore,
         AskDrive.Drive.ServiceAccount,
+        # Secure LDAP sign-in caches, in memory (spec F-1311)
+        AskDrive.Ldap.Cache,
         AskDrive.HealthCheck,
         AskDrive.Runtime.Mode,
         AskDrive.LLM.OllamaModels,

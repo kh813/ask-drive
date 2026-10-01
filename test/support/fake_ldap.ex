@@ -14,6 +14,8 @@ defmodule AskDrive.FakeLdap do
   def reset do
     put_users(%{})
     put_mode(:ok)
+    # the sign-in caches (F-1311) outlive a test otherwise
+    AskDrive.Ldap.Cache.clear()
   end
 
   defp users, do: :persistent_term.get({__MODULE__, :users}, %{})

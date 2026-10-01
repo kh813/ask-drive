@@ -67,7 +67,8 @@ defmodule AskDriveWeb.AuthController do
         )
 
       true ->
-        case Ldap.authenticate(setting, email, password) do
+        # signing in may answer from the 24-hour cache (F-1311); admin screens never do
+        case Ldap.authenticate(setting, email, password, remember: true) do
           {:ok, %{email: verified, name: name}} ->
             LoginThrottle.clear(email)
             finish_password_login(conn, %{email: verified, name: name})

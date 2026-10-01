@@ -28,6 +28,108 @@ defmodule AskDrive.LdapTest do
     assert sslopts[:cacerts] != []
   end
 
+  describe "faster sign-in (F-1311)" do
+    defp flush_ldap do
+      receive do
+        {:ldap, _, _} -> flush_ldap()
+      after
+        0 -> :ok
+      end
+    end
+
+    test "the directory entry is cached: a second sign-in skips the search" do
+      {setting, _} = enable_ldap!()
+      assert {:ok, _} = Ldap.authenticate(setting, "taro@example.com", "correct-horse")
+      assert_received {:ldap, :search, _}
+      flush_ldap()
+
+      assert {:ok, %{name: "山田 太郎"}} =
+               Ldap.authenticate(setting, "taro@example.com", "correct-horse")
+
+      refute_received {:ldap, :search, _}
+      assert_received {:ldap, :bind, {"uid=taro,ou=Users,dc=example,dc=com", "correct-horse"}}
+
+      # a wrong password: one bind, then a look-up to rule out a stale entry, no second bind
+      flush_ldap()
+      assert {:error, :invalid_credentials} = Ldap.authenticate(setting, "taro@example.com", "x")
+      assert_received {:ldap, :bind, {_, "x"}}
+      assert_received {:ldap, :search, _}
+      refute_received {:ldap, :bind, {_, "x"}}
+    end
+
+    test "a moved user (new DN) still signs in with a stale cached entry" do
+      {setting, _} = enable_ldap!()
+      assert {:ok, _} = Ldap.authenticate(setting, "taro@example.com", "correct-horse")
+
+      FakeLdap.put_users(%{
+        "taro@example.com" => %{user() | dn: "uid=taro,ou=Moved,dc=example,dc=com"}
+      })
+
+      assert {:ok, _} = Ldap.authenticate(setting, "taro@example.com", "correct-horse")
+    end
+
+    test "with remember: a verified password answers for 24 hours without the directory" do
+      {setting, _} = enable_ldap!()
+
+      assert {:ok, %{email: "taro@example.com"}} =
+               Ldap.authenticate(setting, "taro@example.com", "correct-horse", remember: true)
+
+      flush_ldap()
+
+      assert {:ok, %{name: "山田 太郎"}} =
+               Ldap.authenticate(setting, "taro@example.com", "correct-horse", remember: true)
+
+      refute_received {:ldap, :open, _}
+
+      # another password goes to the directory; without remember (admin screens) always
+      assert {:error, :invalid_credentials} =
+               Ldap.authenticate(setting, "taro@example.com", "other", remember: true)
+
+      assert_received {:ldap, :open, _}
+      flush_ldap()
+      assert {:ok, _} = Ldap.authenticate(setting, "taro@example.com", "correct-horse")
+      assert_received {:ldap, :open, _}
+    end
+
+    test "a failed password drops the remembered one; the LDAP settings changing does too" do
+      {setting, _} = enable_ldap!()
+
+      assert {:ok, _} =
+               Ldap.authenticate(setting, "taro@example.com", "correct-horse", remember: true)
+
+      # suspended in Google Workspace and the next directory check fails: no more cache hits
+      FakeLdap.put_users(%{})
+
+      assert {:error, :invalid_credentials} =
+               Ldap.authenticate(setting, "taro@example.com", "x", remember: true)
+
+      flush_ldap()
+
+      assert {:error, :invalid_credentials} =
+               Ldap.authenticate(setting, "taro@example.com", "correct-horse", remember: true)
+
+      assert_received {:ldap, :open, _}
+
+      # a different base DN: the cached entries don't apply
+      FakeLdap.put_users(%{"taro@example.com" => user()})
+
+      assert {:ok, _} =
+               Ldap.authenticate(setting, "taro@example.com", "correct-horse", remember: true)
+
+      flush_ldap()
+      other = %{setting | ldap_base_dn: "dc=other,dc=com"}
+      Ldap.authenticate(other, "taro@example.com", "correct-horse", remember: true)
+      assert_received {:ldap, :open, _}
+    end
+
+    test "the TLS session is resumed on the next connection" do
+      {setting, _} = enable_ldap!()
+      {:ok, opts} = Ldap.sslopts(setting)
+      assert opts[:session_tickets] == :auto
+      assert opts[:reuse_sessions] == true
+    end
+  end
+
   test "a wrong password and an unknown user get the same answer" do
     {setting, _} = enable_ldap!()
     assert {:error, :invalid_credentials} = Ldap.authenticate(setting, "taro@example.com", "nope")
