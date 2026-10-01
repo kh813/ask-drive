@@ -112,9 +112,11 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
 
     defp query(url), do: url |> URI.parse() |> Map.get(:query) |> URI.decode_query()
 
-    test "from another PC: 接続 opens Google in a new window (localhost, PKCE, the account) and the pasted address is saved",
+    test "from another PC by IP address: 接続 opens Google in a new window (localhost, PKCE, the account) and the pasted address is saved",
          %{conn: conn} do
+      conn = %{conn | host: "192.168.1.10"}
       {:ok, view, html} = live(conn, "/it-support/admin?tab=settings")
+      assert has_element?(view, "#drive-connect-target", "http://localhost")
       assert html =~ "Google アカウント認証"
       assert has_element?(view, "#drive-connect-btn[target='_blank']")
       assert has_element?(view, "#drive-manual-auth")
@@ -170,6 +172,19 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
       assert q["redirect_uri"] =~ ~r{^http://localhost:\d+/auth/google/callback$}
       assert q["login_hint"] == "sync@example.com"
       assert q["client_id"] == "desk.apps.googleusercontent.com"
+    end
+
+    test "from another PC by a host name Google accepts: Google comes back to that host, no pasting (F-350)",
+         %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
+      refute has_element?(view, "#drive-manual-auth")
+      assert has_element?(view, "#drive-connect-target", "www.example.com/auth/google/callback")
+      assert has_element?(view, "#drive-connect-target", "desk.apps.googleusercontent.com")
+
+      href = connect_href(view)
+      assert query(href)["loopback"] == "0"
+      location = conn |> get(href) |> redirected_to()
+      assert query(location)["redirect_uri"] == "http://www.example.com/auth/google/callback"
     end
 
     test "without an OAuth client, 接続 opens the one-time client section and says what's needed",

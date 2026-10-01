@@ -4006,11 +4006,11 @@ defmodule AskDriveWeb.AdminLive do
                           >
                             接続
                           </button>
-                        <% @drive_on_server? -> %>
+                        <% @drive_redirect_mode in [:loopback, :host] -> %>
                           <a
                             id="drive-connect-btn"
                             href={
-                              ~p"/auth/google/drive?#{[app: @app && @app.slug, loopback: "1", hint: @drive_login_hint, return_to: @base_path <> "/admin?tab=settings"]}"
+                              ~p"/auth/google/drive?#{[app: @app && @app.slug, loopback: if(@drive_redirect_mode == :loopback, do: "1", else: "0"), hint: @drive_login_hint, return_to: @base_path <> "/admin?tab=settings"]}"
                             }
                             class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm"
                           >
@@ -4039,14 +4039,42 @@ defmodule AskDriveWeb.AdminLive do
                     </div>
 
                     <p
-                      :if={@drive_oauth_ready? and @drive_on_server?}
+                      :if={@drive_oauth_ready?}
+                      id="drive-connect-target"
+                      class="text-[11px] text-zinc-500"
+                    >
+                      このボタンが使う OAuth クライアント ID:
+                      <code class="font-mono select-all">{@drive_client_id}</code>
+                      ／ リダイレクト URI: <code class="font-mono select-all">{@drive_redirect_uri}</code>
+                      <span :if={@drive_redirect_mode != :loopback}>
+                        （このクライアントが「ウェブ アプリケーション」型なら、Google Cloud Console の「承認済みのリダイレクト URI」にこの URI を<strong>完全に同じ文字列で</strong>登録してください。「デスクトップ アプリ」型なら{if @drive_redirect_mode ==
+                                                                                                                                                            :paste,
+                                                                                                                                                          do:
+                                                                                                                                                            "登録は不要です",
+                                                                                                                                                          else:
+                                                                                                                                                            "このホスト名への戻りは使えないため、ウェブ アプリケーション型のクライアントを使ってください"}）
+                      </span>
+                    </p>
+
+                    <p
+                      :if={@drive_oauth_ready?}
+                      id="drive-redirect-mismatch-help"
+                      class="text-[11px] text-amber-700 dark:text-amber-300"
+                    >
+                      Google に「エラー 400: redirect_uri_mismatch」と表示された場合は、OAuth クライアントの種類が「ウェブ アプリケーション」です。Google Cloud Console でそのクライアントの「承認済みのリダイレクト URI」に
+                      <code class="font-mono select-all">{@drive_redirect_uri}</code>
+                      を追加して保存し（反映まで数分かかることがあります）、もう一度「接続」を押してください。種類「デスクトップ アプリ」のクライアントなら登録は不要です。
+                    </p>
+
+                    <p
+                      :if={@drive_oauth_ready? and @drive_redirect_mode in [:loopback, :host]}
                       class="text-[11px] text-zinc-500"
                     >
                       「接続」を押すと Google のログイン画面に移ります。同期に使うアカウントでログインして「許可」すると、この画面に戻り、自動で保存されます。
                     </p>
 
                     <div
-                      :if={@drive_oauth_ready? and not @drive_on_server?}
+                      :if={@drive_oauth_ready? and @drive_redirect_mode == :paste}
                       id="drive-manual-auth"
                       class="space-y-2 p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/70 dark:border-indigo-900/60 text-[11px] text-zinc-700 dark:text-zinc-300"
                     >
@@ -4065,11 +4093,6 @@ defmodule AskDriveWeb.AdminLive do
                       />
                       <p class="text-zinc-500">
                         AskDrive のサーバーの PC 上のブラウザ（<code class="font-mono">https://localhost:4443/</code>）で開くと、貼り付けなしで接続できます。
-                      </p>
-                      <p id="drive-redirect-mismatch-help" class="text-amber-700 dark:text-amber-300">
-                        Google に「エラー 400: redirect_uri_mismatch」と表示された場合は、OAuth クライアントの種類が「ウェブ アプリケーション」です。Google Cloud Console でそのクライアントの「承認済みのリダイレクト URI」に
-                        <code class="font-mono select-all">http://localhost</code>
-                        を追加して保存し（反映まで数分かかることがあります）、もう一度「接続」を押してください。種類「デスクトップ アプリ」のクライアントなら登録は不要です。
                       </p>
                     </div>
 
@@ -5352,6 +5375,21 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
+  # Google takes a redirect URI on a real host name (a public top-level domain), not on a
+  # bare IP address or a .local name — those need the paste instead
+  defp google_accepts_host?(host) when is_binary(host) do
+    case :inet.parse_address(String.to_charlist(host)) do
+      {:ok, _ip} ->
+        false
+
+      _ ->
+        String.contains?(host, ".") and not String.ends_with?(host, ".local") and
+          not String.ends_with?(host, ".localhost")
+    end
+  end
+
+  defp google_accepts_host?(_), do: false
+
   # the Drive sync account must belong to the organization (as for the browser flow)
   defp drive_account_allowed(email) do
     domain = Settings.platform_setting!().allowed_domain
@@ -5388,14 +5426,39 @@ defmodule AskDriveWeb.AdminLive do
   defp assign_drive_mode(socket) do
     ready? = AskDrive.Drive.OAuth.drive_client_configured?()
     hint = socket.assigns[:drive_login_hint] || ""
-    # a browser on the server itself (opened as localhost) can be redirected straight back
-    on_server? = socket.host_uri.host in ["localhost", "127.0.0.1", "::1"]
+    # How Google comes back after 接続 (F-348, F-350): to AskDrive itself when the browser
+    # is on the server (loopback) or uses a host name Google accepts; otherwise to the
+    # browser's own localhost, and the address is pasted.
+    %{host: host, port: port, scheme: scheme} = socket.host_uri
+    on_server? = host in ["localhost", "127.0.0.1", "::1"]
+
+    redirect_mode =
+      cond do
+        on_server? -> :loopback
+        google_accepts_host?(host) -> :host
+        true -> :paste
+      end
+
+    redirect_uri =
+      case redirect_mode do
+        :loopback ->
+          "http://#{host}:#{AskDrive.Network.http_port()}/auth/google/callback"
+
+        :host ->
+          "#{scheme}://#{host}#{if port in [80, 443], do: "", else: ":#{port}"}/auth/google/callback"
+
+        :paste ->
+          AskDrive.Drive.OAuth.manual_redirect_uri()
+      end
 
     socket
     |> assign(:drive_oauth_ready?, ready?)
     |> assign(:drive_mode, socket.assigns.setting.drive_auth_mode)
     |> assign(:drive_login_hint, hint)
     |> assign(:drive_on_server?, on_server?)
+    |> assign(:drive_redirect_mode, redirect_mode)
+    |> assign(:drive_redirect_uri, redirect_uri)
+    |> assign(:drive_client_id, elem(AskDrive.Drive.OAuth.drive_client(), 0))
     |> assign_new(:drive_client_open, fn -> false end)
     |> assign_new(:oauth_client_test, fn -> %{} end)
     |> assign_new(:drive_auth_code, fn -> "" end)
