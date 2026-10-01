@@ -740,6 +740,56 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
+  # Typing in the Drive card: the account to authorize (its hint goes into a fresh
+  # authorization URL) and the pasted address (F-347)
+  @impl true
+  def handle_event("drive_form_change", params, socket) do
+    hint = String.trim(params["drive_login_hint"] || socket.assigns[:drive_login_hint] || "")
+
+    socket =
+      if hint != socket.assigns[:drive_login_hint] and socket.assigns[:drive_oauth_ready?],
+        do:
+          socket
+          |> assign(:drive_login_hint, hint)
+          |> assign(:drive_auth, AskDrive.Drive.OAuth.manual_authorization(hint)),
+        else: socket
+
+    {:noreply,
+     assign(
+       socket,
+       :drive_auth_code,
+       params["drive_auth_code"] || socket.assigns[:drive_auth_code] || ""
+     )}
+  end
+
+  def handle_event("drive_auth_finish", _params, socket) do
+    alias AskDrive.Drive.OAuth
+    %{state: state, verifier: verifier} = socket.assigns.drive_auth
+
+    result =
+      with {:ok, code} <- OAuth.code_from_paste(socket.assigns.drive_auth_code, state),
+           {:ok, tokens} <- OAuth.exchange_manual_code(code, verifier),
+           :ok <- drive_account_allowed(tokens[:email]),
+           {:ok, account} <- Accounts.save_tokens(tokens) do
+        {:ok, account}
+      end
+
+    case result do
+      {:ok, account} ->
+        Logger.info("AdminLive: Drive sync account #{account.email} authorized by pasted code")
+
+        {:noreply,
+         socket
+         |> assign(:drive_auth_code, "")
+         |> assign(:drive_auth, OAuth.manual_authorization(socket.assigns.drive_login_hint))
+         |> put_flash(:info, "Google Drive 同期アカウント（#{account.email}）と連携しました。「同期テスト」で確認してください。")
+         |> load_dashboard_data()}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, drive_auth_error(reason))}
+    end
+  end
+
   # The Drive card's single save (F-345): the chosen mode's authentication and the folder
   @impl true
   def handle_event("save_drive_settings", %{"setting" => params}, socket) do
@@ -3831,6 +3881,7 @@ defmodule AskDriveWeb.AdminLive do
                 for={@form}
                 id="drive-settings-form"
                 phx-submit="save_drive_settings"
+                phx-change="drive_form_change"
                 class="space-y-4"
               >
                 <%= if @drive_mode == "service_account" do %>
@@ -3956,45 +4007,90 @@ defmodule AskDriveWeb.AdminLive do
                     id="drive-oauth-client-missing"
                     class="text-[11px] text-amber-700 dark:text-amber-300"
                   >
-                    OAuth クライアント ID / シークレットを保存すると、「専用 Google アカウントで認可」ボタンが表示されます。
+                    OAuth クライアント ID / シークレットを保存すると、同期に使う Google アカウントを認可する手順が表示されます。
                   </p>
 
-                  <div :if={@drive_oauth_ready?} class="flex flex-wrap items-center gap-3 pt-2">
-                    <.link
-                      href={
-                        ~p"/auth/google/drive?#{[return_to: @base_path <> "/admin?tab=settings", app: @app && @app.slug]}"
-                      }
-                      class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
-                    >
-                      <.icon name="hero-arrow-path-rounded-square" class="w-4 h-4" />
-                      {if @account, do: "専用 Google アカウントを再認可", else: "専用 Google アカウントで認可"}
-                    </.link>
-
-                    <%= if @account do %>
-                      <.link
-                        href={
-                          ~p"/auth/google/disconnect?#{[return_to: @base_path <> "/admin?tab=settings", app: @app && @app.slug]}"
-                        }
-                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 font-medium text-xs transition"
-                      >
-                        <.icon name="hero-x-circle" class="w-4 h-4" /> 連携解除
-                      </.link>
-                    <% end %>
+                  <%!-- Authorized from the administrator's own browser and finished by pasting the
+                        address Google ends on (F-347): no public URL of the server is needed --%>
+                  <div
+                    :if={@drive_oauth_ready? and @drive_auth}
+                    id="drive-manual-auth"
+                    class="space-y-3 p-3 rounded-xl border border-indigo-200/70 dark:border-indigo-900/60"
+                  >
+                    <p class="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                      {if @account,
+                        do: "同期に使う Google アカウントを認可し直す",
+                        else: "同期に使う Google アカウントを認可する"}
+                    </p>
+                    <label class="block text-[11px] space-y-1">
+                      <span class="text-zinc-600 dark:text-zinc-400">
+                        同期に使う Google アカウント（メールアドレス・任意。認可画面でこのアカウントが選ばれます）
+                      </span>
+                      <input
+                        type="email"
+                        name="drive_login_hint"
+                        value={@drive_login_hint}
+                        placeholder="sync@example.com"
+                        class="w-full sm:w-80 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs"
+                      />
+                    </label>
+                    <ol class="list-decimal pl-5 space-y-2 text-[11px] text-zinc-600 dark:text-zinc-400">
+                      <li>
+                        <a
+                          id="drive-auth-link"
+                          href={@drive_auth.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+                        >
+                          <.icon name="hero-arrow-top-right-on-square" class="w-3.5 h-3.5" />
+                          Google の認可ページを開く（別ウィンドウ）
+                        </a>
+                        <span class="block mt-1">
+                          同期に使うアカウントでログインし、「許可」を押します。
+                        </span>
+                      </li>
+                      <li>
+                        許可すると、別ウィンドウに「このサイトにアクセスできません」などと表示されます（正常です）。そのページの<strong>アドレス</strong>（<code class="font-mono">http://localhost/?state=…&amp;code=…</code>）をコピーして、下に貼り付けます。
+                        <input
+                          type="text"
+                          name="drive_auth_code"
+                          id="drive-auth-code"
+                          value={@drive_auth_code}
+                          autocomplete="off"
+                          spellcheck="false"
+                          placeholder="http://localhost/?state=...&code=..."
+                          class="mt-1 w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs font-mono"
+                        />
+                      </li>
+                      <li>
+                        <button
+                          type="button"
+                          id="drive-auth-finish-btn"
+                          phx-click="drive_auth_finish"
+                          class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+                        >
+                          トークンを取得して保存
+                        </button>
+                      </li>
+                    </ol>
+                    <p class="text-[10px] text-zinc-500">
+                      OAuth クライアントは種類「デスクトップ アプリ」がおすすめです（リダイレクト URI の登録が不要）。「ウェブ アプリケーション」の場合は、承認済みのリダイレクト URI に
+                      <code class="font-mono">http://localhost</code>
+                      を登録してください。AskDrive のサーバーに Google から戻る URL は不要なので、クライアント／サーバー構成や LAN 内だけの環境でも使えます。
+                    </p>
                   </div>
 
-                  <p class="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed pt-1">
-                    <.icon name="hero-exclamation-triangle" class="w-3.5 h-3.5 inline" />
-                    この方式は Google Cloud Console にブラウザでアクセスした URL と完全一致するリダイレクト URI の登録が必要です。生の IP アドレスや
-                    <code
-                      class="font-mono text-[10px]"
-                      phx-no-curly-interpolation
-                    >.local</code>
-                    ホスト名は Google 側で拒否されます。その場合は、リダイレクト URI に
-                    <code class="font-mono text-[10px]">https://localhost:4443/auth/google/callback</code>
-                    も登録し、AskDrive のサーバーの PC のブラウザで
-                    <code class="font-mono text-[10px]">https://localhost:4443/</code>
-                    を開いて認可してください（認可は最初の 1 回だけで、その後の同期はどこからでも動きます）。
-                  </p>
+                  <div :if={@account} class="flex flex-wrap items-center gap-3">
+                    <.link
+                      href={
+                        ~p"/auth/google/disconnect?#{[return_to: @base_path <> "/admin?tab=settings", app: @app && @app.slug]}"
+                      }
+                      class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 font-medium text-xs transition"
+                    >
+                      <.icon name="hero-x-circle" class="w-4 h-4" /> 連携解除
+                    </.link>
+                  </div>
                 <% end %>
 
                 <%!-- Which folder to sync (moved here from the general settings form) --%>
@@ -5158,11 +5254,55 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
+  # the Drive sync account must belong to the organization (as for the browser flow)
+  defp drive_account_allowed(email) do
+    domain = Settings.platform_setting!().allowed_domain
+
+    cond do
+      domain in [nil, ""] ->
+        :ok
+
+      is_binary(email) and
+          String.ends_with?(String.downcase(email), "@" <> String.downcase(domain)) ->
+        :ok
+
+      true ->
+        {:error, {:domain, domain}}
+    end
+  end
+
+  defp drive_auth_error(:no_code), do: "認可コードが見つかりません。許可したあとのページのアドレスを、そのまま貼り付けてください。"
+
+  defp drive_auth_error(:state_mismatch),
+    do: "別の認可のアドレスです。この画面の「Google の認可ページを開く」から認可し直してください。"
+
+  defp drive_auth_error({:denied, reason}), do: "Google で許可されませんでした（#{reason}）。"
+
+  defp drive_auth_error({:domain, domain}),
+    do: "組織のドメイン（@#{domain}）のアカウントで認可してください。"
+
+  defp drive_auth_error(reason) when is_binary(reason),
+    do: "トークンを取得できませんでした: #{reason}（コードは一度しか使えません。期限切れの場合は認可し直してください）"
+
+  defp drive_auth_error(reason), do: "トークンを取得できませんでした: #{inspect(reason)}"
+
   # Whether this desk can authorize Drive by OAuth: its own client (F-346) or the platform's
   defp assign_drive_mode(socket) do
+    ready? = AskDrive.Drive.OAuth.drive_client_configured?()
+    hint = socket.assigns[:drive_login_hint] || ""
+
     socket
-    |> assign(:drive_oauth_ready?, AskDrive.Drive.OAuth.drive_client_configured?())
+    |> assign(:drive_oauth_ready?, ready?)
     |> assign(:drive_mode, socket.assigns.setting.drive_auth_mode)
+    |> assign(:drive_login_hint, hint)
+    |> assign_new(:drive_auth_code, fn -> "" end)
+    # keep an authorization in progress (its state / PKCE verifier) across refreshes
+    |> assign(
+      :drive_auth,
+      if(ready?,
+        do: socket.assigns[:drive_auth] || AskDrive.Drive.OAuth.manual_authorization(hint)
+      )
+    )
   end
 
   defp drive_sync_dry_run(folder_id, setting) do

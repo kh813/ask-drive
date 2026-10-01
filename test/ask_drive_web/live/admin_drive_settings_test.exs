@@ -54,7 +54,7 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
     assert Settings.get_setting!().drive_auth_mode == "oauth"
     assert has_element?(view, "#drive-settings-form #drive-oauth-client-fields")
     assert has_element?(view, "#drive-oauth-client-missing")
-    refute has_element?(view, "a[href^='/auth/google/drive']")
+    refute has_element?(view, "#drive-auth-link")
 
     view
     |> form("#drive-settings-form", %{
@@ -65,7 +65,7 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
     })
     |> render_submit()
 
-    assert has_element?(view, "a[href^='/auth/google/drive']")
+    assert has_element?(view, "#drive-auth-link")
     refute has_element?(view, "#drive-oauth-client-missing")
 
     # the platform's Google login stays unset and off
@@ -87,5 +87,86 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
     {:ok, _view, html} = live(conn, "/it-support/admin?tab=settings")
     assert html =~ "アクセスユーザー（ドメイン全体の委任・任意）"
     refute html =~ "なりすま"
+  end
+
+  describe "authorizing Drive from the administrator's own browser, by pasting (F-347)" do
+    setup %{conn: conn} do
+      {:ok, _} =
+        Settings.update_setting(Settings.get_setting!(), %{
+          drive_auth_mode: "oauth",
+          drive_oauth_client_id: "desk.apps.googleusercontent.com",
+          drive_oauth_client_secret: "desk-secret"
+        })
+
+      {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
+      %{view: view}
+    end
+
+    defp auth_url(view) do
+      view
+      |> element("#drive-auth-link")
+      |> render()
+      |> then(&Regex.run(~r{href="([^"]+)"}, &1))
+      |> List.last()
+      |> String.replace("&amp;", "&")
+      |> URI.parse()
+      |> Map.get(:query)
+      |> URI.decode_query()
+    end
+
+    test "the link asks Google to come back to localhost, offline, with PKCE and the chosen account",
+         %{view: view} do
+      q = auth_url(view)
+      assert q["client_id"] == "desk.apps.googleusercontent.com"
+      assert q["redirect_uri"] == "http://localhost"
+      assert q["access_type"] == "offline"
+      assert q["code_challenge_method"] == "S256"
+      assert q["scope"] =~ "drive.readonly"
+      refute Map.has_key?(q, "login_hint")
+
+      view
+      |> form("#drive-settings-form", %{"drive_login_hint" => "sync@example.com"})
+      |> render_change()
+
+      assert auth_url(view)["login_hint"] == "sync@example.com"
+    end
+
+    test "what's pasted is checked before asking Google", %{view: view} do
+      view |> form("#drive-settings-form", %{"drive_auth_code" => ""}) |> render_change()
+      view |> element("#drive-auth-finish-btn") |> render_click()
+      assert render(view) =~ "認可コードが見つかりません"
+
+      view
+      |> form("#drive-settings-form", %{
+        "drive_auth_code" => "http://localhost/?state=someone-else&code=abc"
+      })
+      |> render_change()
+
+      view |> element("#drive-auth-finish-btn") |> render_click()
+      assert render(view) =~ "別の認可のアドレスです"
+
+      view
+      |> form("#drive-settings-form", %{
+        "drive_auth_code" => "http://localhost/?error=access_denied"
+      })
+      |> render_change()
+
+      view |> element("#drive-auth-finish-btn") |> render_click()
+      assert render(view) =~ "Google で許可されませんでした"
+    end
+  end
+
+  test "the pasted address or the bare code both give the code" do
+    alias AskDrive.Drive.OAuth
+
+    assert OAuth.code_from_paste("http://localhost/?state=s1&code=4/0AbC&scope=x", "s1") ==
+             {:ok, "4/0AbC"}
+
+    assert OAuth.code_from_paste("  4/0AbC  ", "s1") == {:ok, "4/0AbC"}
+
+    assert OAuth.code_from_paste("http://localhost/?state=s2&code=x", "s1") ==
+             {:error, :state_mismatch}
+
+    assert OAuth.code_from_paste("http://localhost/", "s1") == {:error, :no_code}
   end
 end

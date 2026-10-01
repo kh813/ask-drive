@@ -57,16 +57,20 @@ defmodule AskDrive.Drive.OAuth do
   @doc """
   Exchanges an authorization code for access and refresh tokens.
   """
-  def exchange_code(code, redirect_uri, flow \\ :login) do
+  def exchange_code(code, redirect_uri, flow \\ :login, extra \\ %{}) do
     {client_id, client_secret} = client(flow)
 
-    params = %{
-      code: code,
-      client_id: client_id,
-      client_secret: client_secret,
-      redirect_uri: redirect_uri,
-      grant_type: "authorization_code"
-    }
+    params =
+      Map.merge(
+        %{
+          code: code,
+          client_id: client_id,
+          client_secret: client_secret,
+          redirect_uri: redirect_uri,
+          grant_type: "authorization_code"
+        },
+        extra
+      )
 
     case Req.post(@token_endpoint, form: params) do
       {:ok, %{status: 200, body: body}} ->
@@ -169,6 +173,80 @@ defmodule AskDrive.Drive.OAuth do
   rescue
     _ -> get_client_id() != ""
   end
+
+  # --- Drive sync authorized from the administrator's own browser (F-347) -------------
+  #
+  # Google sends the browser back to a loopback address on the administrator's own PC, where
+  # nothing answers: the address bar then holds the code, which is pasted into AskDrive and
+  # exchanged by the server. No public URL of the server is involved, so it works wherever
+  # the server sits (client/server, LAN only, behind a proxy). PKCE ties the code to the
+  # authorization the screen started.
+
+  @manual_redirect "http://localhost"
+
+  def manual_redirect_uri, do: @manual_redirect
+
+  @doc """
+  Starts a Drive authorization to finish by pasting: `%{url:, state:, verifier:}`.
+  `login_hint` (an e-mail) preselects the account to sync with.
+  """
+  def manual_authorization(login_hint \\ nil) do
+    state = random_token()
+    verifier = random_token() <> random_token()
+    challenge = :crypto.hash(:sha256, verifier) |> Base.url_encode64(padding: false)
+
+    params =
+      %{
+        client_id: elem(drive_client(), 0),
+        redirect_uri: @manual_redirect,
+        response_type: "code",
+        scope: Enum.join(@drive_scopes, " "),
+        state: state,
+        access_type: "offline",
+        prompt: "consent",
+        code_challenge: challenge,
+        code_challenge_method: "S256"
+      }
+      |> then(
+        &if(present?(login_hint), do: Map.put(&1, :login_hint, String.trim(login_hint)), else: &1)
+      )
+
+    %{url: @auth_endpoint <> "?" <> URI.encode_query(params), state: state, verifier: verifier}
+  end
+
+  @doc """
+  The code from what was pasted — the whole address (`http://localhost/?state=…&code=…`) or
+  the code alone. `{:ok, code}`, `{:error, :state_mismatch}` (another authorization's
+  address) or `{:error, :no_code}`; `{:error, {:denied, reason}}` when Google reports one.
+  """
+  def code_from_paste(text, state) do
+    text = text |> to_string() |> String.trim()
+
+    cond do
+      text == "" ->
+        {:error, :no_code}
+
+      String.contains?(text, "?") or String.starts_with?(text, "http") ->
+        query = text |> URI.parse() |> Map.get(:query) |> Kernel.||("") |> URI.decode_query()
+
+        cond do
+          query["error"] -> {:error, {:denied, query["error"]}}
+          query["state"] && query["state"] != state -> {:error, :state_mismatch}
+          present?(query["code"]) -> {:ok, query["code"]}
+          true -> {:error, :no_code}
+        end
+
+      true ->
+        {:ok, text}
+    end
+  end
+
+  @doc "Exchanges a pasted code for the Drive sync account's tokens (with the PKCE verifier)."
+  def exchange_manual_code(code, verifier),
+    do: exchange_code(code, @manual_redirect, :drive, %{code_verifier: verifier})
+
+  defp random_token, do: :crypto.strong_rand_bytes(24) |> Base.url_encode64(padding: false)
+  defp present?(v), do: is_binary(v) and String.trim(v) != ""
 
   @doc """
   The OAuth client for a flow: Google login uses the platform's; Drive sync uses the current
