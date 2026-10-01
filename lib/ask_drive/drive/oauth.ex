@@ -246,6 +246,52 @@ defmodule AskDrive.Drive.OAuth do
   def exchange_manual_code(code, verifier),
     do: exchange_code(code, @manual_redirect, :drive, %{code_verifier: verifier})
 
+  @doc """
+  Checks an OAuth client ID / secret without anyone signing in (F-349): the token endpoint is
+  asked to exchange a code that can't be valid. `invalid_client` means Google doesn't know
+  the ID or the secret is wrong; `invalid_grant` (the code is rejected) means the client
+  itself is fine. `:ok` or `{:error, message}`. Whether a redirect URI is registered can't be
+  told this way.
+  """
+  def test_client({id, secret}) do
+    cond do
+      not present?(id) or not present?(secret) ->
+        {:error, "クライアント ID とシークレットを入力して保存してください。"}
+
+      true ->
+        params = %{
+          code: "askdrive-connection-test",
+          client_id: String.trim(id),
+          client_secret: secret,
+          redirect_uri: @manual_redirect,
+          grant_type: "authorization_code"
+        }
+
+        case Req.post(@token_endpoint, form: params, retry: false) do
+          {:ok, %{body: %{"error" => "invalid_grant"}}} ->
+            :ok
+
+          {:ok, %{body: %{"error" => "invalid_client"} = body}} ->
+            {:error,
+             "クライアント ID またはシークレットが正しくありません（#{body["error_description"]}）。Google Cloud Console の値を確認してください。"}
+
+          {:ok, %{body: %{"error" => error} = body}} ->
+            {:error, "Google の応答: #{error}（#{body["error_description"]}）"}
+
+          {:ok, %{status: status}} ->
+            {:error, "Google の応答が想定外です（HTTP #{status}）"}
+
+          {:error, reason} ->
+            {:error, "Google に接続できません: #{inspect(reason)}"}
+        end
+    end
+  end
+
+  @doc "The redirect URIs a 「ウェブ アプリケーション」 client must have registered (F-349)."
+  def web_client_redirect_uris do
+    [@manual_redirect, "http://localhost:#{AskDrive.Network.http_port()}/auth/google/callback"]
+  end
+
   defp random_token, do: :crypto.strong_rand_bytes(24) |> Base.url_encode64(padding: false)
   defp present?(v), do: is_binary(v) and String.trim(v) != ""
 

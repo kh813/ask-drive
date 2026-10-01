@@ -198,4 +198,28 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
 
     assert OAuth.code_from_paste("http://localhost/", "s1") == {:error, :no_code}
   end
+
+  test "接続テスト for the OAuth client, and which redirect URIs a web client needs (F-349)", %{
+    conn: conn
+  } do
+    {:ok, view, html} = live(conn, ~p"/admin?tab=settings")
+    assert has_element?(view, "#oauth-settings #test-oauth-client-btn")
+    assert html =~ "http://localhost"
+    assert html =~ "/auth/google/callback"
+
+    # nothing entered yet: said without asking Google
+    view |> element("#test-oauth-client-btn") |> render_click()
+    assert render(view) =~ "クライアント ID とシークレットを入力して保存してください"
+
+    {:ok, _} =
+      Settings.update_setting(Settings.get_setting!(), %{
+        drive_auth_mode: "oauth",
+        drive_oauth_client_id: "desk.apps.googleusercontent.com",
+        drive_oauth_client_secret: "desk-secret"
+      })
+
+    {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
+    assert has_element?(view, "#test-drive-oauth-client-btn")
+    assert has_element?(view, "#drive-redirect-mismatch-help", "redirect_uri_mismatch")
+  end
 end

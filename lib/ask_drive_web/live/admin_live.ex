@@ -764,6 +764,25 @@ defmodule AskDriveWeb.AdminLive do
       else: {:noreply, socket}
   end
 
+  # 接続テスト for an OAuth client (F-349): the platform's, or the one this desk uses
+  def handle_event("test_oauth_client", %{"scope" => scope}, socket) do
+    alias AskDrive.Drive.OAuth
+
+    {key, client} =
+      if scope == "desk",
+        do: {:desk, OAuth.drive_client()},
+        else: {:platform, {OAuth.get_client_id(), OAuth.get_client_secret()}}
+
+    result =
+      case OAuth.test_client(client) do
+        :ok -> {:ok, "クライアント ID / シークレットは有効です（Google が認識しています）。"}
+        {:error, message} -> {:error, message}
+      end
+
+    {:noreply,
+     Phoenix.Component.update(socket, :oauth_client_test, &Map.put(&1 || %{}, key, result))}
+  end
+
   # 接続 without an OAuth client: open its section and say what's needed
   def handle_event("drive_connect_needs_client", _params, socket) do
     {:noreply,
@@ -3246,14 +3265,19 @@ defmodule AskDriveWeb.AdminLive do
                         placeholder="例: GOCSPX-xxxxxxxxxxxx"
                       />
                     </div>
-                    <p class="text-xs text-zinc-500">
-                      Google Cloud Console に登録する「承認済みのリダイレクト URI」:
-                      <span class="font-mono text-indigo-600 dark:text-indigo-400 select-all">
-                        https://&lt;ホスト名&gt;:{AskDrive.SSL.https_port()}/auth/google/callback
-                      </span>
-                    </p>
+                    <.redirect_uri_help />
                   </div>
-                  <div class="flex justify-end">
+                  <div class="flex flex-wrap items-center justify-end gap-3">
+                    <.client_test_result result={@oauth_client_test[:platform]} />
+                    <button
+                      type="button"
+                      id="test-oauth-client-btn"
+                      phx-click="test_oauth_client"
+                      phx-value-scope="platform"
+                      class="px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium transition"
+                    >
+                      接続テスト
+                    </button>
                     <button
                       type="submit"
                       id="save-oauth-btn"
@@ -4042,6 +4066,11 @@ defmodule AskDriveWeb.AdminLive do
                       <p class="text-zinc-500">
                         AskDrive のサーバーの PC 上のブラウザ（<code class="font-mono">https://localhost:4443/</code>）で開くと、貼り付けなしで接続できます。
                       </p>
+                      <p id="drive-redirect-mismatch-help" class="text-amber-700 dark:text-amber-300">
+                        Google に「エラー 400: redirect_uri_mismatch」と表示された場合は、OAuth クライアントの種類が「ウェブ アプリケーション」です。Google Cloud Console でそのクライアントの「承認済みのリダイレクト URI」に
+                        <code class="font-mono select-all">http://localhost</code>
+                        を追加して保存し（反映まで数分かかることがあります）、もう一度「接続」を押してください。種類「デスクトップ アプリ」のクライアントなら登録は不要です。
+                      </p>
                     </div>
 
                     <%!-- The OAuth client, set up once (here for this desk, or in the platform
@@ -4108,6 +4137,19 @@ defmodule AskDriveWeb.AdminLive do
                             value=""
                             label={"OAuth クライアント シークレット（#{secret_state(@setting.drive_oauth_client_secret)}）"}
                           />
+                        </div>
+                        <.redirect_uri_help />
+                        <div class="flex flex-wrap items-center gap-3">
+                          <button
+                            type="button"
+                            id="test-drive-oauth-client-btn"
+                            phx-click="test_oauth_client"
+                            phx-value-scope="desk"
+                            class="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium"
+                          >
+                            接続テスト（使用中のクライアント）
+                          </button>
+                          <.client_test_result result={@oauth_client_test[:desk]} />
                         </div>
                       </div>
                     </details>
@@ -5266,6 +5308,41 @@ defmodule AskDriveWeb.AdminLive do
   def handle_async(:drive_sync_test, {:exit, reason}, socket),
     do: {:noreply, assign(socket, :drive_sync_test, {:error, "同期テストに失敗しました: #{inspect(reason)}"})}
 
+  # Which redirect URIs a 「ウェブ アプリケーション」 client needs (F-349); a 「デスクトップ
+  # アプリ」 client needs none for Drive sync
+  defp redirect_uri_help(assigns) do
+    ~H"""
+    <div class="text-[11px] text-zinc-500 space-y-1">
+      <p>
+        Drive 同期だけなら、種類「デスクトップ アプリ」のクライアントがおすすめです（リダイレクト URI の登録は不要）。種類が「ウェブ アプリケーション」の場合は、「承認済みのリダイレクト URI」に次を登録してください:
+      </p>
+      <ul class="list-disc pl-5 font-mono text-indigo-600 dark:text-indigo-400">
+        <li :for={uri <- AskDrive.Drive.OAuth.web_client_redirect_uris()} class="select-all">
+          {uri}
+        </li>
+        <li class="select-all">
+          https://&lt;ホスト名&gt;:{AskDrive.SSL.https_port()}/auth/google/callback
+          <span class="font-sans text-zinc-500">（Google ログインを使う場合）</span>
+        </li>
+      </ul>
+    </div>
+    """
+  end
+
+  attr :result, :any, default: nil
+
+  defp client_test_result(assigns) do
+    ~H"""
+    <%= case @result do %>
+      <% {:ok, message} -> %>
+        <span class="text-[11px] text-emerald-600 dark:text-emerald-400">{message}</span>
+      <% {:error, message} -> %>
+        <span class="text-[11px] text-red-600 dark:text-red-400">{message}</span>
+      <% _ -> %>
+    <% end %>
+    """
+  end
+
   # Takes the settings so the badge re-renders when they're saved (LiveView tracks assigns)
   defp oauth_status(_setting) do
     cond do
@@ -5320,6 +5397,7 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:drive_login_hint, hint)
     |> assign(:drive_on_server?, on_server?)
     |> assign_new(:drive_client_open, fn -> false end)
+    |> assign_new(:oauth_client_test, fn -> %{} end)
     |> assign_new(:drive_auth_code, fn -> "" end)
     # keep an authorization in progress (its state / PKCE verifier) across refreshes
     |> assign(
