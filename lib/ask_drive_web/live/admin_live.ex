@@ -4079,7 +4079,7 @@ defmodule AskDriveWeb.AdminLive do
                       class="space-y-2 p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/70 dark:border-indigo-900/60 text-[11px] text-zinc-700 dark:text-zinc-300"
                     >
                       <p>
-                        「接続」を押すと、別ウィンドウに Google のログイン画面が開きます。同期に使うアカウントでログインして「許可」すると、別ウィンドウに「このサイトにアクセスできません」などと表示されます（正常です）。そのページの<strong>アドレス</strong>（<code class="font-mono">http://localhost/?state=…&amp;code=…</code>）をコピーして、ここに貼り付けてください。貼り付けると自動で保存します。
+                        「接続」を押すと、別ウィンドウに Google のログイン画面が開きます。同期に使うアカウントでログインして「許可」すると、別ウィンドウに「このサイトにアクセスできません」などと表示されます（正常です）。そのページの<strong>アドレス</strong>（<code class="font-mono">{@drive_redirect_uri}?state=…&amp;code=…</code>）をコピーして、ここに貼り付けてください。貼り付けると自動で保存します。
                       </p>
                       <input
                         type="text"
@@ -4088,7 +4088,7 @@ defmodule AskDriveWeb.AdminLive do
                         value={@drive_auth_code}
                         autocomplete="off"
                         spellcheck="false"
-                        placeholder="http://localhost/?state=...&code=..."
+                        placeholder={@drive_redirect_uri <> "?state=...&code=..."}
                         class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs font-mono"
                       />
                       <p class="text-zinc-500">
@@ -5430,7 +5430,9 @@ defmodule AskDriveWeb.AdminLive do
     # is on the server (loopback) or uses a host name Google accepts; otherwise to the
     # browser's own localhost, and the address is pasted.
     %{host: host, port: port, scheme: scheme} = socket.host_uri
-    on_server? = host in ["localhost", "127.0.0.1", "::1"]
+    # the one redirect URI (F-351) names "localhost", so only a page opened as localhost gets
+    # its session back on return
+    on_server? = host == "localhost"
 
     redirect_mode =
       cond do
@@ -5442,7 +5444,7 @@ defmodule AskDriveWeb.AdminLive do
     redirect_uri =
       case redirect_mode do
         :loopback ->
-          "http://#{host}:#{AskDrive.Network.http_port()}/auth/google/callback"
+          AskDrive.Drive.OAuth.manual_redirect_uri()
 
         :host ->
           "#{scheme}://#{host}#{if port in [80, 443], do: "", else: ":#{port}"}/auth/google/callback"

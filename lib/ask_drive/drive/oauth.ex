@@ -183,9 +183,12 @@ defmodule AskDrive.Drive.OAuth do
   # the server sits (client/server, LAN only, behind a proxy). PKCE ties the code to the
   # authorization the screen started.
 
-  @manual_redirect "http://localhost"
-
-  def manual_redirect_uri, do: @manual_redirect
+  # One redirect URI for every case (F-351): AskDrive's own loopback callback. From a browser
+  # on the server Google comes straight back to AskDrive there; from another PC nothing
+  # answers on that PC's localhost, and the address is pasted. A 「ウェブ アプリケーション」
+  # client registers just this one URI; a 「デスクトップ アプリ」 client needs none.
+  def manual_redirect_uri,
+    do: "http://localhost:#{AskDrive.Network.http_port()}/auth/google/callback"
 
   @doc """
   Starts a Drive authorization to finish by pasting: `%{url:, state:, verifier:}`.
@@ -199,7 +202,7 @@ defmodule AskDrive.Drive.OAuth do
     params =
       %{
         client_id: elem(drive_client(), 0),
-        redirect_uri: @manual_redirect,
+        redirect_uri: manual_redirect_uri(),
         response_type: "code",
         scope: Enum.join(@drive_scopes, " "),
         state: state,
@@ -216,7 +219,7 @@ defmodule AskDrive.Drive.OAuth do
   end
 
   @doc """
-  The code from what was pasted — the whole address (`http://localhost/?state=…&code=…`) or
+  The code from what was pasted — the whole address (`http://localhost:4000/auth/google/callback?state=…&code=…`) or
   the code alone. `{:ok, code}`, `{:error, :state_mismatch}` (another authorization's
   address) or `{:error, :no_code}`; `{:error, {:denied, reason}}` when Google reports one.
   """
@@ -244,7 +247,7 @@ defmodule AskDrive.Drive.OAuth do
 
   @doc "Exchanges a pasted code for the Drive sync account's tokens (with the PKCE verifier)."
   def exchange_manual_code(code, verifier),
-    do: exchange_code(code, @manual_redirect, :drive, %{code_verifier: verifier})
+    do: exchange_code(code, manual_redirect_uri(), :drive, %{code_verifier: verifier})
 
   @doc """
   Checks an OAuth client ID / secret without anyone signing in (F-349): the token endpoint is
@@ -263,7 +266,7 @@ defmodule AskDrive.Drive.OAuth do
           code: "askdrive-connection-test",
           client_id: String.trim(id),
           client_secret: secret,
-          redirect_uri: @manual_redirect,
+          redirect_uri: manual_redirect_uri(),
           grant_type: "authorization_code"
         }
 
@@ -288,9 +291,7 @@ defmodule AskDrive.Drive.OAuth do
   end
 
   @doc "The redirect URIs a 「ウェブ アプリケーション」 client must have registered (F-349)."
-  def web_client_redirect_uris do
-    [@manual_redirect, "http://localhost:#{AskDrive.Network.http_port()}/auth/google/callback"]
-  end
+  def web_client_redirect_uris, do: [manual_redirect_uri()]
 
   defp random_token, do: :crypto.strong_rand_bytes(24) |> Base.url_encode64(padding: false)
   defp present?(v), do: is_binary(v) and String.trim(v) != ""

@@ -116,14 +116,14 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
          %{conn: conn} do
       conn = %{conn | host: "192.168.1.10"}
       {:ok, view, html} = live(conn, "/it-support/admin?tab=settings")
-      assert has_element?(view, "#drive-connect-target", "http://localhost")
+      assert has_element?(view, "#drive-connect-target", "http://localhost:")
       assert html =~ "Google アカウント認証"
       assert has_element?(view, "#drive-connect-btn[target='_blank']")
       assert has_element?(view, "#drive-manual-auth")
 
       q = query(connect_href(view))
       assert q["client_id"] == "desk.apps.googleusercontent.com"
-      assert q["redirect_uri"] == "http://localhost"
+      assert q["redirect_uri"] =~ ~r{^http://localhost:\d+/auth/google/callback$}
       assert q["access_type"] == "offline"
       assert q["code_challenge_method"] == "S256"
       assert q["scope"] =~ "drive.readonly"
@@ -137,7 +137,8 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
       # pasting is enough (no button); what's pasted is checked before asking Google
       view
       |> form("#drive-settings-form", %{
-        "drive_auth_code" => "http://localhost/?state=someone-else&code=abc"
+        "drive_auth_code" =>
+          "http://localhost:4000/auth/google/callback?state=someone-else&code=abc"
       })
       |> render_change()
 
@@ -203,7 +204,10 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
   test "the pasted address or the bare code both give the code" do
     alias AskDrive.Drive.OAuth
 
-    assert OAuth.code_from_paste("http://localhost/?state=s1&code=4/0AbC&scope=x", "s1") ==
+    assert OAuth.code_from_paste(
+             "http://localhost:4000/auth/google/callback?state=s1&code=4/0AbC&scope=x",
+             "s1"
+           ) ==
              {:ok, "4/0AbC"}
 
     assert OAuth.code_from_paste("  4/0AbC  ", "s1") == {:ok, "4/0AbC"}

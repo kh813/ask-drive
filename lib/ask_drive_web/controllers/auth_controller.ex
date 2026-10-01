@@ -156,7 +156,7 @@ defmodule AskDriveWeb.AuthController do
       # on, so the session cookie comes along.
       redirect_uri =
         if params["loopback"] == "1" and loopback_host?(conn.host),
-          do: "http://#{conn.host}:#{AskDrive.Network.http_port()}/auth/google/callback"
+          do: OAuth.manual_redirect_uri()
 
       extra =
         case String.trim(params["hint"] || "") do
@@ -417,7 +417,7 @@ defmodule AskDriveWeb.AuthController do
   # machine, which has nothing listening on it. Whichever host ends up here must also be
   # registered as an authorized redirect URI in Google Cloud Console (it accepts more than
   # one per OAuth client, so both localhost and the LAN address can be registered together).
-  defp loopback_host?(host), do: host in ["localhost", "127.0.0.1", "::1", "[::1]"]
+  defp loopback_host?(host), do: host == "localhost"
 
   # the redirect URI this authorization was started with (the loopback one, F-348), else this
   # request's own callback URL — the token exchange must name the same one
