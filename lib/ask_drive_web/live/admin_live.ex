@@ -4325,8 +4325,10 @@ defmodule AskDriveWeb.AdminLive do
               </.form>
             </div>
 
-            <%!-- Local models (Ollama) — pulled by the app itself, spec F-827 --%>
+            <%!-- Local models (Ollama) — pulled by the app itself, spec F-827. Only on a desk
+                  that runs something on Ollama: each desk sets up its own AI (F-830) --%>
             <div
+              :if={@scope == :app and @ollama_required != []}
               id="ollama-models"
               class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
             >
@@ -5354,16 +5356,13 @@ defmodule AskDriveWeb.AdminLive do
     alias AskDrive.LLM.OllamaModels
 
     setting = socket.assigns[:setting] || Settings.get_setting!()
-    installed = OllamaModels.installed(setting)
 
-    # the platform screen covers every app's models (one Ollama for all, spec 6.11)
+    # shown on a desk's settings only, and only when that desk uses Ollama (F-830):
+    # otherwise Ollama isn't even asked (it may well not be running)
     required =
-      if socket.assigns[:scope] == :platform,
-        do:
-          Enum.map(OllamaModels.required_all(), fn {app, role, model} ->
-            {"#{app.name}: #{role}", model}
-          end),
-        else: OllamaModels.required(setting)
+      if socket.assigns[:scope] == :platform, do: [], else: OllamaModels.required(setting)
+
+    installed = if required == [], do: {:ok, []}, else: OllamaModels.installed(setting)
 
     socket
     |> assign(:ollama_installed, installed)

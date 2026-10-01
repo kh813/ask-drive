@@ -25,8 +25,8 @@ defmodule AskDriveWeb.AdminOllamaModelsTest do
     %{setting: setting}
   end
 
-  test "settings show required models' state and can pull a model by name", %{conn: conn} do
-    {:ok, view, html} = live(conn, ~p"/admin?tab=settings")
+  test "a desk on Ollama shows its models' state and can pull a model by name", %{conn: conn} do
+    {:ok, view, html} = live(conn, "/it-support/admin?tab=settings")
 
     assert html =~ "ローカルモデル（Ollama）"
     assert has_element?(view, ~s(tr[data-model="qwen3:4b-instruct-2507-q4_K_M"]), "未取得")
@@ -40,5 +40,24 @@ defmodule AskDriveWeb.AdminOllamaModelsTest do
     # once the pull finishes the row turns to 取得済み
     Process.sleep(300)
     assert has_element?(view, ~s(tr[data-model="qwen3:4b-instruct-2507-q4_K_M"]), "取得済み")
+  end
+
+  test "not in the platform settings, nor on a desk that doesn't use Ollama (F-830)", %{
+    conn: conn,
+    setting: setting
+  } do
+    {:ok, _view, html} = live(conn, ~p"/admin?tab=settings")
+    refute html =~ ~s(id="ollama-models")
+
+    {:ok, _} =
+      Settings.update_setting(setting, %{
+        llm_provider: "gemini",
+        embed_provider: "gemini",
+        chat_summary_provider: "",
+        chat_summary_model: ""
+      })
+
+    {:ok, _view, html} = live(conn, "/it-support/admin?tab=settings")
+    refute html =~ ~s(id="ollama-models")
   end
 end
