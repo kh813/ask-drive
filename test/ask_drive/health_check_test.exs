@@ -15,4 +15,19 @@ defmodule AskDrive.HealthCheckTest do
     # In our environment, sqlite-vec should be loaded
     assert {:ok, _version} = results.sqlite_vec
   end
+
+  test "an API key not registered yet is reported as a step to do, not an auth failure" do
+    {:ok, _} =
+      AskDrive.Settings.update_setting(AskDrive.Settings.get_setting!(), %{
+        llm_provider: "gemini",
+        embed_provider: "gemini",
+        gemini_api_key: ""
+      })
+
+    results = AskDrive.HealthCheck.check()
+    assert results.generation_key_missing and results.embedding_key_missing
+    assert {:error, msg} = results.llm_generation
+    assert msg =~ "API キーが未設定です"
+    refute msg =~ "認証に失敗"
+  end
 end

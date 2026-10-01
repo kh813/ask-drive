@@ -21,6 +21,8 @@ config :ask_drive, auto_nightly_batch: false
 
 # Don't try to pull Ollama models from a test run.
 config :ask_drive, auto_pull_models: false
+# nor start Ollama / write the ollama_needed file for app.sh (AskDrive.LLM.OllamaServer)
+config :ask_drive, manage_ollama: false
 
 # Apps (spec 6.11): the boot step writes to the platform DB, which is sandboxed in tests;
 # app databases created by tests use a plain pool (the SQL sandbox can't own dynamic repos).

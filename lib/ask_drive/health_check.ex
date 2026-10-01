@@ -71,6 +71,9 @@ defmodule AskDrive.HealthCheck do
       llm_embedding: check_provider(:embedding, setting),
       generation_provider: LLM.generation_provider(setting),
       embedding_provider: LLM.embedding_provider(setting),
+      # an API key not registered yet is a step still to do (F-343), not a failure
+      generation_key_missing: missing_key?(:generation, setting),
+      embedding_key_missing: missing_key?(:embedding, setting),
       pdftotext: check_cli("pdftotext", ["-v"]),
       pandoc: check_cli("pandoc", ["-v"])
     }
@@ -94,7 +97,18 @@ defmodule AskDrive.HealthCheck do
     e -> {:error, Exception.message(e)}
   end
 
+  defp missing_key?(role, setting),
+    do: setting != nil and LLM.missing_api_key(role, setting) != nil
+
   defp check_provider(role, setting) do
+    if missing_key?(role, setting) do
+      {:error, "API キーが未設定です（窓口の管理画面の「設定」で登録してください）"}
+    else
+      check_provider_health(role, setting)
+    end
+  end
+
+  defp check_provider_health(role, setting) do
     case LLM.health(role, setting) do
       {:ok, info} -> {:ok, info}
       {:error, reason} -> {:error, HTTP.describe(reason)}
@@ -132,8 +146,19 @@ defmodule AskDrive.HealthCheck do
       {:error, err} -> Logger.warning("  [✗] sqlite-vec: #{err}")
     end
 
-    log_provider("回答生成", results.generation_provider, results.llm_generation)
-    log_provider("埋め込み", results.embedding_provider, results.llm_embedding)
+    log_provider(
+      "回答生成",
+      results.generation_provider,
+      results.llm_generation,
+      results.generation_key_missing
+    )
+
+    log_provider(
+      "埋め込み",
+      results.embedding_provider,
+      results.llm_embedding,
+      results.embedding_key_missing
+    )
 
     case results.pdftotext do
       {:ok, ver} -> Logger.info("  [✓] pdftotext: #{ver}")
@@ -154,11 +179,12 @@ defmodule AskDrive.HealthCheck do
     end
   end
 
-  defp log_provider(role, provider, result) do
+  defp log_provider(role, provider, result, key_missing?) do
     label = "#{role} (#{LLM.label(provider)})"
 
     case result do
       {:ok, info} -> Logger.info("  [✓] #{label}: #{info}")
+      {:error, err} when key_missing? -> Logger.warning("  [!] #{label}: #{err}")
       {:error, err} -> Logger.warning("  [✗] #{label}: #{err}")
     end
   end

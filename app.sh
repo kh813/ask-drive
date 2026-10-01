@@ -149,6 +149,20 @@ wait_for_ollama() {
   tail -n 20 "${SCRIPT_DIR}/log/ollama.log" 2>/dev/null || true
 }
 
+# Ollama を使うか（F-829）。アプリが DB の隣に書く ollama_needed（yes / no）に従う。
+# まだない（初回起動）ときは .env.prod の生成・埋め込みのプロバイダで判断する。
+# どの窓口も外部 API（Gemini など）なら Ollama は起動しない。あとで Ollama に切り替えた場合は、
+# アプリが ollama serve を起動する。
+ollama_needed() {
+  local flag
+  flag="$(dirname "${DATABASE_PATH:-${SCRIPT_DIR}/ask_drive_prod.db}")/ollama_needed"
+  if [[ -f "${flag}" ]]; then
+    [[ "$(tr -d '[:space:]' < "${flag}")" == "yes" ]]
+  else
+    [[ "${ASK_DRIVE_LLM_PROVIDER:-ollama}" == "ollama" || "${ASK_DRIVE_EMBED_PROVIDER:-ollama}" == "ollama" ]]
+  fi
+}
+
 # --- アプリケーション制御 ---
 
 cmd_start() {
@@ -162,16 +176,20 @@ cmd_start() {
   export OLLAMA_FLASH_ATTENTION="${OLLAMA_FLASH_ATTENTION:-1}"
   export OLLAMA_KV_CACHE_TYPE="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
 
-  repair_ollama_runtime
+  # Ollama サーバーの稼働確認と自動起動（使う設定のときだけ）
+  if ollama_needed; then
+    repair_ollama_runtime
 
-  # Ollama サーバーの稼働確認と自動起動
-  local ollama_host="${OLLAMA_HOST:-http://localhost:11434}"
-  if ! curl -s "${ollama_host}/api/tags" >/dev/null 2>&1; then
-    if command -v ollama >/dev/null 2>&1; then
-      echo "Ollama サービスが停止しているため、バックグラウンド起動します..."
-      ollama serve > "${SCRIPT_DIR}/log/ollama.log" 2>&1 &
-      wait_for_ollama "${ollama_host}"
+    local ollama_host="${OLLAMA_HOST:-http://localhost:11434}"
+    if ! curl -s "${ollama_host}/api/tags" >/dev/null 2>&1; then
+      if command -v ollama >/dev/null 2>&1; then
+        echo "Ollama サービスが停止しているため、バックグラウンド起動します..."
+        ollama serve > "${SCRIPT_DIR}/log/ollama.log" 2>&1 &
+        wait_for_ollama "${ollama_host}"
+      fi
     fi
+  else
+    echo "Ollama は使わない設定のため起動しません（外部 API のみ）。"
   fi
 
   if [[ -f "${SCRIPT_DIR}/_build/prod/rel/ask_drive/bin/ask_drive" ]]; then
@@ -227,6 +245,8 @@ cmd_status() {
     local ollama_version
     ollama_version="$(curl -s http://localhost:11434/api/version | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')"
     echo -e "${GREEN}稼働中 (v${ollama_version})${NC}"
+  elif ! ollama_needed; then
+    echo "停止中（使わない設定のため起動していません。外部 API のみ）"
   else
     echo -e "${RED}停止中 または 未応答 (http://localhost:11434)${NC}"
   fi

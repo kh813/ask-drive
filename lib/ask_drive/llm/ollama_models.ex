@@ -19,6 +19,7 @@ defmodule AskDrive.LLM.OllamaModels do
   require Logger
 
   alias AskDrive.{LLM, Settings}
+  alias AskDrive.LLM.OllamaServer
   alias AskDrive.LLM.Providers.Ollama
 
   @topic "ollama_models"
@@ -58,34 +59,30 @@ defmodule AskDrive.LLM.OllamaModels do
   """
   def ensure_required(setting \\ Settings.get_setting!())
 
+  # No desk on Ollama: nothing to pull, and Ollama isn't contacted (or started) at all.
+  # Records for `app.sh start` whether it is needed (F-829).
   def ensure_required(:all) do
-    with {:ok, names} <- installed(Settings.platform_setting!()) do
-      missing =
-        required_all()
-        |> Enum.map(fn {_app, _role, model} -> model end)
-        |> Enum.uniq()
-        |> Enum.reject(&installed?(&1, names))
+    models = required_all() |> Enum.map(fn {_app, _role, model} -> model end) |> Enum.uniq()
+    OllamaServer.record_needed(models != [])
 
-      Enum.each(missing, &pull_async/1)
-      {:ok, missing}
-    end
+    if models == [],
+      do: {:ok, :not_used},
+      else: pull_missing(models, Settings.platform_setting!())
   end
 
   def ensure_required(setting) do
-    case installed(setting) do
-      {:ok, names} ->
-        missing =
-          setting
-          |> required()
-          |> Enum.map(fn {_role, model} -> model end)
-          |> Enum.uniq()
-          |> Enum.reject(&installed?(&1, names))
+    OllamaServer.record_needed(required_all() != [])
+    models = setting |> required() |> Enum.map(fn {_role, model} -> model end) |> Enum.uniq()
+    if models == [], do: {:ok, []}, else: pull_missing(models, setting)
+  end
 
-        Enum.each(missing, &pull_async/1)
-        {:ok, missing}
+  defp pull_missing(models, setting) do
+    OllamaServer.ensure_running(setting)
 
-      error ->
-        error
+    with {:ok, names} <- installed(setting) do
+      missing = Enum.reject(models, &installed?(&1, names))
+      Enum.each(missing, &pull_async/1)
+      {:ok, missing}
     end
   end
 
@@ -164,6 +161,9 @@ defmodule AskDrive.LLM.OllamaModels do
   @impl true
   def handle_info(:ensure_required, state) do
     case ensure_required(:all) do
+      {:ok, :not_used} ->
+        Logger.info("OllamaModels: no desk uses Ollama; it is not started")
+
       {:ok, []} ->
         Logger.info("OllamaModels: all required models are installed")
 
