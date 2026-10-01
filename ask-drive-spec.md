@@ -1651,7 +1651,7 @@ Mac mini（Apple Silicon / macOS）または Linux（x64 / arm64、Ubuntu / Debi
   4. ./app.sh service install        # launchd 登録＆常駐自動起動
 ```
 
-**ZIP 展開環境の更新**（`./app.sh update`、`.git` がない環境）は GitHub Release の ZIP を上書き展開する。上書きだけでは新しいリリースで削除されたファイルが残り、コンパイルされてしまうため、リリースの ZIP にはファイル一覧 `RELEASE_MANIFEST` を同梱し、`scripts/deploy.sh` が `lib`・`config`・`priv/repo`・`priv/gettext`・`assets/js`・`assets/css`・`scripts` に限って一覧にないファイルを削除する（`.env.prod`・DB・証明書・`.runtime` などには触れない）。
+**ZIP 展開環境の更新**（`./app.sh update`、`.git` がない環境）は GitHub Release の ZIP を上書き展開する。上書きだけでは新しいリリースで削除されたファイルが残り、コンパイルされてしまうため、リリースの ZIP にはファイル一覧 `RELEASE_MANIFEST` を同梱し、`scripts/deploy.sh` が `lib`・`config`・`priv/repo`・`priv/gettext`・`assets/js`・`assets/css`・`scripts` に限って一覧にないファイルを削除する（`.env.prod`・DB・証明書・`.runtime` などには触れない）。照合は並び順に依存しない完全一致で行う（v0.1.10 は `sort` + `comm` で照合し、ロケールによる並び順の違いで残すべきファイルまで削除した）。安全のため、一覧に `mix.exs` と `lib/ask_drive/application.ex` がなければ、また削除対象が 20 件を超えれば、何も削除しない。
 
 ### 12.3 初回セットアップフロー（`scripts/initial-setup.sh` / `./app.sh setup`）
 

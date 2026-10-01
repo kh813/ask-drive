@@ -40,15 +40,39 @@ set +a
 # unzip は上書きするだけなので、リリースから消えたソース（例: 廃止した mix タスク）が残り、
 # コンパイルされて警告やエラーになる。リリースに同梱のファイル一覧（RELEASE_MANIFEST）にない
 # ファイルを、アプリのソースのディレクトリに限って削除する（.env.prod・DB・証明書などには触れない）。
-if [[ ! -d "${SCRIPT_DIR}/.git" && -f "${SCRIPT_DIR}/RELEASE_MANIFEST" ]]; then
+# 照合は並び順に依存しない完全一致（grep -Fx）で行う。v0.1.10 は sort + comm で照合していたため、
+# ロケールによる並び順の違いで、残すべきファイルまで削除してしまった。
+# 安全のため、一覧が不完全に見える場合や、削除が多すぎる場合は何も削除しない。
+prune_removed_files() {
+  local manifest="${SCRIPT_DIR}/RELEASE_MANIFEST"
+  [[ ! -d "${SCRIPT_DIR}/.git" && -f "${manifest}" ]] || return 0
+
+  if ! grep -qx "mix.exs" "${manifest}" || ! grep -qx "lib/ask_drive/application.ex" "${manifest}"; then
+    echo -e "${YELLOW}  RELEASE_MANIFEST が不完全なため、削除済みファイルの整理を省略します。${NC}"
+    return 0
+  fi
+
+  local stale_list dir
+  stale_list="$(mktemp)"
   for dir in lib config priv/repo priv/gettext assets/js assets/css scripts; do
     [[ -d "${SCRIPT_DIR}/${dir}" ]] || continue
-    find "${dir}" -type f | sort | comm -23 - "${SCRIPT_DIR}/RELEASE_MANIFEST" | while IFS= read -r stale; do
+    (cd "${SCRIPT_DIR}" && find "${dir}" -type f) | grep -Fxv -f "${manifest}" >> "${stale_list}" || true
+  done
+
+  local count
+  count="$(grep -c . "${stale_list}" || true)"
+  if [[ "${count}" -gt 20 ]]; then
+    echo -e "${YELLOW}  リリースにないファイルが ${count} 件あり多すぎるため、削除を省略します（想定外の状態）。${NC}"
+  elif [[ "${count}" -gt 0 ]]; then
+    local stale
+    while IFS= read -r stale; do
       echo -e "${YELLOW}  リリースから削除されたファイルを削除: ${stale}${NC}"
       rm -f "${SCRIPT_DIR:?}/${stale:?}"
-    done
-  done
-fi
+    done < "${stale_list}"
+  fi
+  rm -f "${stale_list:?}"
+}
+prune_removed_files
 
 # 2. 依存関係の更新
 echo -e "\n${YELLOW}[1/4] 依存関係の取得中...${NC}"
