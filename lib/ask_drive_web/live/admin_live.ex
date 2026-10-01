@@ -3192,18 +3192,19 @@ defmodule AskDriveWeb.AdminLive do
               <div>
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                   <.icon name="hero-building-office-2" class="w-5 h-5 text-indigo-600" />
-                  組織（Google Workspace）
+                  組織・アカウント（Google Workspace / ドメイン制限）
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  Google ログイン（SSO）と Google Drive の連携では、このドメインのアカウントだけを受け付けます。ドメイン全体の委任で「アクセスユーザー」を指定する場合も、このドメインのアドレスである必要があります。
+                  会社・組織で特定ドメイン（例: <code class="font-mono">company.com</code>）のみにアクセスを制限する場合はドメインを入力してください。個人利用（<code class="font-mono">@gmail.com</code>
+                  等）やドメイン制限を行わない場合は、<strong>空欄</strong>のまま保存してください（どの Google アカウントでもログイン・Drive 連携が可能になります）。
                 </p>
               </div>
               <.form for={@form} id="org-form" phx-submit="save_settings" class="space-y-4">
                 <.input
                   field={@form[:allowed_domain]}
                   type="text"
-                  label="Google Workspace ドメイン（例: company.com）"
-                  placeholder="company.com"
+                  label="許可ドメイン（例: company.com / 空欄で制限なし）"
+                  placeholder="company.com (空欄で制限なし)"
                 />
                 <div class="flex justify-end">
                   <button
@@ -4118,7 +4119,7 @@ defmodule AskDriveWeb.AdminLive do
                         >
                           「接続」するには、Google の OAuth クライアント（ID とシークレット）が必要です。情報システム部門が全体設定の「Google OAuth（ログイン / Drive 同期）」に 1 つ登録すれば、すべての窓口で使えます（Google ログインは無効のままで構いません）。この窓口だけで使う場合は、下に入力してください。
                         </p>
-                        <ol class="list-decimal pl-5 text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1">
+                        <ol class="list-decimal pl-5 text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1.5">
                           <li>
                             <a
                               href="https://console.cloud.google.com/apis/library/drive.googleapis.com"
@@ -4134,7 +4135,15 @@ defmodule AskDriveWeb.AdminLive do
                               rel="noopener noreferrer"
                               class="underline text-indigo-600"
                             >OAuth 同意画面</a>
-                            を作る（ユーザーの種類は「内部」）
+                            を作成する:
+                            <ul class="list-disc pl-4 mt-0.5 space-y-0.5 text-zinc-500">
+                              <li>
+                                <strong>Google Workspace（組織）</strong>: ユーザーの種類を「<strong>内部</strong>」にする
+                              </li>
+                              <li>
+                                <strong>個人 Gmail（@gmail.com 等）</strong>: ユーザーの種類を「<strong>外部</strong>」にし、「テストユーザー」に同期する Gmail アドレスを追加する
+                              </li>
+                            </ul>
                           </li>
                           <li>
                             <a

@@ -63,6 +63,33 @@ defmodule AskDrive.SetupTest do
     refute Setup.required?()
   end
 
+  test "completing setup with personal account mode allows any email and leaves domain empty" do
+    code = Setup.ensure_code()
+
+    assert :ok =
+             Setup.complete(%{
+               "code" => code,
+               "account_type" => "personal",
+               "domain" => "",
+               "app_name" => "個人用相談窓口",
+               "admin_emails" => "myuser@gmail.com, helper@other.org"
+             })
+
+    setting = Settings.get_setting!()
+    assert is_nil(setting.allowed_domain)
+    assert setting.setup_completed_at
+    assert Apps.primary().name == "個人用相談窓口"
+
+    assert AskDrive.Accounts.list_app_admins(Apps.primary().slug)
+           |> Enum.map(& &1.email)
+           |> Enum.sort() ==
+             ["helper@other.org", "myuser@gmail.com"]
+
+    refute File.exists?(Setup.code_path())
+    Setup.reset_cache()
+    refute Setup.required?()
+  end
+
   test "each invalid field is reported and nothing is saved" do
     Setup.ensure_code()
 

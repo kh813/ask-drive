@@ -185,24 +185,40 @@ defmodule AskDrive.Setup do
   # --- Completing -----------------------------------------------------------------
 
   @doc """
-  Validates and applies the setup form: `%{"code", "domain", "app_name", "admin_emails"}` (the platform administrators, who also become the
+  Validates and applies the setup form: `%{"code", "domain", "app_name", "admin_emails", "account_type"}` (the platform administrators, who also become the
   default app's administrators, F-1116).
   Returns `:ok` or `{:error, %{field => message}}`.
   """
   def complete(params) do
+    account_type = Map.get(params, "account_type", "workspace")
+    domain = params["domain"]
+
     errors =
       %{}
       |> check(:code, code_error(params["code"]))
-      |> check(:domain, domain_error(params["domain"]))
+      |> check(:domain, domain_error(domain, account_type))
       |> check(:app_name, if(present?(params["app_name"]), do: nil, else: "窓口名を入力してください"))
-      |> check(:admin_emails, admin_emails_error(params["admin_emails"], params["domain"]))
+      |> check(
+        :admin_emails,
+        admin_emails_error(
+          params["admin_emails"],
+          if(account_type == "personal", do: nil, else: domain)
+        )
+      )
 
     if errors == %{} do
+      allowed_domain =
+        if account_type == "personal" or not present?(domain) do
+          nil
+        else
+          String.trim(domain) |> String.trim_leading("@")
+        end
+
       {:ok, setting} =
         Apps.platform(fn ->
           # the first desk is being set up too: its nightly batch starts switched off (F-344)
           Settings.update_setting(Settings.get_setting!(), %{
-            allowed_domain: params["domain"],
+            allowed_domain: allowed_domain,
             auto_batch_enabled: false
           })
         end)
@@ -249,7 +265,20 @@ defmodule AskDrive.Setup do
     end
   end
 
-  defp domain_error(domain) do
+  defp domain_error(domain, "personal") do
+    if present?(domain) do
+      cs =
+        AskDrive.Settings.Setting.changeset(%AskDrive.Settings.Setting{}, %{
+          allowed_domain: domain
+        })
+
+      if cs.errors[:allowed_domain], do: "ドメイン名（例: company.com）で入力してください", else: nil
+    else
+      nil
+    end
+  end
+
+  defp domain_error(domain, _account_type) do
     cs =
       AskDrive.Settings.Setting.changeset(%AskDrive.Settings.Setting{}, %{allowed_domain: domain})
 
@@ -272,7 +301,11 @@ defmodule AskDrive.Setup do
     emails = admin_emails(text)
 
     domain =
-      domain |> to_string() |> String.trim() |> String.downcase() |> String.trim_leading("@")
+      if present?(domain) do
+        domain |> to_string() |> String.trim() |> String.downcase() |> String.trim_leading("@")
+      else
+        ""
+      end
 
     cond do
       emails == [] ->

@@ -61,4 +61,22 @@ defmodule AskDriveWeb.SetupLiveTest do
     # and /setup is no longer offered
     assert {:error, {:live_redirect, %{to: "/"}}} = live(conn, "/setup")
   end
+
+  test "the setup form can be completed in personal account mode", %{conn: conn} do
+    code = Setup.ensure_code()
+    {:ok, view, _html} = live(conn, "/setup")
+
+    {:error, {:redirect, %{to: "/admin?tab=apps"}}} =
+      view
+      |> form("#setup-form", %{
+        "code" => code,
+        "account_type" => "personal",
+        "domain" => "",
+        "app_name" => "My-Personal-Desk",
+        "admin_emails" => "me@gmail.com"
+      })
+      |> render_submit()
+
+    assert {:error, {:live_redirect, %{to: "/"}}} = live(conn, "/setup")
+  end
 end
