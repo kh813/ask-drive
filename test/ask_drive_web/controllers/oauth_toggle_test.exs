@@ -8,7 +8,8 @@ defmodule AskDriveWeb.OAuthToggleTest do
   setup do
     {:ok, _} =
       Settings.update_setting(Settings.platform_setting!(), %{
-        "google_client_id" => "cid.apps.googleusercontent.com"
+        "google_client_id" => "cid.apps.googleusercontent.com",
+        "oauth_login_enabled" => "true"
       })
 
     on_exit(&AskDrive.FakeLdap.reset/0)
@@ -74,6 +75,19 @@ defmodule AskDriveWeb.OAuthToggleTest do
     assert run.(["status"]) =~ "Google ログイン（OAuth）: 無効（認証情報は設定済み）"
     assert run.(["oauth", "on"]) =~ "有効にしました"
     assert Settings.platform_setting!().oauth_login_enabled
+  end
+
+  test "both off by default: configured credentials alone don't put Google on the login page" do
+    {:ok, _} =
+      Settings.update_setting(Settings.platform_setting!(), %{"oauth_login_enabled" => "false"})
+
+    fresh = %AskDrive.Settings.Setting{}
+    refute fresh.oauth_login_enabled
+    refute fresh.ldap_enabled
+
+    html = build_conn() |> get(~p"/login") |> html_response(200)
+    refute html =~ ~s(id="google-login-btn")
+    refute html =~ ~s(id="ldap-login-form")
   end
 
   test "only Google login on: the intro speaks of Google accounts, no LDAP form", %{conn: conn} do

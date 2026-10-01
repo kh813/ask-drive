@@ -48,7 +48,7 @@ defmodule AskDrive.Settings.Setting do
     field :setup_completed_at, :utc_datetime
     field :google_client_id, :string
     # Google login (OAuth) on/off (spec F-1310); Drive sync's OAuth is not affected
-    field :oauth_login_enabled, :boolean, default: true
+    field :oauth_login_enabled, :boolean, default: false
     field :google_client_secret, Binary
     field :maintenance_mode, :boolean, default: false
     # the nightly batch starts by itself (F-344); off while a new desk is being set up

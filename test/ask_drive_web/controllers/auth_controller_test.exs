@@ -5,7 +5,13 @@ defmodule AskDriveWeb.AuthControllerTest do
 
   setup do
     setting = Settings.get_setting!()
-    {:ok, setting} = Settings.update_setting(setting, %{google_client_id: "test-client-id"})
+
+    {:ok, setting} =
+      Settings.update_setting(setting, %{
+        google_client_id: "test-client-id",
+        oauth_login_enabled: true
+      })
+
     %{setting: setting}
   end
 
