@@ -1,7 +1,7 @@
 defmodule AskDriveWeb.SetupLive do
   @moduledoc """
-  First-access setup (spec 6.12): setup code, administrator password, the organization's
-  Google Workspace domain and the first app's name. See `AskDrive.Setup`.
+  First-access setup (spec 6.12): setup code, the organization's Google Workspace domain,
+  the first app's name and the platform administrators. See `AskDrive.Setup`.
   """
   use AskDriveWeb, :live_view
 
@@ -53,7 +53,7 @@ defmodule AskDriveWeb.SetupLive do
           </h1>
           <p class="text-sm text-zinc-500 mt-1 leading-relaxed">
             {gettext(
-              "Set up your administrator password and organization settings. This screen will remain until setup is finished."
+              "Set up your organization settings and administrators. This screen will remain until setup is finished."
             )}
           </p>
         </div>
@@ -75,27 +75,8 @@ defmodule AskDriveWeb.SetupLive do
           </.setup_field>
 
           <.setup_field
-            name="password"
-            type="password"
-            label={gettext("2. Administrator Password")}
-            errors={@errors}
-            autocomplete="new-password"
-          >
-            {gettext("Required when elevating to administrator. Minimum %{length} characters.",
-              length: AskDrive.Accounts.AdminAccess.min_password_length()
-            )}
-          </.setup_field>
-          <.setup_field
-            name="password_confirmation"
-            type="password"
-            label={gettext("Administrator Password (Confirm)")}
-            errors={@errors}
-            autocomplete="new-password"
-          />
-
-          <.setup_field
             name="domain"
-            label={gettext("3. Organization Google Workspace Domain")}
+            label={gettext("2. Organization Google Workspace Domain")}
             errors={@errors}
             value={@values["domain"]}
             placeholder="company.com"
@@ -107,7 +88,7 @@ defmodule AskDriveWeb.SetupLive do
 
           <.setup_field
             name="app_name"
-            label={gettext("4. First Desk Name")}
+            label={gettext("3. First Desk Name")}
             errors={@errors}
             value={@values["app_name"]}
           >
@@ -118,12 +99,14 @@ defmodule AskDriveWeb.SetupLive do
 
           <.setup_field
             name="admin_emails"
-            label={gettext("5. Platform Administrator Email Addresses")}
+            label={gettext("4. Platform Administrator Email Addresses")}
             errors={@errors}
             value={@values["admin_emails"]}
             placeholder="name@company.com"
           >
-            {gettext("Email addresses for initial platform administrators (comma-separated).")}
+            {gettext(
+              "Email addresses for initial platform administrators (comma-separated). They enter Platform Admin with their own account — no shared password."
+            )}
           </.setup_field>
 
           <button

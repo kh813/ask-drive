@@ -5,10 +5,10 @@
         <.icon name="hero-shield-check" class="w-6 h-6" />
       </div>
       <h1 class="font-bold text-xl text-zinc-900 dark:text-zinc-100">
-        {gettext("Elevate to Administrator")}
+        {gettext("Enter Platform Admin")}
       </h1>
       <p class="text-xs text-zinc-500 leading-relaxed">
-        {gettext("Elevating as %{email}. This action is recorded in the audit log.",
+        {gettext("Entering as %{email}. Identity verification required. Recorded in audit log.",
           email: @current_user.email
         )}
       </p>
@@ -16,6 +16,7 @@
 
     <div
       :if={@error_message}
+      id="elevate-error"
       class="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-red-700 dark:text-red-300 text-xs flex items-start gap-2"
     >
       <.icon name="hero-exclamation-circle" class="w-4 h-4 shrink-0 mt-0.5" />
@@ -23,79 +24,44 @@
     </div>
 
     <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-5">
-      <%= cond do %>
-        <% @locked_until -> %>
-          <div class="text-center space-y-2 py-4">
-            <.icon name="hero-lock-closed" class="w-8 h-8 text-red-500 mx-auto" />
-            <p class="font-medium text-sm text-zinc-900 dark:text-zinc-100">
-              {gettext("Temporarily Locked")}
-            </p>
-            <p class="text-xs text-zinc-500">
-              {gettext("Please try again after %{time}.",
-                time: Calendar.strftime(@locked_until, "%H:%M")
-              )}
-            </p>
-          </div>
-        <% not @password_set? -> %>
-          <%!-- First run: an eligible account sets the shared password here (F-917). --%>
-          <div class="space-y-1">
-            <h2 class="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
-              {gettext("Initial Administrator Password Setup")}
-            </h2>
-            <p class="text-xs text-zinc-500 leading-relaxed">
-              {gettext(
-                "An administrator password has not been set yet. You will be prompted for this password when entering the admin area."
-              )}
-            </p>
-          </div>
-
-          <.form :let={f} for={%{}} as={:admin} action={~p"/admin/password"} class="space-y-4">
-            <.input
-              field={f[:password]}
-              type="password"
-              label={
-                gettext("New administrator password (at least %{count} characters)",
-                  count: @min_length
-                )
-              }
-              required
-              autocomplete="new-password"
-            />
-            <.input
-              field={f[:confirmation]}
-              type="password"
-              label={gettext("Confirm password")}
-              required
-              autocomplete="new-password"
-            />
-            <button
-              type="submit"
-              id="set-admin-password-btn"
-              class="w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
-            >
-              {gettext("Set Password")}
-            </button>
-          </.form>
-        <% true -> %>
-          <.form :let={f} for={%{}} as={:admin} action={~p"/admin/elevate"} class="space-y-4">
-            <.input
-              field={f[:password]}
-              type="password"
-              label={gettext("Administrator Password")}
-              required
-              autocomplete="current-password"
-            />
-            <button
-              type="submit"
-              id="elevate-btn"
-              class="w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
-            >
-              {gettext("Continue as Administrator")}
-            </button>
-            <p class="text-[11px] text-zinc-400 text-center">
-              {gettext("Attempts remaining: %{count}", count: @attempts_remaining)}
-            </p>
-          </.form>
+      <%= if @method == :ldap_password do %>
+        <.form
+          :let={f}
+          for={%{}}
+          as={:admin}
+          action={~p"/admin/elevate"}
+          id="elevate-form"
+          class="space-y-4"
+        >
+          <.input
+            field={f[:password]}
+            type="password"
+            label={gettext("Your Google Workspace Password (identity verification)")}
+            required
+            autocomplete="current-password"
+          />
+          <button
+            type="submit"
+            id="elevate-btn"
+            class="w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
+          >
+            {gettext("Enter Admin Screen")}
+          </button>
+        </.form>
+      <% else %>
+        <p class="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+          {gettext(
+            "Please sign in again for verification (direct access allowed if signed in within %{minutes} minutes).",
+            minutes: @fresh_minutes
+          )}
+        </p>
+        <a
+          id="reauth-btn"
+          href={~p"/admin/reauth"}
+          class="block text-center w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
+        >
+          {gettext("Sign in again to enter Admin")}
+        </a>
       <% end %>
     </div>
 

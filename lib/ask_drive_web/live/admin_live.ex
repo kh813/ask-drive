@@ -82,7 +82,6 @@ defmodule AskDriveWeb.AdminLive do
      |> assign(:trigger_batch_loading, false)
      |> assign(:connection_test, %{})
      |> assign(:service_account_test, nil)
-     |> assign(:password_form, to_form(%{}, as: :admin_password))
      |> assign(:access_password_form, to_form(%{}, as: :access_password))
      |> load_dashboard_data()}
   end
@@ -286,9 +285,6 @@ defmodule AskDriveWeb.AdminLive do
         not (AskDrive.Ldap.enabled?(setting) or AskDrive.Drive.OAuth.login_enabled?()) ->
           "ログインの方法がありません。先に「Google Secure LDAP でのログイン」または Google ログイン（OAuth）を設定してください。"
 
-        not AdminAccess.password_set?(setting) ->
-          "管理者パスワードが未設定です。先に設定してください。"
-
         match?({:error, _}, parsed) ->
           elem(parsed, 1)
 
@@ -312,7 +308,7 @@ defmodule AskDriveWeb.AdminLive do
        socket
        |> put_flash(
          :info,
-         "ログイン認証を有効にしました。#{Enum.join(emails, "、")} のいずれかでログインし、管理者パスワードで昇格してください。"
+         "ログイン認証を有効にしました。#{Enum.join(emails, "、")} のいずれかでログインし、「全体管理」から本人確認して入ってください。"
        )
        |> redirect(to: ~p"/login")}
     end
@@ -835,33 +831,6 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
-  @impl true
-  def handle_event("change_admin_password", %{"admin_password" => params}, socket) do
-    %{"current" => current, "new" => new_password, "confirmation" => confirmation} =
-      Map.merge(%{"current" => "", "new" => "", "confirmation" => ""}, params)
-
-    context = %{ip_address: nil, user_agent: nil}
-    user = socket.assigns.current_user
-
-    cond do
-      new_password != confirmation ->
-        {:noreply, put_flash(socket, :error, password_error_message(:mismatch))}
-
-      true ->
-        case AdminAccess.change_password(user, current, new_password, context) do
-          {:ok, updated} ->
-            {:noreply,
-             socket
-             |> assign(:setting, updated)
-             |> put_flash(:info, "管理者パスワードを変更しました。")
-             |> load_dashboard_data()}
-
-          {:error, reason} ->
-            {:noreply, put_flash(socket, :error, password_error_message(reason))}
-        end
-    end
-  end
-
   # suggestions for the address being typed (F-1115)
   @impl true
   def handle_event("ac_suggest", %{"field" => field, "value" => value}, socket) do
@@ -1006,7 +975,6 @@ defmodule AskDriveWeb.AdminLive do
   defp event_class(_), do: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
 
   defp password_error_message(:mismatch), do: "新しいパスワードが一致しません。"
-  defp password_error_message(:invalid_password), do: "現在のパスワードが違います。"
 
   defp password_error_message(:too_short),
     do: "パスワードは #{AdminAccess.min_password_length()} 文字以上にしてください。"
@@ -1104,7 +1072,6 @@ defmodule AskDriveWeb.AdminLive do
     |> assign_ollama_models()
     |> assign(:users, users)
     |> assign(:elevation_logs, AdminAccess.list_elevation_logs(100))
-    |> assign(:admin_password_set?, AdminAccess.password_set?(setting))
     |> assign(:generation_provider, LLM.generation_provider(setting))
     |> assign(:embedding_provider, LLM.embedding_provider(setting))
     |> assign(:latest_run, latest_run)
@@ -2377,7 +2344,7 @@ defmodule AskDriveWeb.AdminLive do
                     <.icon name="hero-users" class="w-5 h-5 text-indigo-600" /> 登録ユーザー
                   </h2>
                   <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    利用者は初回ログイン時に自動登録され、全員が一般ユーザーとして開始します。<strong>「昇格可」</strong>に指定されたアカウントだけが、管理者パスワードを入力して一時的に管理者になれます。
+                    利用者は初回ログイン時に自動登録され、全員が一般ユーザーとして開始します。<strong>「昇格可」</strong>に指定されたアカウント（全体管理者）だけが、本人確認をして一時的に全体管理に入れます。
                   </p>
                 </div>
                 <span class="text-xs text-zinc-500 shrink-0">合計 {length(@users)} 名</span>
@@ -2571,8 +2538,7 @@ defmodule AskDriveWeb.AdminLive do
                               data-confirm={
                                 if(user.admin_eligible,
                                   do: "#{user.email} から管理者への昇格資格を外しますか？",
-                                  else:
-                                    "#{user.email} に管理者への昇格を許可しますか？管理者パスワードを知っていれば設定と API キーを変更できるようになります。"
+                                  else: "#{user.email} を全体管理者にしますか？本人確認をすれば、全体の設定を変更できるようになります。"
                                 )
                               }
                               class="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[11px] font-medium transition"
@@ -3443,7 +3409,7 @@ defmodule AskDriveWeb.AdminLive do
                   </span>
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  有効にすると、窓口一覧・チャットを含むすべての画面でログインが必要になり、管理画面はさらに管理者パスワードでの昇格が必要になります。無効の間は、誰でもログインなしでチャットと管理画面を使えます。締め出された場合は、サーバー上で
+                  有効にすると、窓口一覧・チャットを含むすべての画面でログインが必要になり、管理画面はさらに本人確認が必要になります（Secure LDAP なら本人のパスワード、それ以外は 10 分以内のログイン）。無効の間は、誰でもログインなしでチャットと管理画面を使えます。締め出された場合は、サーバー上で
                   <code class="font-mono">./app.sh auth disable</code>
                   を実行すると無効に戻せます。
                 </p>
@@ -3481,12 +3447,12 @@ defmodule AskDriveWeb.AdminLive do
                   </div>
                 </label>
                 <p class="text-xs text-zinc-500">
-                  必要なもの: ログインの方法（Google Secure LDAP または Google ログイン）が設定済みで、管理者パスワードが設定済みであること。有効にすると、このブラウザもログイン画面に移ります。
+                  必要なもの: ログインの方法（Google Secure LDAP または Google ログイン）が設定済みであること。有効にすると、このブラウザもログイン画面に移ります。
                 </p>
                 <button
                   type="submit"
                   id="enable-auth-btn"
-                  data-confirm="ログイン認証を有効にしますか？有効にした後は、ログインと管理者パスワードでの昇格をしないと管理画面に入れません。"
+                  data-confirm="ログイン認証を有効にしますか？有効にした後は、ログインと本人確認をしないと管理画面に入れません。"
                   class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                 >
                   ログイン認証を有効にする
@@ -3505,59 +3471,25 @@ defmodule AskDriveWeb.AdminLive do
               </div>
             </div>
 
-            <%!-- Card 1: Administrator password --%>
+            <%!-- Card 1: How platform administrators get in (no shared password) --%>
             <div
               :if={@scope == :platform}
+              id="platform-admin-entry-card"
               class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
             >
               <div>
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-shield-check" class="w-5 h-5 text-indigo-600" /> 管理者パスワード
+                  <.icon name="hero-shield-check" class="w-5 h-5 text-indigo-600" /> 全体管理への入り方
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  管理画面へ昇格する際に入力するパスワードです。昇格可能なアカウント全員で共有します。退職者が出たときや漏洩が疑われるときは変更してください。
+                  全体管理者（ユーザー管理で「昇格可」のアカウント）は、ヘッダーの「全体管理」から、各自のアカウントで本人確認して入ります。共有のパスワードはありません。 {if AdminAccess.confirmation_method() ==
+                                                                                                     :ldap_password,
+                                                                                                   do:
+                                                                                                     "現在は Google Secure LDAP が有効なので、本人の Google Workspace のパスワードで確認します（入力ミスは LDAP ログインと同じロックの対象です）。",
+                                                                                                   else:
+                                                                                                     "現在は Google Secure LDAP が無効なので、#{AskDrive.Accounts.AppAdminAccess.fresh_login_minutes()} 分以内にログインしていればそのまま入れます（古い場合はログインし直します）。"}
                 </p>
               </div>
-
-              <.form
-                for={@password_form}
-                id="admin-password-form"
-                phx-submit="change_admin_password"
-                class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end"
-              >
-                <.input
-                  field={@password_form[:current]}
-                  type="password"
-                  value=""
-                  label="現在のパスワード"
-                  autocomplete="current-password"
-                />
-                <.input
-                  field={@password_form[:new]}
-                  type="password"
-                  value=""
-                  label={"新しいパスワード（#{AdminAccess.min_password_length()} 文字以上）"}
-                  autocomplete="new-password"
-                />
-                <div class="flex items-end gap-3">
-                  <div class="flex-1">
-                    <.input
-                      field={@password_form[:confirmation]}
-                      type="password"
-                      value=""
-                      label="確認"
-                      autocomplete="new-password"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    id="change-admin-password-btn"
-                    class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition whitespace-nowrap"
-                  >
-                    変更
-                  </button>
-                </div>
-              </.form>
 
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-zinc-200/60 dark:border-zinc-800">
                 <.input
@@ -3568,25 +3500,9 @@ defmodule AskDriveWeb.AdminLive do
                   max="480"
                   form="settings-form"
                 />
-                <.input
-                  field={@form[:admin_max_attempts]}
-                  type="number"
-                  label="管理者パスワードの入力ミス: ロックまでの回数"
-                  min="1"
-                  max="50"
-                  form="settings-form"
-                />
-                <.input
-                  field={@form[:admin_lockout_minutes]}
-                  type="number"
-                  label="管理者パスワードの入力ミス: ロック時間 (分)"
-                  min="1"
-                  max="1440"
-                  form="settings-form"
-                />
               </div>
               <p class="text-[11px] text-zinc-400">
-                上記 3 項目は下の「設定を保存」で反映されます。入力ミスのロックは管理者への昇格（管理者パスワード）に対するもので、LDAP ログインのロックは「組織」→「Google Secure LDAP でのログイン」に記載のとおり別に働きます。
+                昇格の有効時間は下の「設定を保存」で反映されます（窓口の管理画面にも同じ時間が適用されます）。
               </p>
             </div>
 

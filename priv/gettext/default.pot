@@ -21,7 +21,7 @@ msgstr ""
 msgid "%{count} chunks indexed for search"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:260
+#: lib/ask_drive_web/components/layouts.ex:283
 #, elixir-autogen, elixir-format
 msgid "(%{minutes} min remaining)"
 msgstr ""
@@ -39,26 +39,6 @@ msgstr ""
 #: lib/ask_drive_web/live/setup_live.ex:68
 #, elixir-autogen, elixir-format
 msgid "1. Setup Code"
-msgstr ""
-
-#: lib/ask_drive_web/live/setup_live.ex:80
-#, elixir-autogen, elixir-format
-msgid "2. Administrator Password"
-msgstr ""
-
-#: lib/ask_drive_web/live/setup_live.ex:98
-#, elixir-autogen, elixir-format
-msgid "3. Organization Google Workspace Domain"
-msgstr ""
-
-#: lib/ask_drive_web/live/setup_live.ex:110
-#, elixir-autogen, elixir-format
-msgid "4. First Desk Name"
-msgstr ""
-
-#: lib/ask_drive_web/live/setup_live.ex:121
-#, elixir-autogen, elixir-format
-msgid "5. Platform Administrator Email Addresses"
 msgstr ""
 
 #: lib/ask_drive_web/live/chat_live.ex:196
@@ -91,27 +71,17 @@ msgstr ""
 msgid "Actions"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:125
+#: lib/ask_drive_web/components/layouts.ex:148
 #, elixir-autogen, elixir-format
 msgid "Admin login"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:250
+#: lib/ask_drive_web/components/layouts.ex:273
 #, elixir-autogen, elixir-format
 msgid "Administrator (Elevated)"
 msgstr ""
 
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:84
-#, elixir-autogen, elixir-format
-msgid "Administrator Password"
-msgstr ""
-
-#: lib/ask_drive_web/live/setup_live.ex:91
-#, elixir-autogen, elixir-format
-msgid "Administrator Password (Confirm)"
-msgstr ""
-
-#: lib/ask_drive_web/components/layouts.ex:85
+#: lib/ask_drive_web/components/layouts.ex:111
 #, elixir-autogen, elixir-format
 msgid "All desks"
 msgstr ""
@@ -119,11 +89,6 @@ msgstr ""
 #: lib/ask_drive_web/controllers/auth_html/login.html.heex:136
 #, elixir-autogen, elixir-format
 msgid "An administrator needs to configure Google Secure LDAP or Google Login (OAuth) in Platform Settings."
-msgstr ""
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:46
-#, elixir-autogen, elixir-format
-msgid "An administrator password has not been set yet. You will be prompted for this password when entering the admin area."
 msgstr ""
 
 #: lib/ask_drive_web/live/chat_live.ex:374
@@ -146,15 +111,10 @@ msgstr ""
 msgid "AskDrive Initial Setup"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:302
-#: lib/ask_drive_web/components/layouts.ex:317
+#: lib/ask_drive_web/components/layouts.ex:325
+#: lib/ask_drive_web/components/layouts.ex:340
 #, elixir-autogen, elixir-format
 msgid "Attempting to reconnect"
-msgstr ""
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:96
-#, elixir-autogen, elixir-format
-msgid "Attempts remaining: %{count}"
 msgstr ""
 
 #: lib/ask_drive_web/live/chat_live.ex:247
@@ -162,29 +122,19 @@ msgstr ""
 msgid "Cannot connect to %{provider}"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:95
+#: lib/ask_drive_web/components/layouts.ex:123
 #, elixir-autogen, elixir-format
 msgid "Chat"
 msgstr ""
 
-#: lib/ask_drive_web/live/setup_live.ex:134
+#: lib/ask_drive_web/live/setup_live.ex:117
 #, elixir-autogen, elixir-format
 msgid "Complete Setup"
-msgstr ""
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:67
-#, elixir-autogen, elixir-format
-msgid "Confirm password"
 msgstr ""
 
 #: lib/ask_drive_web/live/chat_live.ex:313
 #, elixir-autogen, elixir-format
 msgid "Connect now"
-msgstr ""
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:93
-#, elixir-autogen, elixir-format
-msgid "Continue as Administrator"
 msgstr ""
 
 #: lib/ask_drive_web/live/chat_live.ex:476
@@ -202,7 +152,7 @@ msgstr ""
 msgid "Database updates or maintenance are in progress. Please wait a moment."
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:95
+#: lib/ask_drive_web/components/layouts.ex:123
 #, elixir-autogen, elixir-format
 msgid "Desk list"
 msgstr ""
@@ -212,27 +162,13 @@ msgstr ""
 msgid "Document"
 msgstr ""
 
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:8
-#, elixir-autogen, elixir-format
-msgid "Elevate to Administrator"
-msgstr ""
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:11
-#, elixir-autogen, elixir-format
-msgid "Elevating as %{email}. This action is recorded in the audit log."
-msgstr ""
-
 #: lib/ask_drive_web/controllers/auth_html/login.html.heex:65
 #, elixir-autogen, elixir-format
 msgid "Email address"
 msgstr ""
 
-#: lib/ask_drive_web/live/setup_live.ex:126
-#, elixir-autogen, elixir-format
-msgid "Email addresses for initial platform administrators (comma-separated)."
-msgstr ""
-
 #: lib/ask_drive_web/controllers/admin_access_html/app_elevate.html.heex:47
+#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:48
 #, elixir-autogen, elixir-format
 msgid "Enter Admin Screen"
 msgstr ""
@@ -254,16 +190,17 @@ msgid "Enter the setup code found on the server."
 msgstr ""
 
 #: lib/ask_drive_web/controllers/admin_access_html/app_elevate.html.heex:11
+#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:11
 #, elixir-autogen, elixir-format
 msgid "Entering as %{email}. Identity verification required. Recorded in audit log."
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:136
+#: lib/ask_drive_web/components/layouts.ex:159
 #, elixir-autogen, elixir-format
 msgid "External AI: %{provider}"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:133
+#: lib/ask_drive_web/components/layouts.ex:156
 #, elixir-autogen, elixir-format
 msgid "External API is used for answering. Document content is sent externally."
 msgstr ""
@@ -293,11 +230,6 @@ msgstr ""
 msgid "Google Drive synchronization or ingestion may not be finished. Please check with an administrator."
 msgstr ""
 
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:43
-#, elixir-autogen, elixir-format
-msgid "Initial Administrator Password Setup"
-msgstr ""
-
 #: lib/ask_drive_web/live/chat_live.ex:336
 #, elixir-autogen, elixir-format
 msgid "Instant answers and document excerpts from your internal policies, manuals, and notes."
@@ -308,14 +240,9 @@ msgstr ""
 msgid "Internal Document Knowledge Assistant"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:215
+#: lib/ask_drive_web/components/layouts.ex:238
 #, elixir-autogen, elixir-format
 msgid "Log out"
-msgstr ""
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:57
-#, elixir-autogen, elixir-format
-msgid "New administrator password (at least %{count} characters)"
 msgstr ""
 
 #: lib/ask_drive_web/controllers/auth_html/login.html.heex:144
@@ -343,12 +270,12 @@ msgstr ""
 msgid "No sign-in method is currently available."
 msgstr ""
 
-#: lib/ask_drive_web/live/setup_live.ex:137
+#: lib/ask_drive_web/live/setup_live.ex:120
 #, elixir-autogen, elixir-format
 msgid "OAuth Client ID / Secret can be configured later in Platform Settings."
 msgstr ""
 
-#: lib/ask_drive_web/live/setup_live.ex:103
+#: lib/ask_drive_web/live/setup_live.ex:84
 #, elixir-autogen, elixir-format
 msgid "Only accounts from this domain will be accepted for Google Login (SSO) and Google Drive."
 msgstr ""
@@ -364,7 +291,7 @@ msgstr ""
 msgid "Open in Drive (p.%{page})"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:72
+#: lib/ask_drive_web/components/layouts.ex:98
 #, elixir-autogen, elixir-format
 msgid "Other desks"
 msgstr ""
@@ -374,13 +301,14 @@ msgstr ""
 msgid "Password (Google Workspace password)"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:183
-#: lib/ask_drive_web/components/layouts.ex:193
+#: lib/ask_drive_web/components/layouts.ex:206
+#: lib/ask_drive_web/components/layouts.ex:216
 #, elixir-autogen, elixir-format
 msgid "Platform Admin"
 msgstr ""
 
 #: lib/ask_drive_web/controllers/admin_access_html/app_elevate.html.heex:52
+#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:53
 #, elixir-autogen, elixir-format
 msgid "Please sign in again for verification (direct access allowed if signed in within %{minutes} minutes)."
 msgstr ""
@@ -400,12 +328,7 @@ msgstr ""
 msgid "Please sign in with your email address and Google Workspace password."
 msgstr ""
 
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:34
-#, elixir-autogen, elixir-format
-msgid "Please try again after %{time}."
-msgstr ""
-
-#: lib/ask_drive_web/components/layouts.ex:168
+#: lib/ask_drive_web/components/layouts.ex:191
 #, elixir-autogen, elixir-format
 msgid "Release"
 msgstr ""
@@ -416,17 +339,12 @@ msgstr ""
 msgid "Relevant excerpts"
 msgstr ""
 
-#: lib/ask_drive_web/live/setup_live.ex:84
-#, elixir-autogen, elixir-format
-msgid "Required when elevating to administrator. Minimum %{length} characters."
-msgstr ""
-
 #: lib/ask_drive_web/live/chat_live.ex:258
 #, elixir-autogen, elixir-format
 msgid "Reset conversation"
 msgstr ""
 
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:107
+#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:73
 #, elixir-autogen, elixir-format
 msgid "Return to Chat"
 msgstr ""
@@ -444,16 +362,6 @@ msgstr ""
 #: lib/ask_drive_web/live/chat_live.ex:630
 #, elixir-autogen, elixir-format
 msgid "Send"
-msgstr ""
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:76
-#, elixir-autogen, elixir-format
-msgid "Set Password"
-msgstr ""
-
-#: lib/ask_drive_web/live/setup_live.ex:55
-#, elixir-autogen, elixir-format
-msgid "Set up your administrator password and organization settings. This screen will remain until setup is finished."
 msgstr ""
 
 #: lib/ask_drive_web/live/chat_live.ex:512
@@ -477,6 +385,7 @@ msgid "Sign in"
 msgstr ""
 
 #: lib/ask_drive_web/controllers/admin_access_html/app_elevate.html.heex:62
+#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:63
 #, elixir-autogen, elixir-format
 msgid "Sign in again to enter Admin"
 msgstr ""
@@ -486,7 +395,7 @@ msgstr ""
 msgid "Sign in with Google"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:309
+#: lib/ask_drive_web/components/layouts.ex:332
 #, elixir-autogen, elixir-format
 msgid "Something went wrong!"
 msgstr ""
@@ -499,11 +408,6 @@ msgstr ""
 #: lib/ask_drive_web/live/chat_live.ex:271
 #, elixir-autogen, elixir-format
 msgid "System is currently under maintenance"
-msgstr ""
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:31
-#, elixir-autogen, elixir-format
-msgid "Temporarily Locked"
 msgstr ""
 
 #: lib/ask_drive_web/live/chat_live.ex:483
@@ -536,27 +440,28 @@ msgstr ""
 msgid "Unlock and start chat"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:253
+#: lib/ask_drive_web/components/layouts.ex:276
 #, elixir-autogen, elixir-format
 msgid "User"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:253
+#: lib/ask_drive_web/components/layouts.ex:276
 #, elixir-autogen, elixir-format
 msgid "User (Eligible for admin)"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:294
+#: lib/ask_drive_web/components/layouts.ex:317
 #, elixir-autogen, elixir-format
 msgid "We can't find the internet"
 msgstr ""
 
-#: lib/ask_drive_web/live/setup_live.ex:114
+#: lib/ask_drive_web/live/setup_live.ex:95
 #, elixir-autogen, elixir-format
 msgid "Will appear in the chat header as \"AskDrive for (this name)\". Can be changed later."
 msgstr ""
 
 #: lib/ask_drive_web/controllers/admin_access_html/app_elevate.html.heex:38
+#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:39
 #, elixir-autogen, elixir-format
 msgid "Your Google Workspace Password (identity verification)"
 msgstr ""
@@ -576,18 +481,63 @@ msgstr ""
 msgid "or"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:113
+#: lib/ask_drive_web/components/layouts.ex:136
 #, elixir-autogen, elixir-format
 msgid "Desk admin"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:112
+#: lib/ask_drive_web/components/layouts.ex:135
 #, elixir-autogen, elixir-format
 msgid "Manage %{desk}"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:153
-#: lib/ask_drive_web/components/layouts.ex:159
+#: lib/ask_drive_web/components/layouts.ex:176
+#: lib/ask_drive_web/components/layouts.ex:182
 #, elixir-autogen, elixir-format
 msgid "Admin mode"
+msgstr ""
+
+#: lib/ask_drive_web/live/setup_live.ex:79
+#, elixir-autogen, elixir-format
+msgid "2. Organization Google Workspace Domain"
+msgstr ""
+
+#: lib/ask_drive_web/live/setup_live.ex:91
+#, elixir-autogen, elixir-format
+msgid "3. First Desk Name"
+msgstr ""
+
+#: lib/ask_drive_web/live/setup_live.ex:102
+#, elixir-autogen, elixir-format
+msgid "4. Platform Administrator Email Addresses"
+msgstr ""
+
+#: lib/ask_drive_web/components/layouts.ex:68
+#, elixir-autogen, elixir-format
+msgid "Anyone who can reach AskDrive can use Platform Admin."
+msgstr ""
+
+#: lib/ask_drive_web/live/setup_live.ex:107
+#, elixir-autogen, elixir-format
+msgid "Email addresses for initial platform administrators (comma-separated). They enter Platform Admin with their own account — no shared password."
+msgstr ""
+
+#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:8
+#, elixir-autogen, elixir-format
+msgid "Enter Platform Admin"
+msgstr ""
+
+#: lib/ask_drive_web/components/layouts.ex:66
+#, elixir-autogen, elixir-format
+msgid "Login is turned off (guest mode)."
+msgstr ""
+
+#: lib/ask_drive_web/live/setup_live.ex:55
+#, elixir-autogen, elixir-format
+msgid "Set up your organization settings and administrators. This screen will remain until setup is finished."
+msgstr ""
+
+#: lib/ask_drive_web/components/layouts.ex:73
+#, elixir-autogen, elixir-format
+msgid "Turn on login"
 msgstr ""

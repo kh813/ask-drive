@@ -2,8 +2,8 @@ defmodule AskDrive.Setup do
   @moduledoc """
   First-access web setup (spec 6.12).
 
-  `app.sh setup` no longer asks for the administrator password or the Google Workspace
-  domain; the first visit to the web UI does, at `/setup`. Because "whoever gets there first
+  `app.sh setup` doesn't ask for the Google Workspace domain or the administrators; the
+  first visit to the web UI does, at `/setup`. Because "whoever gets there first
   becomes the administrator" is unsafe on a shared LAN (and more so once the site is public),
   setup requires a one-time **setup code** that only someone with access to the server can
   read: it is printed in the server log at boot, shown by `./app.sh status`, and stored in
@@ -11,12 +11,11 @@ defmodule AskDrive.Setup do
   completing setup deletes the code.
 
   Setup is required while the platform has no `setup_completed_at` — unless an installation
-  from before this existed already has both an administrator password and a domain, in which
+  from before this existed already has both a platform administrator and a domain, in which
   case it is simply marked complete.
   """
   require Logger
 
-  alias AskDrive.Accounts.AdminAccess
   alias AskDrive.{Apps, PlatformRepo, Settings}
 
   @max_failures 10
@@ -43,7 +42,7 @@ defmodule AskDrive.Setup do
         false
 
       # configured before web setup existed: nothing to ask
-      AdminAccess.password_set?(setting) and present?(setting.allowed_domain) ->
+      present?(setting.allowed_domain) and AskDrive.Accounts.count_eligible_admins() > 0 ->
         {:ok, _} = complete!(setting)
         false
 
@@ -158,8 +157,7 @@ defmodule AskDrive.Setup do
   # --- Completing -----------------------------------------------------------------
 
   @doc """
-  Validates and applies the setup form: `%{"code", "password", "password_confirmation",
-  "domain", "app_name", "admin_emails"}` (the platform administrators, who also become the
+  Validates and applies the setup form: `%{"code", "domain", "app_name", "admin_emails"}` (the platform administrators, who also become the
   default app's administrators, F-1116).
   Returns `:ok` or `{:error, %{field => message}}`.
   """
@@ -167,14 +165,11 @@ defmodule AskDrive.Setup do
     errors =
       %{}
       |> check(:code, code_error(params["code"]))
-      |> check(:password, password_error(params["password"], params["password_confirmation"]))
       |> check(:domain, domain_error(params["domain"]))
       |> check(:app_name, if(present?(params["app_name"]), do: nil, else: "窓口名を入力してください"))
       |> check(:admin_emails, admin_emails_error(params["admin_emails"], params["domain"]))
 
     if errors == %{} do
-      {:ok, _} = AdminAccess.force_set_password(params["password"])
-
       {:ok, setting} =
         Apps.platform(fn ->
           Settings.update_setting(Settings.get_setting!(), %{allowed_domain: params["domain"]})
@@ -219,17 +214,6 @@ defmodule AskDrive.Setup do
       :ok -> nil
       {:error, :locked} -> "入力の失敗が続いたため、しばらく受け付けません（15 分後に再試行してください）"
       {:error, :invalid} -> "セットアップコードが正しくありません"
-    end
-  end
-
-  defp password_error(password, confirmation) do
-    min = AdminAccess.min_password_length()
-
-    cond do
-      not is_binary(password) or String.length(password) < min -> "#{min} 文字以上で入力してください"
-      String.trim(password) != password -> "前後に空白を含めないでください"
-      password != confirmation -> "確認用のパスワードが一致しません"
-      true -> nil
     end
   end
 

@@ -1,7 +1,7 @@
 defmodule AskDrive.CliTask do
   @moduledoc """
   Shared startup for one-off `mix ask_drive.*` recovery tasks (grant_admin,
-  set_admin_password, set_drive_service_account).
+  set_drive_service_account, ...).
 
   These exist specifically so an operator can fix things when the running AskDrive service
   is in a bad state — but `.env.prod` always sets `PHX_SERVER=true`, so a plain `mix

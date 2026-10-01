@@ -16,7 +16,7 @@ msgstr "（ローカルの生成 AI では数十秒かかることがありま�
 msgid "%{count} chunks indexed for search"
 msgstr "%{count} チャンクを検索対象にしています"
 
-#: lib/ask_drive_web/components/layouts.ex:260
+#: lib/ask_drive_web/components/layouts.ex:283
 #, elixir-autogen, elixir-format
 msgid "(%{minutes} min remaining)"
 msgstr "（残り %{minutes} 分）"
@@ -35,26 +35,6 @@ msgstr "（下の引用元の抜粋だけを根拠に生成）"
 #, elixir-autogen, elixir-format
 msgid "1. Setup Code"
 msgstr "1. セットアップコード"
-
-#: lib/ask_drive_web/live/setup_live.ex:80
-#, elixir-autogen, elixir-format
-msgid "2. Administrator Password"
-msgstr "2. 管理者パスワード"
-
-#: lib/ask_drive_web/live/setup_live.ex:98
-#, elixir-autogen, elixir-format
-msgid "3. Organization Google Workspace Domain"
-msgstr "3. 組織の Google Workspace ドメイン"
-
-#: lib/ask_drive_web/live/setup_live.ex:110
-#, elixir-autogen, elixir-format
-msgid "4. First Desk Name"
-msgstr "4. 最初の窓口の名前"
-
-#: lib/ask_drive_web/live/setup_live.ex:121
-#, elixir-autogen, elixir-format
-msgid "5. Platform Administrator Email Addresses"
-msgstr "5. 全体管理者のメールアドレス"
 
 #: lib/ask_drive_web/live/chat_live.ex:196
 #, elixir-autogen, elixir-format
@@ -86,27 +66,17 @@ msgstr "管理者として操作"
 msgid "Actions"
 msgstr "操作"
 
-#: lib/ask_drive_web/components/layouts.ex:125
+#: lib/ask_drive_web/components/layouts.ex:148
 #, elixir-autogen, elixir-format
 msgid "Admin login"
 msgstr "管理者ログイン"
 
-#: lib/ask_drive_web/components/layouts.ex:250
+#: lib/ask_drive_web/components/layouts.ex:273
 #, elixir-autogen, elixir-format
 msgid "Administrator (Elevated)"
 msgstr "管理者（昇格中）"
 
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:84
-#, elixir-autogen, elixir-format
-msgid "Administrator Password"
-msgstr "管理者パスワード"
-
-#: lib/ask_drive_web/live/setup_live.ex:91
-#, elixir-autogen, elixir-format
-msgid "Administrator Password (Confirm)"
-msgstr "管理者パスワード（確認）"
-
-#: lib/ask_drive_web/components/layouts.ex:85
+#: lib/ask_drive_web/components/layouts.ex:111
 #, elixir-autogen, elixir-format
 msgid "All desks"
 msgstr "窓口の一覧"
@@ -115,11 +85,6 @@ msgstr "窓口の一覧"
 #, elixir-autogen, elixir-format
 msgid "An administrator needs to configure Google Secure LDAP or Google Login (OAuth) in Platform Settings."
 msgstr "管理者は、全体管理の「全体設定」→「組織（Google Workspace）」→「ログインの方法」で Google Secure LDAP または Google ログイン（OAuth）を有効にしてください。"
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:46
-#, elixir-autogen, elixir-format
-msgid "An administrator password has not been set yet. You will be prompted for this password when entering the admin area."
-msgstr "まだ管理者パスワードが設定されていません。以後、管理画面に入るたびにこのパスワードの入力を求めます。"
 
 #: lib/ask_drive_web/live/chat_live.ex:374
 #, elixir-autogen, elixir-format
@@ -141,46 +106,31 @@ msgstr "Google Drive ドキュメントについて質問してください"
 msgid "AskDrive Initial Setup"
 msgstr "AskDrive 初回セットアップ"
 
-#: lib/ask_drive_web/components/layouts.ex:302
-#: lib/ask_drive_web/components/layouts.ex:317
+#: lib/ask_drive_web/components/layouts.ex:325
+#: lib/ask_drive_web/components/layouts.ex:340
 #, elixir-autogen, elixir-format
 msgid "Attempting to reconnect"
 msgstr "再接続を試行しています"
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:96
-#, elixir-autogen, elixir-format
-msgid "Attempts remaining: %{count}"
-msgstr "残り試行回数: %{count} 回"
 
 #: lib/ask_drive_web/live/chat_live.ex:247
 #, elixir-autogen, elixir-format
 msgid "Cannot connect to %{provider}"
 msgstr "%{provider} に接続できません"
 
-#: lib/ask_drive_web/components/layouts.ex:95
+#: lib/ask_drive_web/components/layouts.ex:123
 #, elixir-autogen, elixir-format
 msgid "Chat"
 msgstr "チャット"
 
-#: lib/ask_drive_web/live/setup_live.ex:134
+#: lib/ask_drive_web/live/setup_live.ex:117
 #, elixir-autogen, elixir-format
 msgid "Complete Setup"
 msgstr "セットアップを完了する"
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:67
-#, elixir-autogen, elixir-format
-msgid "Confirm password"
-msgstr "確認のためもう一度入力"
 
 #: lib/ask_drive_web/live/chat_live.ex:313
 #, elixir-autogen, elixir-format
 msgid "Connect now"
 msgstr "今すぐ連携する"
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:93
-#, elixir-autogen, elixir-format
-msgid "Continue as Administrator"
-msgstr "管理者として続行"
 
 #: lib/ask_drive_web/live/chat_live.ex:476
 #, elixir-autogen, elixir-format
@@ -197,7 +147,7 @@ msgstr "この質問に関する明確な記載を現在のインデックスか
 msgid "Database updates or maintenance are in progress. Please wait a moment."
 msgstr "データベースの更新またはアップデート作業を行っています。完了までしばらくお待ちください。"
 
-#: lib/ask_drive_web/components/layouts.ex:95
+#: lib/ask_drive_web/components/layouts.ex:123
 #, elixir-autogen, elixir-format
 msgid "Desk list"
 msgstr "窓口一覧"
@@ -207,27 +157,13 @@ msgstr "窓口一覧"
 msgid "Document"
 msgstr "ドキュメント"
 
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:8
-#, elixir-autogen, elixir-format
-msgid "Elevate to Administrator"
-msgstr "管理者権限への昇格"
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:11
-#, elixir-autogen, elixir-format
-msgid "Elevating as %{email}. This action is recorded in the audit log."
-msgstr "%{email} として昇格します。昇格した記録は監査ログに残ります。"
-
 #: lib/ask_drive_web/controllers/auth_html/login.html.heex:65
 #, elixir-autogen, elixir-format
 msgid "Email address"
 msgstr "メールアドレス"
 
-#: lib/ask_drive_web/live/setup_live.ex:126
-#, elixir-autogen, elixir-format
-msgid "Email addresses for initial platform administrators (comma-separated)."
-msgstr "AskDrive 全体を管理する人です（複数ならカンマ区切り）。最初の窓口の担当者（窓口管理者）にもなり、その窓口の設定（Google Drive・API キー等）を行います。"
-
 #: lib/ask_drive_web/controllers/admin_access_html/app_elevate.html.heex:47
+#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:48
 #, elixir-autogen, elixir-format
 msgid "Enter Admin Screen"
 msgstr "管理画面に入る"
@@ -249,16 +185,17 @@ msgid "Enter the setup code found on the server."
 msgstr "サーバーを操作できる人だけが最初の管理者になれるよう、サーバー上で確認できるコードを入力します。"
 
 #: lib/ask_drive_web/controllers/admin_access_html/app_elevate.html.heex:11
+#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:11
 #, elixir-autogen, elixir-format
 msgid "Entering as %{email}. Identity verification required. Recorded in audit log."
 msgstr "%{email} として入ります。本人確認のうえ入り、記録は監査ログに残ります。"
 
-#: lib/ask_drive_web/components/layouts.ex:136
+#: lib/ask_drive_web/components/layouts.ex:159
 #, elixir-autogen, elixir-format
 msgid "External AI: %{provider}"
 msgstr "外部AI: %{provider}"
 
-#: lib/ask_drive_web/components/layouts.ex:133
+#: lib/ask_drive_web/components/layouts.ex:156
 #, elixir-autogen, elixir-format
 msgid "External API is used for answering. Document content is sent externally."
 msgstr "回答生成に外部 API を使用しています。文書本文が送信されます。"
@@ -288,11 +225,6 @@ msgstr "Google Drive が連携されていません"
 msgid "Google Drive synchronization or ingestion may not be finished. Please check with an administrator."
 msgstr "Google Drive の同期・取り込みが完了していない可能性があります。管理者に確認してください（管理画面のドキュメント一覧で各文書の状態とエラーを確認できます）。"
 
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:43
-#, elixir-autogen, elixir-format
-msgid "Initial Administrator Password Setup"
-msgstr "管理者パスワードの初回設定"
-
 #: lib/ask_drive_web/live/chat_live.ex:336
 #, elixir-autogen, elixir-format
 msgid "Instant answers and document excerpts from your internal policies, manuals, and notes."
@@ -303,15 +235,10 @@ msgstr "社内規定、マニュアル、議事録など、取り込まれた文
 msgid "Internal Document Knowledge Assistant"
 msgstr "社内文書ナレッジ回答ボット"
 
-#: lib/ask_drive_web/components/layouts.ex:215
+#: lib/ask_drive_web/components/layouts.ex:238
 #, elixir-autogen, elixir-format
 msgid "Log out"
 msgstr "ログアウト"
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:57
-#, elixir-autogen, elixir-format
-msgid "New administrator password (at least %{count} characters)"
-msgstr "新しい管理者パスワード（%{count} 文字以上）"
 
 #: lib/ask_drive_web/controllers/auth_html/login.html.heex:144
 #, elixir-autogen, elixir-format
@@ -338,12 +265,12 @@ msgstr "検索対象の文書がまだ1件も取り込まれていません。"
 msgid "No sign-in method is currently available."
 msgstr "現在ログインできる方法がありません。"
 
-#: lib/ask_drive_web/live/setup_live.ex:137
+#: lib/ask_drive_web/live/setup_live.ex:120
 #, elixir-autogen, elixir-format
 msgid "OAuth Client ID / Secret can be configured later in Platform Settings."
 msgstr "Google ログインの OAuth クライアント ID / シークレットは、あとで全体管理の「全体設定」で設定できます。"
 
-#: lib/ask_drive_web/live/setup_live.ex:103
+#: lib/ask_drive_web/live/setup_live.ex:84
 #, elixir-autogen, elixir-format
 msgid "Only accounts from this domain will be accepted for Google Login (SSO) and Google Drive."
 msgstr "Google ログイン（SSO）と Google Drive の連携で、このドメインのアカウントだけを受け付けます。"
@@ -359,7 +286,7 @@ msgstr "Drive で開く"
 msgid "Open in Drive (p.%{page})"
 msgstr "Drive で開く（p.%{page}）"
 
-#: lib/ask_drive_web/components/layouts.ex:72
+#: lib/ask_drive_web/components/layouts.ex:98
 #, elixir-autogen, elixir-format
 msgid "Other desks"
 msgstr "ほかの窓口"
@@ -369,13 +296,14 @@ msgstr "ほかの窓口"
 msgid "Password (Google Workspace password)"
 msgstr "パスワード（Google Workspace のパスワード）"
 
-#: lib/ask_drive_web/components/layouts.ex:183
-#: lib/ask_drive_web/components/layouts.ex:193
+#: lib/ask_drive_web/components/layouts.ex:206
+#: lib/ask_drive_web/components/layouts.ex:216
 #, elixir-autogen, elixir-format
 msgid "Platform Admin"
 msgstr "全体管理"
 
 #: lib/ask_drive_web/controllers/admin_access_html/app_elevate.html.heex:52
+#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:53
 #, elixir-autogen, elixir-format
 msgid "Please sign in again for verification (direct access allowed if signed in within %{minutes} minutes)."
 msgstr "本人確認のため、もう一度ログインしてください（ログインから %{minutes} 分以内なら、そのまま管理画面に入れます）。"
@@ -395,12 +323,7 @@ msgstr "Google アカウントでログインしてください。"
 msgid "Please sign in with your email address and Google Workspace password."
 msgstr "メールアドレスと Google Workspace のパスワードでログインしてください。"
 
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:34
-#, elixir-autogen, elixir-format
-msgid "Please try again after %{time}."
-msgstr "%{time} 以降に再度お試しください。"
-
-#: lib/ask_drive_web/components/layouts.ex:168
+#: lib/ask_drive_web/components/layouts.ex:191
 #, elixir-autogen, elixir-format
 msgid "Release"
 msgstr "解除"
@@ -411,17 +334,12 @@ msgstr "解除"
 msgid "Relevant excerpts"
 msgstr "関連しそうな箇所（原文抜粋）"
 
-#: lib/ask_drive_web/live/setup_live.ex:84
-#, elixir-autogen, elixir-format
-msgid "Required when elevating to administrator. Minimum %{length} characters."
-msgstr "管理画面に入る（管理者に昇格する）ときに入力します。%{length} 文字以上。"
-
 #: lib/ask_drive_web/live/chat_live.ex:258
 #, elixir-autogen, elixir-format
 msgid "Reset conversation"
 msgstr "会話をリセット"
 
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:107
+#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:73
 #, elixir-autogen, elixir-format
 msgid "Return to Chat"
 msgstr "チャットに戻る"
@@ -440,16 +358,6 @@ msgstr "相談したい窓口を選んでください。"
 #, elixir-autogen, elixir-format
 msgid "Send"
 msgstr "送信"
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:76
-#, elixir-autogen, elixir-format
-msgid "Set Password"
-msgstr "パスワードを設定"
-
-#: lib/ask_drive_web/live/setup_live.ex:55
-#, elixir-autogen, elixir-format
-msgid "Set up your administrator password and organization settings. This screen will remain until setup is finished."
-msgstr "最初に、管理者パスワードと組織の情報を設定します。この画面はセットアップが終わるまで表示されます。"
 
 #: lib/ask_drive_web/live/chat_live.ex:512
 #, elixir-autogen, elixir-format
@@ -472,6 +380,7 @@ msgid "Sign in"
 msgstr "ログイン"
 
 #: lib/ask_drive_web/controllers/admin_access_html/app_elevate.html.heex:62
+#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:63
 #, elixir-autogen, elixir-format
 msgid "Sign in again to enter Admin"
 msgstr "ログインし直して管理画面に入る"
@@ -481,7 +390,7 @@ msgstr "ログインし直して管理画面に入る"
 msgid "Sign in with Google"
 msgstr "Google でログイン"
 
-#: lib/ask_drive_web/components/layouts.ex:309
+#: lib/ask_drive_web/components/layouts.ex:332
 #, elixir-autogen, elixir-format
 msgid "Something went wrong!"
 msgstr "エラーが発生しました"
@@ -495,11 +404,6 @@ msgstr "引用元"
 #, elixir-autogen, elixir-format
 msgid "System is currently under maintenance"
 msgstr "現在システムメンテナンス中です"
-
-#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:31
-#, elixir-autogen, elixir-format
-msgid "Temporarily Locked"
-msgstr "一時的にロックされています"
 
 #: lib/ask_drive_web/live/chat_live.ex:483
 #, elixir-autogen, elixir-format
@@ -531,27 +435,28 @@ msgstr "未回答（今夜のバッチで回答生成予定）"
 msgid "Unlock and start chat"
 msgstr "解除してチャットを開始"
 
-#: lib/ask_drive_web/components/layouts.ex:253
+#: lib/ask_drive_web/components/layouts.ex:276
 #, elixir-autogen, elixir-format
 msgid "User"
 msgstr "一般ユーザー"
 
-#: lib/ask_drive_web/components/layouts.ex:253
+#: lib/ask_drive_web/components/layouts.ex:276
 #, elixir-autogen, elixir-format
 msgid "User (Eligible for admin)"
 msgstr "一般ユーザー（昇格可）"
 
-#: lib/ask_drive_web/components/layouts.ex:294
+#: lib/ask_drive_web/components/layouts.ex:317
 #, elixir-autogen, elixir-format
 msgid "We can't find the internet"
 msgstr "インターネットに接続できません"
 
-#: lib/ask_drive_web/live/setup_live.ex:114
+#: lib/ask_drive_web/live/setup_live.ex:95
 #, elixir-autogen, elixir-format
 msgid "Will appear in the chat header as \"AskDrive for (this name)\". Can be changed later."
 msgstr "チャット画面に「AskDrive for（この名前）」と表示されます。あとから変更でき、窓口は全体管理で追加できます。"
 
 #: lib/ask_drive_web/controllers/admin_access_html/app_elevate.html.heex:38
+#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:39
 #, elixir-autogen, elixir-format
 msgid "Your Google Workspace Password (identity verification)"
 msgstr "あなたの Google Workspace のパスワード（本人確認）"
@@ -571,18 +476,63 @@ msgstr "閉じる"
 msgid "or"
 msgstr "または"
 
-#: lib/ask_drive_web/components/layouts.ex:113
+#: lib/ask_drive_web/components/layouts.ex:136
 #, elixir-autogen, elixir-format
 msgid "Desk admin"
 msgstr "窓口の管理"
 
-#: lib/ask_drive_web/components/layouts.ex:112
+#: lib/ask_drive_web/components/layouts.ex:135
 #, elixir-autogen, elixir-format
 msgid "Manage %{desk}"
 msgstr "%{desk} の管理"
 
-#: lib/ask_drive_web/components/layouts.ex:153
-#: lib/ask_drive_web/components/layouts.ex:159
+#: lib/ask_drive_web/components/layouts.ex:176
+#: lib/ask_drive_web/components/layouts.ex:182
 #, elixir-autogen, elixir-format
 msgid "Admin mode"
 msgstr "管理者モード"
+
+#: lib/ask_drive_web/live/setup_live.ex:79
+#, elixir-autogen, elixir-format
+msgid "2. Organization Google Workspace Domain"
+msgstr "2. 組織の Google Workspace ドメイン"
+
+#: lib/ask_drive_web/live/setup_live.ex:91
+#, elixir-autogen, elixir-format
+msgid "3. First Desk Name"
+msgstr "3. 最初の窓口の名前"
+
+#: lib/ask_drive_web/live/setup_live.ex:102
+#, elixir-autogen, elixir-format
+msgid "4. Platform Administrator Email Addresses"
+msgstr "4. 全体管理者のメールアドレス"
+
+#: lib/ask_drive_web/components/layouts.ex:68
+#, elixir-autogen, elixir-format
+msgid "Anyone who can reach AskDrive can use Platform Admin."
+msgstr "AskDrive にアクセスできる人は誰でも全体管理を操作できます。"
+
+#: lib/ask_drive_web/live/setup_live.ex:107
+#, elixir-autogen, elixir-format
+msgid "Email addresses for initial platform administrators (comma-separated). They enter Platform Admin with their own account — no shared password."
+msgstr "AskDrive 全体を管理する人です（複数ならカンマ区切り）。各自のアカウントで本人確認して全体管理に入ります（共有のパスワードはありません）。最初の窓口の担当者（窓口管理者）にもなり、その窓口の設定（Google Drive・API キー等）を行います。"
+
+#: lib/ask_drive_web/controllers/admin_access_html/elevate.html.heex:8
+#, elixir-autogen, elixir-format
+msgid "Enter Platform Admin"
+msgstr "全体管理に入る"
+
+#: lib/ask_drive_web/components/layouts.ex:66
+#, elixir-autogen, elixir-format
+msgid "Login is turned off (guest mode)."
+msgstr "ログイン認証が無効です（ゲストモード）。"
+
+#: lib/ask_drive_web/live/setup_live.ex:55
+#, elixir-autogen, elixir-format
+msgid "Set up your organization settings and administrators. This screen will remain until setup is finished."
+msgstr "最初に、組織の情報と全体管理者を設定します。この画面はセットアップが終わるまで表示されます。"
+
+#: lib/ask_drive_web/components/layouts.ex:73
+#, elixir-autogen, elixir-format
+msgid "Turn on login"
+msgstr "ログイン認証を有効にする"

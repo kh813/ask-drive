@@ -40,8 +40,6 @@ defmodule AskDriveWeb.SetupLiveTest do
       view
       |> form("#setup-form", %{
         "code" => "BAD",
-        "password" => "x",
-        "password_confirmation" => "x",
         "domain" => "",
         "app_name" => "IT"
       })
@@ -54,8 +52,6 @@ defmodule AskDriveWeb.SetupLiveTest do
       view
       |> form("#setup-form", %{
         "code" => code,
-        "password" => "correct horse",
-        "password_confirmation" => "correct horse",
         "domain" => "example.com",
         "app_name" => "IT-Support",
         "admin_emails" => "owner@example.com"

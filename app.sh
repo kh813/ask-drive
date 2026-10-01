@@ -50,8 +50,7 @@ AskDrive 管理スクリプト
   deploy             最新コードを取得し、マイグレーションと再ビルド・再起動を実行
   update [options]   Git/Release から自己アップデート (--yes, --ver <version>)
   repair-ollama      .runtime に Ollama をインストール / 再インストール (あとで Ollama に切り替えるとき・llama-server 欠落の修復)
-  admin grant <mail> 指定メールアドレスに管理者への昇格を許可 (ロックアウト時の復旧)
-  admin password     管理者パスワードを再設定 (対話入力)
+  admin grant <mail> 指定メールアドレスを全体管理者にする (ロックアウト時の復旧)
   auth status        ログイン認証・LDAP・管理者アカウントの状態
   auth disable       ログイン認証を無効に戻す (ゲスト・POC。締め出されたときの復旧)
   auth enable [mail…] ログイン認証を有効にする (mail = 管理者に昇格できるアカウント、複数可)
@@ -332,11 +331,8 @@ cmd_admin() {
       fi
       MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.grant_admin "${email}"
       ;;
-    password)
-      MIX_ENV="${MIX_ENV:-prod}" mix ask_drive.set_admin_password
-      ;;
     *)
-      echo -e "${RED}使用方法: ./app.sh admin grant <email> | ./app.sh admin password${NC}"
+      echo -e "${RED}使用方法: ./app.sh admin grant <email>${NC}"
       exit 1
       ;;
   esac

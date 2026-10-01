@@ -150,7 +150,7 @@ defmodule AskDrive.HealthCheck do
     if AskDriveWeb.UserAuth.auth_disabled?() do
       Logger.warning("  [!] 認証: 無効 (ASK_DRIVE_DISABLE_AUTH) — /admin を含め誰でも管理者として操作できます")
     else
-      Logger.info("  [✓] 認証: 有効 (管理画面は Google ログイン + 管理者パスワードが必要)")
+      Logger.info("  [✓] 認証: 有効 (管理画面はログイン + 本人確認が必要)")
     end
   end
 

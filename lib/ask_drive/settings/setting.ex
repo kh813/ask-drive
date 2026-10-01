@@ -78,18 +78,9 @@ defmodule AskDrive.Settings.Setting do
     field :ldap_bind_dn, :string
     field :ldap_bind_password, Binary
 
-    # The app's own administrator password (spec F-1113): digest only, set by the app's
-    # administrator at first access; the platform admin can only clear it (reset)
-    field :app_admin_password_hash, :string
-    field :app_admin_password_reset_at, :utc_datetime
-    field :app_admin_password_reset_by, :string
-
     # --- Administrator elevation (spec 6.2.1.1) ---
-    # Digest only. The password itself is never stored, cast, or rendered.
-    field :admin_password_hash, :string
+    # how long Platform Admin / a desk's admin screen stays open after confirming identity
     field :admin_session_minutes, :integer, default: 30
-    field :admin_max_attempts, :integer, default: 5
-    field :admin_lockout_minutes, :integer, default: 15
 
     # --- App Access Password (spec 6.11 F-1112) ---
     field :access_password_hash, :string
@@ -229,8 +220,6 @@ defmodule AskDrive.Settings.Setting do
         :drive_service_account_json,
         :drive_impersonate_email,
         :admin_session_minutes,
-        :admin_max_attempts,
-        :admin_lockout_minutes,
         :llm_provider,
         :embed_provider,
         :embedding_dim,
@@ -277,14 +266,6 @@ defmodule AskDrive.Settings.Setting do
     |> validate_number(:admin_session_minutes,
       greater_than_or_equal_to: 1,
       less_than_or_equal_to: 480
-    )
-    |> validate_number(:admin_max_attempts,
-      greater_than_or_equal_to: 1,
-      less_than_or_equal_to: 50
-    )
-    |> validate_number(:admin_lockout_minutes,
-      greater_than_or_equal_to: 1,
-      less_than_or_equal_to: 1440
     )
     |> validate_inclusion(:drive_auth_mode, @drive_auth_modes, message: "は対応していない認証方式です")
     |> validate_base_urls()

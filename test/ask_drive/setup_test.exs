@@ -2,7 +2,6 @@ defmodule AskDrive.SetupTest do
   use AskDrive.DataCase, async: false
 
   alias AskDrive.{Apps, Settings, Setup}
-  alias AskDrive.Accounts.AdminAccess
 
   setup do
     dir = Path.join(System.tmp_dir!(), "askdrive_setup_#{System.unique_integer([:positive])}")
@@ -25,8 +24,6 @@ defmodule AskDrive.SetupTest do
   defp valid_params(code) do
     %{
       "code" => code,
-      "password" => "correct horse",
-      "password_confirmation" => "correct horse",
       "domain" => "@Example.COM ",
       "app_name" => "情シス相談窓口",
       "admin_emails" => "Owner@example.com, second@example.com"
@@ -43,12 +40,11 @@ defmodule AskDrive.SetupTest do
     assert Setup.ensure_code() == code
   end
 
-  test "completing setup sets the password, domain and first app name, and burns the code" do
+  test "completing setup sets the domain, first app name and administrators, and burns the code" do
     code = Setup.ensure_code()
     assert :ok = Setup.complete(valid_params(String.downcase(code)))
 
     setting = Settings.get_setting!()
-    assert AdminAccess.password_matches?(setting.admin_password_hash, "correct horse")
     assert setting.allowed_domain == "example.com"
     assert setting.setup_completed_at
     assert Apps.primary().name == "情シス相談窓口"
@@ -71,28 +67,17 @@ defmodule AskDrive.SetupTest do
     assert {:error, errors} =
              Setup.complete(%{
                "code" => "WRONG",
-               "password" => "short",
-               "password_confirmation" => "short",
                "domain" => "not a domain",
                "app_name" => "",
                "admin_emails" => ""
              })
 
     assert errors.code =~ "正しくありません"
-    assert errors.password =~ "文字以上"
+    refute Map.has_key?(errors, :password)
     assert errors.domain =~ "ドメイン名"
     assert errors.app_name
     assert errors.admin_emails =~ "全体管理者"
     refute Settings.get_setting!().setup_completed_at
-  end
-
-  test "a mismatched confirmation is caught" do
-    code = Setup.ensure_code()
-
-    assert {:error, %{password: msg}} =
-             Setup.complete(%{valid_params(code) | "password_confirmation" => "other pass"})
-
-    assert msg =~ "一致しません"
   end
 
   test "wrong codes are locked out after 10 attempts" do
@@ -101,8 +86,8 @@ defmodule AskDrive.SetupTest do
     assert {:error, :locked} = Setup.verify_code(code)
   end
 
-  test "an installation that already has a password and a domain is marked complete" do
-    {:ok, _} = AdminAccess.force_set_password("already set 1")
+  test "an installation that already has a platform administrator and a domain is marked complete" do
+    {:ok, _} = AskDrive.Accounts.grant_admin("boss@example.com")
     {:ok, _} = Settings.update_setting(Settings.get_setting!(), %{allowed_domain: "example.com"})
 
     refute Setup.required?()

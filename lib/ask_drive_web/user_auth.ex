@@ -21,7 +21,7 @@ defmodule AskDriveWeb.UserAuth do
 
   Anyone who can reach the app at all gets full chat and admin access with no accountability
   for who did what — do not use this outside a trusted LAN, and re-enable proper
-  authentication (a real admin password at minimum) before any wider rollout.
+  authentication before any wider rollout.
   """
   use AskDriveWeb, :verified_routes
 
@@ -261,7 +261,7 @@ defmodule AskDriveWeb.UserAuth do
 
       User.admin_eligible?(user) ->
         conn
-        |> put_flash(:info, "管理操作を行うには管理者パスワードを入力してください。")
+        |> put_flash(:info, "全体管理に入るには本人確認をしてください。")
         |> maybe_store_return_to()
         |> redirect(to: ~p"/admin/elevate")
         |> halt()
@@ -432,7 +432,7 @@ defmodule AskDriveWeb.UserAuth do
          redirect_with(
            socket,
            :info,
-           "管理操作を行うには管理者パスワードを入力してください。",
+           "全体管理に入るには本人確認をしてください。",
            ~p"/admin/elevate"
          )}
 
@@ -453,7 +453,8 @@ defmodule AskDriveWeb.UserAuth do
         {:halt, redirect_with(socket, :error, "続行するにはログインしてください。", ~p"/login")}
 
       :elevate ->
-        {:halt, redirect_with(socket, :info, "窓口の管理者パスワードを入力してください。", "/#{slug}/admin/elevate")}
+        {:halt,
+         redirect_with(socket, :info, "窓口の管理画面に入るには本人確認をしてください。", "/#{slug}/admin/elevate")}
 
       {:denied, message} ->
         {:halt, redirect_with(socket, :error, message, "/" <> slug)}

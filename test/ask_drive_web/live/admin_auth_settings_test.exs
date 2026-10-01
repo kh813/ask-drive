@@ -32,7 +32,6 @@ defmodule AskDriveWeb.AdminAuthSettingsTest do
       end)
     )
 
-    {:ok, _} = AskDrive.Accounts.AdminAccess.force_set_password("admin-pass-1")
     {:ok, view, _html} = live(build_conn(), ~p"/admin?tab=settings")
 
     view |> form("#enable-auth-form", %{"admin_email" => "bos@example.com"}) |> render_submit()

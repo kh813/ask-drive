@@ -21,6 +21,7 @@ defmodule AskDriveWeb.HeaderNavTest do
     assert html =~ ~s(href="/admin/elevate")
     assert right_side_ids(html) == ["elevate-link", "locale-switcher"]
     refute html =~ "Act as administrator"
+    refute html =~ ~s(id="guest-mode-banner")
 
     # after: the same place, now the last item of the admin-mode group
     html = conn |> log_in_admin(admin) |> get(~p"/") |> html_response(200)

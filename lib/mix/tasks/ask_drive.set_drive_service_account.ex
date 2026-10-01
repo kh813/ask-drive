@@ -11,8 +11,8 @@ defmodule Mix.Tasks.AskDrive.SetDriveServiceAccount do
 
   This is the recovery path for a chicken-and-egg problem: the settings screen that
   configures Drive sync sits behind Google sign-in and administrator elevation, but if
-  nobody can complete that sign-in yet (broken OAuth redirect_uri, no admin password set,
-  etc.), there is no way to reach it. This task writes directly to the database instead.
+  nobody can complete that sign-in yet (broken OAuth redirect_uri,
+  LDAP unreachable, etc.), there is no way to reach it. This task writes directly to the database instead.
 
   The private key is minted by Google when a service account key is created, so there is
   nothing here to "generate" from scratch by answering prompts. What this task interactively

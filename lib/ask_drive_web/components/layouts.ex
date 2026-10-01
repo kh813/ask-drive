@@ -46,9 +46,35 @@ defmodule AskDriveWeb.Layouts do
   slot :inner_block, required: true
 
   def app(assigns) do
-    assigns = assign(assigns, :remote_provider, remote_generation_provider())
+    assigns =
+      assigns
+      |> assign(:remote_provider, remote_generation_provider())
+      |> assign(:guest_mode?, AskDriveWeb.UserAuth.auth_disabled?())
 
     ~H"""
+    <%!-- Guest mode is for getting started: everyone can reach Platform Admin, so say so on
+          every screen until login is switched on (spec 6.9.6) --%>
+    <div
+      :if={@guest_mode?}
+      id="guest-mode-banner"
+      role="alert"
+      class="bg-red-600 text-white text-xs"
+    >
+      <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span class="inline-flex items-center gap-1.5 font-semibold">
+          <.icon name="hero-exclamation-triangle" class="w-4 h-4" />
+          {gettext("Login is turned off (guest mode).")}
+        </span>
+        <span>{gettext("Anyone who can reach AskDrive can use Platform Admin.")}</span>
+        <.link
+          href={~p"/admin?tab=settings" <> "#auth-settings"}
+          class="underline font-medium hover:text-red-100"
+        >
+          {gettext("Turn on login")}
+        </.link>
+      </div>
+    </div>
+
     <header class="sticky top-0 z-40 border-b border-zinc-200 dark:border-zinc-800 bg-white/85 dark:bg-zinc-950/85 backdrop-blur">
       <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 h-14 flex items-center gap-4">
         <.link navigate={~p"/"} class="flex items-center gap-2.5 shrink-0 group">

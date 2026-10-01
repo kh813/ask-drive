@@ -20,8 +20,12 @@ defmodule AskDriveWeb.AuthDisabledTest do
     conn: conn
   } do
     Application.put_env(:ask_drive, :auth_disabled_by_default, true)
-    {:ok, _view, html} = live(conn, ~p"/admin")
+    {:ok, view, html} = live(conn, ~p"/admin")
     assert html =~ "全体管理"
+
+    # said on every screen while it lasts, with the way to turn login on
+    assert has_element?(view, "#guest-mode-banner a[href='/admin?tab=settings#auth-settings']")
+    assert conn |> get(~p"/it-support") |> html_response(200) =~ ~s(id="guest-mode-banner")
   end
 
   test "ASK_DRIVE_DISABLE_AUTH=false restores login even when the default is on", %{

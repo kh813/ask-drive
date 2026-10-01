@@ -25,8 +25,8 @@ defmodule Mix.Tasks.AskDrive.GrantAdmin do
     case AskDrive.Accounts.grant_admin(email) do
       {:ok, user} ->
         Mix.shell().info("""
-        #{user.email} に管理者権限への昇格を許可しました。
-        Google でログインしたうえで、管理者パスワードを入力すると昇格できます。
+        #{user.email} を全体管理者にしました。
+        ログインしたうえで、ヘッダーの「全体管理」から本人確認をすると入れます。
         """)
 
       {:error, changeset} ->

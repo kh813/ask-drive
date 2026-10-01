@@ -71,7 +71,7 @@ defmodule AskDriveWeb.Router do
 
     get "/admin/elevate", AdminAccessController, :new
     post "/admin/elevate", AdminAccessController, :create
-    post "/admin/password", AdminAccessController, :set_password
+    get "/admin/reauth", AdminAccessController, :reauth
   end
 
   # Releasing rights must work for anyone signed in, even after the elevation lapsed.

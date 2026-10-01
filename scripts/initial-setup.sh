@@ -292,17 +292,16 @@ BANNER
     fi
   done
 
-  # 管理者パスワードと Google Workspace ドメインは、ここでは聞かない（spec 6.12）。
+  # 全体管理者と Google Workspace ドメインは、ここでは聞かない（spec 6.12）。
   # 初回に Web 画面へアクセスしたとき、サーバー上で確認できるセットアップコードを入力して設定する。
   # Google ログイン（SSO）の OAuth クライアント ID / シークレットも、後から全体管理の画面で設定できる。
   GOOGLE_ID=""
   GOOGLE_SECRET=""
   ALLOWED_DOMAIN=""
   ADMIN_EMAILS=""
-  ADMIN_PASSWORD=""
-  echo -e "\n${BLUE}[管理者パスワードと組織のドメイン]${NC}"
+  echo -e "\n${BLUE}[全体管理者と組織のドメイン]${NC}"
   echo "  セットアップ完了後、ブラウザで AskDrive を開くと初回セットアップ画面が表示されます。"
-  echo "  そこで管理者パスワードと Google Workspace ドメインを設定してください。"
+  echo "  そこで Google Workspace ドメインと全体管理者のメールアドレスを設定してください。"
   echo "  画面で求められるセットアップコードは ./app.sh status で確認できます。"
 
   cat << EOF > "${SCRIPT_DIR}/.env.prod"
@@ -319,8 +318,6 @@ GOOGLE_CLIENT_ID=${GOOGLE_ID}
 GOOGLE_CLIENT_SECRET=${GOOGLE_SECRET}
 ASK_DRIVE_ALLOWED_DOMAIN=${ALLOWED_DOMAIN}
 ASK_DRIVE_ADMIN_EMAILS=${ADMIN_EMAILS}
-# 起動時にハッシュ化して DB へ保存される。保存後この値は参照されない。
-ASK_DRIVE_ADMIN_PASSWORD=${ADMIN_PASSWORD}
 
 # --- LLM プロバイダ ---
 ASK_DRIVE_LLM_PROVIDER=${LLM_PROVIDER}

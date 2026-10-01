@@ -1,21 +1,23 @@
 defmodule AskDrive.Accounts.AdminAccess do
   @moduledoc """
-  Administrator elevation: password hashing and verification, attempt throttling, and the
-  audit trail (spec 6.9).
+  Platform administrator elevation and its audit trail (spec 6.9), plus the password
+  hashing the desks' passphrases use (F-1112).
 
-  The password is hashed with PBKDF2-HMAC-SHA512 from `:crypto` rather than a dedicated
-  password-hashing dependency. It is a single shared operator secret on a LAN-only box, and
-  OTP already ships everything needed (N-613).
+  There is no shared administrator password. A platform administrator (`admin_eligible`)
+  confirms it is really them, the same way a desk's administrators do (F-1113):
 
-  Throttling is derived from the audit log instead of session state: an attacker who clears
-  their cookies would otherwise reset the counter (N-615).
+    * with their own password, checked by Secure LDAP, when LDAP sign-in is on — wrong
+      passwords count towards the sign-in lockout (F-1305);
+    * otherwise by having signed in within the last 10 minutes (signing in again if not).
+
+  Passwords are hashed with PBKDF2-HMAC-SHA512 from `:crypto`; OTP already ships
+  everything needed (N-613).
   """
   import Ecto.Query, warn: false
   require Logger
 
-  alias AskDrive.Accounts.{AdminElevationLog, User}
-  alias AskDrive.PlatformRepo
-  alias AskDrive.Settings
+  alias AskDrive.Accounts.{AdminElevationLog, AppAdminAccess, LoginThrottle, User}
+  alias AskDrive.{Ldap, PlatformRepo, Settings}
 
   @digest :sha512
   @iterations 210_000
@@ -73,55 +75,67 @@ defmodule AskDrive.Accounts.AdminAccess do
 
   def password_matches?(_stored, _password), do: false
 
-  @doc """
-  Whether an administrator password has been configured at all.
-  """
-  def password_set?(setting \\ nil) do
-    case stored_hash(setting) do
-      hash when is_binary(hash) and hash != "" -> true
-      _ -> false
-    end
-  end
-
   # --- Elevation ------------------------------------------------------------
 
+  @doc "How an administrator confirms it is them: `:ldap_password` or `:fresh_login`."
+  defdelegate confirmation_method, to: AppAdminAccess
+
   @doc """
-  Attempts to elevate `user` with `password`.
-
-  Returns `{:ok, user}` on success, `{:error, {:locked_out, unlock_at}}` while throttled,
-  `{:error, :not_eligible}`, `{:error, :no_password}` or `{:error, :invalid_password}`.
-  Every outcome is written to the audit log before returning.
+  Elevates a platform administrator with their own password (Secure LDAP). `env` is the
+  connection environment for the sign-in lockout. `{:ok, user}` or `{:error, :not_eligible
+  | {:locked, until} | :invalid_password | {:unavailable, message}}`. Every outcome but an
+  unreachable LDAP server is written to the audit log.
   """
-  # The platform password only: an app's admin screen has its own (AppAdminAccess, F-1113)
-  def elevate(%User{} = user, password, context \\ %{}) do
-    platform_setting = Settings.platform_setting!()
-
+  def elevate_with_password(%User{} = user, password, env, context \\ %{}) do
     cond do
-      not password_set?(platform_setting) ->
-        {:error, :no_password}
+      not User.admin_eligible?(user) ->
+        {:error, :not_eligible}
+
+      match?({:locked, _, _}, LoginThrottle.check(user.email, env.key)) ->
+        {:locked, until, _} = LoginThrottle.check(user.email, env.key)
+        log(user, "locked_out", context)
+        {:error, {:locked, until}}
 
       true ->
-        case locked_out_until(user, platform_setting) do
-          nil -> verify_and_elevate(user, password, platform_setting, context)
-          unlock_at -> deny_locked_out(user, unlock_at, context)
+        case Ldap.authenticate(Settings.platform_setting!(), user.email, password) do
+          {:ok, _} ->
+            LoginThrottle.clear(user.email)
+            grant(user, context)
+
+          {:error, :invalid_credentials} ->
+            LoginThrottle.record_failure(user.email, env, "admin_password")
+            log(user, "denied", context)
+            {:error, :invalid_password}
+
+          {:error, {:unavailable, message}} ->
+            {:error, {:unavailable, message}}
         end
     end
   end
 
-  defp verify_and_elevate(user, password, platform_setting, context) do
-    if password_matches?(platform_setting.admin_password_hash, password) do
-      {:ok, user} = touch_elevated_at(user)
-      log(user, "granted", context)
-      {:ok, user}
-    else
-      log(user, "denied", context)
-      {:error, :invalid_password}
+  @doc """
+  Elevates a platform administrator without a password when the sign-in (unix seconds) is
+  recent enough: `{:ok, user}` or `{:error, :not_eligible | :stale_login}`.
+  """
+  def elevate_with_fresh_login(%User{} = user, authenticated_at, context \\ %{}) do
+    cond do
+      not User.admin_eligible?(user) ->
+        {:error, :not_eligible}
+
+      is_integer(authenticated_at) and
+          System.system_time(:second) - authenticated_at <=
+            AppAdminAccess.fresh_login_minutes() * 60 ->
+        grant(user, context)
+
+      true ->
+        {:error, :stale_login}
     end
   end
 
-  defp deny_locked_out(user, unlock_at, context) do
-    log(user, "locked_out", context)
-    {:error, {:locked_out, unlock_at}}
+  defp grant(user, context) do
+    {:ok, user} = touch_elevated_at(user)
+    log(user, "granted", context)
+    {:ok, user}
   end
 
   @doc """
@@ -213,106 +227,7 @@ defmodule AskDrive.Accounts.AdminAccess do
     max(minutes, 1) * 60
   end
 
-  # --- Throttling -----------------------------------------------------------
-
-  @doc """
-  Returns the `DateTime` the user may try again, or nil when they are not throttled.
-  """
-  def locked_out_until(%User{} = user, setting \\ nil) do
-    setting = resolve_setting(setting)
-    max_attempts = (setting && setting.admin_max_attempts) || 5
-    lockout_minutes = (setting && setting.admin_lockout_minutes) || 15
-    window_start = DateTime.add(DateTime.utc_now(), -lockout_minutes * 60, :second)
-
-    failures =
-      PlatformRepo.all(
-        from l in AdminElevationLog,
-          where:
-            l.email == ^user.email and l.event == "denied" and l.occurred_at >= ^window_start,
-          order_by: [asc: l.occurred_at],
-          select: l.occurred_at
-      )
-
-    if length(failures) >= max_attempts do
-      failures
-      |> List.first()
-      |> DateTime.add(lockout_minutes * 60, :second)
-    end
-  end
-
-  @doc """
-  Attempts remaining before the user is locked out.
-  """
-  def attempts_remaining(%User{} = user, setting \\ nil) do
-    setting = resolve_setting(setting)
-    max_attempts = (setting && setting.admin_max_attempts) || 5
-    lockout_minutes = (setting && setting.admin_lockout_minutes) || 15
-    window_start = DateTime.add(DateTime.utc_now(), -lockout_minutes * 60, :second)
-
-    failures =
-      PlatformRepo.one(
-        from l in AdminElevationLog,
-          where:
-            l.email == ^user.email and l.event == "denied" and l.occurred_at >= ^window_start,
-          select: count(l.id)
-      ) || 0
-
-    max(max_attempts - failures, 0)
-  end
-
-  # --- Password management --------------------------------------------------
-
-  @doc """
-  Sets the first administrator password. Refuses if one already exists (F-917).
-  """
-  def set_initial_password(%User{} = user, password, context \\ %{}) do
-    setting = Settings.platform_setting!()
-
-    cond do
-      password_set?(setting) -> {:error, :already_set}
-      not User.admin_eligible?(user) -> {:error, :not_eligible}
-      true -> store_password(setting, password, user, "password_set", context)
-    end
-  end
-
-  @doc """
-  Changes the platform administrator password. The current password must be supplied
-  (F-914). An app's own password is changed with `AppAdminAccess.change/5` (F-1113).
-  """
-  def change_password(%User{} = user, current_password, new_password, context \\ %{}) do
-    setting = Settings.platform_setting!()
-
-    if password_matches?(setting.admin_password_hash, current_password) do
-      store_password(setting, new_password, user, "password_changed", context)
-    else
-      log(user, "denied", context)
-      {:error, :invalid_password}
-    end
-  end
-
-  @doc """
-  Sets the password with no current-password check. Only for the CLI recovery path (F-920).
-  """
-  def force_set_password(password) do
-    setting = Settings.platform_setting!()
-
-    with :ok <- validate_password(password) do
-      setting
-      |> Ecto.Changeset.change(admin_password_hash: hash_password(password))
-      |> PlatformRepo.update()
-    end
-  end
-
-  defp store_password(setting, password, user, event, context) do
-    with :ok <- validate_password(password),
-         {:ok, updated} <-
-           setting
-           |> Ecto.Changeset.change(admin_password_hash: hash_password(password))
-           |> AskDrive.Repo.update() do
-      log(user, event, context)
-      {:ok, updated}
-    end
-  end
+  # --- Password rules (the desks' passphrases) ------------------------------------
 
   @doc "Minimum length, no surrounding whitespace: `:ok` or `{:error, reason}`."
   def validate_password(password) when is_binary(password) do
@@ -375,13 +290,6 @@ defmodule AskDrive.Accounts.AdminAccess do
     user
     |> User.changeset(%{last_elevated_at: DateTime.utc_now() |> DateTime.truncate(:second)})
     |> PlatformRepo.update()
-  end
-
-  defp stored_hash(setting) do
-    case resolve_setting(setting) do
-      %{admin_password_hash: hash} -> hash
-      _ -> nil
-    end
   end
 
   defp resolve_setting(%{__struct__: _} = setting), do: setting

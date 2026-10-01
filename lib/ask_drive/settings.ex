@@ -19,31 +19,12 @@ defmodule AskDrive.Settings do
         {:ok, setting} =
           %Setting{}
           |> Setting.changeset(default_attrs())
-          |> seed_admin_password()
           |> Repo.insert()
 
         setting
 
       setting ->
         setting
-    end
-  end
-
-  # `ASK_DRIVE_ADMIN_PASSWORD` is a setup convenience: it is hashed once into the singleton
-  # and never read again, so the plaintext does not have to live in the environment
-  # long-term (spec 6.9.4). Applied outside the changeset because the hash is derived, not
-  # user input.
-  defp seed_admin_password(changeset) do
-    case System.get_env("ASK_DRIVE_ADMIN_PASSWORD") do
-      password when is_binary(password) and byte_size(password) > 0 ->
-        Ecto.Changeset.put_change(
-          changeset,
-          :admin_password_hash,
-          AskDrive.Accounts.AdminAccess.hash_password(password)
-        )
-
-      _ ->
-        changeset
     end
   end
 

@@ -7,7 +7,8 @@ defmodule AskDrive.Accounts.User do
   proves identity, and the Phoenix session carries it from there.
 
   There is deliberately no standing admin role. `admin_eligible` says the account may
-  *attempt* to elevate with the admin password; whether it currently holds admin rights is
+  *attempt* to enter Platform Admin (confirming it is them with their own account); whether
+  it currently holds admin rights is
   session state, checked through `AskDriveWeb.UserAuth` (spec 6.9.1).
   """
   use Ecto.Schema
