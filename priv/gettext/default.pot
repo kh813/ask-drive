@@ -21,7 +21,7 @@ msgstr ""
 msgid "%{count} chunks indexed for search"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:260
+#: lib/ask_drive_web/components/layouts.ex:263
 #, elixir-autogen, elixir-format
 msgid "(%{minutes} min remaining)"
 msgstr ""
@@ -81,7 +81,6 @@ msgstr ""
 msgid "AI summaries may contain errors. Always verify key details against the cited sources."
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:123
 #: lib/ask_drive_web/live/chat_live.ex:320
 #, elixir-autogen, elixir-format
 msgid "Act as administrator"
@@ -92,18 +91,18 @@ msgstr ""
 msgid "Actions"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:135
+#: lib/ask_drive_web/components/layouts.ex:125
 #, elixir-autogen, elixir-format
 msgid "Admin login"
 msgstr ""
 
+#: lib/ask_drive_web/components/layouts.ex:153
 #: lib/ask_drive_web/components/layouts.ex:161
-#: lib/ask_drive_web/components/layouts.ex:167
 #, elixir-autogen, elixir-format
 msgid "Admin mode%{remaining}"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:250
+#: lib/ask_drive_web/components/layouts.ex:253
 #, elixir-autogen, elixir-format
 msgid "Administrator (Elevated)"
 msgstr ""
@@ -153,8 +152,8 @@ msgstr ""
 msgid "AskDrive Initial Setup"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:302
-#: lib/ask_drive_web/components/layouts.ex:317
+#: lib/ask_drive_web/components/layouts.ex:305
+#: lib/ask_drive_web/components/layouts.ex:320
 #, elixir-autogen, elixir-format
 msgid "Attempting to reconnect"
 msgstr ""
@@ -265,12 +264,12 @@ msgstr ""
 msgid "Entering as %{email}. Identity verification required. Recorded in audit log."
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:146
+#: lib/ask_drive_web/components/layouts.ex:136
 #, elixir-autogen, elixir-format
 msgid "External AI: %{provider}"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:143
+#: lib/ask_drive_web/components/layouts.ex:133
 #, elixir-autogen, elixir-format
 msgid "External API is used for answering. Document content is sent externally."
 msgstr ""
@@ -315,7 +314,7 @@ msgstr ""
 msgid "Internal Document Knowledge Assistant"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:215
+#: lib/ask_drive_web/components/layouts.ex:218
 #, elixir-autogen, elixir-format
 msgid "Log out"
 msgstr ""
@@ -381,7 +380,8 @@ msgstr ""
 msgid "Password (Google Workspace password)"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:185
+#: lib/ask_drive_web/components/layouts.ex:186
+#: lib/ask_drive_web/components/layouts.ex:196
 #, elixir-autogen, elixir-format
 msgid "Platform Admin"
 msgstr ""
@@ -411,7 +411,7 @@ msgstr ""
 msgid "Please try again after %{time}."
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:192
+#: lib/ask_drive_web/components/layouts.ex:171
 #, elixir-autogen, elixir-format
 msgid "Release"
 msgstr ""
@@ -492,7 +492,7 @@ msgstr ""
 msgid "Sign in with Google"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:309
+#: lib/ask_drive_web/components/layouts.ex:312
 #, elixir-autogen, elixir-format
 msgid "Something went wrong!"
 msgstr ""
@@ -542,17 +542,17 @@ msgstr ""
 msgid "Unlock and start chat"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:253
+#: lib/ask_drive_web/components/layouts.ex:256
 #, elixir-autogen, elixir-format
 msgid "User"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:253
+#: lib/ask_drive_web/components/layouts.ex:256
 #, elixir-autogen, elixir-format
 msgid "User (Eligible for admin)"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:294
+#: lib/ask_drive_web/components/layouts.ex:297
 #, elixir-autogen, elixir-format
 msgid "We can't find the internet"
 msgstr ""
@@ -582,12 +582,12 @@ msgstr ""
 msgid "or"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:114
+#: lib/ask_drive_web/components/layouts.ex:113
 #, elixir-autogen, elixir-format
 msgid "Desk admin"
 msgstr ""
 
-#: lib/ask_drive_web/components/layouts.ex:113
+#: lib/ask_drive_web/components/layouts.ex:112
 #, elixir-autogen, elixir-format
 msgid "Manage %{desk}"
 msgstr ""

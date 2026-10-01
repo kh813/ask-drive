@@ -112,15 +112,6 @@ defmodule AskDriveWeb.Layouts do
             <span class="hidden md:inline">{gettext("Manage %{desk}", desk: @app.name)}</span>
             <span class="md:hidden">{gettext("Desk admin")}</span>
           </.link>
-          <%!-- Eligible but not elevated: the way in is the password prompt, not /admin. --%>
-          <.link
-            :if={not @admin_elevated? and admin_eligible?(@current_user)}
-            href={~p"/admin/elevate"}
-            id="elevate-link"
-            class="px-2.5 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-1"
-          >
-            <.icon name="hero-shield-check" class="w-3.5 h-3.5" /> {gettext("Act as administrator")}
-          </.link>
         </nav>
 
         <div class="flex-1"></div>
@@ -147,8 +138,10 @@ defmodule AskDriveWeb.Layouts do
           )}
         </span>
 
-        <%!-- Admin mode and what only it opens (Platform Admin, Release) form one group, so
-              platform-wide settings read as part of the elevated session, not as a desk tab. --%>
+        <%!-- Admin mode and what only it opens (Release, Platform Admin) form one group, so
+              platform-wide settings read as part of the elevated session, not as a desk tab.
+              "Platform Admin" stays in one place — right before the language switch — before
+              and after elevating; before, it leads to the password prompt. --%>
         <div
           :if={@admin_elevated?}
           id="admin-mode-group"
@@ -171,6 +164,13 @@ defmodule AskDriveWeb.Layouts do
             </span>
           </span>
           <.link
+            href={~p"/admin/release"}
+            id="release-admin-link"
+            class="inline-flex items-center px-2.5 py-1 border-l border-indigo-200/60 dark:border-indigo-800/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition"
+          >
+            {gettext("Release")}
+          </.link>
+          <.link
             :if={is_platform_admin?(@current_user)}
             href={~p"/admin"}
             id="platform-admin-nav-link"
@@ -185,14 +185,16 @@ defmodule AskDriveWeb.Layouts do
           >
             {gettext("Platform Admin")}
           </.link>
-          <.link
-            href={~p"/admin/release"}
-            id="release-admin-link"
-            class="inline-flex items-center px-2.5 py-1 border-l border-indigo-200/60 dark:border-indigo-800/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition"
-          >
-            {gettext("Release")}
-          </.link>
         </div>
+
+        <.link
+          :if={not @admin_elevated? and is_platform_admin?(@current_user)}
+          href={~p"/admin/elevate"}
+          id="elevate-link"
+          class="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-full border border-indigo-200/60 dark:border-indigo-800/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition"
+        >
+          <.icon name="hero-shield-check" class="w-3.5 h-3.5" /> {gettext("Platform Admin")}
+        </.link>
 
         <.locale_switcher />
 
