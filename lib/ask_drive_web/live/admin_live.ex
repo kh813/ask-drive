@@ -33,6 +33,9 @@ defmodule AskDriveWeb.AdminLive do
       :timer.send_interval(5000, self(), :tick)
       # Ollama model download progress (spec F-827)
       Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.LLM.OllamaModels.topic())
+      # a Drive authorization finished in Google's window (spec F-352)
+      if app = socket.assigns[:app],
+        do: Phoenix.PubSub.subscribe(AskDrive.PubSub, "drive_auth:" <> app.slug)
     end
 
     setting = Settings.get_setting!()
@@ -126,6 +129,16 @@ defmodule AskDriveWeb.AdminLive do
         else: socket
 
     {:noreply, socket}
+  end
+
+  # Google brought the authorizing window back to AskDrive and the tokens were saved there
+  def handle_info({:drive_connected, email}, socket) do
+    {:noreply,
+     socket
+     |> assign(:drive_auth_code, "")
+     |> assign(:drive_auth, nil)
+     |> put_flash(:info, "Google Drive 同期アカウント（#{email}）と連携しました。「同期テスト」で確認してください。")
+     |> load_dashboard_data()}
   end
 
   @impl true
@@ -751,7 +764,7 @@ defmodule AskDriveWeb.AdminLive do
         do:
           socket
           |> assign(:drive_login_hint, hint)
-          |> assign(:drive_auth, AskDrive.Drive.OAuth.manual_authorization(hint)),
+          |> assign(:drive_auth, new_drive_auth(socket, hint)),
         else: socket
 
     pasted = params["drive_auth_code"] || socket.assigns[:drive_auth_code] || ""
@@ -4006,16 +4019,6 @@ defmodule AskDriveWeb.AdminLive do
                           >
                             接続
                           </button>
-                        <% @drive_redirect_mode in [:loopback, :host] -> %>
-                          <a
-                            id="drive-connect-btn"
-                            href={
-                              ~p"/auth/google/drive?#{[app: @app && @app.slug, loopback: if(@drive_redirect_mode == :loopback, do: "1", else: "0"), hint: @drive_login_hint, return_to: @base_path <> "/admin?tab=settings"]}"
-                            }
-                            class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm"
-                          >
-                            接続
-                          </a>
                         <% true -> %>
                           <a
                             id="drive-connect-btn"
@@ -4066,20 +4069,17 @@ defmodule AskDriveWeb.AdminLive do
                       を追加して保存し（反映まで数分かかることがあります）、もう一度「接続」を押してください。種類「デスクトップ アプリ」のクライアントなら登録は不要です。
                     </p>
 
-                    <p
-                      :if={@drive_oauth_ready? and @drive_redirect_mode in [:loopback, :host]}
-                      class="text-[11px] text-zinc-500"
-                    >
-                      「接続」を押すと Google のログイン画面に移ります。同期に使うアカウントでログインして「許可」すると、この画面に戻り、自動で保存されます。
-                    </p>
-
                     <div
-                      :if={@drive_oauth_ready? and @drive_redirect_mode == :paste}
+                      :if={@drive_oauth_ready?}
                       id="drive-manual-auth"
                       class="space-y-2 p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/70 dark:border-indigo-900/60 text-[11px] text-zinc-700 dark:text-zinc-300"
                     >
                       <p>
-                        「接続」を押すと、別ウィンドウに Google のログイン画面が開きます。同期に使うアカウントでログインして「許可」すると、別ウィンドウに「このサイトにアクセスできません」などと表示されます（正常です）。そのページの<strong>アドレス</strong>（<code class="font-mono">{@drive_redirect_uri}?state=…&amp;code=…</code>）をコピーして、ここに貼り付けてください。貼り付けると自動で保存します。
+                        「接続」を押すと、別ウィンドウに Google のログイン画面が開きます。同期に使うアカウントでログインして「許可」してください。
+                        <span :if={@drive_redirect_mode in [:loopback, :host]}>
+                          このブラウザからなら、別ウィンドウに「Google Drive と接続しました」と表示され、この画面も自動で「接続中」になります。
+                        </span>
+                        別ウィンドウに「このサイトにアクセスできません」などと表示された場合は（別の PC から操作しているときは正常です）、そのページの<strong>アドレス</strong>（<code class="font-mono">{@drive_redirect_uri}?state=…&amp;code=…</code>）をコピーして、ここに貼り付けてください。貼り付けると自動で保存します。
                       </p>
                       <input
                         type="text"
@@ -5464,12 +5464,27 @@ defmodule AskDriveWeb.AdminLive do
     |> assign_new(:drive_client_open, fn -> false end)
     |> assign_new(:oauth_client_test, fn -> %{} end)
     |> assign_new(:drive_auth_code, fn -> "" end)
-    # keep an authorization in progress (its state / PKCE verifier) across refreshes
-    |> assign(
-      :drive_auth,
-      if(ready?,
-        do: socket.assigns[:drive_auth] || AskDrive.Drive.OAuth.manual_authorization(hint)
-      )
+    |> then(fn socket ->
+      # keep an authorization in progress (its state / PKCE verifier) across refreshes, as
+      # long as it still goes back to the same place
+      current = socket.assigns[:drive_auth]
+
+      auth =
+        cond do
+          not ready? -> nil
+          current && current.redirect_uri == redirect_uri -> current
+          true -> new_drive_auth(socket, hint)
+        end
+
+      assign(socket, :drive_auth, auth)
+    end)
+  end
+
+  defp new_drive_auth(socket, hint) do
+    AskDrive.Drive.OAuth.manual_authorization(
+      hint,
+      socket.assigns[:app] && socket.assigns.app.slug,
+      socket.assigns[:drive_redirect_uri]
     )
   end
 
@@ -5965,11 +5980,13 @@ defmodule AskDriveWeb.AdminLive do
 
   defp finish_drive_auth(socket) do
     alias AskDrive.Drive.OAuth
-    %{state: state, verifier: verifier} = socket.assigns.drive_auth
+    %{state: state, verifier: verifier, redirect_uri: redirect_uri} = socket.assigns.drive_auth
 
     result =
       with {:ok, code} <- OAuth.code_from_paste(socket.assigns.drive_auth_code, state),
-           {:ok, tokens} <- OAuth.exchange_manual_code(code, verifier),
+           # used once: Google's return to AskDrive can't finish it again (F-352)
+           _ <- AskDrive.Drive.PendingAuth.take(state),
+           {:ok, tokens} <- OAuth.exchange_manual_code(code, verifier, redirect_uri),
            :ok <- drive_account_allowed(tokens[:email]),
            {:ok, account} <- Accounts.save_tokens(tokens) do
         {:ok, account}
@@ -5982,7 +5999,7 @@ defmodule AskDriveWeb.AdminLive do
         {:noreply,
          socket
          |> assign(:drive_auth_code, "")
-         |> assign(:drive_auth, OAuth.manual_authorization(socket.assigns.drive_login_hint))
+         |> assign(:drive_auth, nil)
          |> put_flash(:info, "Google Drive 同期アカウント（#{account.email}）と連携しました。「同期テスト」で確認してください。")
          |> load_dashboard_data()}
 

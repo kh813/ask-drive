@@ -153,39 +153,51 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
       assert render(view) =~ "Google で許可されませんでした"
     end
 
-    test "on the server itself (localhost): 接続 goes to Google and comes straight back, no pasting",
+    test "on the server itself (localhost): Google's window comes back to AskDrive, which saves it there and updates the screen (F-352)",
          %{conn: conn} do
       conn = %{conn | host: "localhost"}
       {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
-      refute has_element?(view, "#drive-manual-auth")
 
-      view
-      |> form("#drive-settings-form", %{"drive_login_hint" => "sync@example.com"})
-      |> render_change()
-
-      href = connect_href(view)
-      assert href =~ "/auth/google/drive?"
-      assert query(href)["loopback"] == "1"
-
-      location = conn |> get(href) |> redirected_to()
-      q = query(location)
-      assert location =~ "accounts.google.com"
+      # 接続 opens Google in a new window; the paste box is there as a fallback
+      assert has_element?(view, "#drive-connect-btn[target='_blank']")
+      assert has_element?(view, "#drive-manual-auth")
+      q = query(connect_href(view))
       assert q["redirect_uri"] =~ ~r{^http://localhost:\d+/auth/google/callback$}
-      assert q["login_hint"] == "sync@example.com"
-      assert q["client_id"] == "desk.apps.googleusercontent.com"
+
+      # Google answers on AskDrive's callback, without the admin screen's session: the
+      # state names the pending authorization (here: refused at Google, so no network)
+      resp =
+        get(build_conn(), "/auth/google/callback", %{
+          "state" => q["state"],
+          "error" => "access_denied"
+        })
+
+      assert resp.status == 400
+      assert resp.resp_body =~ "Google で許可されませんでした"
+
+      # used once
+      refute AskDrive.Drive.PendingAuth.pending?(q["state"])
+
+      # a success elsewhere tells the open admin screen
+      Phoenix.PubSub.broadcast(
+        AskDrive.PubSub,
+        "drive_auth:it-support",
+        {:drive_connected, "sync@example.com"}
+      )
+
+      assert render(view) =~ "sync@example.com"
     end
 
-    test "from another PC by a host name Google accepts: Google comes back to that host, no pasting (F-350)",
+    test "from another PC by a host name Google accepts: Google comes back to that host (F-350)",
          %{conn: conn} do
       {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
-      refute has_element?(view, "#drive-manual-auth")
       assert has_element?(view, "#drive-connect-target", "www.example.com/auth/google/callback")
       assert has_element?(view, "#drive-connect-target", "desk.apps.googleusercontent.com")
+      assert has_element?(view, "#drive-manual-auth")
 
-      href = connect_href(view)
-      assert query(href)["loopback"] == "0"
-      location = conn |> get(href) |> redirected_to()
-      assert query(location)["redirect_uri"] == "http://www.example.com/auth/google/callback"
+      q = query(connect_href(view))
+      assert q["redirect_uri"] == "http://www.example.com/auth/google/callback"
+      assert AskDrive.Drive.PendingAuth.pending?(q["state"])
     end
 
     test "without an OAuth client, 接続 opens the one-time client section and says what's needed",

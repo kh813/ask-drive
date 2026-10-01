@@ -194,15 +194,16 @@ defmodule AskDrive.Drive.OAuth do
   Starts a Drive authorization to finish by pasting: `%{url:, state:, verifier:}`.
   `login_hint` (an e-mail) preselects the account to sync with.
   """
-  def manual_authorization(login_hint \\ nil) do
+  def manual_authorization(login_hint \\ nil, app \\ nil, redirect_uri \\ nil) do
     state = random_token()
     verifier = random_token() <> random_token()
     challenge = :crypto.hash(:sha256, verifier) |> Base.url_encode64(padding: false)
+    redirect_uri = redirect_uri || manual_redirect_uri()
 
     params =
       %{
         client_id: elem(drive_client(), 0),
-        redirect_uri: manual_redirect_uri(),
+        redirect_uri: redirect_uri,
         response_type: "code",
         scope: Enum.join(@drive_scopes, " "),
         state: state,
@@ -215,7 +216,19 @@ defmodule AskDrive.Drive.OAuth do
         &if(present?(login_hint), do: Map.put(&1, :login_hint, String.trim(login_hint)), else: &1)
       )
 
-    %{url: @auth_endpoint <> "?" <> URI.encode_query(params), state: state, verifier: verifier}
+    # whichever finishes it — Google returning to AskDrive's callback, or a paste (F-352)
+    AskDrive.Drive.PendingAuth.put(state, %{
+      verifier: verifier,
+      redirect_uri: redirect_uri,
+      app: app
+    })
+
+    %{
+      url: @auth_endpoint <> "?" <> URI.encode_query(params),
+      state: state,
+      verifier: verifier,
+      redirect_uri: redirect_uri
+    }
   end
 
   @doc """
@@ -246,8 +259,11 @@ defmodule AskDrive.Drive.OAuth do
   end
 
   @doc "Exchanges a pasted code for the Drive sync account's tokens (with the PKCE verifier)."
-  def exchange_manual_code(code, verifier),
-    do: exchange_code(code, manual_redirect_uri(), :drive, %{code_verifier: verifier})
+  def exchange_manual_code(code, verifier, redirect_uri \\ nil),
+    do:
+      exchange_code(code, redirect_uri || manual_redirect_uri(), :drive, %{
+        code_verifier: verifier
+      })
 
   @doc """
   Checks an OAuth client ID / secret without anyone signing in (F-349): the token endpoint is

@@ -238,7 +238,96 @@ defmodule AskDriveWeb.AuthController do
   @doc """
   Handles the shared OAuth callback for whichever flow the session recorded.
   """
-  def callback(conn, %{"code" => code, "state" => state}) do
+  # A Drive authorization started from a desk's admin screen (F-352): Google brought the
+  # browser back here — on the server itself, or to a host name AskDrive answers on. The
+  # state names it, and its PKCE verifier never left the server, so no session is needed.
+  def callback(conn, %{"state" => state} = params) when is_binary(state) and state != "" do
+    if AskDrive.Drive.PendingAuth.pending?(state),
+      do: finish_pending_drive_auth(conn, state, params),
+      else: session_callback(conn, params)
+  end
+
+  def callback(conn, params), do: session_callback(conn, params)
+
+  defp finish_pending_drive_auth(conn, state, params) do
+    auth = AskDrive.Drive.PendingAuth.take(state)
+
+    result =
+      cond do
+        is_nil(auth) ->
+          {:error, "この認可は期限が切れました。AskDrive の画面で「接続」からやり直してください。"}
+
+        params["error"] ->
+          {:error, "Google で許可されませんでした（#{params["error"]}）。"}
+
+        true ->
+          in_app(auth.app, fn ->
+            with {:ok, tokens} <-
+                   OAuth.exchange_manual_code(params["code"], auth.verifier, auth.redirect_uri),
+                 :ok <- drive_account_in_domain(tokens[:email]),
+                 {:ok, account} <- Accounts.save_tokens(tokens) do
+              {:ok, account}
+            end
+          end)
+      end
+
+    case result do
+      {:ok, account} ->
+        app = desk(auth.app)
+
+        Phoenix.PubSub.broadcast(
+          AskDrive.PubSub,
+          "drive_auth:" <> app.slug,
+          {:drive_connected, account.email}
+        )
+
+        drive_auth_page(
+          conn,
+          :ok,
+          "Google Drive と接続しました（#{account.email}）。このウィンドウを閉じて、AskDrive の画面に戻ってください。"
+        )
+
+      {:error, {:domain, domain}} ->
+        drive_auth_page(conn, :error, "組織のドメイン（@#{domain}）のアカウントで認可してください。")
+
+      {:error, message} when is_binary(message) ->
+        drive_auth_page(conn, :error, message)
+
+      {:error, reason} ->
+        drive_auth_page(conn, :error, "トークンを取得できませんでした: #{inspect(reason)}")
+    end
+  end
+
+  defp drive_account_in_domain(email) do
+    domain = Settings.platform_setting!().allowed_domain
+
+    cond do
+      domain in [nil, ""] ->
+        :ok
+
+      is_binary(email) and
+          String.ends_with?(String.downcase(email), "@" <> String.downcase(domain)) ->
+        :ok
+
+      true ->
+        {:error, {:domain, domain}}
+    end
+  end
+
+  # a page of its own: this is the window Google opened, not the admin screen
+  defp drive_auth_page(conn, status, message) do
+    color = if status == :ok, do: "#047857", else: "#b91c1c"
+    message = message |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()
+
+    conn
+    |> put_resp_content_type("text/html")
+    |> send_resp(
+      if(status == :ok, do: 200, else: 400),
+      ~s(<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>AskDrive</title></head><body style="font-family:sans-serif;max-width:36rem;margin:4rem auto;padding:0 1rem"><h1 style="font-size:1.1rem">AskDrive — Google Drive 同期</h1><p id="drive-auth-result" style="color:#{color}">#{message}</p></body></html>)
+    )
+  end
+
+  defp session_callback(conn, %{"code" => code, "state" => state}) do
     session_state = get_session(conn, :oauth_state)
     flow = get_session(conn, :oauth_flow) || "login"
     return_to = get_session(conn, :oauth_return_to) || "/"
@@ -263,7 +352,7 @@ defmodule AskDriveWeb.AuthController do
     end
   end
 
-  def callback(conn, %{"error" => error}) do
+  defp session_callback(conn, %{"error" => error}) do
     flow = get_session(conn, :oauth_flow) || "login"
     auth_failed(conn, flow, "Google 認証がキャンセルまたは失敗しました: #{error}")
   end
