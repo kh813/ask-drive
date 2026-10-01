@@ -9,6 +9,7 @@ defmodule AskDriveWeb.OAuthToggleTest do
     {:ok, _} =
       Settings.update_setting(Settings.platform_setting!(), %{
         "google_client_id" => "cid.apps.googleusercontent.com",
+        "google_client_secret" => "secret",
         "oauth_login_enabled" => "true"
       })
 
@@ -51,7 +52,7 @@ defmodule AskDriveWeb.OAuthToggleTest do
     on_exit(fn -> System.delete_env("ASK_DRIVE_DISABLE_AUTH") end)
 
     {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
-    assert has_element?(view, "#org-settings #oauth-settings", "有効")
+    assert has_element?(view, "#org-settings #oauth-settings", "ログイン: 有効")
     assert has_element?(view, "#org-settings #ldap-settings")
 
     view
@@ -59,7 +60,8 @@ defmodule AskDriveWeb.OAuthToggleTest do
     |> render_submit()
 
     refute Settings.platform_setting!().oauth_login_enabled
-    assert has_element?(view, "#oauth-settings", "無効")
+    # Drive sync keeps using the same OAuth client
+    assert has_element?(view, "#oauth-settings", "ログイン: 無効（Drive 同期のみ）")
 
     view
     |> form("#oauth-form", %{"setting" => %{"oauth_login_enabled" => "true"}})

@@ -10,7 +10,7 @@ defmodule AskDriveWeb.AuthController do
   use AskDriveWeb, :controller
 
   alias AskDrive.Accounts
-  alias AskDrive.Accounts.LoginThrottle
+  alias AskDrive.Accounts.{AppAdminAccess, LoginThrottle}
   alias AskDrive.Drive.OAuth
   alias AskDrive.Ldap
   alias AskDrive.Settings
@@ -144,11 +144,38 @@ defmodule AskDriveWeb.AuthController do
   Starts the Drive sync account authorization flow (administrators only).
   """
   def request_drive(conn, params) do
-    # The callback URL is shared by every app, so remember which app is authorizing (6.11)
-    conn
-    |> put_session(:oauth_app, params["app"])
-    |> start_oauth(:drive, params["return_to"] || "/admin?tab=settings")
+    if drive_manager?(conn, params["app"]) do
+      # The callback URL is shared by every app, so remember which app is authorizing (6.11)
+      conn
+      |> put_session(:oauth_app, params["app"])
+      |> start_oauth(:drive, params["return_to"] || "/admin?tab=settings")
+    else
+      not_drive_manager(conn, params["app"])
+    end
   end
+
+  # A desk's Drive sync account belongs to its settings: its administrators, inside its
+  # admin screen (the per-desk elevation of F-1113), may (re)authorize or revoke it — not
+  # platform administrators who aren't assigned to it. Guest mode lets everyone in.
+  defp drive_manager?(conn, slug) do
+    app = desk(slug)
+    tokens = get_session(conn, AppAdminAccess.session_key()) || %{}
+
+    UserAuth.auth_disabled?() or
+      (is_map(conn.assigns[:current_user]) and
+         AppAdminAccess.elevated?(tokens[app.slug], conn.assigns.current_user, app))
+  end
+
+  defp not_drive_manager(conn, slug) do
+    app = desk(slug)
+
+    conn
+    |> clear_oauth_session()
+    |> put_flash(:error, "Google Drive の連携は、窓口「#{app.name}」の管理画面に入っている窓口管理者だけが行えます。")
+    |> redirect(to: "/#{app.slug}/admin?tab=settings")
+  end
+
+  defp desk(slug), do: AskDrive.Apps.get_by_slug(slug || "") || AskDrive.Apps.primary()
 
   defp start_oauth(conn, flow, return_to) do
     if OAuth.get_client_id() == "" do
@@ -184,11 +211,8 @@ defmodule AskDriveWeb.AuthController do
         |> put_flash(:error, "不正な認証リクエスト (state 不一致) です。もう一度お試しください。")
         |> redirect(to: fallback_path(conn, flow))
 
-      flow == "drive" and not conn.assigns[:admin_elevated?] ->
-        conn
-        |> clear_oauth_session()
-        |> put_flash(:error, "Drive 連携は管理者権限に昇格したセッションでのみ実行できます。")
-        |> redirect(to: ~p"/")
+      flow == "drive" and not drive_manager?(conn, get_session(conn, :oauth_app)) ->
+        not_drive_manager(conn, get_session(conn, :oauth_app))
 
       true ->
         case OAuth.exchange_code(code, callback_url(conn)) do
@@ -216,11 +240,15 @@ defmodule AskDriveWeb.AuthController do
   Revokes and forgets the Drive sync account (administrators only).
   """
   def disconnect(conn, params) do
-    in_app(params["app"], &Accounts.disconnect_account/0)
+    if drive_manager?(conn, params["app"]) do
+      in_app(params["app"], &Accounts.disconnect_account/0)
 
-    conn
-    |> put_flash(:info, "Google アカウントの連携を解除しました。")
-    |> redirect(to: params["return_to"] || ~p"/admin?tab=settings")
+      conn
+      |> put_flash(:info, "Google アカウントの連携を解除しました。")
+      |> redirect(to: params["return_to"] || ~p"/admin?tab=settings")
+    else
+      not_drive_manager(conn, params["app"])
+    end
   end
 
   # Runs `fun` in the named app's database (the Drive sync account is per app, spec 6.11);

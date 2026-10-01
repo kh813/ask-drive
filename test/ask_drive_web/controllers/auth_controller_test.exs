@@ -60,7 +60,9 @@ defmodule AskDriveWeb.AuthControllerTest do
     assert redirected_to(conn) == ~p"/login"
   end
 
-  test "DELETE /auth/google disconnects account for an elevated administrator", %{conn: conn} do
+  # A desk's Drive sync account is its administrators' to change (F-345)
+  test "the desk's administrator, inside its admin screen, disconnects its Drive account; a platform administrator not assigned can't",
+       %{conn: conn} do
     Accounts.save_tokens(%{
       email: "test@example.com",
       access_token: "tok",
@@ -68,12 +70,38 @@ defmodule AskDriveWeb.AuthControllerTest do
       expires_in: 3600
     })
 
+    boss = user_fixture(admin_eligible: true)
+
+    denied =
+      conn
+      |> log_in_admin(boss)
+      |> delete(~p"/auth/google", app: "it-support", return_to: "/")
+
+    assert redirected_to(denied) == "/it-support/admin?tab=settings"
     assert Accounts.get_account() != nil
 
-    admin = user_fixture(admin_eligible: true)
-    conn = conn |> log_in_admin(admin) |> delete(~p"/auth/google", return_to: "/")
+    # starting a new authorization is refused the same way
+    assert build_conn()
+           |> log_in_admin(boss)
+           |> get(~p"/auth/google/drive", app: "it-support")
+           |> redirected_to() == "/it-support/admin?tab=settings"
 
+    owner = user_fixture()
+    {:ok, _} = Accounts.add_app_admin(owner, "it-support")
+
+    elevated =
+      build_conn()
+      |> log_in_user(owner)
+      |> Plug.Conn.put_session("app_admin_elevations", %{
+        "it-support" => %{"at" => System.system_time(:second), "user" => owner.id}
+      })
+
+    conn = delete(elevated, ~p"/auth/google", app: "it-support", return_to: "/")
     assert redirected_to(conn) == ~p"/"
     assert Accounts.get_account() == nil
+
+    # and may start the authorization (off to Google)
+    conn = get(elevated, ~p"/auth/google/drive", app: "it-support")
+    assert redirected_to(conn) =~ "accounts.google.com"
   end
 end

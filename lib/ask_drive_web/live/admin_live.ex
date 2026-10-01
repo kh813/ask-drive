@@ -3177,24 +3177,27 @@ defmodule AskDriveWeb.AdminLive do
                 class="p-4 rounded-xl border border-zinc-200/80 dark:border-zinc-800 space-y-3"
               >
                 <h3 class="font-semibold text-sm text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
-                  <.icon name="hero-key" class="w-4 h-4 text-indigo-500" /> Google ログイン（OAuth）
+                  <.icon name="hero-key" class="w-4 h-4 text-indigo-500" />
+                  Google OAuth（ログイン / Drive 同期）
                   <span class={[
                     "text-[11px] font-medium px-2 py-0.5 rounded-full",
-                    if(AskDrive.Drive.OAuth.login_enabled?(),
+                    if(oauth_status(@setting) == :login,
                       do:
                         "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
                       else: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
                     )
                   ]}>
-                    {cond do
-                      AskDrive.Drive.OAuth.get_client_id() == "" -> "未設定"
-                      AskDrive.Drive.OAuth.login_enabled?() -> "有効"
-                      true -> "無効"
+                    {case oauth_status(@setting) do
+                      :unset -> "未設定"
+                      :login -> "ログイン: 有効"
+                      :drive_only -> "ログイン: 無効（Drive 同期のみ）"
                     end}
                   </span>
                 </h3>
                 <p class="text-xs text-zinc-500 leading-relaxed">
-                  ログイン画面に「Google でログイン」を出します（Google のログイン画面を通るため 2 段階認証がかかります）。Google Cloud Console に承認済みのリダイレクト URI（公開ドメイン）を登録できる環境で使えます。無効にしても認証情報は残り、Drive 同期の OAuth 連携には影響しません。
+                  クライアント ID / シークレットは、<strong>ログイン</strong>（「Google でログイン」）と、窓口の<strong>Google Drive 同期の OAuth</strong>（専用アカウントでの認可）で共通です。下の「Google ログインを有効にする」はログイン画面にだけ関係し、オフのままでも窓口の Drive 同期には OAuth を使えます（Google のログイン画面を通るため 2 段階認証がかかります）。Google Cloud Console に、承認済みのリダイレクト URI として
+                  <code class="font-mono">https://（公開ホスト名）/auth/google/callback</code>
+                  を登録してください（ログインと Drive 同期で共通）。
                 </p>
                 <.form for={@form} id="oauth-form" phx-submit="save_settings" class="space-y-3">
                   <input type="hidden" name="setting[oauth_login_enabled]" value="false" />
@@ -3818,7 +3821,7 @@ defmodule AskDriveWeb.AdminLive do
                   disabled={not @drive_oauth_ready?}
                   title={
                     if not @drive_oauth_ready?,
-                      do: "全体設定で Google ログイン（OAuth）のクライアント ID / シークレットを設定すると使えます"
+                      do: "全体設定の「Google OAuth（ログイン / Drive 同期）」でクライアント ID / シークレットを設定すると使えます"
                   }
                   class={[
                     "px-3 py-1.5 rounded-lg transition",
@@ -3858,7 +3861,7 @@ defmodule AskDriveWeb.AdminLive do
                 id="drive-oauth-unavailable"
                 class="text-[11px] text-zinc-500"
               >
-                OAuth（専用アカウント）は、全体設定の「組織（Google Workspace）」→「Google ログイン（OAuth）」でクライアント ID / シークレットを設定すると選べます。
+                OAuth（専用アカウント）は、全体設定の「組織（Google Workspace）」→「Google OAuth（ログイン / Drive 同期）」でクライアント ID / シークレットを設定すると選べます（Google ログインを有効にする必要はありません）。
               </p>
 
               <%= if @drive_mode == "service_account" do %>
@@ -5144,6 +5147,15 @@ defmodule AskDriveWeb.AdminLive do
 
   def handle_async(:drive_sync_test, {:exit, reason}, socket),
     do: {:noreply, assign(socket, :drive_sync_test, {:error, "同期テストに失敗しました: #{inspect(reason)}"})}
+
+  # Takes the settings so the badge re-renders when they're saved (LiveView tracks assigns)
+  defp oauth_status(_setting) do
+    cond do
+      not AskDrive.Drive.OAuth.client_configured?() -> :unset
+      AskDrive.Drive.OAuth.login_enabled?() -> :login
+      true -> :drive_only
+    end
+  end
 
   # Without the platform's OAuth client, OAuth can't be used: show the service account
   # (saving it switches the desk over), whatever mode is stored (F-345)

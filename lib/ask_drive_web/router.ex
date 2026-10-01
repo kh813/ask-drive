@@ -97,9 +97,15 @@ defmodule AskDriveWeb.Router do
       ] do
       live "/admin", AdminLive, :platform
     end
+  end
 
-    # Authorizing and revoking the Drive sync account changes what the whole system reads,
-    # so it needs the same elevated session as the settings screen.
+  # --- A desk's Drive sync account (spec F-345) -----------------------------
+  # Authorizing / revoking it is part of a desk's settings, so it's for that desk's
+  # administrators inside its admin screen (checked per desk in AuthController), not only
+  # for platform administrators.
+  scope "/", AskDriveWeb do
+    pipe_through [:browser, :require_authenticated_user]
+
     get "/auth/google/drive", AuthController, :request_drive
     get "/auth/google/disconnect", AuthController, :disconnect
     delete "/auth/google", AuthController, :disconnect
