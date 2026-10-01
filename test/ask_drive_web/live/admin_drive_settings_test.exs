@@ -33,20 +33,39 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
     assert has_element?(view, "#drive-sync-test-result", "先に認証")
   end
 
-  test "OAuth is greyed out until the platform's OAuth client is configured", %{conn: conn} do
+  test "Drive sync by a real Google account with the desk's own OAuth client, no platform OAuth (F-346)",
+       %{conn: conn} do
     {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
-    assert has_element?(view, "#drive-auth-mode-oauth[disabled]")
-    assert has_element?(view, "#drive-oauth-unavailable")
 
-    {:ok, _} =
-      Settings.update_setting(Settings.platform_setting!(), %{
-        "google_client_id" => "cid.apps.googleusercontent.com",
-        "google_client_secret" => "secret"
-      })
+    # selectable although the platform has no OAuth client
+    view |> element("#drive-auth-mode-oauth") |> render_click()
+    assert Settings.get_setting!().drive_auth_mode == "oauth"
+    assert has_element?(view, "#drive-oauth-client-form")
+    assert has_element?(view, "#drive-oauth-client-missing")
+    refute has_element?(view, "a[href^='/auth/google/drive']")
 
-    {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
-    refute has_element?(view, "#drive-auth-mode-oauth[disabled]")
-    refute has_element?(view, "#drive-oauth-unavailable")
+    view
+    |> form("#drive-oauth-client-form", %{
+      "setting" => %{
+        "drive_oauth_client_id" => "desk.apps.googleusercontent.com",
+        "drive_oauth_client_secret" => "desk-secret"
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "a[href^='/auth/google/drive']")
+    refute has_element?(view, "#drive-oauth-client-missing")
+
+    # the platform's Google login stays unset and off
+    refute AskDrive.Drive.OAuth.client_configured?()
+    refute AskDrive.Drive.OAuth.login_enabled?()
+
+    # authorizing goes to Google with the desk's client, asking for offline Drive access
+    location = conn |> get(~p"/auth/google/drive", app: "it-support") |> redirected_to()
+    assert location =~ "accounts.google.com"
+    assert location =~ "client_id=desk.apps.googleusercontent.com"
+    assert location =~ "drive.readonly"
+    assert location =~ "access_type=offline"
   end
 
   test "the delegation field is called アクセスユーザー", %{conn: conn} do

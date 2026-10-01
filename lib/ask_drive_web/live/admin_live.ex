@@ -725,12 +725,6 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   @impl true
-  def handle_event("set_drive_auth_mode", %{"mode" => "oauth"}, socket)
-      when not socket.assigns.drive_oauth_ready? do
-    {:noreply,
-     put_flash(socket, :error, "OAuth は、全体設定で Google OAuth のクライアント ID / シークレットを設定すると使えます。")}
-  end
-
   def handle_event("set_drive_auth_mode", %{"mode" => mode}, socket) do
     case Settings.update_setting(socket.assigns.setting, %{drive_auth_mode: mode}) do
       {:ok, updated} ->
@@ -3811,33 +3805,22 @@ defmodule AskDriveWeb.AdminLive do
               </div>
 
               <div class="flex gap-2 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 w-fit text-xs font-medium">
-                <%!-- OAuth uses the platform's Google OAuth client: without it there's nothing to
-                      authorize with, so the choice is greyed out (F-345) --%>
+                <%!-- OAuth: a real Google account authorizes Drive sync, with this desk's own OAuth
+                      client or the platform's (F-346) --%>
                 <button
                   type="button"
                   id="drive-auth-mode-oauth"
                   phx-click="set_drive_auth_mode"
                   phx-value-mode="oauth"
-                  disabled={not @drive_oauth_ready?}
-                  title={
-                    if not @drive_oauth_ready?,
-                      do: "全体設定の「Google OAuth（ログイン / Drive 同期）」でクライアント ID / シークレットを設定すると使えます"
-                  }
                   class={[
                     "px-3 py-1.5 rounded-lg transition",
-                    cond do
-                      not @drive_oauth_ready? ->
-                        "text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
-
-                      @drive_mode == "oauth" ->
-                        "bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-100"
-
-                      true ->
-                        "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-                    end
+                    if(@drive_mode == "oauth",
+                      do: "bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-100",
+                      else: "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                    )
                   ]}
                 >
-                  OAuth（専用アカウント）
+                  OAuth（実在の Google アカウント）
                 </button>
                 <button
                   type="button"
@@ -3855,14 +3838,6 @@ defmodule AskDriveWeb.AdminLive do
                   サービスアカウント
                 </button>
               </div>
-
-              <p
-                :if={not @drive_oauth_ready?}
-                id="drive-oauth-unavailable"
-                class="text-[11px] text-zinc-500"
-              >
-                OAuth（専用アカウント）は、全体設定の「組織（Google Workspace）」→「Google OAuth（ログイン / Drive 同期）」でクライアント ID / シークレットを設定すると選べます（Google ログインを有効にする必要はありません）。
-              </p>
 
               <%= if @drive_mode == "service_account" do %>
                 <p class="text-xs text-zinc-500 leading-relaxed">
@@ -3963,6 +3938,54 @@ defmodule AskDriveWeb.AdminLive do
                   で連携してください。<br /> ※ 一般ユーザーがチャット画面で質問する際は、各自の通常アカウントで利用します。
                 </p>
 
+                <.form
+                  for={@form}
+                  id="drive-oauth-client-form"
+                  phx-submit="save_settings"
+                  class="space-y-3 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
+                >
+                  <p class="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                    この窓口の Drive 同期に使う <strong>OAuth クライアント</strong>（Google Cloud Console →「API とサービス」→「認証情報」→「OAuth クライアント ID」、種類は「ウェブ アプリケーション」）。全体設定のログイン用 OAuth とは別で、ログインには使いません。承認済みのリダイレクト URI に
+                    <code class="font-mono">https://（このページのホスト名:ポート）/auth/google/callback</code>
+                    を登録してください。{if AskDrive.Drive.OAuth.desk_drive_client?(),
+                      do: "",
+                      else:
+                        if(AskDrive.Drive.OAuth.client_configured?(),
+                          do: "空欄のままなら全体設定の OAuth クライアントを使います。",
+                          else: ""
+                        )}
+                  </p>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <.input
+                      field={@form[:drive_oauth_client_id]}
+                      type="text"
+                      label="OAuth クライアント ID"
+                      placeholder="xxxxxxxx.apps.googleusercontent.com"
+                    />
+                    <.input
+                      field={@form[:drive_oauth_client_secret]}
+                      type="password"
+                      value=""
+                      label={"OAuth クライアント シークレット（#{secret_state(@setting.drive_oauth_client_secret)}）"}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    id="save-drive-oauth-client-btn"
+                    class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+                  >
+                    保存
+                  </button>
+                </.form>
+
+                <p
+                  :if={not @drive_oauth_ready?}
+                  id="drive-oauth-client-missing"
+                  class="text-[11px] text-amber-700 dark:text-amber-300"
+                >
+                  OAuth クライアント ID / シークレットを保存すると、「専用 Google アカウントで認可」ボタンが表示されます。
+                </p>
+
                 <div :if={@drive_oauth_ready?} class="flex flex-wrap items-center gap-3 pt-2">
                   <.link
                     href={
@@ -3993,7 +4016,11 @@ defmodule AskDriveWeb.AdminLive do
                     class="font-mono text-[10px]"
                     phx-no-curly-interpolation
                   >.local</code>
-                  ホスト名は Google 側で拒否されます。LAN 内からの利用でこの制約を避けたい場合は上の「サービスアカウント」を選んでください。
+                  ホスト名は Google 側で拒否されます。その場合は、リダイレクト URI に
+                  <code class="font-mono text-[10px]">https://localhost:4443/auth/google/callback</code>
+                  も登録し、AskDrive のサーバーの PC のブラウザで
+                  <code class="font-mono text-[10px]">https://localhost:4443/</code>
+                  を開いて認可してください（認可は最初の 1 回だけで、その後の同期はどこからでも動きます）。
                 </p>
               <% end %>
 
@@ -5157,15 +5184,11 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
-  # Without the platform's OAuth client, OAuth can't be used: show the service account
-  # (saving it switches the desk over), whatever mode is stored (F-345)
+  # Whether this desk can authorize Drive by OAuth: its own client (F-346) or the platform's
   defp assign_drive_mode(socket) do
-    ready? = AskDrive.Drive.OAuth.client_configured?()
-    stored = socket.assigns.setting.drive_auth_mode
-
     socket
-    |> assign(:drive_oauth_ready?, ready?)
-    |> assign(:drive_mode, if(ready?, do: stored, else: "service_account"))
+    |> assign(:drive_oauth_ready?, AskDrive.Drive.OAuth.drive_client_configured?())
+    |> assign(:drive_mode, socket.assigns.setting.drive_auth_mode)
   end
 
   defp drive_sync_dry_run(folder_id, setting) do

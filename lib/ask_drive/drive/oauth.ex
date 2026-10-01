@@ -38,7 +38,7 @@ defmodule AskDrive.Drive.OAuth do
   """
   def authorize_url(state, redirect_uri, flow \\ :drive) do
     base = %{
-      client_id: get_client_id(),
+      client_id: client(flow) |> elem(0),
       redirect_uri: redirect_uri,
       response_type: "code",
       scope: Enum.join(scopes(flow), " "),
@@ -57,11 +57,13 @@ defmodule AskDrive.Drive.OAuth do
   @doc """
   Exchanges an authorization code for access and refresh tokens.
   """
-  def exchange_code(code, redirect_uri) do
+  def exchange_code(code, redirect_uri, flow \\ :login) do
+    {client_id, client_secret} = client(flow)
+
     params = %{
       code: code,
-      client_id: get_client_id(),
-      client_secret: get_client_secret(),
+      client_id: client_id,
+      client_secret: client_secret,
       redirect_uri: redirect_uri,
       grant_type: "authorization_code"
     }
@@ -98,10 +100,13 @@ defmodule AskDrive.Drive.OAuth do
   @doc """
   Refreshes an expired access token using the stored refresh token.
   """
+  # only the Drive sync account has a refresh token, so this is always the Drive client
   def refresh_token(refresh_token) do
+    {client_id, client_secret} = drive_client()
+
     params = %{
-      client_id: get_client_id(),
-      client_secret: get_client_secret(),
+      client_id: client_id,
+      client_secret: client_secret,
       refresh_token: refresh_token,
       grant_type: "refresh_token"
     }
@@ -163,6 +168,43 @@ defmodule AskDrive.Drive.OAuth do
     get_client_id() != "" and AskDrive.Settings.platform_setting!().oauth_login_enabled != false
   rescue
     _ -> get_client_id() != ""
+  end
+
+  @doc """
+  The OAuth client for a flow: Google login uses the platform's; Drive sync uses the current
+  desk's own client when it has one (F-346), otherwise the platform's. Call it in the desk's
+  context (its database) for the Drive flow.
+  """
+  def client(:login), do: {get_client_id(), get_client_secret()}
+  def client(_drive), do: drive_client()
+
+  def drive_client do
+    case AskDrive.Settings.get_setting() do
+      %{drive_oauth_client_id: id, drive_oauth_client_secret: secret}
+      when is_binary(id) and id != "" and is_binary(secret) and secret != "" ->
+        {String.trim(id), secret}
+
+      _ ->
+        {get_client_id(), get_client_secret()}
+    end
+  rescue
+    _ -> {get_client_id(), get_client_secret()}
+  end
+
+  @doc "Whether the current desk can authorize Drive sync by OAuth (its own client or the platform's)."
+  def drive_client_configured? do
+    {id, secret} = drive_client()
+    id != "" and secret != ""
+  end
+
+  @doc "Whether the current desk has an OAuth client of its own for Drive sync (F-346)."
+  def desk_drive_client? do
+    case AskDrive.Settings.get_setting() do
+      %{drive_oauth_client_id: id} when is_binary(id) and id != "" -> true
+      _ -> false
+    end
+  rescue
+    _ -> false
   end
 
   @doc """

@@ -173,7 +173,8 @@ defmodule AskDrive.Apps do
 
   # Fields each app must bring itself, cleared when copying the primary's settings
   @per_app_blank ~w(drive_folder_id drive_folder_name drive_service_account_json
-                    drive_impersonate_email gemini_api_key openai_api_key anthropic_api_key)a
+                    drive_impersonate_email gemini_api_key openai_api_key anthropic_api_key
+                    drive_oauth_client_id drive_oauth_client_secret)a
 
   defp seed_settings(app) do
     base =

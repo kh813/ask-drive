@@ -50,6 +50,9 @@ defmodule AskDrive.Settings.Setting do
     # Google login (OAuth) on/off (spec F-1310); Drive sync's OAuth is not affected
     field :oauth_login_enabled, :boolean, default: false
     field :google_client_secret, Binary
+    # this desk's own OAuth client for Drive sync (F-346); blank = the platform's
+    field :drive_oauth_client_id, :string
+    field :drive_oauth_client_secret, Binary
     field :maintenance_mode, :boolean, default: false
     # the nightly batch starts by itself (F-344); off while a new desk is being set up
     field :auto_batch_enabled, :boolean, default: true
@@ -127,7 +130,12 @@ defmodule AskDrive.Settings.Setting do
   Every encrypted secret. A blank submission for these keeps the stored value, so the form
   never has to echo a secret back just to survive a round trip (N-610).
   """
-  def secret_fields, do: [:google_client_secret, :drive_service_account_json | @api_key_fields]
+  def secret_fields,
+    do: [
+      :google_client_secret,
+      :drive_oauth_client_secret,
+      :drive_service_account_json | @api_key_fields
+    ]
 
   @doc """
   Accepted values for `drive_auth_mode`.
@@ -198,6 +206,8 @@ defmodule AskDrive.Settings.Setting do
         :drive_folder_name,
         :google_client_id,
         :google_client_secret,
+        :drive_oauth_client_id,
+        :drive_oauth_client_secret,
         :oauth_login_enabled,
         :batch_start_hour,
         :batch_end_hour,

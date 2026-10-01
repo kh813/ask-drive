@@ -180,23 +180,42 @@ defmodule AskDriveWeb.AuthController do
   defp desk(slug), do: AskDrive.Apps.get_by_slug(slug || "") || AskDrive.Apps.primary()
 
   defp start_oauth(conn, flow, return_to) do
-    if OAuth.get_client_id() == "" do
+    state = :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
+
+    # the Drive flow uses the desk's own OAuth client when it has one (F-346)
+    {client_id, url} =
+      in_flow_context(conn, flow, fn ->
+        {OAuth.client(flow) |> elem(0), OAuth.authorize_url(state, callback_url(conn), flow)}
+      end)
+
+    if client_id == "" do
       conn
       |> put_flash(
         :error,
-        "Google OAuth の Client ID / Secret が未設定です。.env.prod または管理画面で設定してください。"
+        if(flow == :drive,
+          do: "Google Drive 同期の OAuth クライアント ID / シークレットが未設定です。窓口の「Google Drive 同期設定」で設定してください。",
+          else: "Google OAuth の Client ID / Secret が未設定です。全体設定で設定してください。"
+        )
       )
       |> redirect(to: fallback_path(conn, flow))
     else
-      state = :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
-
       conn
       |> put_session(:oauth_state, state)
       |> put_session(:oauth_flow, Atom.to_string(flow))
       |> put_session(:oauth_return_to, return_to)
-      |> redirect(external: OAuth.authorize_url(state, callback_url(conn), flow))
+      |> redirect(external: url)
     end
   end
+
+  # The Drive flow reads the authorizing desk's settings (its OAuth client); login, the
+  # platform's
+  defp in_flow_context(conn, flow, fun) when flow in [:drive, "drive"],
+    do: in_app(get_session(conn, :oauth_app), fun)
+
+  defp in_flow_context(_conn, _flow, fun), do: fun.()
+
+  defp flow_atom("drive"), do: :drive
+  defp flow_atom(_), do: :login
 
   @doc """
   Handles the shared OAuth callback for whichever flow the session recorded.
@@ -217,7 +236,9 @@ defmodule AskDriveWeb.AuthController do
         not_drive_manager(conn, get_session(conn, :oauth_app))
 
       true ->
-        case OAuth.exchange_code(code, callback_url(conn)) do
+        exchange = fn -> OAuth.exchange_code(code, callback_url(conn), flow_atom(flow)) end
+
+        case in_flow_context(conn, flow, exchange) do
           {:ok, tokens} -> complete(conn, flow, tokens, return_to)
           {:error, reason} -> auth_failed(conn, flow, "Google 認証に失敗しました: #{inspect(reason)}")
         end
