@@ -572,8 +572,14 @@ defmodule AskDriveWeb.ChatLive do
             </div>
           <% end %>
 
-          <%!-- Messages Scroll Area --%>
-          <div id="chat-messages" class="flex-1 overflow-y-auto space-y-6 pr-2 mb-4 scroll-smooth">
+          <%!-- Messages Scroll Area. Follows the conversation: each new message brings the
+                latest question to the top, its answer below it (see .ChatScroll) --%>
+          <div
+            id="chat-messages"
+            phx-hook=".ChatScroll"
+            data-count={length(@messages)}
+            class="flex-1 overflow-y-auto space-y-6 pr-2 mb-4 scroll-smooth"
+          >
             <%= if @messages == [] do %>
               <div class="h-full flex flex-col items-center justify-center text-center p-8 text-zinc-400 dark:text-zinc-500">
                 <div class="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3">
@@ -591,7 +597,7 @@ defmodule AskDriveWeb.ChatLive do
             <% else %>
               <%= for msg <- @messages do %>
                 <%= if msg.role == :user do %>
-                  <div class="flex justify-end">
+                  <div id={"msg-#{msg.id}"} data-role="user" class="flex justify-end scroll-mt-2">
                     <div class="max-w-2xl rounded-2xl rounded-tr-sm bg-indigo-600 text-white px-4 py-3 shadow-sm text-sm">
                       <p class="whitespace-pre-wrap">{msg.content}</p>
                       <span class="text-[10px] text-indigo-200 block text-right mt-1">
@@ -605,7 +611,7 @@ defmodule AskDriveWeb.ChatLive do
                     </div>
                   </div>
                 <% else %>
-                  <div class="flex justify-start">
+                  <div id={"msg-#{msg.id}"} data-role="assistant" class="flex justify-start">
                     <div class="max-w-3xl w-full rounded-2xl rounded-tl-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-4 text-sm shadow-sm space-y-3">
                       <%!-- Tier Badge --%>
                       <div class="flex items-center justify-between pb-2 border-b border-zinc-200/60 dark:border-zinc-800">
@@ -908,6 +914,30 @@ defmodule AskDriveWeb.ChatLive do
               </div>
             <% end %>
           </div>
+          <script :type={Phoenix.LiveView.ColocatedHook} name=".ChatScroll">
+            // When a message is added — a question sent, its answer arriving, or one opened
+            // from the history — bring the latest question to the top of the chat area, with
+            // its answer below: a long answer is then read from its start. Scrolling again when
+            // the answer arrives matters: when the question was sent, there may not have been
+            // enough below it to bring it to the top. Updates that add no message (a summary
+            // being written) leave the scroll position alone, so it can be read undisturbed.
+            export default {
+              mounted() {
+                this.count = this.el.dataset.count
+              },
+              updated() {
+                if (this.el.dataset.count === this.count) return
+                const grew = Number(this.el.dataset.count) > Number(this.count)
+                this.count = this.el.dataset.count
+                if (!grew) return
+                const questions = this.el.querySelectorAll("[data-role='user']")
+                const last = questions[questions.length - 1]
+                if (!last) return
+                const top = last.getBoundingClientRect().top - this.el.getBoundingClientRect().top
+                this.el.scrollTo({top: this.el.scrollTop + top - 8, behavior: "smooth"})
+              }
+            }
+          </script>
 
           <%!-- Bottom Input Bar --%>
           <div class="pt-2 border-t border-zinc-200 dark:border-zinc-800">

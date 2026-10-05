@@ -22,7 +22,9 @@ config :ask_drive, auto_nightly_batch: false
 # Updating from the admin screen (F-1501): no nightly check, and state kept out of log/
 config :ask_drive,
   auto_update_check: false,
-  update_state_dir: Path.join(System.tmp_dir!(), "askdrive_test_update")
+  update_state_dir: Path.join(System.tmp_dir!(), "askdrive_test_update"),
+  # the notice after a restart waits for the server to be up: not within a test
+  update_notify_ms: 600_000
 
 # Don't try to pull Ollama models from a test run.
 config :ask_drive, auto_pull_models: false

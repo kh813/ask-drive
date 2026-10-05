@@ -11,6 +11,7 @@ defmodule AskDriveWeb.UpdatePanel do
   attr :form, :any, required: true
   attr :latest, :any, default: nil
   attr :checking, :boolean, default: false
+  attr :notify_test, :any, default: nil
 
   def update_tab(assigns) do
     assigns =
@@ -267,6 +268,81 @@ defmodule AskDriveWeb.UpdatePanel do
             </button>
           </div>
         </.form>
+      </div>
+
+      <%!-- Notices to Google Chat (F-1507) --%>
+      <div
+        id="update-notify"
+        class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
+      >
+        <div>
+          <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+            <.icon name="hero-bell-alert" class="w-5 h-5 text-indigo-600" /> 通知（Google Chat）
+          </h2>
+          <p class="text-xs text-zinc-500 mt-1 leading-relaxed max-w-2xl">
+            アップデートの開始時と、新しいバージョンが起動して正常に稼働したときに、Google Chat のスペースへ通知します（自動・手動とも）。開始の通知だけが届いて完了の通知が来なければ、再起動後に起動できていない可能性があります。ビルドの失敗や、古いバージョンのまま起動した場合も通知します。
+          </p>
+        </div>
+        <ol class="list-decimal pl-5 text-[11px] text-zinc-600 dark:text-zinc-400 space-y-0.5">
+          <li>Google Chat で通知先のスペースを開き、スペース名 →「アプリと統合」→「Webhook を追加」</li>
+          <li>名前（例: AskDrive）を入れて保存し、表示された URL をコピー</li>
+          <li>下に貼り付けて保存し、「テスト送信」で届くか確認</li>
+        </ol>
+        <.form
+          for={@form}
+          id="notify-settings-form"
+          phx-submit="save_notify_settings"
+          class="space-y-3"
+        >
+          <.input
+            field={@form[:google_chat_webhook_url]}
+            type="password"
+            value=""
+            autocomplete="off"
+            label={"Webhook URL（#{if AskDrive.Notify.GoogleChat.configured?(@setting), do: "設定済み。変更するときだけ入力", else: "未設定"}）"}
+            placeholder="https://chat.googleapis.com/v1/spaces/.../messages?key=...&token=..."
+          />
+          <div class="flex flex-wrap items-center justify-end gap-2">
+            <button
+              :if={AskDrive.Notify.GoogleChat.configured?(@setting)}
+              type="button"
+              id="clear-google-chat-btn"
+              phx-click="clear_google_chat"
+              data-confirm="Google Chat の Webhook URL を削除しますか？（通知が届かなくなります）"
+              class="px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40 text-xs transition"
+            >
+              削除
+            </button>
+            <button
+              :if={AskDrive.Notify.GoogleChat.configured?(@setting)}
+              type="button"
+              id="test-google-chat-btn"
+              phx-click="test_google_chat"
+              phx-disable-with="送信しています…"
+              class="px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium transition"
+            >
+              テスト送信
+            </button>
+            <button
+              type="submit"
+              id="save-notify-settings-btn"
+              class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
+            >
+              保存
+            </button>
+          </div>
+        </.form>
+        <%= case @notify_test do %>
+          <% :ok -> %>
+            <p id="google-chat-test-result" class="text-xs text-emerald-600 dark:text-emerald-400">
+              テスト通知を送信しました。Google Chat のスペースに届いているか確認してください。
+            </p>
+          <% {:error, message} -> %>
+            <p id="google-chat-test-result" class="text-xs text-red-600 dark:text-red-400">
+              {message}
+            </p>
+          <% _ -> %>
+        <% end %>
       </div>
     </div>
     """

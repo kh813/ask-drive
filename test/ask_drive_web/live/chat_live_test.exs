@@ -76,6 +76,22 @@ defmodule AskDriveWeb.ChatLiveTest do
     assert html =~ "https://drive.google.com/file/d/abc/view?usp=drivesdk#page=33"
   end
 
+  test "the conversation follows new messages: each question and answer is marked for the scroll hook",
+       %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/it-support")
+    assert has_element?(view, "#chat-messages[phx-hook][data-count='0']")
+
+    view |> form("#chat-form", %{"question" => "最初の質問"}) |> render_submit()
+    render_async(view, 20_000)
+    view |> form("#chat-form", %{"question" => "次の質問"}) |> render_submit()
+    render_async(view, 20_000)
+
+    # two questions, two answers: the hook scrolls the latest question to the top
+    assert has_element?(view, "#chat-messages[data-count='4']")
+    assert has_element?(view, "#chat-messages [data-role='user']", "次の質問")
+    assert has_element?(view, "#chat-messages [data-role='assistant']")
+  end
+
   test "resets chat history", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/it-support")
 

@@ -20,6 +20,7 @@ defmodule AskDrive.Updates.Server do
   require Logger
 
   alias AskDrive.{Apps, Updates}
+  alias AskDrive.Notify.GoogleChat
   alias AskDrive.Batch.{BatchRun, Night, Scheduler}
 
   @topic "updates"
@@ -93,6 +94,8 @@ defmodule AskDrive.Updates.Server do
 
     Logger.info("Updates: started by #{state.by} (v#{state.from} → v#{state.to || "?"})")
     state = %{state | port: open_build()}
+    # whoever looks after the server learns of it, even at night (F-1507)
+    GoogleChat.send_async(start_notice(state))
 
     state =
       log(
@@ -132,6 +135,7 @@ defmodule AskDrive.Updates.Server do
 
   def handle_info({port, {:exit_status, code}}, %{port: port} = state) do
     Logger.error("Updates: build failed with status #{code}")
+    GoogleChat.send_async(build_failed_notice(state, code))
     state = log(%{state | port: nil}, "=== ビルドに失敗しました（終了コード #{code}）===")
 
     {:noreply,
@@ -170,8 +174,15 @@ defmodule AskDrive.Updates.Server do
         Logger.info("Updates: #{result}")
         Updates.save_platform(%{update_last_result: result})
         Process.send_after(self(), {:resume, marker}, resume_delay())
+        # once the server is fully up and answering (F-1507)
+        Process.send_after(self(), {:notify_boot, marker}, notify_delay())
         {:noreply, %{state | message: result}}
     end
+  end
+
+  def handle_info({:notify_boot, marker}, state) do
+    GoogleChat.send_async(boot_notice(marker, Updates.current_version(), healthy?()))
+    {:noreply, state}
   end
 
   def handle_info({:resume, marker}, state) do
@@ -248,6 +259,71 @@ defmodule AskDrive.Updates.Server do
     Logger.warning("Updates: restarting into the new release (status #{@restart_status})")
     Process.send_after(self(), :halt, halt_delay())
     enter(%{state | message: "再起動しています…"}, :restarting)
+  end
+
+  # --- Notices (F-1507) ---------------------------------------------------------------------
+
+  @doc false
+  def start_notice(state) do
+    """
+    🔄 *AskDrive のアップデートを開始します*
+    v#{state.from} → #{if state.to, do: "v#{state.to}", else: "最新版"}（#{state.by}）
+    サーバー: #{GoogleChat.host()}
+    ビルドが終わると 30 秒ほど再起動します。完了の通知が届かない場合は、サーバーのログ（log/update.log、log/ask_drive_stderr.log）を確認してください。
+    """
+    |> String.trim()
+  end
+
+  @doc false
+  def build_failed_notice(state, code) do
+    """
+    ⚠️ *AskDrive のアップデートに失敗しました*
+    ビルドに失敗したため（終了コード #{code}）、v#{state.from} のまま稼働しています（#{state.by}）。
+    サーバー: #{GoogleChat.host()}
+    ログ: log/update.log
+    """
+    |> String.trim()
+  end
+
+  @doc false
+  def boot_notice(marker, running, healthy?) do
+    from = marker["from"]
+    by = marker["by"] || "管理者"
+    switched? = running != from
+
+    cond do
+      switched? and healthy? ->
+        """
+        ✅ *AskDrive のアップデートが完了しました*
+        v#{from} → v#{running} で起動し、正常に稼働しています（#{by}）。
+        サーバー: #{GoogleChat.host()}
+        """
+
+      switched? ->
+        """
+        ⚠️ *AskDrive は v#{running} で起動しましたが、正常に稼働していない可能性があります*
+        Web 画面またはデータベースが応答していません（#{by}）。
+        サーバー: #{GoogleChat.host()}
+        ログ: log/ask_drive_stderr.log
+        """
+
+      true ->
+        """
+        ⚠️ *AskDrive はアップデート後も v#{running} のままで起動しました*
+        新しいバージョンに切り替わっていません（#{by}）。
+        サーバー: #{GoogleChat.host()}
+        ログ: log/update.log、log/ask_drive_stderr.log
+        """
+    end
+    |> String.trim()
+  end
+
+  # up and answering: the web endpoint runs and the database answers
+  defp healthy? do
+    Process.whereis(AskDriveWeb.Endpoint) != nil and
+      match?({:ok, _}, Ecto.Adapters.SQL.query(AskDrive.Repo, "SELECT 1", []))
+  rescue
+    _ -> false
   end
 
   # --- After the restart ---------------------------------------------------------------------
@@ -457,4 +533,5 @@ defmodule AskDrive.Updates.Server do
   defp poll_interval, do: Application.get_env(:ask_drive, :update_poll_ms, 2_000)
   defp halt_delay, do: Application.get_env(:ask_drive, :update_halt_ms, 1_500)
   defp resume_delay, do: Application.get_env(:ask_drive, :update_resume_ms, 15_000)
+  defp notify_delay, do: Application.get_env(:ask_drive, :update_notify_ms, 10_000)
 end

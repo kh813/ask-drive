@@ -95,6 +95,7 @@ defmodule AskDriveWeb.AdminLive do
      |> assign(:update_status, if(scope == :platform, do: AskDrive.Updates.status()))
      |> assign(:update_latest, nil)
      |> assign(:update_checking, false)
+     |> assign(:notify_test, nil)
      |> load_dashboard_data()}
   end
 
@@ -728,6 +729,60 @@ defmodule AskDriveWeb.AdminLive do
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "保存できませんでした。")}
     end
+  end
+
+  # Update notices to Google Chat (F-1507)
+  def handle_event(
+        "save_notify_settings",
+        %{"setting" => params},
+        %{assigns: %{scope: :platform}} = socket
+      ) do
+    # blank keeps the stored URL (it is a secret and never shown)
+    case Settings.update_setting(
+           socket.assigns.setting,
+           Map.take(params, ["google_chat_webhook_url"])
+         ) do
+      {:ok, updated} ->
+        {:noreply,
+         socket
+         |> assign(:setting, updated)
+         |> assign(:form, to_form(Settings.change_setting(updated)))
+         |> assign(:notify_test, nil)
+         |> put_flash(:info, "Google Chat の通知先を保存しました。「テスト送信」で確認できます。")}
+
+      {:error, changeset} ->
+        {:noreply,
+         socket
+         |> assign(:form, to_form(changeset))
+         |> put_flash(:error, "保存できませんでした: " <> changeset_messages(changeset))}
+    end
+  end
+
+  def handle_event("test_google_chat", _params, %{assigns: %{scope: :platform}} = socket) do
+    text =
+      "✅ AskDrive からのテスト通知です（サーバー: #{AskDrive.Notify.GoogleChat.host()}・v#{AskDrive.version()}）"
+
+    result =
+      case AskDrive.Notify.GoogleChat.send_message(text, socket.assigns.setting) do
+        :not_configured -> {:error, "Webhook URL が設定されていません。"}
+        other -> other
+      end
+
+    {:noreply, assign(socket, :notify_test, result)}
+  end
+
+  def handle_event("clear_google_chat", _params, %{assigns: %{scope: :platform}} = socket) do
+    {:ok, updated} =
+      socket.assigns.setting
+      |> Ecto.Changeset.change(google_chat_webhook_url: nil)
+      |> Repo.update()
+
+    {:noreply,
+     socket
+     |> assign(:setting, updated)
+     |> assign(:form, to_form(Settings.change_setting(updated)))
+     |> assign(:notify_test, nil)
+     |> put_flash(:info, "Google Chat の通知先を削除しました。")}
   end
 
   def handle_event("select_tab", %{"tab" => tab}, socket) do
@@ -3315,6 +3370,7 @@ defmodule AskDriveWeb.AdminLive do
             form={@form}
             latest={@update_latest}
             checking={@update_checking}
+            notify_test={@notify_test}
           />
         <% end %>
 

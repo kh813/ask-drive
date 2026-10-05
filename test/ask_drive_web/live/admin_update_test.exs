@@ -83,6 +83,50 @@ defmodule AskDriveWeb.AdminUpdateTest do
     refute has_element?(view, "#start-update-hint")
   end
 
+  test "Google Chat notices: save the webhook, send a test, delete it (F-1507)", %{conn: conn} do
+    test = self()
+
+    Application.put_env(:ask_drive, :notify_req_options,
+      plug: fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        send(test, {:google_chat, Jason.decode!(body)})
+        Req.Test.json(conn, %{})
+      end
+    )
+
+    on_exit(fn -> Application.delete_env(:ask_drive, :notify_req_options) end)
+
+    {:ok, view, _html} = live(conn, "/admin?tab=update")
+    assert has_element?(view, "#update-notify")
+    refute has_element?(view, "#test-google-chat-btn")
+
+    view
+    |> form("#notify-settings-form", %{
+      "setting" => %{"google_chat_webhook_url" => "https://example.com/x"}
+    })
+    |> render_submit()
+
+    refute AskDrive.Notify.GoogleChat.configured?()
+
+    url = "https://chat.googleapis.com/v1/spaces/AAAA/messages?key=k&token=t"
+
+    view
+    |> form("#notify-settings-form", %{"setting" => %{"google_chat_webhook_url" => url}})
+    |> render_submit()
+
+    assert AskDrive.Settings.platform_setting!().google_chat_webhook_url == url
+    # never shown back
+    refute render(view) =~ "token=t"
+
+    view |> element("#test-google-chat-btn") |> render_click()
+    assert_received {:google_chat, %{"text" => "✅ AskDrive からのテスト通知です" <> _}}
+    assert has_element?(view, "#google-chat-test-result", "送信しました")
+
+    view |> element("#clear-google-chat-btn") |> render_click()
+    refute AskDrive.Notify.GoogleChat.configured?()
+    refute has_element?(view, "#test-google-chat-btn")
+  end
+
   test "only the platform screen has the update tab, not a desk's", %{conn: conn, admin: admin} do
     {:ok, view, _html} = live(conn, "/admin")
     assert has_element?(view, "#tab-update")

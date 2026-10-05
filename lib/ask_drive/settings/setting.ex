@@ -63,6 +63,8 @@ defmodule AskDrive.Settings.Setting do
     field :update_checked_at, :utc_datetime
     field :update_latest_version, :string
     field :update_last_result, :string
+    # Google Chat incoming webhook for update notices (F-1507); a secret (key and token)
+    field :google_chat_webhook_url, Binary
     field :maintenance_message, :string
 
     # --- Drive sync authentication (spec 6.1, F-110) ---
@@ -141,6 +143,7 @@ defmodule AskDrive.Settings.Setting do
     do: [
       :google_client_secret,
       :drive_oauth_client_secret,
+      :google_chat_webhook_url,
       :drive_service_account_json | @api_key_fields
     ]
 
@@ -237,6 +240,7 @@ defmodule AskDrive.Settings.Setting do
         :auto_batch_enabled,
         :update_check_enabled,
         :update_auto_apply,
+        :google_chat_webhook_url,
         :maintenance_message,
         :drive_auth_mode,
         :drive_service_account_json,
@@ -297,6 +301,10 @@ defmodule AskDrive.Settings.Setting do
       :allowed_domain,
       ~r/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/,
       message: "はドメイン名（例: company.com）で入力してください"
+    )
+    |> update_change(:google_chat_webhook_url, &(&1 && String.trim(&1)))
+    |> validate_format(:google_chat_webhook_url, ~r{^https://chat\.googleapis\.com/\S+$},
+      message: "は Google Chat の Webhook URL（https://chat.googleapis.com/...）を入力してください"
     )
     |> validate_batch_llm_mode()
     |> validate_drive_service_account()
