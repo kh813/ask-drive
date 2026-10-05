@@ -22,6 +22,8 @@ defmodule AskDrive.Application do
         {Oban, Application.fetch_env!(:ask_drive, Oban)},
         # One database per app (spec 6.11): started and migrated before anything serves them
         AskDrive.Apps.Repos,
+        # updating from the admin screen (F-1501); after a restart it continues paused batches
+        AskDrive.Updates.Server,
         AskDrive.LLM.Semaphore,
         AskDrive.Drive.ServiceAccount,
         # Secure LDAP sign-in caches, in memory (spec F-1311)

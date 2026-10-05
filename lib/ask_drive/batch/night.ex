@@ -32,6 +32,12 @@ defmodule AskDrive.Batch.Night do
   @doc "Whether the nightly batch is going through the desks."
   def running?, do: Process.whereis(__MODULE__) != nil
 
+  @doc """
+  The night in progress: `%{slugs: desks, cutoff: when generation stops, started_at: ...}`,
+  or nil. An update pausing it continues it after the restart from this (F-1503).
+  """
+  def current, do: if(running?(), do: :persistent_term.get({__MODULE__, :current}, nil))
+
   @doc "Runs the nightly batch for `apps` (in this process, which it registers)."
   def run(apps, opts \\ []) do
     Process.register(self(), __MODULE__)
@@ -45,6 +51,14 @@ defmodule AskDrive.Batch.Night do
       "Nightly batch: #{length(apps)} desk(s), generation until #{inspect(cutoff)} (F-355)"
     )
 
+    :persistent_term.put({__MODULE__, :current}, %{
+      slugs: Enum.map(apps, & &1.slug),
+      cutoff: cutoff,
+      started_at: DateTime.utc_now() |> DateTime.truncate(:second)
+    })
+
+    # An update about to restart refuses new runs and pauses the waiting ones (F-1503), so
+    # both passes then just run out; the night is continued after the restart.
     waiting = import_pass(apps)
     generate_pass(waiting, cutoff)
     :ok
@@ -62,7 +76,10 @@ defmodule AskDrive.Batch.Night do
       )
     end)
 
-    if Process.whereis(__MODULE__) == self(), do: Process.unregister(__MODULE__)
+    if Process.whereis(__MODULE__) == self() do
+      :persistent_term.erase({__MODULE__, :current})
+      Process.unregister(__MODULE__)
+    end
   end
 
   # --- Pass 1: import ----------------------------------------------------------------------

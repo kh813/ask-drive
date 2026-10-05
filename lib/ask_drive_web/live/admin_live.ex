@@ -36,6 +36,10 @@ defmodule AskDriveWeb.AdminLive do
       # a Drive authorization finished in Google's window (spec F-352)
       if app = socket.assigns[:app],
         do: Phoenix.PubSub.subscribe(AskDrive.PubSub, "drive_auth:" <> app.slug)
+
+      # an update's progress and log (F-1502), on the platform screen
+      if socket.assigns.live_action == :platform,
+        do: Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.Updates.Server.topic())
     end
 
     setting = Settings.get_setting!()
@@ -88,6 +92,9 @@ defmodule AskDriveWeb.AdminLive do
      |> assign(:connection_test, %{})
      |> assign(:service_account_test, nil)
      |> assign(:access_password_form, to_form(%{}, as: :access_password))
+     |> assign(:update_status, if(scope == :platform, do: AskDrive.Updates.status()))
+     |> assign(:update_latest, nil)
+     |> assign(:update_checking, false)
      |> load_dashboard_data()}
   end
 
@@ -104,7 +111,8 @@ defmodule AskDriveWeb.AdminLive do
       {"users", "ユーザー管理"},
       {"audit", "昇格ログ"},
       {"metrics", "API利用量・ログ"},
-      {"settings", "全体設定"}
+      {"settings", "全体設定"},
+      {"update", "アップデート"}
     ]
 
   defp tabs(:app),
@@ -118,7 +126,28 @@ defmodule AskDriveWeb.AdminLive do
 
   defp default_tab(scope), do: scope |> tabs() |> hd() |> elem(0)
 
+  # --- Updating from the admin screen (F-1501–F-1506), platform scope only ---
+
   @impl true
+  def handle_info({:update_status, status}, socket),
+    do: {:noreply, assign(socket, :update_status, status)}
+
+  def handle_info({:update_log, line}, socket) do
+    {:noreply,
+     Phoenix.Component.update(socket, :update_status, fn
+       %{log: log} = status -> %{status | log: Enum.take(log ++ [line], -400)}
+       other -> other
+     end)}
+  end
+
+  def handle_info({:update_checked, result}, socket) do
+    {:noreply,
+     socket
+     |> assign(:update_latest, result)
+     |> assign(:update_checking, false)
+     |> assign(:setting, Settings.get_setting!())}
+  end
+
   def handle_info({:ollama_pulls, pulls}, socket) do
     socket = assign(socket, :ollama_pulls, pulls)
 
@@ -639,6 +668,62 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   @impl true
+  def handle_event("check_updates", _params, %{assigns: %{scope: :platform}} = socket) do
+    lv = self()
+    Task.start(fn -> send(lv, {:update_checked, AskDrive.Updates.check()}) end)
+    {:noreply, assign(socket, :update_checking, true)}
+  end
+
+  def handle_event("start_update", params, %{assigns: %{scope: :platform}} = socket) do
+    user = socket.assigns.current_user
+    wait = if params["wait"] == "batch_end", do: :batch_end, else: :boundary
+
+    case AskDrive.Updates.start(
+           by: (user && user.email) || "管理者",
+           wait: wait,
+           to: AskDrive.Updates.available_version(socket.assigns.setting)
+         ) do
+      :ok ->
+        {:noreply,
+         socket
+         |> assign(:update_status, AskDrive.Updates.status())
+         |> put_flash(:info, "アップデートを開始しました。ビルドが終わると再起動します。")}
+
+      {:error, :busy} ->
+        {:noreply, put_flash(socket, :error, "アップデートはすでに進行中です。")}
+    end
+  end
+
+  def handle_event("cancel_update", _params, %{assigns: %{scope: :platform}} = socket) do
+    AskDrive.Updates.cancel()
+    {:noreply, assign(socket, :update_status, AskDrive.Updates.status())}
+  end
+
+  def handle_event("restart_now", _params, %{assigns: %{scope: :platform}} = socket) do
+    AskDrive.Updates.restart_now()
+    {:noreply, assign(socket, :update_status, AskDrive.Updates.status())}
+  end
+
+  def handle_event(
+        "save_update_settings",
+        %{"setting" => params},
+        %{assigns: %{scope: :platform}} = socket
+      ) do
+    attrs = Map.take(params, ["update_check_enabled", "update_auto_apply"])
+
+    case Settings.update_setting(socket.assigns.setting, attrs) do
+      {:ok, updated} ->
+        {:noreply,
+         socket
+         |> assign(:setting, updated)
+         |> assign(:form, to_form(Settings.change_setting(updated)))
+         |> put_flash(:info, "夜間のアップデートの設定を保存しました。")}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, "保存できませんでした。")}
+    end
+  end
+
   def handle_event("select_tab", %{"tab" => tab}, socket) do
     {:noreply, push_patch(socket, to: "#{socket.assigns.base_path}/admin?tab=#{tab}")}
   end
@@ -1315,6 +1400,15 @@ defmodule AskDriveWeb.AdminLive do
               >
                 v{AskDrive.version()}
               </span>
+              <% available = @scope == :platform && AskDrive.Updates.available_version(@setting) %>
+              <.link
+                :if={available}
+                id="update-available-badge"
+                patch="/admin?tab=update"
+                class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white transition"
+              >
+                v{available} があります
+              </.link>
             </div>
             <p class="text-xs text-zinc-500 mt-1">
               {if @scope == :app,
@@ -3208,6 +3302,16 @@ defmodule AskDriveWeb.AdminLive do
         <% end %>
 
         <%!-- Tab 6: Settings Management --%>
+        <%= if @current_tab == "update" and @scope == :platform do %>
+          <AskDriveWeb.UpdatePanel.update_tab
+            status={@update_status}
+            setting={@setting}
+            form={@form}
+            latest={@update_latest}
+            checking={@update_checking}
+          />
+        <% end %>
+
         <%= if @current_tab == "settings" do %>
           <div class="space-y-6">
             <%!-- Organization (Google Workspace), platform-wide: spec 6.12 --%>

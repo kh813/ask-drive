@@ -135,6 +135,10 @@ defmodule AskDrive.Runtime.Mode do
 
   @impl true
   def handle_info(:clock_tick, state) do
+    # tonight's update check first (F-1504): an automatic update then runs before the batch
+    if Application.get_env(:ask_drive, :auto_update_check, true),
+      do: AskDrive.Updates.maybe_nightly()
+
     maybe_start_nightly_batch()
     new_state = follow_clock(state, "Clock tick")
     schedule_clock_tick()
@@ -196,8 +200,10 @@ defmodule AskDrive.Runtime.Mode do
   night's automatic one, as happened on 2026-09-28).
   """
   def nightly_due?(now \\ AskDrive.Clock.local_now()) do
+    # an update under way first: the batch starts after its restart (F-1504)
     Settings.get_setting!().auto_batch_enabled != false and
       calculate_current_mode(now) == :night_batch and
+      not AskDrive.Updates.busy?() and
       not AskDrive.Batch.Scheduler.running_anywhere?() and
       not AskDrive.Batch.Scheduler.ran_since?(night_window_start_utc(now))
   end

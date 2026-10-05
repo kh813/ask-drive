@@ -68,6 +68,27 @@ defmodule AskDrive.Batch.Scheduler do
   end
 
   @doc """
+  Pauses this app's batch for an update (F-1503): a running one stops at the next item
+  boundary, like a stop request, but is recorded as "paused" and continued after the
+  restart; one waiting for its turn to generate is paused right away.
+  """
+  def pause_for_update do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    Repo.update_all(
+      from(b in BatchRun, where: b.status == "running" and is_nil(b.stop_requested_at)),
+      set: [stop_requested_at: now, stop_reason: "update"]
+    )
+
+    Repo.update_all(
+      from(b in BatchRun, where: b.status == "waiting"),
+      set: [stop_requested_at: now, stop_reason: "update", status: "paused", finished_at: now]
+    )
+
+    :ok
+  end
+
+  @doc """
   Whether any app's batch is running (they share one local model; spec 6.11), or the
   nightly batch is going through the desks (F-355).
   """
@@ -114,6 +135,11 @@ defmodule AskDrive.Batch.Scheduler do
     busy? = if Keyword.get(opts, :night), do: any_app_running?(), else: running_anywhere?()
 
     cond do
+      # about to restart into a new version (F-1503): it would only be paused again
+      AskDrive.Updates.restart_pending?() ->
+        Logger.warning("Batch requested while an update is about to restart; skipped")
+        {:error, :updating}
+
       busy? ->
         Logger.warning("Batch requested while another is running; skipped")
         {:error, :already_running}
@@ -392,12 +418,14 @@ defmodule AskDrive.Batch.Scheduler do
         {:error, e}
     catch
       :throw, :batch_stop_requested ->
-        Logger.info("Batch ##{batch_run.id} stopped at the admin's request")
+        batch_run = Repo.reload!(batch_run)
+        # paused for an update: continued after the restart (F-1503)
+        status = if batch_run.stop_reason == "update", do: "paused", else: "stopped"
+        Logger.info("Batch ##{batch_run.id} #{status} (#{batch_run.stop_reason || "admin"})")
 
         {:ok, batch_run} =
           batch_run
-          |> Repo.reload!()
-          |> BatchRun.changeset(%{finished_at: DateTime.utc_now(), status: "stopped"})
+          |> BatchRun.changeset(%{finished_at: DateTime.utc_now(), status: status})
           |> Repo.update()
 
         LLM.unload_model(setting.batch_model, setting: setting)

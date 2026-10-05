@@ -6,12 +6,12 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: lib/ask_drive_web/live/chat_live.ex:790
+#: lib/ask_drive_web/live/chat_live.ex:793
 #, elixir-autogen, elixir-format
 msgid " (local LLMs may take several seconds)"
 msgstr "（ローカルの生成 AI では数十秒かかることがあります）"
 
-#: lib/ask_drive_web/live/chat_live.ex:378
+#: lib/ask_drive_web/live/chat_live.ex:380
 #, elixir-autogen, elixir-format
 msgid "%{count} chunks indexed for search"
 msgstr "%{count} チャンクを検索対象にしています"
@@ -21,42 +21,42 @@ msgstr "%{count} チャンクを検索対象にしています"
 msgid "(%{minutes} min remaining)"
 msgstr "（残り %{minutes} 分）"
 
-#: lib/ask_drive_web/live/chat_live.ex:830
+#: lib/ask_drive_web/live/chat_live.ex:833
 #, elixir-autogen, elixir-format
 msgid "(Excerpts with search terms highlighted):"
 msgstr "（原文の抜粋。質問の語をハイライトしています）:"
 
-#: lib/ask_drive_web/live/chat_live.ex:765
+#: lib/ask_drive_web/live/chat_live.ex:768
 #, elixir-autogen, elixir-format
 msgid "(Grounded solely on the cited excerpts below)"
 msgstr "（下の引用元の抜粋だけを根拠に生成）"
 
-#: lib/ask_drive_web/live/setup_live.ex:68
+#: lib/ask_drive_web/live/setup_live.ex:97
 #, elixir-autogen, elixir-format
 msgid "1. Setup Code"
 msgstr "1. セットアップコード"
 
-#: lib/ask_drive_web/live/chat_live.ex:339
+#: lib/ask_drive_web/live/chat_live.ex:341
 #, elixir-autogen, elixir-format
 msgid "A passphrase is required to use the chat for desk \"%{name}\"."
 msgstr "窓口「%{name}」のチャットを利用するにはアクセスパスワード（合言葉）が必要です。"
 
-#: lib/ask_drive_web/live/chat_live.ex:763
+#: lib/ask_drive_web/live/chat_live.ex:766
 #, elixir-autogen, elixir-format
 msgid "AI Summary"
 msgstr "AI による要約"
 
-#: lib/ask_drive_web/live/chat_live.ex:614
+#: lib/ask_drive_web/live/chat_live.ex:617
 #, elixir-autogen, elixir-format
 msgid "AI Summary & Sources"
 msgstr "AI 要約と引用元"
 
-#: lib/ask_drive_web/live/chat_live.ex:806
+#: lib/ask_drive_web/live/chat_live.ex:809
 #, elixir-autogen, elixir-format
 msgid "AI summaries may contain errors. Always verify key details against the cited sources."
 msgstr "生成 AI の要約は誤りを含むことがあります。重要な判断の前に、必ず引用元をご確認ください。"
 
-#: lib/ask_drive_web/live/chat_live.ex:567
+#: lib/ask_drive_web/live/chat_live.ex:570
 #, elixir-autogen, elixir-format
 msgid "Act as administrator"
 msgstr "管理者として操作"
@@ -86,23 +86,23 @@ msgstr "窓口の一覧"
 msgid "An administrator needs to configure Google Secure LDAP or Google Login (OAuth) in Platform Settings."
 msgstr "管理者は、全体管理の「全体設定」→「組織（Google Workspace）」→「ログインの方法」で Google Secure LDAP または Google ログイン（OAuth）を有効にしてください。"
 
-#: lib/ask_drive_web/live/chat_live.ex:626
-#: lib/ask_drive_web/live/chat_live.ex:965
+#: lib/ask_drive_web/live/chat_live.ex:629
+#: lib/ask_drive_web/live/chat_live.ex:968
 #, elixir-autogen, elixir-format
 msgid "Answer"
 msgstr "回答"
 
-#: lib/ask_drive_web/live/chat_live.ex:924
+#: lib/ask_drive_web/live/chat_live.ex:927
 #, elixir-autogen, elixir-format
 msgid "Ask a question about Google Drive documents..."
 msgstr "Google Drive の文書について質問を入力してください..."
 
-#: lib/ask_drive_web/live/chat_live.ex:580
+#: lib/ask_drive_web/live/chat_live.ex:583
 #, elixir-autogen, elixir-format
 msgid "Ask questions about your Google Drive documents"
 msgstr "Google Drive ドキュメントについて質問してください"
 
-#: lib/ask_drive_web/live/setup_live.ex:52
+#: lib/ask_drive_web/live/setup_live.ex:80
 #, elixir-autogen, elixir-format
 msgid "AskDrive Initial Setup"
 msgstr "AskDrive 初回セットアップ"
@@ -113,7 +113,7 @@ msgstr "AskDrive 初回セットアップ"
 msgid "Attempting to reconnect"
 msgstr "再接続を試行しています"
 
-#: lib/ask_drive_web/live/chat_live.ex:390
+#: lib/ask_drive_web/live/chat_live.ex:392
 #, elixir-autogen, elixir-format
 msgid "Cannot connect to %{provider}"
 msgstr "%{provider} に接続できません"
@@ -123,27 +123,27 @@ msgstr "%{provider} に接続できません"
 msgid "Chat"
 msgstr "チャット"
 
-#: lib/ask_drive_web/live/setup_live.ex:117
+#: lib/ask_drive_web/live/setup_live.ex:223
 #, elixir-autogen, elixir-format
 msgid "Complete Setup"
 msgstr "セットアップを完了する"
 
-#: lib/ask_drive_web/live/chat_live.ex:560
+#: lib/ask_drive_web/live/chat_live.ex:563
 #, elixir-autogen, elixir-format
 msgid "Connect now"
 msgstr "今すぐ連携する"
 
-#: lib/ask_drive_web/live/chat_live.ex:775
+#: lib/ask_drive_web/live/chat_live.ex:778
 #, elixir-autogen, elixir-format
 msgid "Could not create summary. Please check the excerpts below."
 msgstr "要約を作成できませんでした。下の引用元の抜粋をご確認ください。"
 
-#: lib/ask_drive_web/live/chat_live.ex:700
+#: lib/ask_drive_web/live/chat_live.ex:703
 #, elixir-autogen, elixir-format
 msgid "Could not find a clear statement for this question in the current index."
 msgstr "この質問に関する明確な記載を現在のインデックスから特定できませんでした。"
 
-#: lib/ask_drive_web/live/chat_live.ex:522
+#: lib/ask_drive_web/live/chat_live.ex:525
 #, elixir-autogen, elixir-format
 msgid "Database updates or maintenance are in progress. Please wait a moment."
 msgstr "データベースの更新またはアップデート作業を行っています。完了までしばらくお待ちください。"
@@ -153,8 +153,8 @@ msgstr "データベースの更新またはアップデート作業を行って
 msgid "Desk list"
 msgstr "窓口一覧"
 
-#: lib/ask_drive_web/live/chat_live.ex:738
-#: lib/ask_drive_web/live/chat_live.ex:846
+#: lib/ask_drive_web/live/chat_live.ex:741
+#: lib/ask_drive_web/live/chat_live.ex:849
 #, elixir-autogen, elixir-format
 msgid "Document"
 msgstr "ドキュメント"
@@ -175,13 +175,13 @@ msgstr "管理画面に入る"
 msgid "Enter Desk Admin for \"%{name}\""
 msgstr "窓口「%{name}」の管理画面へ"
 
-#: lib/ask_drive_web/live/chat_live.ex:336
-#: lib/ask_drive_web/live/chat_live.ex:355
+#: lib/ask_drive_web/live/chat_live.ex:338
+#: lib/ask_drive_web/live/chat_live.ex:357
 #, elixir-autogen, elixir-format
 msgid "Enter passphrase"
 msgstr "合言葉を入力"
 
-#: lib/ask_drive_web/live/setup_live.ex:73
+#: lib/ask_drive_web/live/setup_live.ex:102
 #, elixir-autogen, elixir-format
 msgid "Enter the setup code found on the server."
 msgstr "サーバーを操作できる人だけが最初の管理者になれるよう、サーバー上で確認できるコードを入力します。"
@@ -202,32 +202,32 @@ msgstr "外部AI: %{provider}"
 msgid "External API is used for answering. Document content is sent externally."
 msgstr "回答生成に外部 API を使用しています。文書本文が送信されます。"
 
-#: lib/ask_drive_web/live/chat_live.ex:668
+#: lib/ask_drive_web/live/chat_live.ex:671
 #, elixir-autogen, elixir-format
 msgid "Generated at: %{date}"
 msgstr "生成日時: %{date}"
 
-#: lib/ask_drive_web/live/chat_live.ex:789
+#: lib/ask_drive_web/live/chat_live.ex:792
 #, elixir-autogen, elixir-format
 msgid "Generating summary…"
 msgstr "要約を作成しています…"
 
-#: lib/ask_drive_web/live/chat_live.ex:382
+#: lib/ask_drive_web/live/chat_live.ex:384
 #, elixir-autogen, elixir-format
 msgid "Google Drive disconnected"
 msgstr "Google Drive 未連携"
 
-#: lib/ask_drive_web/live/chat_live.ex:534
+#: lib/ask_drive_web/live/chat_live.ex:537
 #, elixir-autogen, elixir-format
 msgid "Google Drive is not connected"
 msgstr "Google Drive が連携されていません"
 
-#: lib/ask_drive_web/live/chat_live.ex:690
+#: lib/ask_drive_web/live/chat_live.ex:693
 #, elixir-autogen, elixir-format
 msgid "Google Drive synchronization or ingestion may not be finished. Please check with an administrator."
 msgstr "Google Drive の同期・取り込みが完了していない可能性があります。管理者に確認してください（管理画面のドキュメント一覧で各文書の状態とエラーを確認できます）。"
 
-#: lib/ask_drive_web/live/chat_live.ex:583
+#: lib/ask_drive_web/live/chat_live.ex:586
 #, elixir-autogen, elixir-format
 msgid "Instant answers and document excerpts from your internal policies, manuals, and notes."
 msgstr "社内規定、マニュアル、議事録など、取り込まれた文書から即座に原文抜粋を探索して回答します。"
@@ -247,7 +247,7 @@ msgstr "ログアウト"
 msgid "New users are automatically registered on first login. Admin permissions can be granted in Platform Settings."
 msgstr "初回ログイン時に自動で登録されます。管理者権限は初期セットアップで指定したアドレス、または管理画面から付与されます。"
 
-#: lib/ask_drive_web/live/chat_live.ex:546
+#: lib/ask_drive_web/live/chat_live.ex:549
 #, elixir-autogen, elixir-format
 msgid "No documents have been ingested yet. Please ask an administrator to connect Google Drive."
 msgstr "まだドキュメントが取り込まれていません。管理者に Drive 連携を依頼してください。"
@@ -257,7 +257,7 @@ msgstr "まだドキュメントが取り込まれていません。管理者に
 msgid "No login method configured"
 msgstr "ログインの方法が設定されていません"
 
-#: lib/ask_drive_web/live/chat_live.ex:688
+#: lib/ask_drive_web/live/chat_live.ex:691
 #, elixir-autogen, elixir-format
 msgid "No searchable documents have been ingested yet."
 msgstr "検索対象の文書がまだ1件も取り込まれていません。"
@@ -267,24 +267,24 @@ msgstr "検索対象の文書がまだ1件も取り込まれていません。"
 msgid "No sign-in method is currently available."
 msgstr "現在ログインできる方法がありません。"
 
-#: lib/ask_drive_web/live/setup_live.ex:120
+#: lib/ask_drive_web/live/setup_live.ex:226
 #, elixir-autogen, elixir-format
 msgid "OAuth Client ID / Secret can be configured later in Platform Settings."
 msgstr "Google ログインの OAuth クライアント ID / シークレットは、あとで全体管理の「全体設定」で設定できます。"
 
-#: lib/ask_drive_web/live/setup_live.ex:84
+#: lib/ask_drive_web/live/setup_live.ex:173
 #, elixir-autogen, elixir-format
 msgid "Only accounts from this domain will be accepted for Google Login (SSO) and Google Drive."
 msgstr "Google ログイン（SSO）と Google Drive の連携で、このドメインのアカウントだけを受け付けます。"
 
-#: lib/ask_drive_web/live/chat_live.ex:659
-#: lib/ask_drive_web/live/chat_live.ex:746
-#: lib/ask_drive_web/live/chat_live.ex:866
+#: lib/ask_drive_web/live/chat_live.ex:662
+#: lib/ask_drive_web/live/chat_live.ex:749
+#: lib/ask_drive_web/live/chat_live.ex:869
 #, elixir-autogen, elixir-format
 msgid "Open in Drive"
 msgstr "Drive で開く"
 
-#: lib/ask_drive_web/live/chat_live.ex:865
+#: lib/ask_drive_web/live/chat_live.ex:868
 #, elixir-autogen, elixir-format
 msgid "Open in Drive (p.%{page})"
 msgstr "Drive で開く（p.%{page}）"
@@ -331,13 +331,13 @@ msgstr "メールアドレスと Google Workspace のパスワードでログイ
 msgid "Release"
 msgstr "解除"
 
-#: lib/ask_drive_web/live/chat_live.ex:615
-#: lib/ask_drive_web/live/chat_live.ex:830
+#: lib/ask_drive_web/live/chat_live.ex:618
+#: lib/ask_drive_web/live/chat_live.ex:833
 #, elixir-autogen, elixir-format
 msgid "Relevant excerpts"
 msgstr "関連しそうな箇所（原文抜粋）"
 
-#: lib/ask_drive_web/live/chat_live.ex:420
+#: lib/ask_drive_web/live/chat_live.ex:422
 #, elixir-autogen, elixir-format
 msgid "Reset conversation"
 msgstr "会話をリセット"
@@ -347,7 +347,7 @@ msgstr "会話をリセット"
 msgid "Return to Chat"
 msgstr "チャットに戻る"
 
-#: lib/ask_drive_web/live/chat_live.ex:901
+#: lib/ask_drive_web/live/chat_live.ex:904
 #, elixir-autogen, elixir-format
 msgid "Searching for answers…"
 msgstr "回答を検索しています…"
@@ -357,17 +357,17 @@ msgstr "回答を検索しています…"
 msgid "Select a desk to ask questions."
 msgstr "相談したい窓口を選んでください。"
 
-#: lib/ask_drive_web/live/chat_live.ex:946
+#: lib/ask_drive_web/live/chat_live.ex:949
 #, elixir-autogen, elixir-format
 msgid "Send"
 msgstr "送信"
 
-#: lib/ask_drive_web/live/chat_live.ex:817
+#: lib/ask_drive_web/live/chat_live.ex:820
 #, elixir-autogen, elixir-format
 msgid "Show AI thinking process (%{count} chars)"
 msgstr "AI の思考過程を表示（%{count}字）"
 
-#: lib/ask_drive_web/live/chat_live.ex:884
+#: lib/ask_drive_web/live/chat_live.ex:887
 #, elixir-autogen, elixir-format
 msgid "Show full text"
 msgstr "全文を表示"
@@ -398,42 +398,42 @@ msgstr "Google でログイン"
 msgid "Something went wrong!"
 msgstr "エラーが発生しました"
 
-#: lib/ask_drive_web/live/chat_live.ex:829
+#: lib/ask_drive_web/live/chat_live.ex:832
 #, elixir-autogen, elixir-format
 msgid "Sources"
 msgstr "引用元"
 
-#: lib/ask_drive_web/live/chat_live.ex:518
+#: lib/ask_drive_web/live/chat_live.ex:521
 #, elixir-autogen, elixir-format
 msgid "System is currently under maintenance"
 msgstr "現在システムメンテナンス中です"
 
-#: lib/ask_drive_web/live/chat_live.ex:782
+#: lib/ask_drive_web/live/chat_live.ex:785
 #, elixir-autogen, elixir-format
 msgid "Thinking… (%{count} chars)"
 msgstr "考えています…（%{count}字）"
 
-#: lib/ask_drive_web/live/chat_live.ex:542
+#: lib/ask_drive_web/live/chat_live.ex:545
 #, elixir-autogen, elixir-format
 msgid "To connect Drive, please elevate to administrator privileges first."
 msgstr "Drive を連携するには、まず管理者権限に昇格してください。"
 
-#: lib/ask_drive_web/live/chat_live.ex:538
+#: lib/ask_drive_web/live/chat_live.ex:541
 #, elixir-autogen, elixir-format
 msgid "To ingest documents and search/answer, please configure Google Drive integration in Admin."
 msgstr "ドキュメントを取り込んで検索・回答を行うには、管理画面で Drive 連携を設定してください。"
 
-#: lib/ask_drive_web/live/chat_live.ex:621
+#: lib/ask_drive_web/live/chat_live.ex:624
 #, elixir-autogen, elixir-format
 msgid "Unanswered (no documents ingested)"
 msgstr "未回答（文書が未取り込み）"
 
-#: lib/ask_drive_web/live/chat_live.ex:622
+#: lib/ask_drive_web/live/chat_live.ex:625
 #, elixir-autogen, elixir-format
 msgid "Unanswered (will generate in nightly batch)"
 msgstr "未回答（今夜のバッチで回答生成予定）"
 
-#: lib/ask_drive_web/live/chat_live.ex:365
+#: lib/ask_drive_web/live/chat_live.ex:367
 #, elixir-autogen, elixir-format
 msgid "Unlock and start chat"
 msgstr "解除してチャットを開始"
@@ -453,7 +453,7 @@ msgstr "一般ユーザー（昇格可）"
 msgid "We can't find the internet"
 msgstr "インターネットに接続できません"
 
-#: lib/ask_drive_web/live/setup_live.ex:95
+#: lib/ask_drive_web/live/setup_live.ex:196
 #, elixir-autogen, elixir-format
 msgid "Will appear in the chat header as \"AskDrive for (this name)\". Can be changed later."
 msgstr "チャット画面に「AskDrive for（この名前）」と表示されます。あとから変更でき、窓口は全体管理で追加できます。"
@@ -464,7 +464,7 @@ msgstr "チャット画面に「AskDrive for（この名前）」と表示され
 msgid "Your Google Workspace Password (identity verification)"
 msgstr "あなたの Google Workspace のパスワード（本人確認）"
 
-#: lib/ask_drive_web/live/chat_live.ex:705
+#: lib/ask_drive_web/live/chat_live.ex:708
 #, elixir-autogen, elixir-format
 msgid "Your question has been logged. Answers will be generated during the nightly batch."
 msgstr "質問内容はシステムに記録されました。今夜の夜間バッチで全ドキュメントを対象に回答データを生成し、翌朝から即答できるようになります。"
@@ -495,27 +495,12 @@ msgstr "%{desk} の管理"
 msgid "Admin mode"
 msgstr "管理者モード"
 
-#: lib/ask_drive_web/live/setup_live.ex:79
-#, elixir-autogen, elixir-format
-msgid "2. Organization Google Workspace Domain"
-msgstr "2. 組織の Google Workspace ドメイン"
-
-#: lib/ask_drive_web/live/setup_live.ex:91
-#, elixir-autogen, elixir-format
-msgid "3. First Desk Name"
-msgstr "3. 最初の窓口の名前"
-
-#: lib/ask_drive_web/live/setup_live.ex:102
-#, elixir-autogen, elixir-format
-msgid "4. Platform Administrator Email Addresses"
-msgstr "4. 全体管理者のメールアドレス"
-
 #: lib/ask_drive_web/components/layouts.ex:90
 #, elixir-autogen, elixir-format
 msgid "Anyone who can reach AskDrive can use Platform Admin."
 msgstr "AskDrive にアクセスできる人は誰でも全体管理を操作できます。"
 
-#: lib/ask_drive_web/live/setup_live.ex:107
+#: lib/ask_drive_web/live/setup_live.ex:213
 #, elixir-autogen, elixir-format
 msgid "Email addresses for initial platform administrators (comma-separated). They enter Platform Admin with their own account — no shared password."
 msgstr "AskDrive 全体を管理する人です（複数ならカンマ区切り）。各自のアカウントで本人確認して全体管理に入ります（共有のパスワードはありません）。最初の窓口の担当者（窓口管理者）にもなり、その窓口の設定（Google Drive・API キー等）を行います。"
@@ -530,7 +515,7 @@ msgstr "全体管理に入る"
 msgid "Login is turned off (guest mode)."
 msgstr "ログイン認証が無効です（ゲストモード）。"
 
-#: lib/ask_drive_web/live/setup_live.ex:55
+#: lib/ask_drive_web/live/setup_live.ex:83
 #, elixir-autogen, elixir-format
 msgid "Set up your organization settings and administrators. This screen will remain until setup is finished."
 msgstr "最初に、組織の情報と全体管理者を設定します。この画面はセットアップが終わるまで表示されます。"
@@ -560,87 +545,152 @@ msgstr "ログインの方法を設定する"
 msgid "You may leave out @%{domain}: it is filled in. For another domain of your organization, type the whole address."
 msgstr "@%{domain} は省略できます（自動で補完されます）。組織の別のドメインの場合は、@ 以降も入力してください。"
 
-#: lib/ask_drive_web/live/chat_live.ex:803
+#: lib/ask_drive_web/live/chat_live.ex:806
 #, elixir-autogen, elixir-format
 msgid "(Stopped)"
 msgstr "（中止しました）"
 
-#: lib/ask_drive_web/live/chat_live.ex:938
+#: lib/ask_drive_web/live/chat_live.ex:941
 #, elixir-autogen, elixir-format
 msgid "Stop"
 msgstr "停止"
 
-#: lib/ask_drive_web/live/chat_live.ex:934
+#: lib/ask_drive_web/live/chat_live.ex:937
 #, elixir-autogen, elixir-format
 msgid "Stop answering"
 msgstr "回答の生成を停止"
 
-#: lib/ask_drive_web/live/chat_live.ex:101
+#: lib/ask_drive_web/live/chat_live.ex:102
 #, elixir-autogen, elixir-format
 msgid "Stopped answering the question."
 msgstr "回答の生成を中止しました。"
 
-#: lib/ask_drive_web/live/chat_live.ex:771
+#: lib/ask_drive_web/live/chat_live.ex:774
 #, elixir-autogen, elixir-format
 msgid "Summary stopped. Please check the excerpts below."
 msgstr "要約を中止しました。下の抜粋をご確認ください。"
 
-#: lib/ask_drive_web/live/chat_live.ex:501
+#: lib/ask_drive_web/live/chat_live.ex:504
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr "削除"
 
-#: lib/ask_drive_web/live/chat_live.ex:500
+#: lib/ask_drive_web/live/chat_live.ex:503
 #, elixir-autogen, elixir-format
 msgid "Delete this question from your history?"
 msgstr "この質問を履歴から削除しますか？"
 
-#: lib/ask_drive_web/live/chat_live.ex:964
+#: lib/ask_drive_web/live/chat_live.ex:967
 #, elixir-autogen, elixir-format
 msgid "Excerpts"
 msgstr "抜粋"
 
-#: lib/ask_drive_web/live/chat_live.ex:596
+#: lib/ask_drive_web/live/chat_live.ex:599
 #, elixir-autogen, elixir-format
 msgid "From history"
 msgstr "履歴から"
 
-#: lib/ask_drive_web/live/chat_live.ex:412
+#: lib/ask_drive_web/live/chat_live.ex:414
 #, elixir-autogen, elixir-format
 msgid "History"
 msgstr "履歴"
 
-#: lib/ask_drive_web/live/chat_live.ex:465
+#: lib/ask_drive_web/live/chat_live.ex:467
 #, elixir-autogen, elixir-format
 msgid "No questions match."
 msgstr "一致する質問はありません。"
 
-#: lib/ask_drive_web/live/chat_live.ex:464
+#: lib/ask_drive_web/live/chat_live.ex:466
 #, elixir-autogen, elixir-format
 msgid "No questions yet."
 msgstr "まだ質問はありません。"
 
-#: lib/ask_drive_web/live/chat_live.ex:438
+#: lib/ask_drive_web/live/chat_live.ex:440
 #, elixir-autogen, elixir-format
 msgid "Only you can see these. Open one to read its answer again."
 msgstr "あなただけに表示されます。開くと、そのときの回答をもう一度確認できます。"
 
-#: lib/ask_drive_web/live/chat_live.ex:448
+#: lib/ask_drive_web/live/chat_live.ex:450
 #, elixir-autogen, elixir-format
 msgid "Search your questions"
 msgstr "質問を検索"
 
-#: lib/ask_drive_web/live/chat_live.ex:726
+#: lib/ask_drive_web/live/chat_live.ex:729
 #, elixir-autogen, elixir-format
 msgid "The documents have been updated since, so the excerpts can't be shown. Sources at the time:"
 msgstr "その後、文書が更新されたため抜粋は表示できません。当時の引用元:"
 
-#: lib/ask_drive_web/live/chat_live.ex:963
+#: lib/ask_drive_web/live/chat_live.ex:966
 #, elixir-autogen, elixir-format
 msgid "Unanswered"
 msgstr "未回答"
 
-#: lib/ask_drive_web/live/chat_live.ex:435
+#: lib/ask_drive_web/live/chat_live.ex:437
 #, elixir-autogen, elixir-format
 msgid "Your earlier questions"
 msgstr "これまでの質問"
+
+#: lib/ask_drive_web/live/setup_live.ex:108
+#, elixir-autogen, elixir-format
+msgid "2. Account & Usage Type"
+msgstr ""
+
+#: lib/ask_drive_web/live/setup_live.ex:168
+#, elixir-autogen, elixir-format, fuzzy
+msgid "3. Organization Google Workspace Domain"
+msgstr "2. 組織の Google Workspace ドメイン"
+
+#: lib/ask_drive_web/live/setup_live.ex:192
+#, elixir-autogen, elixir-format, fuzzy
+msgid "4. First Desk Name"
+msgstr "3. 最初の窓口の名前"
+
+#: lib/ask_drive_web/live/setup_live.ex:203
+#, elixir-autogen, elixir-format, fuzzy
+msgid "5. Platform Administrator Email Addresses"
+msgstr "4. 全体管理者のメールアドレス"
+
+#: lib/ask_drive_web/live/setup_live.ex:183
+#, elixir-autogen, elixir-format
+msgid "Any Google account (including personal @gmail.com) can be used. You can later restrict domains in Platform Settings if needed."
+msgstr ""
+
+#: lib/ask_drive_web/live/setup_live.ex:180
+#, elixir-autogen, elixir-format
+msgid "Domain restriction is disabled"
+msgstr ""
+
+#: lib/ask_drive_web/live/setup_live.ex:129
+#, elixir-autogen, elixir-format
+msgid "Google Workspace (Company/Org)"
+msgstr ""
+
+#: lib/ask_drive_web/live/setup_live.ex:155
+#, elixir-autogen, elixir-format
+msgid "Personal Account / No Domain Restriction"
+msgstr ""
+
+#: lib/ask_drive_web/system_notices.ex:22
+#, elixir-autogen, elixir-format
+msgid "Restarting on the new version. This page reconnects by itself in about 30 seconds."
+msgstr "新しいバージョンで再起動しています。30 秒ほどでこの画面は自動的に再接続します。"
+
+#: lib/ask_drive_web/system_notices.ex:21
+#, elixir-autogen, elixir-format
+msgid "Restarting on version %{version}. This page reconnects by itself in about 30 seconds."
+msgstr "%{version} で再起動しています。30 秒ほどでこの画面は自動的に再接続します。"
+
+#: lib/ask_drive_web/live/setup_live.ex:133
+#, elixir-autogen, elixir-format
+msgid "Restrict access to your organization domain (e.g. company.com)."
+msgstr ""
+
+#: lib/ask_drive_web/system_notices.ex:18
+#, elixir-autogen, elixir-format
+msgid "Updating AskDrive…"
+msgstr "AskDrive をアップデートしています…"
+
+#: lib/ask_drive_web/live/setup_live.ex:159
+#, elixir-autogen, elixir-format
+msgid "Use personal Gmail (@gmail.com) or allow any Google account."
+msgstr ""

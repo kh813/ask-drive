@@ -32,6 +32,37 @@ const liveSocket = new LiveSocket("/live", Socket, {
   hooks: {...colocatedHooks},
 })
 
+// The server is about to restart into an update (spec F-1505): cover the page with
+// "updating" until the socket is back, then reload on the new version (new assets too).
+let askdriveUpdating = false
+window.addEventListener("phx:askdrive:updating", ({detail}) => {
+  askdriveUpdating = true
+  if (document.getElementById("askdrive-updating")) return
+  const overlay = document.createElement("div")
+  overlay.id = "askdrive-updating"
+  overlay.setAttribute("role", "alert")
+  overlay.className =
+    "fixed inset-0 z-[100] flex items-center justify-center bg-white/80 dark:bg-zinc-950/80 backdrop-blur-sm transition-opacity"
+  const card = document.createElement("div")
+  card.className =
+    "mx-4 max-w-sm w-full p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl text-center space-y-3"
+  const spinner = document.createElement("div")
+  spinner.className =
+    "mx-auto w-10 h-10 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"
+  const title = document.createElement("p")
+  title.className = "font-semibold text-zinc-900 dark:text-zinc-100"
+  title.textContent = detail.title
+  const message = document.createElement("p")
+  message.className = "text-xs text-zinc-500 leading-relaxed"
+  message.textContent = detail.message
+  card.append(spinner, title, message)
+  overlay.append(card)
+  document.body.append(overlay)
+})
+liveSocket.getSocket().onOpen(() => {
+  if (askdriveUpdating) window.location.reload()
+})
+
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 // Sign-in e-mail: "name" becomes "name@<the organization's domain>" when the field is left

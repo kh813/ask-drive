@@ -48,7 +48,7 @@ AskDrive 管理スクリプト
   status             アプリケーションおよび依存サービスの稼働状態を確認
   setup              初回セットアップを実行 (依存ツール確認、DB初期化、ビルド)
   deploy             最新コードを取得し、マイグレーションと再ビルド・再起動を実行
-  update [options]   Git/Release から自己アップデート (--yes, --ver <version>)
+  update [options]   Git/Release から自己アップデート (--yes, --ver <version>, --build-only: ビルドのみ・再起動なし)
   repair-ollama      .runtime に Ollama をインストール / 再インストール (あとで Ollama に切り替えるとき・llama-server 欠落の修復)
   admin grant <mail> 指定メールアドレスを全体管理者にする (ロックアウト時の復旧)
   auth status        ログイン認証・LDAP・管理者アカウントの状態
@@ -192,12 +192,30 @@ cmd_start() {
     echo "Ollama は使わない設定のため起動しません（外部 API のみ）。"
   fi
 
+  promote_built_release
+
   if [[ -f "${SCRIPT_DIR}/_build/prod/rel/ask_drive/bin/ask_drive" ]]; then
     export MIX_ENV=prod
     export PHX_SERVER=true
     "${SCRIPT_DIR}/_build/prod/rel/ask_drive/bin/ask_drive" start
   else
     mix phx.server
+  fi
+}
+
+# 管理画面からのアップデート（F-1502）は、稼働中のリリースに触れずに隣（ask_drive.next）へビルドする。
+# 起動時にそれがあれば切り替える（直前のリリースは ask_drive.prev に残す）。
+promote_built_release() {
+  local rel="${SCRIPT_DIR}/_build/prod/rel"
+  [[ -x "${rel}/ask_drive.next/bin/ask_drive" ]] || return 0
+  echo "新しいリリース（管理画面からのアップデート）に切り替えます..."
+  rm -rf "${rel}/ask_drive.prev"
+  if [[ -d "${rel}/ask_drive" ]]; then
+    mv "${rel}/ask_drive" "${rel}/ask_drive.prev"
+  fi
+  if ! mv "${rel}/ask_drive.next" "${rel}/ask_drive"; then
+    echo -e "${RED}新しいリリースに切り替えられませんでした。直前のリリースで起動します。${NC}"
+    [[ -d "${rel}/ask_drive.prev" && ! -d "${rel}/ask_drive" ]] && mv "${rel}/ask_drive.prev" "${rel}/ask_drive"
   fi
 }
 
@@ -484,9 +502,14 @@ cmd_update() {
         target_ver="${2:-}"
         shift 2 || true
         ;;
+      --build-only)
+        # 管理画面から（F-1502）: 稼働中のサーバーはそのままビルドだけ行う（再起動は管理画面側）
+        export ASK_DRIVE_DEPLOY_BUILD_ONLY=1
+        shift
+        ;;
       *)
         echo -e "${RED}未知の update オプション: '$1'${NC}"
-        echo "使用方法: ./app.sh update [--yes] [--ver <version>]"
+        echo "使用方法: ./app.sh update [--yes] [--ver <version>] [--build-only]"
         exit 1
         ;;
     esac

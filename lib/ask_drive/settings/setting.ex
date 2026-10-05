@@ -56,6 +56,13 @@ defmodule AskDrive.Settings.Setting do
     field :maintenance_mode, :boolean, default: false
     # the nightly batch starts by itself (F-344); off while a new desk is being set up
     field :auto_batch_enabled, :boolean, default: true
+    # updating from the admin screen (F-1501, platform row): check every night, and update by
+    # itself when a new version is out; what the last check and update found
+    field :update_check_enabled, :boolean, default: true
+    field :update_auto_apply, :boolean, default: false
+    field :update_checked_at, :utc_datetime
+    field :update_latest_version, :string
+    field :update_last_result, :string
     field :maintenance_message, :string
 
     # --- Drive sync authentication (spec 6.1, F-110) ---
@@ -228,6 +235,8 @@ defmodule AskDrive.Settings.Setting do
         :allowed_domain,
         :maintenance_mode,
         :auto_batch_enabled,
+        :update_check_enabled,
+        :update_auto_apply,
         :maintenance_message,
         :drive_auth_mode,
         :drive_service_account_json,

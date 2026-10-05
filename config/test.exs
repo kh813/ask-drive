@@ -19,6 +19,11 @@ config :ask_drive, auth_disabled_by_default: false
 # Never let the runtime clock start a real nightly batch in the middle of a test run.
 config :ask_drive, auto_nightly_batch: false
 
+# Updating from the admin screen (F-1501): no nightly check, and state kept out of log/
+config :ask_drive,
+  auto_update_check: false,
+  update_state_dir: Path.join(System.tmp_dir!(), "askdrive_test_update")
+
 # Don't try to pull Ollama models from a test run.
 config :ask_drive, auto_pull_models: false
 # nor start Ollama / write the ollama_needed file for app.sh (AskDrive.LLM.OllamaServer)

@@ -23,8 +23,19 @@ NC='\033[0m'
 echo -e "${GREEN}=== AskDrive デプロイ処理を開始します ===${NC}"
 cd "${SCRIPT_DIR}"
 
+# 管理画面からのアップデート（F-1502）: 稼働中のサーバーとバッチはそのままビルドだけ行う。
+# リリースは稼働中のものの隣（ask_drive.next）に作り、次の起動（./app.sh start）で切り替える。
+# マイグレーションは新しいリリースの起動時に実行されるため、ここでは行わない（稼働中の古いコードの
+# 下でスキーマを変えない）。再起動は管理画面（サーバー自身）が行う。
+BUILD_ONLY="${ASK_DRIVE_DEPLOY_BUILD_ONLY:-}"
+REL_DIR="${SCRIPT_DIR}/_build/prod/rel"
+
 # 1. mix コマンドおよび .env.prod の確認 (未準備なら initial-setup.sh を実行)
 if ! command -v mix >/dev/null 2>&1 || [[ ! -f "${SCRIPT_DIR}/.env.prod" ]]; then
+  if [[ -n "${BUILD_ONLY}" ]]; then
+    echo "初期環境が未構築です（mix または .env.prod がありません）。サーバーで ./app.sh setup を実行してください。"
+    exit 1
+  fi
   echo -e "${YELLOW}初期環境が未構築のため、初期セットアップ (scripts/initial-setup.sh) を実行します...${NC}"
   bash "${SCRIPT_DIR}/scripts/initial-setup.sh"
   exit 0
@@ -81,13 +92,24 @@ mix local.rebar --force || true
 mix deps.get
 
 # 3. マイグレーション
-echo -e "\n${YELLOW}[2/4] データベースマイグレーションの実行中...${NC}"
-MIX_ENV=prod mix ecto.create || true
-MIX_ENV=prod mix ecto.migrate
+if [[ -n "${BUILD_ONLY}" ]]; then
+  echo -e "\n${YELLOW}[2/4] データベースマイグレーションは新しいバージョンの起動時に実行します${NC}"
+else
+  echo -e "\n${YELLOW}[2/4] データベースマイグレーションの実行中...${NC}"
+  MIX_ENV=prod mix ecto.create || true
+  MIX_ENV=prod mix ecto.migrate
+fi
 
 # 4. アセットとリリースの再ビルド
 echo -e "\n${YELLOW}[3/4] アセットとリリースのビルド中...${NC}"
 MIX_ENV=prod mix assets.deploy
+# 前回の管理画面からのアップデートで、切り替えられずに残ったビルドは使わない
+rm -rf "${REL_DIR}/ask_drive.next"
+if [[ -n "${BUILD_ONLY}" ]]; then
+  MIX_ENV=prod mix release --overwrite --path "${REL_DIR}/ask_drive.next"
+  echo -e "\n${GREEN}=== ビルドが完了しました（${REL_DIR}/ask_drive.next）。次の起動で切り替わります ===${NC}"
+  exit 0
+fi
 MIX_ENV=prod mix release --overwrite
 
 # 5. サービスの再起動

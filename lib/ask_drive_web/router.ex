@@ -51,6 +51,7 @@ defmodule AskDriveWeb.Router do
     live_session :setup,
       on_mount: [
         {AskDriveWeb.Plugs.SetLocale, :default},
+        AskDriveWeb.SystemNotices,
         {AskDriveWeb.UserAuth, :mount_current_user}
       ] do
       live "/setup", SetupLive
@@ -59,6 +60,7 @@ defmodule AskDriveWeb.Router do
     live_session :portal,
       on_mount: [
         {AskDriveWeb.Plugs.SetLocale, :default},
+        AskDriveWeb.SystemNotices,
         {AskDriveWeb.UserAuth, :require_login_when_enabled}
       ] do
       live "/", PortalLive
@@ -93,6 +95,7 @@ defmodule AskDriveWeb.Router do
     live_session :admin,
       on_mount: [
         {AskDriveWeb.Plugs.SetLocale, :default},
+        AskDriveWeb.SystemNotices,
         {AskDriveWeb.UserAuth, :require_admin_session}
       ] do
       live "/admin", AdminLive, :platform
@@ -148,6 +151,7 @@ defmodule AskDriveWeb.Router do
     live_session :app_admin,
       on_mount: [
         {AskDriveWeb.Plugs.SetLocale, :default},
+        AskDriveWeb.SystemNotices,
         {AskDriveWeb.UserAuth, :require_app_admin_session},
         {AskDriveWeb.AppScope, :app}
       ] do
@@ -164,6 +168,7 @@ defmodule AskDriveWeb.Router do
     live_session :app_chat,
       on_mount: [
         {AskDriveWeb.Plugs.SetLocale, :default},
+        AskDriveWeb.SystemNotices,
         {AskDriveWeb.UserAuth, :require_login_when_enabled},
         {AskDriveWeb.AppScope, :app}
       ] do
