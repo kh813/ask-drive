@@ -17,6 +17,7 @@ This document outlines planned improvements, future concepts, and the technical 
   - WAL checkpointing (`TRUNCATE` mode) integrated into Nightly Batch phase 6.
   - Automated temporary file & OCR cache garbage collection (`AskDrive.Cleanup`).
   - CLI commands (`./app.sh backup`, `./app.sh backup status`, `./app.sh backup checkpoint`).
+- **管理画面からのアップデート**（v0.1.30〜）: 全体管理の「アップデート」タブで最新版を確認し、サーバーとバッチを動かしたまま裏でビルドして、短い再起動で切り替える。実行中のバッチは区切りで一時停止し、再起動後に続きから再開。再起動中は全画面に「アップデート中」を表示。毎晩の確認と自動アップデート（夜間枠の開始時のみ）の設定
 
 ---
 
@@ -35,6 +36,8 @@ This document outlines planned improvements, future concepts, and the technical 
   - Direct 👍 / 👎 answer rating in chat UI, automatically feeding low-rated answers to administrators for Tier 1 FAQ curation.
 
 ### 3. Advanced Networking & Architecture
+- **コードだけの更新の再起動なし適用（ホットパッチ）**:
+  - マイグレーション・依存関係・プロセス構成の変更がない更新に限り、変更されたモジュールを稼働中のサーバーに読み込み、営業時間中でも利用者を中断せずに更新する。安全に適用できない場合は現在の再起動方式に切り替える。
 - **DNS & Network Telemetry**:
   - DNS request logging and intranet latency analysis for air-gapped or restricted enterprise networks.
 - **Distributed Ingestion Workers**:
