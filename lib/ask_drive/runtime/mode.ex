@@ -168,6 +168,7 @@ defmodule AskDrive.Runtime.Mode do
   # from batch_runs, so a restart inside the window doesn't start a second one.
   # Every app gets its nightly run, one after another in a single task: there is one local
   # model, and run_batch refuses to start while any app's batch is running (spec 6.11).
+  # The desks import first, then share the time left for generation (F-355).
   defp maybe_start_nightly_batch do
     if Application.get_env(:ask_drive, :auto_nightly_batch, true) and
          not AskDrive.Batch.Scheduler.running_anywhere?() do
@@ -181,13 +182,7 @@ defmodule AskDrive.Runtime.Mode do
           "Night window reached: nightly batch for #{Enum.map_join(due, ", ", & &1.slug)}"
         )
 
-        Task.start(fn ->
-          for app <- due do
-            AskDrive.Apps.with_app(app, fn ->
-              AskDrive.Batch.Scheduler.run_batch(trigger: "auto")
-            end)
-          end
-        end)
+        Task.start(fn -> AskDrive.Batch.Night.run(due) end)
       end
     end
   rescue

@@ -199,7 +199,8 @@ defmodule AskDrive.HealthCheck do
       AskDrive.Apps.each(fn _app ->
         {n, _} =
           AskDrive.Repo.update_all(
-            from(b in AskDrive.Batch.BatchRun, where: b.status == "running"),
+            # also one waiting for its turn to generate (F-355): that night is gone
+            from(b in AskDrive.Batch.BatchRun, where: b.status in ["running", "waiting"]),
             set: [
               status: "aborted",
               finished_at: DateTime.utc_now() |> DateTime.truncate(:second),

@@ -1,7 +1,18 @@
 defmodule AskDriveWeb.ChatLive do
   use AskDriveWeb, :live_view
 
-  alias AskDrive.{Accounts, Answering, ChatSummary, HealthCheck, LLM, Repo, Settings, Snippet}
+  alias AskDrive.{
+    Accounts,
+    Answering,
+    ChatHistory,
+    ChatSummary,
+    HealthCheck,
+    LLM,
+    Repo,
+    Settings,
+    Snippet
+  }
+
   alias AskDrive.Accounts.{AdminAccess, User}
   alias AskDrive.Documents.Chunk
 
@@ -37,6 +48,12 @@ defmodule AskDriveWeb.ChatLive do
      |> assign(:access_password_form, to_form(%{"password" => ""}, as: :chat_access))
      |> assign(:messages, [])
      |> assign(:loading, false)
+     # the user's earlier questions (F-430): listed when the panel is opened
+     |> assign(:history_enabled?, ChatHistory.enabled?(socket.assigns.current_user))
+     |> assign(:history_open?, false)
+     |> assign(:history_query, "")
+     |> assign(:history_count, 0)
+     |> stream(:history, [])
      |> assign(:form, to_form(%{"question" => ""}))}
   end
 
@@ -72,14 +89,87 @@ defmodule AskDriveWeb.ChatLive do
     end
   end
 
+  # 停止: the search still running and/or the AI summaries still being written. Killing the
+  # task closes its request, so a local model stops generating too.
+  @impl true
+  def handle_event("cancel_answer", _params, socket) do
+    socket =
+      if socket.assigns.loading,
+        do:
+          socket
+          |> cancel_async(:answer)
+          |> assign(:loading, false)
+          |> put_flash(:info, gettext("Stopped answering the question.")),
+        else: socket
+
+    socket =
+      socket.assigns.messages
+      |> Enum.filter(&match?(%{summary: %{status: :running}}, &1))
+      |> Enum.reduce(socket, fn msg, socket ->
+        # kept as far as it got
+        ChatHistory.put_summary(msg[:history_id], msg.summary.text)
+
+        socket
+        |> cancel_async({:summary, msg.id})
+        |> update_summary(msg.id, &%{&1 | status: :cancelled})
+      end)
+
+    {:noreply, socket}
+  end
+
   @impl true
   def handle_event("reset_chat", _params, socket) do
     {:noreply, assign(socket, :messages, [])}
   end
 
+  # The history panel (F-430): the user's own earlier questions, newest first
+  def handle_event("toggle_history", _params, socket) do
+    if socket.assigns.history_open? do
+      {:noreply, assign(socket, :history_open?, false)}
+    else
+      {:noreply,
+       socket
+       |> assign(:history_open?, true)
+       |> assign(:history_query, "")
+       |> load_history()}
+    end
+  end
+
+  def handle_event("history_search", %{"q" => query}, socket) do
+    {:noreply, socket |> assign(:history_query, query) |> load_history()}
+  end
+
+  # Shows an earlier question and its answer again, below the conversation
+  def handle_event("history_open", %{"id" => id}, socket) do
+    case ChatHistory.get(socket.assigns.current_user, id) do
+      nil ->
+        {:noreply, socket}
+
+      entry ->
+        {:noreply,
+         socket
+         |> assign(:messages, socket.assigns.messages ++ history_messages(entry))
+         |> assign(:history_open?, false)}
+    end
+  end
+
+  def handle_event("history_delete", %{"id" => id}, socket) do
+    case ChatHistory.delete(socket.assigns.current_user, id) do
+      {:ok, entry} ->
+        {:noreply,
+         socket
+         |> stream_delete(:history, entry)
+         |> update(:history_count, &max(&1 - 1, 0))}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
   @impl true
   def handle_async(:answer, {:ok, result}, socket) do
     summarise? = result.tier == 2 and result.chunks != [] and ChatSummary.enabled?()
+    entry = ChatHistory.record(socket.assigns.current_user, result)
 
     assistant_msg = %{
       id: System.unique_integer([:positive]),
@@ -93,6 +183,7 @@ defmodule AskDriveWeb.ChatLive do
       index_empty?: Map.get(result, :index_empty?, false),
       # Live AI summary of the excerpts (spec 6.4.4): shown above them, streamed in
       summary: if(summarise?, do: %{status: :running, text: "", thinking: ""}),
+      history_id: entry && entry.id,
       inserted_at: DateTime.utc_now()
     }
 
@@ -123,6 +214,7 @@ defmodule AskDriveWeb.ChatLive do
   end
 
   def handle_async({:summary, id}, {:ok, {:ok, %{text: text, thinking: thinking}}}, socket) do
+    ChatHistory.put_summary(history_id(socket, id), text)
     {:noreply, update_summary(socket, id, &%{&1 | status: :done, text: text, thinking: thinking})}
   end
 
@@ -131,6 +223,9 @@ defmodule AskDriveWeb.ChatLive do
     Logger.warning("ChatLive: summary failed: #{inspect(reason)}")
     {:noreply, update_summary(socket, id, &Map.merge(&1, %{status: :failed, error: reason}))}
   end
+
+  # Stopped with 停止: the screen was already updated by "cancel_answer"
+  def handle_async(_key, {:exit, {:shutdown, :cancel}}, socket), do: {:noreply, socket}
 
   def handle_async({:summary, id}, {:exit, reason}, socket) do
     require Logger
@@ -161,9 +256,59 @@ defmodule AskDriveWeb.ChatLive do
     {:noreply, update_summary(socket, id, &%{&1 | thinking: &1.thinking <> delta})}
   end
 
+  defp history_id(socket, id) do
+    Enum.find_value(socket.assigns.messages, fn
+      %{id: ^id} = msg -> msg[:history_id]
+      _ -> nil
+    end)
+  end
+
+  defp load_history(socket) do
+    entries = ChatHistory.list(socket.assigns.current_user, socket.assigns.history_query)
+
+    socket
+    |> assign(:history_count, length(entries))
+    |> stream(:history, entries, reset: true)
+  end
+
+  # An entry as the question and answer bubbles, marked as from the history
+  defp history_messages(entry) do
+    restored = ChatHistory.restore(entry)
+
+    user_msg = %{
+      id: System.unique_integer([:positive]),
+      role: :user,
+      content: entry.question,
+      inserted_at: entry.asked_at,
+      history_at: entry.asked_at
+    }
+
+    assistant_msg = %{
+      id: System.unique_integer([:positive]),
+      role: :assistant,
+      tier: entry.tier,
+      content: entry.answer || "",
+      answer: entry.answer,
+      chunks: restored.chunks,
+      qa_pair: restored.qa_pair,
+      question: entry.question,
+      index_empty?: entry.index_empty,
+      summary: if(entry.summary, do: %{status: :done, text: entry.summary, thinking: ""}),
+      # the excerpts were re-indexed since: what they were, instead
+      missing_sources:
+        if(entry.tier == 2 and restored.chunks == [], do: restored.sources, else: []),
+      inserted_at: entry.asked_at,
+      history_at: entry.asked_at
+    }
+
+    [user_msg, assistant_msg]
+  end
+
   defp update_summary(socket, id, fun) do
     messages =
       Enum.map(socket.assigns.messages, fn
+        # stopped: pieces still in the mailbox are dropped
+        %{id: ^id, summary: %{status: :cancelled}} = msg -> msg
         %{id: ^id, summary: %{} = summary} = msg -> %{msg | summary: fun.(summary)}
         msg -> msg
       end)
@@ -249,15 +394,120 @@ defmodule AskDriveWeb.ChatLive do
               <% end %>
             </div>
 
-            <%= if @messages != [] do %>
+            <div class="flex items-center gap-2">
               <button
-                id="reset-chat-btn"
-                phx-click="reset_chat"
-                class="text-xs px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 flex items-center gap-1 transition"
+                :if={@history_enabled?}
+                type="button"
+                id="history-btn"
+                phx-click="toggle_history"
+                aria-expanded={to_string(@history_open?)}
+                class={[
+                  "text-xs px-3 py-1.5 rounded-lg border flex items-center gap-1 transition",
+                  if(@history_open?,
+                    do:
+                      "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300",
+                    else:
+                      "border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
+                  )
+                ]}
               >
-                <.icon name="hero-trash" class="w-3.5 h-3.5" /> {gettext("Reset conversation")}
+                <.icon name="hero-clock" class="w-3.5 h-3.5" /> {gettext("History")}
               </button>
-            <% end %>
+              <%= if @messages != [] do %>
+                <button
+                  id="reset-chat-btn"
+                  phx-click="reset_chat"
+                  class="text-xs px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 flex items-center gap-1 transition"
+                >
+                  <.icon name="hero-trash" class="w-3.5 h-3.5" /> {gettext("Reset conversation")}
+                </button>
+              <% end %>
+            </div>
+          </div>
+
+          <%!-- The user's own earlier questions (F-430) --%>
+          <div
+            :if={@history_open?}
+            id="history-panel"
+            class="mb-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-zinc-200/70 dark:border-zinc-800">
+              <div>
+                <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                  {gettext("Your earlier questions")}
+                </h3>
+                <p class="text-[11px] text-zinc-500">
+                  {gettext("Only you can see these. Open one to read its answer again.")}
+                </p>
+              </div>
+              <form id="history-search-form" phx-change="history_search" phx-submit="history_search">
+                <input
+                  type="search"
+                  name="q"
+                  id="history-search"
+                  value={@history_query}
+                  phx-debounce="300"
+                  placeholder={gettext("Search your questions")}
+                  autocomplete="off"
+                  class="w-56 px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                />
+              </form>
+            </div>
+            <ul
+              id="history-list"
+              phx-update="stream"
+              class="max-h-72 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800"
+            >
+              <li
+                id="history-empty"
+                class="hidden only:block px-4 py-6 text-center text-xs text-zinc-500"
+              >
+                {if @history_query == "",
+                  do: gettext("No questions yet."),
+                  else: gettext("No questions match.")}
+              </li>
+              <li
+                :for={{dom_id, entry} <- @streams.history}
+                id={dom_id}
+                class="group flex items-start gap-2 px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition"
+              >
+                <button
+                  type="button"
+                  id={"history-open-#{entry.id}"}
+                  phx-click="history_open"
+                  phx-value-id={entry.id}
+                  class="flex-1 min-w-0 text-left"
+                >
+                  <span class="block text-sm text-zinc-800 dark:text-zinc-200 line-clamp-2 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition">
+                    {entry.question}
+                  </span>
+                  <span class="mt-0.5 flex items-center gap-2 text-[10px] text-zinc-400">
+                    {format_datetime(entry.asked_at)}
+                    <span class={[
+                      "px-1.5 py-0.5 rounded-full",
+                      if(entry.tier == 3,
+                        do: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+                        else:
+                          "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                      )
+                    ]}>
+                      {history_tier_label(entry.tier)}
+                    </span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  id={"history-delete-#{entry.id}"}
+                  phx-click="history_delete"
+                  phx-value-id={entry.id}
+                  data-confirm={gettext("Delete this question from your history?")}
+                  title={gettext("Delete")}
+                  class="shrink-0 p-1.5 rounded-lg text-zinc-400 opacity-60 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition"
+                >
+                  <.icon name="hero-trash" class="w-3.5 h-3.5" />
+                </button>
+              </li>
+            </ul>
           </div>
 
           <%!-- Maintenance Mode Alert --%>
@@ -345,7 +595,12 @@ defmodule AskDriveWeb.ChatLive do
                     <div class="max-w-2xl rounded-2xl rounded-tr-sm bg-indigo-600 text-white px-4 py-3 shadow-sm text-sm">
                       <p class="whitespace-pre-wrap">{msg.content}</p>
                       <span class="text-[10px] text-indigo-200 block text-right mt-1">
-                        {format_time(msg.inserted_at)}
+                        <span :if={msg[:history_at]} class="mr-1">
+                          <.icon name="hero-clock" class="w-3 h-3" /> {gettext("From history")}
+                        </span>
+                        {if msg[:history_at],
+                          do: format_datetime(msg.history_at),
+                          else: format_time(msg.inserted_at)}
                       </span>
                     </div>
                   </div>
@@ -377,7 +632,9 @@ defmodule AskDriveWeb.ChatLive do
                             </span>
                         <% end %>
                         <span class="text-[10px] text-zinc-400">
-                          {format_time(msg.inserted_at)}
+                          {if msg[:history_at],
+                            do: format_datetime(msg.history_at),
+                            else: format_time(msg.inserted_at)}
                         </span>
                       </div>
 
@@ -455,6 +712,47 @@ defmodule AskDriveWeb.ChatLive do
                         </div>
                       <% end %>
 
+                      <%!-- From the history, its excerpts re-indexed since (F-430): the summary
+                            as it was, and what the sources were --%>
+                      <div
+                        :if={msg[:missing_sources] not in [nil, []]}
+                        id={"history-sources-#{msg.id}"}
+                        class="space-y-2"
+                      >
+                        <div
+                          :if={msg[:summary]}
+                          class="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-900/60 text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed"
+                        >
+                          {summary_html(msg.summary.text, msg.id, 0)}
+                        </div>
+                        <p class="text-xs text-zinc-500">
+                          {gettext(
+                            "The documents have been updated since, so the excerpts can't be shown. Sources at the time:"
+                          )}
+                        </p>
+                        <ol class="space-y-1 text-xs">
+                          <li
+                            :for={{source, n} <- Enum.with_index(msg.missing_sources, 1)}
+                            class="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300"
+                          >
+                            <span class="shrink-0 px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-bold">
+                              [{n}]
+                            </span>
+                            {source["name"] || gettext("Document")}
+                            <span :if={source["page"]} class="text-zinc-500">p.{source["page"]}</span>
+                            <.link
+                              :if={source["link"]}
+                              href={source["link"]}
+                              target="_blank"
+                              class="text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 inline-flex items-center gap-0.5 transition"
+                            >
+                              {gettext("Open in Drive")}
+                              <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
+                            </.link>
+                          </li>
+                        </ol>
+                      </div>
+
                       <%!-- Tier 2 Excerpt Sources --%>
                       <%= if msg.tier == 2 and msg.chunks != [] do %>
                         <div class="space-y-3">
@@ -471,6 +769,10 @@ defmodule AskDriveWeb.ChatLive do
                               </span>
                             </div>
                             <%= case msg.summary do %>
+                              <% %{status: :cancelled, text: ""} -> %>
+                                <p class="text-xs text-zinc-500">
+                                  {gettext("Summary stopped. Please check the excerpts below.")}
+                                </p>
                               <% %{status: :failed} -> %>
                                 <p class="text-xs text-zinc-500">
                                   {gettext(
@@ -497,6 +799,12 @@ defmodule AskDriveWeb.ChatLive do
                                     class="inline-block w-1.5 h-3.5 ml-0.5 bg-indigo-400 animate-pulse align-middle"
                                   ></span>
                                 </div>
+                                <p
+                                  :if={summary.status == :cancelled}
+                                  class="text-[10px] text-zinc-400"
+                                >
+                                  {gettext("(Stopped)")}
+                                </p>
                                 <p :if={summary.status == :done} class="text-[10px] text-zinc-400">
                                   {gettext(
                                     "AI summaries may contain errors. Always verify key details against the cited sources."
@@ -622,6 +930,17 @@ defmodule AskDriveWeb.ChatLive do
                 />
               </div>
               <button
+                :if={@loading or summarising?(@messages)}
+                type="button"
+                id="stop-btn"
+                phx-click="cancel_answer"
+                title={gettext("Stop answering")}
+                class="px-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-red-50 hover:border-red-300 hover:text-red-700 dark:hover:bg-red-950/40 dark:hover:text-red-300 text-zinc-700 dark:text-zinc-200 font-medium text-sm flex items-center gap-1.5 shadow-sm transition"
+              >
+                <.icon name="hero-stop-circle" class="w-4 h-4" />
+                <span>{gettext("Stop")}</span>
+              </button>
+              <button
                 type="submit"
                 id="send-btn"
                 disabled={@loading}
@@ -637,6 +956,16 @@ defmodule AskDriveWeb.ChatLive do
     </Layouts.app>
     """
   end
+
+  defp summarising?(messages),
+    do: Enum.any?(messages, &match?(%{summary: %{status: :running}}, &1))
+
+  defp format_datetime(%DateTime{} = dt), do: AskDrive.Clock.format(dt, "%Y-%m-%d %H:%M")
+  defp format_datetime(_), do: ""
+
+  defp history_tier_label(3), do: gettext("Unanswered")
+  defp history_tier_label(2), do: gettext("Excerpts")
+  defp history_tier_label(_), do: gettext("Answer")
 
   defp format_time(%DateTime{} = dt) do
     AskDrive.Clock.format(dt, "%H:%M")

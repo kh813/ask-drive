@@ -21,6 +21,7 @@ defmodule AskDrive.Batch.BatchRun do
     field :progress_item, :string
     field :progress_detail, :string
     field :progress_phase_started_at, :utc_datetime
+    field :generation_deadline, :utc_datetime
     field :stop_requested_at, :utc_datetime
 
     has_many :phase_stats, AskDrive.Batch.BatchPhaseStat, on_delete: :delete_all
@@ -51,6 +52,7 @@ defmodule AskDrive.Batch.BatchRun do
       :progress_item,
       :progress_detail,
       :progress_phase_started_at,
+      :generation_deadline,
       :stop_requested_at
     ])
     |> validate_required([:status])
@@ -58,6 +60,8 @@ defmodule AskDrive.Batch.BatchRun do
     |> validate_inclusion(:trigger, ["manual", "auto"])
     |> validate_inclusion(:status, [
       "running",
+      # a nightly run that has imported and waits for its turn to generate (F-355)
+      "waiting",
       "completed",
       "deadline_reached",
       "failed",

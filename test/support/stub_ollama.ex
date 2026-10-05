@@ -16,6 +16,8 @@ defmodule AskDrive.StubOllama do
     if pid = :persistent_term.get({__MODULE__, :owner}, nil),
       do: send(pid, {:stub_embed, length(inputs)})
 
+    Process.sleep(:persistent_term.get({__MODULE__, :embed_delay}, 0))
+
     dim = :persistent_term.get({__MODULE__, :dim}, 1024)
 
     embeddings =
@@ -131,6 +133,9 @@ defmodule AskDrive.StubOllama do
   @doc "Makes /api/generate wait `ms` before answering (a slow local model)."
   def put_generate_delay(ms), do: :persistent_term.put({__MODULE__, :generate_delay}, ms)
 
+  @doc "Makes /api/embed wait `ms` before answering (a busy local model)."
+  def put_embed_delay(ms), do: :persistent_term.put({__MODULE__, :embed_delay}, ms)
+
   @doc "Makes /api/generate reject requests carrying `think` (models without thinking)."
   def reject_think(on?), do: :persistent_term.put({__MODULE__, :reject_think}, on?)
 
@@ -144,6 +149,7 @@ defmodule AskDrive.StubOllama do
     :persistent_term.put({__MODULE__, :installed}, [])
     :persistent_term.put({__MODULE__, :reject_think}, false)
     :persistent_term.put({__MODULE__, :generate_delay}, 0)
+    :persistent_term.put({__MODULE__, :embed_delay}, 0)
     {:ok, pid} = Bandit.start_link(plug: __MODULE__, port: 0, ip: {127, 0, 0, 1})
     {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
     {pid, "http://127.0.0.1:#{port}"}

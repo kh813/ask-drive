@@ -134,7 +134,10 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
 
       assert query(connect_href(view))["login_hint"] == "sync@example.com"
 
-      # pasting is enough (no button); what's pasted is checked before asking Google
+      # pasting only fills the box; 保存して認証完了 (or Enter) completes it (F-353), and
+      # what's pasted is checked before asking Google
+      assert has_element?(view, "#drive-auth-finish-btn[disabled]")
+
       view
       |> form("#drive-settings-form", %{
         "drive_auth_code" =>
@@ -142,15 +145,19 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
       })
       |> render_change()
 
-      assert render(view) =~ "別の認可のアドレスです"
+      refute has_element?(view, "#drive-auth-result")
+      refute has_element?(view, "#drive-auth-finish-btn[disabled]")
+      view |> element("#drive-auth-finish-btn") |> render_click()
+      assert has_element?(view, "#drive-auth-result", "別の認可のアドレスです")
 
+      # Enter in the box submits the card, which completes the pasted address too
       view
       |> form("#drive-settings-form", %{
         "drive_auth_code" => "http://localhost/?error=access_denied"
       })
-      |> render_change()
+      |> render_submit()
 
-      assert render(view) =~ "Google で許可されませんでした"
+      assert has_element?(view, "#drive-auth-result", "Google で許可されませんでした")
     end
 
     test "on the server itself (localhost): Google's window comes back to AskDrive, which saves it there and updates the screen (F-352)",

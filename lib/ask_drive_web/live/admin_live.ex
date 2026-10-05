@@ -137,6 +137,7 @@ defmodule AskDriveWeb.AdminLive do
      socket
      |> assign(:drive_auth_code, "")
      |> assign(:drive_auth, nil)
+     |> assign(:drive_auth_result, {:ok, "#{email} と連携しました。"})
      |> put_flash(:info, "Google Drive 同期アカウント（#{email}）と連携しました。「同期テスト」で確認してください。")
      |> load_dashboard_data()}
   end
@@ -754,7 +755,7 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   # Typing in the Drive card: the account to authorize (its hint goes into a fresh
-  # authorization URL) and the pasted address (F-347)
+  # authorization URL) and the pasted address (F-347), kept until 保存して認証完了 (F-353)
   @impl true
   def handle_event("drive_form_change", params, socket) do
     hint = String.trim(params["drive_login_hint"] || socket.assigns[:drive_login_hint] || "")
@@ -768,13 +769,8 @@ defmodule AskDriveWeb.AdminLive do
         else: socket
 
     pasted = params["drive_auth_code"] || socket.assigns[:drive_auth_code] || ""
-    changed? = pasted != socket.assigns[:drive_auth_code]
-    socket = assign(socket, :drive_auth_code, pasted)
 
-    # pasting the address Google ended on is enough: save straight away (F-348)
-    if changed? and pasted =~ ~r/[?&](code|error)=/,
-      do: finish_drive_auth(socket),
-      else: {:noreply, socket}
+    {:noreply, assign(socket, :drive_auth_code, pasted)}
   end
 
   # 接続テスト for an OAuth client (F-349): the platform's, or the one this desk uses
@@ -811,7 +807,7 @@ defmodule AskDriveWeb.AdminLive do
 
   # The Drive card's single save (F-345): the chosen mode's authentication and the folder
   @impl true
-  def handle_event("save_drive_settings", %{"setting" => params}, socket) do
+  def handle_event("save_drive_settings", %{"setting" => params} = form_params, socket) do
     folder = Map.take(params, ["drive_folder_id", "drive_folder_name"])
 
     if socket.assigns.drive_mode == "service_account" do
@@ -822,7 +818,17 @@ defmodule AskDriveWeb.AdminLive do
         |> Map.take(["drive_oauth_client_id", "drive_oauth_client_secret"])
         |> Map.merge(folder)
 
-      save_drive_settings(socket, attrs)
+      pasted = String.trim(form_params["drive_auth_code"] || "")
+
+      # Enter in the paste box submits the card: the pasted address is completed as well,
+      # as with 保存して認証完了 (F-353)
+      case save_drive_settings(socket, attrs) do
+        {:noreply, socket} when pasted != "" ->
+          socket |> assign(:drive_auth_code, pasted) |> finish_drive_auth()
+
+        reply ->
+          reply
+      end
     end
   end
 
@@ -1157,7 +1163,8 @@ defmodule AskDriveWeb.AdminLive do
         is_nil(AskDrive.LLM.missing_api_key(:generation))
 
     # progress of the run in progress (spec F-340); the dashboard ticks every 5 s
-    running_run = Enum.find(runs, &(&1.status == "running"))
+    # (or one waiting for its turn to generate in the nightly batch, F-355)
+    running_run = Enum.find(runs, &(&1.status in ["running", "waiting"]))
 
     # 2. Coverage Stats
     total_chunks = Repo.aggregate(Chunk, :count, :id) || 0
@@ -1515,10 +1522,11 @@ defmodule AskDriveWeb.AdminLive do
                     </div>
                   <% :running -> %>
                     バッチを実行中です。<span :if={@running_progress}>
-                      全体の目安 {@running_progress.overall}% ・ ステップ {@running_progress.step}/{@running_progress.steps}「{@running_progress.label}」{if @running_progress.total >
-                                                                                                                                                   0,
-                                                                                                                                                 do:
-                                                                                                                                                   " #{@running_progress.done} / #{@running_progress.total}"}
+                      全体の目安 {@running_progress.overall}%{if @running_progress.remaining_seconds,
+                        do: "（残り #{eta_label(@running_progress.remaining_seconds)}）"} ・ ステップ {@running_progress.step}/{@running_progress.steps}「{@running_progress.label}」{if @running_progress.total >
+                                                                                                                                                                                0,
+                                                                                                                                                                              do:
+                                                                                                                                                                                " #{@running_progress.done} / #{@running_progress.total}"}
                     </span>
                   <% :done -> %>
                     {Calendar.strftime(@auto_status.window_start, "%-m/%-d")} の夜間枠は実行済みです（#{@auto_status.run.id}・{trigger_label(
@@ -1787,21 +1795,40 @@ defmodule AskDriveWeb.AdminLive do
                 <div
                   :if={
                     @selected_progress &&
-                      @latest_run.status in ["running", "aborted", "failed", "stopped"]
+                      @latest_run.status in ["running", "waiting", "aborted", "failed", "stopped"]
                   }
                   id="batch-progress"
                   class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3"
                 >
                   <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                    {if @latest_run.status == "running", do: "進捗", else: "停止した位置"}
+                    {case @latest_run.status do
+                      "running" -> "進捗"
+                      "waiting" -> "進捗（ほかの窓口の取り込みが終わったら想定QAを生成します）"
+                      _ -> "停止した位置"
+                    end}
                   </h3>
                   <div>
                     <div class="flex items-baseline justify-between text-xs text-zinc-600 dark:text-zinc-400">
-                      <span>全体の目安</span>
+                      <span>
+                        全体の目安<span
+                          :if={@latest_run.status == "running"}
+                          id="batch-progress-basis"
+                          class="text-zinc-500"
+                        >{if @selected_progress.basis == :time,
+                          do: "（想定される処理時間から。最近のバッチの各ステップの所要時間と、このステップのペースで推定）",
+                          else: "（ステップごとの固定の比率から。所要時間の記録がたまると処理時間ベースになります）"}</span>
+                      </span>
                       <span class="font-mono text-base font-semibold text-zinc-900 dark:text-zinc-100">
                         {@selected_progress.overall}%
                       </span>
                     </div>
+                    <p
+                      :if={@latest_run.status == "running" && @selected_progress.remaining_seconds}
+                      id="batch-progress-remaining"
+                      class="mt-0.5 text-right text-[11px] text-zinc-500"
+                    >
+                      全体の残り {eta_label(@selected_progress.remaining_seconds)}
+                    </p>
                     <div class="mt-1 h-2.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
                       <div
                         class="h-full rounded-full bg-indigo-600 transition-all duration-700"
@@ -4177,7 +4204,7 @@ defmodule AskDriveWeb.AdminLive do
                                 Google で「許可」を押したあと、別ウィンドウのアドレスバーが
                                 <code class="font-mono bg-white/80 dark:bg-black/30 px-1 py-0.5 rounded">http://localhost:4000/...</code>
                                 に遷移してエラー表示になるのは正常です。
-                                その<strong>ブラウザのアドレスバーの URL をすべてコピー</strong>して、下の枠に貼り付けてください（貼り付けると自動で認証が完了します）。
+                                その<strong>ブラウザのアドレスバーの URL をすべてコピー</strong>して、下の枠に貼り付け、「保存して認証完了」を押してください（枠で Enter を押しても同じです）。
                               </p>
                             </div>
 
@@ -4192,6 +4219,36 @@ defmodule AskDriveWeb.AdminLive do
                                 placeholder={@drive_redirect_uri <> "?state=...&code=..."}
                                 class="w-full px-3 py-2.5 rounded-lg border-2 border-dashed border-indigo-300 dark:border-indigo-700 bg-white dark:bg-zinc-950 text-xs font-mono focus:border-indigo-500 focus:border-solid shadow-xs"
                               />
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-3">
+                              <button
+                                type="button"
+                                id="drive-auth-finish-btn"
+                                phx-click="drive_auth_finish"
+                                phx-disable-with="認証しています…"
+                                disabled={String.trim(@drive_auth_code) == ""}
+                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                <.icon name="hero-check-circle" class="w-4 h-4" /> 保存して認証完了
+                              </button>
+                              <%= case @drive_auth_result do %>
+                                <% {:ok, message} -> %>
+                                  <span
+                                    id="drive-auth-result"
+                                    class="text-[11px] text-emerald-600 dark:text-emerald-400"
+                                  >
+                                    {message}
+                                  </span>
+                                <% {:error, message} -> %>
+                                  <span
+                                    id="drive-auth-result"
+                                    class="text-[11px] text-red-600 dark:text-red-400"
+                                  >
+                                    {message}
+                                  </span>
+                                <% _ -> %>
+                              <% end %>
                             </div>
 
                             <p :if={@drive_on_server?} class="text-[11px] text-zinc-500">
@@ -4681,6 +4738,12 @@ defmodule AskDriveWeb.AdminLive do
                     min="0"
                     max="23"
                   />
+                  <p
+                    id="night-order-help"
+                    class="sm:col-span-2 text-[11px] text-zinc-500 leading-relaxed"
+                  >
+                    窓口が複数あるときの夜間の自動実行は、1 つずつ順に 2 段階で行います。(1) すべての窓口の取り込み（同期・本文抽出・埋め込み）を、取り込み済みの割合が低い窓口から。(2) 想定QAの生成を、生成が済んでいる割合が低い窓口から。打ち切り時刻までの残り時間は、生成が残っているチャンク数に応じて窓口ごとに分け、早く終わった窓口の余りは次の窓口に回します。
+                  </p>
                 </div>
 
                 <.input
@@ -5578,6 +5641,7 @@ defmodule AskDriveWeb.AdminLive do
     |> assign_new(:drive_client_open, fn -> false end)
     |> assign_new(:oauth_client_test, fn -> %{} end)
     |> assign_new(:drive_auth_code, fn -> "" end)
+    |> assign_new(:drive_auth_result, fn -> nil end)
     |> then(fn socket ->
       # keep an authorization in progress (its state / PKCE verifier) across refreshes, as
       # long as it still goes back to the same place
@@ -5700,6 +5764,7 @@ defmodule AskDriveWeb.AdminLive do
 
   defp status_label("completed"), do: "完了"
   defp status_label("running"), do: "実行中"
+  defp status_label("waiting"), do: "生成待ち（取り込み済み）"
   defp status_label("aborted"), do: "中断（再起動）"
   defp status_label("failed"), do: "失敗"
   defp status_label("deadline_reached"), do: "時間切れ"
@@ -5712,6 +5777,9 @@ defmodule AskDriveWeb.AdminLive do
 
   defp status_class("running"),
     do: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 animate-pulse"
+
+  defp status_class("waiting"),
+    do: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300"
 
   defp status_class("deadline_reached"),
     do: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
@@ -5922,15 +5990,23 @@ defmodule AskDriveWeb.AdminLive do
   defp eta_label(sec) when sec < 3600, do: "約 #{div(sec + 59, 60)} 分"
   defp eta_label(sec), do: "約 #{div(sec, 3600)} 時間 #{div(rem(sec, 3600), 60)} 分"
 
-  # Progress.overview plus, while generating, whether the pace reaches the cut-off time
+  # Progress.overview plus, while generating, whether the pace reaches the cut-off time.
+  # The overall percentage is by expected time, from earlier runs' phase times (F-354).
   defp progress_view(run) do
     now = DateTime.utc_now()
 
-    case Progress.overview(run, now) do
+    # this run's own cut-off: in the nightly batch, its share of the night (F-355)
+    deadline =
+      run.generation_deadline || Scheduler.calculate_deadline(Settings.platform_setting!())
+
+    opts =
+      if run.status == "running",
+        do: [history: Progress.phase_history(run.kind), deadline: deadline],
+        else: []
+
+    case Progress.overview(run, now, opts) do
       %{phase: "generate", eta_seconds: eta} = view
       when is_integer(eta) and run.status == "running" ->
-        deadline = Scheduler.calculate_deadline(Settings.platform_setting!())
-
         if DateTime.compare(DateTime.add(now, eta), deadline) == :gt,
           do: Map.put(view, :past_deadline, AskDrive.Clock.format(deadline, "%H:%M")),
           else: view
@@ -6092,6 +6168,14 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
+  # no authorization started (no OAuth client yet): nothing to complete the pasted address with
+  defp finish_drive_auth(%{assigns: %{drive_auth: nil}} = socket) do
+    message = "先に OAuth クライアントを設定し、「Google の認可画面を開く」から認可してください。"
+
+    {:noreply,
+     socket |> assign(:drive_auth_result, {:error, message}) |> put_flash(:error, message)}
+  end
+
   defp finish_drive_auth(socket) do
     alias AskDrive.Drive.OAuth
     %{state: state, verifier: verifier, redirect_uri: redirect_uri} = socket.assigns.drive_auth
@@ -6114,11 +6198,15 @@ defmodule AskDriveWeb.AdminLive do
          socket
          |> assign(:drive_auth_code, "")
          |> assign(:drive_auth, nil)
+         |> assign(:drive_auth_result, {:ok, "#{account.email} と連携しました。"})
          |> put_flash(:info, "Google Drive 同期アカウント（#{account.email}）と連携しました。「同期テスト」で確認してください。")
          |> load_dashboard_data()}
 
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, drive_auth_error(reason))}
+        {:noreply,
+         socket
+         |> assign(:drive_auth_result, {:error, drive_auth_error(reason)})
+         |> put_flash(:error, drive_auth_error(reason))}
     end
   end
 

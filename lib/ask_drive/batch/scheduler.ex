@@ -49,17 +49,33 @@ defmodule AskDrive.Batch.Scheduler do
   automatic run counts as this night's run, so the window doesn't start it again.
   """
   def request_stop do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
     {count, _} =
       Repo.update_all(
         from(b in BatchRun, where: b.status == "running" and is_nil(b.stop_requested_at)),
-        set: [stop_requested_at: DateTime.utc_now() |> DateTime.truncate(:second)]
+        set: [stop_requested_at: now]
       )
 
-    if count > 0, do: :ok, else: {:error, :not_running}
+    # one waiting for its turn to generate (F-355) stops right away: it never gets the turn
+    {waiting, _} =
+      Repo.update_all(
+        from(b in BatchRun, where: b.status == "waiting"),
+        set: [stop_requested_at: now, status: "stopped", finished_at: now]
+      )
+
+    if count + waiting > 0, do: :ok, else: {:error, :not_running}
   end
 
-  @doc "Whether any app's batch is running (they share one local model; spec 6.11)."
+  @doc """
+  Whether any app's batch is running (they share one local model; spec 6.11), or the
+  nightly batch is going through the desks (F-355).
+  """
   def running_anywhere? do
+    AskDrive.Batch.Night.running?() or any_app_running?()
+  end
+
+  defp any_app_running? do
     AskDrive.Apps.each(fn _app -> running?() end) |> Enum.any?(fn {_app, r} -> r end)
   end
 
@@ -86,12 +102,19 @@ defmodule AskDrive.Batch.Scheduler do
   generation model (spec 6.3.8 F-331). Meant for daytime manual runs: a full batch spends
   hours generating QA with the local model, and chat query embeddings queue behind it.
   It also stays out of `:night_batch`, so the embedding model stays resident for chat.
+
+  Used by the nightly batch (`AskDrive.Batch.Night`, F-355): `stage: :ingest` runs phases
+  1-3 and leaves the run "waiting" for `resume_batch/2` to generate; `deadline:` sets when
+  generation stops (default: the night's cut-off, `calculate_deadline/2`); `night: true`
+  lets it run while the nightly batch itself is what is going on.
   """
   def run_batch(opts \\ []) do
     # The nightly cron and a manual run — in this app or another — could otherwise overlap
     # and fight over the one local model.
+    busy? = if Keyword.get(opts, :night), do: any_app_running?(), else: running_anywhere?()
+
     cond do
-      running_anywhere?() ->
+      busy? ->
         Logger.warning("Batch requested while another is running; skipped")
         {:error, :already_running}
 
@@ -209,7 +232,6 @@ defmodule AskDrive.Batch.Scheduler do
   end
 
   defp do_run_batch(opts) do
-    force_all = Keyword.get(opts, :force, false)
     ingest_only? = Keyword.get(opts, :ingest_only, false)
     setting = Settings.get_setting!()
 
@@ -229,6 +251,91 @@ defmodule AskDrive.Batch.Scheduler do
       })
       |> Repo.insert()
 
+    in_run(batch_run, setting, opts, fn batch_run, deadline ->
+      # --- Phase 1: Sync ---
+      {_p1_stat, batch_run} = run_phase_1_sync(batch_run, setting)
+
+      # --- Phase 2: Invalidate ---
+      {_p2_stat, batch_run} = run_phase_2_invalidate(batch_run, setting)
+
+      # --- Phase 3: Embed Chunks ---
+      {_p3_stat, batch_run} = run_phase_3_embed_chunks(batch_run, setting)
+
+      if Keyword.get(opts, :stage) == :ingest and not ingest_only? do
+        # the nightly batch imports every desk before any generates (F-355)
+        Progress.detail("ほかの窓口の取り込みが終わるのを待っています（このあと想定QAを生成します）")
+
+        {:ok, batch_run |> BatchRun.changeset(%{status: "waiting"}) |> Repo.update!()}
+      else
+        finish_run(batch_run, setting, deadline, opts)
+      end
+    end)
+  end
+
+  @doc """
+  Generates for a run left "waiting" by `run_batch(stage: :ingest)` (phases 4-6), with
+  generation cut off at `deadline:` (F-355). `{:error, :not_waiting}` if it no longer
+  waits (stopped in the meantime).
+  """
+  def resume_batch(run_id, opts \\ []) do
+    case Repo.get(BatchRun, run_id) do
+      %BatchRun{status: "waiting"} = run ->
+        run = run |> BatchRun.changeset(%{status: "running"}) |> Repo.update!()
+        setting = Settings.get_setting!()
+        in_run(run, setting, opts, &finish_run(&1, setting, &2, opts))
+
+      _ ->
+        {:error, :not_waiting}
+    end
+  rescue
+    e ->
+      Logger.error("Batch resume crashed: #{Exception.format(:error, e, __STACKTRACE__)}")
+      {:error, e}
+  end
+
+  # Phases 4-6: generate (unless ingest-only or without a generation key), then finish
+  defp finish_run(batch_run, setting, deadline, opts) do
+    ingest_only? = batch_run.kind == "ingest_only"
+    missing_generation_key = LLM.missing_api_key(:generation, setting)
+
+    {batch_run, deadline_reached?} =
+      cond do
+        ingest_only? ->
+          Logger.info("Batch ##{batch_run.id} - ingest only: skipping Phase 4 (Generate) and 5")
+          {batch_run, false}
+
+        # the embedding key is there but not the generation one (spec F-343): index, and
+        # say why no QA was generated
+        missing_generation_key ->
+          note =
+            "生成（#{missing_generation_key}）の API キーが未設定のため、QA 生成を行いませんでした（取り込みのみ実行）。"
+
+          Logger.warning("Batch ##{batch_run.id} - #{note}")
+          {batch_run |> BatchRun.changeset(%{error: note}) |> Repo.update!(), false}
+
+        true ->
+          # --- Phase 4: Generate (Deadline-controlled) ---
+          batch_run =
+            batch_run |> BatchRun.changeset(%{generation_deadline: deadline}) |> Repo.update!()
+
+          {_p4_stat, batch_run, deadline_reached?} =
+            run_phase_4_generate(batch_run, setting, deadline, Keyword.get(opts, :force, false))
+
+          # --- Phase 5: Embed Questions ---
+          {_p5_stat, batch_run} = run_phase_5_embed_questions(batch_run, setting)
+          {batch_run, deadline_reached?}
+      end
+
+    # --- Phase 6: Verify & Finish ---
+    {_p6_stat, batch_run} = run_phase_6_verify(batch_run, setting, deadline_reached?)
+    {:ok, batch_run}
+  end
+
+  # Runs `fun.(batch_run, deadline)` as the run's process: progress reports go to the run,
+  # the machine stays awake, and a failure or a stop request is recorded on the run.
+  defp in_run(batch_run, setting, opts, fun) do
+    ingest_only? = batch_run.kind == "ingest_only"
+
     # progress reports from this process (and the workers it calls) go to this run (F-340)
     Progress.bind(batch_run.id)
 
@@ -236,8 +343,11 @@ defmodule AskDrive.Batch.Scheduler do
     # generation model, and the daytime mode keeps the embedding model resident for chat)
     unless ingest_only?, do: Mode.set_mode(:night_batch)
 
-    # the cut-off hour is platform-wide (spec 6.11)
-    deadline = calculate_deadline(Settings.platform_setting!())
+    # the cut-off hour is platform-wide (spec 6.11); the nightly batch gives each desk its
+    # share of the night (F-355)
+    deadline =
+      Keyword.get_lazy(opts, :deadline, fn -> calculate_deadline(Settings.platform_setting!()) end)
+
     Logger.info("Starting Night Batch ##{batch_run.id}. Deadline: #{inspect(deadline)}")
 
     # Start caffeinate process to prevent macOS sleep during nightly batch (12-6)
@@ -251,54 +361,18 @@ defmodule AskDrive.Batch.Scheduler do
         nil
       end
 
-    try do
-      # --- Phase 1: Sync ---
-      {_p1_stat, batch_run} = run_phase_1_sync(batch_run, setting)
-
-      # --- Phase 2: Invalidate ---
-      {_p2_stat, batch_run} = run_phase_2_invalidate(batch_run, setting)
-
-      # --- Phase 3: Embed Chunks ---
-      {_p3_stat, batch_run} = run_phase_3_embed_chunks(batch_run, setting)
-
-      missing_generation_key = LLM.missing_api_key(:generation, setting)
-
-      {batch_run, deadline_reached?} =
-        cond do
-          ingest_only? ->
-            Logger.info("Batch ##{batch_run.id} - ingest only: skipping Phase 4 (Generate) and 5")
-            {batch_run, false}
-
-          # the embedding key is there but not the generation one (spec F-343): index, and
-          # say why no QA was generated
-          missing_generation_key ->
-            note =
-              "生成（#{missing_generation_key}）の API キーが未設定のため、QA 生成を行いませんでした（取り込みのみ実行）。"
-
-            Logger.warning("Batch ##{batch_run.id} - #{note}")
-            {batch_run |> BatchRun.changeset(%{error: note}) |> Repo.update!(), false}
-
-          true ->
-            # --- Phase 4: Generate (Deadline-controlled) ---
-            {_p4_stat, batch_run, deadline_reached?} =
-              run_phase_4_generate(batch_run, setting, deadline, force_all)
-
-            # --- Phase 5: Embed Questions ---
-            {_p5_stat, batch_run} = run_phase_5_embed_questions(batch_run, setting)
-            {batch_run, deadline_reached?}
-        end
-
-      # --- Phase 6: Verify & Finish ---
-      {_p6_stat, batch_run} = run_phase_6_verify(batch_run, setting, deadline_reached?)
-
+    cleanup = fn ->
       # Leave night_batch for whatever mode the clock calls for (daytime or standby)
       Mode.end_batch()
       if ingest_only?, do: rewarm_embedding(setting)
-
       if caffeinate_port, do: Port.close(caffeinate_port)
       Progress.unbind()
+    end
 
-      {:ok, batch_run}
+    try do
+      result = fun.(batch_run, deadline)
+      cleanup.()
+      result
     rescue
       e ->
         # the message and where it happened, shown on the dashboard (the server's log may be
@@ -314,15 +388,11 @@ defmodule AskDrive.Batch.Scheduler do
         })
         |> Repo.update()
 
-        Mode.end_batch()
-        if ingest_only?, do: rewarm_embedding(setting)
-        if caffeinate_port, do: Port.close(caffeinate_port)
-        Progress.unbind()
+        cleanup.()
         {:error, e}
     catch
       :throw, :batch_stop_requested ->
         Logger.info("Batch ##{batch_run.id} stopped at the admin's request")
-        Progress.unbind()
 
         {:ok, batch_run} =
           batch_run
@@ -331,9 +401,7 @@ defmodule AskDrive.Batch.Scheduler do
           |> Repo.update()
 
         LLM.unload_model(setting.batch_model, setting: setting)
-        Mode.end_batch()
-        if ingest_only?, do: rewarm_embedding(setting)
-        if caffeinate_port, do: Port.close(caffeinate_port)
+        cleanup.()
         {:ok, batch_run}
     end
   end

@@ -154,6 +154,67 @@ defmodule AskDriveWeb.ChatLiveTest do
     assert html =~ ~r{id="src-\d+-1"}
   end
 
+  test "停止 stops a long summary (and the search before it)", %{conn: conn} do
+    {server, url} = AskDrive.StubOllama.start!(self())
+    on_exit(fn -> Process.exit(server, :normal) end)
+    AskDrive.StubOllama.put_generate_pieces(["外部記憶媒体の接続は禁止されています [1]。"])
+    # a local model that takes a long time
+    AskDrive.StubOllama.put_generate_delay(30_000)
+
+    {:ok, _} =
+      AskDrive.Settings.update_setting(AskDrive.Settings.get_setting!(), %{
+        ollama_host: url,
+        llm_provider: "ollama",
+        embed_provider: "ollama"
+      })
+
+    {:ok, doc} =
+      %AskDrive.Documents.Document{}
+      |> AskDrive.Documents.Document.changeset(%{
+        drive_file_id: "stop_doc",
+        name: "guide.pdf",
+        mime_type: "application/pdf",
+        status: "indexed"
+      })
+      |> AskDrive.Repo.insert()
+
+    {:ok, _} =
+      %AskDrive.Documents.Chunk{}
+      |> AskDrive.Documents.Chunk.changeset(%{
+        document_id: doc.id,
+        position: 0,
+        content_hash: "s",
+        content: "USB メモリ、外付け HDD も接続を禁止する。",
+        page: 5
+      })
+      |> AskDrive.Repo.insert()
+
+    {:ok, view, _html} = live(conn, ~p"/it-support")
+    refute has_element?(view, "#stop-btn")
+
+    # while searching: the query embedding waits on a busy model
+    AskDrive.StubOllama.put_embed_delay(5_000)
+    view |> form("#chat-form", %{"question" => "USBメモリの規則は？"}) |> render_submit()
+    assert_receive {:stub_embed, 1}, 5_000
+    assert has_element?(view, "#stop-btn")
+    view |> element("#stop-btn") |> render_click()
+    refute has_element?(view, "#answer-loading")
+    refute has_element?(view, "#stop-btn")
+    AskDrive.StubOllama.put_embed_delay(0)
+
+    # while the summary is being written
+    view |> form("#chat-form", %{"question" => "USBメモリの利用ルールは？"}) |> render_submit()
+    assert_receive {:stub_generate, _}, 20_000
+    assert has_element?(view, "#stop-btn")
+    view |> element("#stop-btn") |> render_click()
+
+    refute has_element?(view, "#stop-btn")
+    assert has_element?(view, "#send-btn:not([disabled])")
+    html = render(view)
+    assert html =~ "Summary stopped" or html =~ "要約を中止しました"
+    refute html =~ "外部記憶媒体の接続は禁止されています"
+  end
+
   test "a reasoning model's thinking is kept but collapsed, not mixed into the summary", %{
     conn: conn
   } do
