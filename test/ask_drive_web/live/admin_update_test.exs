@@ -6,6 +6,7 @@ defmodule AskDriveWeb.AdminUpdateTest do
 
   setup %{conn: conn} do
     test = self()
+    File.rm_rf!(Path.dirname(Server.marker_path()))
     Application.put_env(:ask_drive, :update_build_command, {"/bin/sh", ["-c", "echo building"]})
     Application.put_env(:ask_drive, :update_service_check, fn -> true end)
     Application.put_env(:ask_drive, :update_restart_fun, fn -> send(test, :restarted) end)
@@ -20,6 +21,7 @@ defmodule AskDriveWeb.AdminUpdateTest do
           ],
           do: Application.delete_env(:ask_drive, key)
 
+      File.rm_rf!(Path.dirname(Server.marker_path()))
       :ok = Supervisor.terminate_child(AskDrive.Supervisor, Server)
       {:ok, _} = Supervisor.restart_child(AskDrive.Supervisor, Server)
     end)

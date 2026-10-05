@@ -35,6 +35,8 @@ defmodule AskDrive.Updates.ServerTest do
 
     on_exit(fn ->
       Enum.each(@envs, &Application.delete_env(:ask_drive, &1))
+      # a marker left by a restart must not be picked up once this test's database is gone
+      File.rm_rf!(Path.dirname(Server.marker_path()))
       restart_server()
     end)
   end

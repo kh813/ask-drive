@@ -173,14 +173,9 @@ defmodule AskDrive.Updates do
 
   @doc false
   def save_platform(attrs) do
+    # get_setting! creates the row if there is none yet (a fresh install)
     AskDrive.Apps.platform(fn ->
-      case Settings.get_setting() do
-        nil ->
-          :ok
-
-        setting ->
-          setting |> Ecto.Changeset.change(attrs) |> AskDrive.Repo.update()
-      end
+      Settings.get_setting!() |> Ecto.Changeset.change(attrs) |> AskDrive.Repo.update()
     end)
   end
 end
