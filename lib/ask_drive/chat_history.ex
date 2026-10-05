@@ -24,12 +24,15 @@ defmodule AskDrive.ChatHistory do
   def enabled?(%{id: id}) when is_integer(id) and id > 0, do: true
   def enabled?(_user), do: false
 
-  @doc "Saves an answer (`Answering.ask/1`'s result) to `user`'s history; nil if it keeps none."
-  def record(user, result) do
+  @doc """
+  Saves an answer (`Answering.ask/1`'s result) to `user`'s history, in the thread `thread_key`
+  (F-431); nil if the user keeps none.
+  """
+  def record(user, result, thread_key \\ nil) do
     if enabled?(user) do
       chunks = result.chunks || []
 
-      %Entry{user_id: user.id}
+      %Entry{user_id: user.id, thread_key: thread_key || Ecto.UUID.generate()}
       |> Entry.changeset(%{
         question: result.question,
         tier: result.tier,
@@ -67,22 +70,55 @@ defmodule AskDrive.ChatHistory do
     :ok
   end
 
-  @doc "`user`'s latest entries, newest first; `query` narrows them to questions containing it."
+  @doc """
+  `user`'s threads (F-431), the latest first: `%{id: thread_key, title: its first question,
+  follow_ups: how many, tier: the first answer's, asked_at: the latest question's}`. `query`
+  narrows them to threads with a question containing it.
+  """
   def list(user, query \\ "") do
     if enabled?(user) do
       query = String.trim(query || "")
 
-      from(e in Entry,
-        where: e.user_id == ^user.id,
-        order_by: [desc: e.asked_at, desc: e.id],
-        limit: @list_limit
-      )
-      |> then(fn q ->
-        if query == "",
-          do: q,
-          else: where(q, [e], like(e.question, ^"%#{escape_like(query)}%"))
+      keys =
+        from(e in Entry,
+          where: e.user_id == ^user.id,
+          group_by: e.thread_key,
+          order_by: [desc: max(e.asked_at), desc: max(e.id)],
+          limit: @list_limit,
+          select: e.thread_key
+        )
+        |> then(fn q ->
+          if query == "",
+            do: q,
+            else: where(q, [e], like(e.question, ^"%#{escape_like(query)}%"))
+        end)
+        |> Repo.all()
+
+      entries =
+        Repo.all(
+          from e in Entry,
+            where: e.user_id == ^user.id and e.thread_key in ^keys,
+            order_by: [asc: e.asked_at, asc: e.id]
+        )
+        |> Enum.group_by(& &1.thread_key)
+
+      Enum.flat_map(keys, fn key ->
+        case entries[key] do
+          [first | _] = thread ->
+            [
+              %{
+                id: key,
+                title: first.question,
+                follow_ups: length(thread) - 1,
+                tier: first.tier,
+                asked_at: List.last(thread).asked_at
+              }
+            ]
+
+          _ ->
+            []
+        end
       end)
-      |> Repo.all()
     else
       []
     end
@@ -91,16 +127,28 @@ defmodule AskDrive.ChatHistory do
   # SQLite's LIKE has no escape character by default: match % and _ literally by dropping them
   defp escape_like(text), do: String.replace(text, ["%", "_"], "")
 
-  @doc "One of `user`'s entries, or nil."
-  def get(user, id) do
-    if enabled?(user), do: Repo.get_by(Entry, id: id, user_id: user.id)
+  @doc "One of `user`'s threads: its entries, the first question first ([] if none)."
+  def get_thread(user, key) do
+    if enabled?(user) do
+      Repo.all(
+        from e in Entry,
+          where: e.user_id == ^user.id and e.thread_key == ^key,
+          order_by: [asc: e.asked_at, asc: e.id]
+      )
+    else
+      []
+    end
   end
 
-  @doc "Deletes one of `user`'s entries."
-  def delete(user, id) do
-    case get(user, id) do
-      nil -> {:error, :not_found}
-      entry -> Repo.delete(entry)
+  @doc "Deletes one of `user`'s threads (its question and every follow-up)."
+  def delete_thread(user, key) do
+    if enabled?(user) do
+      case Repo.delete_all(from e in Entry, where: e.user_id == ^user.id and e.thread_key == ^key) do
+        {0, _} -> {:error, :not_found}
+        {n, _} -> {:ok, n}
+      end
+    else
+      {:error, :not_found}
     end
   end
 

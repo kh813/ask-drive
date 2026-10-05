@@ -4,6 +4,8 @@ defmodule AskDrive.ChatHistory.Entry do
 
   schema "chat_history" do
     field :user_id, :integer
+    # the thread it belongs to: a question and its follow-ups share it (F-431)
+    field :thread_key, :string
     field :question, :string
     field :tier, :integer
     field :answer, :string
@@ -22,6 +24,7 @@ defmodule AskDrive.ChatHistory.Entry do
     entry
     |> cast(attrs, [
       :question,
+      :thread_key,
       :tier,
       :answer,
       :summary,

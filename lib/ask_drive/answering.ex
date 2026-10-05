@@ -24,16 +24,32 @@ defmodule AskDrive.Answering do
 
   @doc """
   Processes a user question and returns a structured response map with tier information and sources.
+
+  A follow-up in a chat thread (spec F-431) passes the thread's earlier questions as
+  `context:` (oldest first) and the QA pairs already shown in it as `exclude_qa_ids:`. It is
+  searched together with them, so "それ" in "それは何日前まで？" finds what the thread is about;
+  it skips the exact-match cache (the follow-up's wording alone would match the wrong thing),
+  and an already shown QA pair isn't given again as its answer. `search_query` in the result
+  is what was searched.
   """
-  def ask(question, _opts \\ []) when is_binary(question) do
+  def ask(question, opts \\ []) when is_binary(question) do
     trimmed = String.trim(question)
+
+    context =
+      opts |> Keyword.get(:context, []) |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
+
+    follow_up? = context != []
+    exclude_qa_ids = Keyword.get(opts, :exclude_qa_ids, [])
+    # what is searched (and logged): the thread's questions, then this one
+    query = if follow_up?, do: Enum.join(context ++ [trimmed], "\n"), else: trimmed
+    logged = if follow_up?, do: Enum.join(context ++ [trimmed], " / "), else: trimmed
     normalized = normalize_question(trimmed)
     setting = Settings.get_setting!()
     now = DateTime.utc_now()
 
     # --- Tier 0: Answer Cache exact match ---
     tier0_result =
-      if Map.get(setting, :tier0_enabled, true) do
+      if Map.get(setting, :tier0_enabled, true) and not follow_up? do
         QA.get_cached_answer(normalized)
       else
         nil
@@ -47,6 +63,7 @@ defmodule AskDrive.Answering do
       %{
         tier: 0,
         question: trimmed,
+        search_query: trimmed,
         answer: tier0_result.answer,
         chunks: [tier0_result.chunk] |> Enum.reject(&is_nil/1),
         qa_pair: tier0_result,
@@ -60,7 +77,7 @@ defmodule AskDrive.Answering do
       # default 30s x 3 attempts left the chat hanging for minutes. Giving up quickly lets
       # Tier 2 answer from keyword search alone instead.
       embedding =
-        case LLM.embed(setting.embed_model, [trimmed],
+        case LLM.embed(setting.embed_model, [query],
                setting: setting,
                timeout: @query_embed_timeout,
                retry: false
@@ -84,12 +101,15 @@ defmodule AskDrive.Answering do
 
       tier1_match =
         if embedding do
-          case QA.search_qa_vectors(embedding, 3) do
+          case Enum.reject(QA.search_qa_vectors(embedding, 3), fn {qa, _} ->
+                 qa.id in exclude_qa_ids
+               end) do
             [{best_qa, sim} | _] when sim >= tier1_threshold ->
               if best_qa.status == "active" or
                    (best_qa.status == "stale" and setting.serve_stale_qa) do
-                # Update answer cache for future Tier 0 instant hit
-                if Map.get(setting, :tier0_enabled, true) do
+                # Update answer cache for future Tier 0 instant hit (a follow-up's wording
+                # alone means nothing outside its thread)
+                if Map.get(setting, :tier0_enabled, true) and not follow_up? do
                   QA.put_cached_answer(normalized, best_qa.id)
                 end
 
@@ -108,11 +128,12 @@ defmodule AskDrive.Answering do
       if tier1_match do
         {matched_qa, _sim} = tier1_match
         candidate_ids = if matched_qa.chunk_id, do: [matched_qa.chunk_id], else: []
-        record_question_log(trimmed, embedding, 1, candidate_ids, now)
+        record_question_log(logged, embedding, 1, candidate_ids, now)
 
         %{
           tier: 1,
           question: trimmed,
+          search_query: query,
           answer: matched_qa.answer,
           chunks: [matched_qa.chunk] |> Enum.reject(&is_nil/1),
           qa_pair: matched_qa,
@@ -125,7 +146,7 @@ defmodule AskDrive.Answering do
 
         scored_chunks =
           if tier2_enabled do
-            Retrieval.hybrid_search(trimmed, embedding, limit: excerpt_count)
+            Retrieval.hybrid_search(query, embedding, limit: excerpt_count)
           else
             []
           end
@@ -140,11 +161,12 @@ defmodule AskDrive.Answering do
 
         # --- Tier 2 / 3: Record question in question_log table ---
         candidate_ids = Enum.map(matched_chunks, & &1.id)
-        record_question_log(trimmed, embedding, tier, candidate_ids, now)
+        record_question_log(logged, embedding, tier, candidate_ids, now)
 
         %{
           tier: tier,
           question: trimmed,
+          search_query: query,
           answer: nil,
           chunks: matched_chunks,
           qa_pair: nil,

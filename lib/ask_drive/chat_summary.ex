@@ -45,8 +45,13 @@ defmodule AskDrive.ChatSummary do
       shows collapsed rather than in the answer
 
   Returns `{:ok, %{text: answer, thinking: thinking}}` or `{:error, reason}`.
+
+  A follow-up in a chat thread (F-431) passes the thread's earlier exchanges as `context:`
+  (`[%{question: q, answer: a}]`, oldest first): the prompt shows them, so the question is
+  read as their continuation.
   """
-  def generate(question, chunks, on_event \\ fn _ -> :ok end) when is_list(chunks) do
+  def generate(question, chunks, on_event \\ fn _ -> :ok end, opts \\ []) when is_list(chunks) do
+    context = Keyword.get(opts, :context, [])
     setting = Settings.get_setting!()
     {provider, model} = provider_and_model(setting)
     model = available_model(provider, model, setting)
@@ -90,7 +95,8 @@ defmodule AskDrive.ChatSummary do
       if String.length(visible) >= cap or String.length(raw) >= @raw_cap, do: :halt, else: :ok
     end
 
-    result = LLM.generate_stream(model, build_prompt(question, chunks, model), opts, filtered)
+    result =
+      LLM.generate_stream(model, build_prompt(question, chunks, model, context), opts, filtered)
 
     with {:ok, _} <- result do
       raw = Process.get({__MODULE__, :raw}, "")
@@ -111,7 +117,7 @@ defmodule AskDrive.ChatSummary do
 
       if ambiguous? or wrong_language? do
         notes = if ambiguous?, do: raw, else: Enum.join([thinking, answer], "\n")
-        finalize(question, chunks, notes, provider, model, setting, cap, on_event)
+        finalize(question, chunks, notes, provider, model, setting, cap, on_event, context)
       else
         emit(:answer, String.slice(answer, 0, cap), on_event)
         {:ok, %{text: cap_text(answer, cap, on_event), thinking: thinking}}
@@ -121,7 +127,7 @@ defmodule AskDrive.ChatSummary do
 
   # Second pass: the first output (thinking and/or a wrong-language answer) becomes notes, and
   # the model is asked for the conclusion only, in the question's language, within budget.
-  defp finalize(question, chunks, notes, provider, model, setting, cap, on_event) do
+  defp finalize(question, chunks, notes, provider, model, setting, cap, on_event, context) do
     on_event.(:answer_reset)
     Process.put({__MODULE__, :raw}, "")
     Process.put({__MODULE__, :sent}, %{answer: 0, thinking: 0})
@@ -136,7 +142,7 @@ defmodule AskDrive.ChatSummary do
       think: false
     ]
 
-    prompt = finalize_prompt(question, chunks, notes, model)
+    prompt = finalize_prompt(question, chunks, notes, model, context)
 
     stream = fn piece ->
       raw = Process.get({__MODULE__, :raw}) <> piece
@@ -179,8 +185,8 @@ defmodule AskDrive.ChatSummary do
   defp available_model(_provider, model, _setting), do: model
 
   @doc "The prompt for the second pass: excerpts, the first attempt as notes, the rules."
-  def finalize_prompt(question, chunks, notes, model \\ nil) do
-    base = build_prompt(question, chunks, nil)
+  def finalize_prompt(question, chunks, notes, model \\ nil, context \\ []) do
+    base = build_prompt(question, chunks, nil, context)
     notes = (notes || "") |> String.trim() |> String.slice(-3_000, 3_000)
 
     intro =
@@ -309,7 +315,7 @@ defmodule AskDrive.ChatSummary do
   end
 
   @doc "The prompt: the question, numbered excerpts with their source, and the rules."
-  def build_prompt(question, chunks, model \\ nil) do
+  def build_prompt(question, chunks, model \\ nil, context \\ []) do
     excerpts =
       chunks
       |> Enum.with_index(1)
@@ -320,14 +326,52 @@ defmodule AskDrive.ChatSummary do
 
     prompt =
       if japanese?(question),
-        do: ja_prompt(question, excerpts),
-        else: en_prompt(question, excerpts)
+        do: ja_context(context) <> ja_prompt(question, excerpts),
+        else: en_context(context) <> en_prompt(question, excerpts)
 
     # qwen3's own switch for "answer directly, no reasoning" (Ollama's think:false alone did
     # not stop it on the POC machine: the chat showed pages of English reasoning)
     if reasoning_model?(model) and String.contains?(String.downcase(model), "qwen3"),
       do: prompt <> "\n/no_think",
       else: prompt
+  end
+
+  # the thread so far (F-431): the last few exchanges, each kept short
+  @context_turns 3
+  @context_answer_chars 400
+
+  defp ja_context([]), do: ""
+
+  defp ja_context(context) do
+    turns =
+      context
+      |> Enum.take(-@context_turns)
+      |> Enum.map_join("\n", fn turn ->
+        "質問: #{turn.question}" <>
+          if(turn[:answer] in [nil, ""],
+            do: "",
+            else: "\n回答: #{String.slice(turn.answer, 0, @context_answer_chars)}"
+          )
+      end)
+
+    "これまでのやり取り（次の質問は、このやり取りの続きです。「それ」などはこの内容を指します）:\n#{turns}\n\n"
+  end
+
+  defp en_context([]), do: ""
+
+  defp en_context(context) do
+    turns =
+      context
+      |> Enum.take(-@context_turns)
+      |> Enum.map_join("\n", fn turn ->
+        "Question: #{turn.question}" <>
+          if(turn[:answer] in [nil, ""],
+            do: "",
+            else: "\nAnswer: #{String.slice(turn.answer, 0, @context_answer_chars)}"
+          )
+      end)
+
+    "The conversation so far (the next question continues it; words like \"it\" refer to it):\n#{turns}\n\n"
   end
 
   defp ja_prompt(question, excerpts) do

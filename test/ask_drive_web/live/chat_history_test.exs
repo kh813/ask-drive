@@ -22,7 +22,7 @@ defmodule AskDriveWeb.ChatHistoryTest do
     ask(view, "経費精算の締め日は？")
     ask(view, "VPN の接続方法は？")
 
-    assert [%{question: "VPN の接続方法は？"}, %{question: "経費精算の締め日は？"}] =
+    assert [%{title: "VPN の接続方法は？"}, %{title: "経費精算の締め日は？"}] =
              ChatHistory.list(user)
 
     view |> element("#reset-chat-btn") |> render_click()
@@ -42,7 +42,7 @@ defmodule AskDriveWeb.ChatHistoryTest do
     view |> element("#history-btn") |> render_click()
     view |> element("#history-delete-#{vpn.id}") |> render_click()
     refute has_element?(view, "#history-open-#{vpn.id}")
-    assert [%{question: "経費精算の締め日は？"}] = ChatHistory.list(user)
+    assert [%{title: "経費精算の締め日は？"}] = ChatHistory.list(user)
   end
 
   test "someone else's history is neither listed nor opened", %{conn: conn, user: user} do
@@ -52,8 +52,8 @@ defmodule AskDriveWeb.ChatHistoryTest do
 
     other = user_fixture()
     assert ChatHistory.list(other) == []
-    assert ChatHistory.get(other, entry.id) == nil
-    assert ChatHistory.delete(other, entry.id) == {:error, :not_found}
+    assert ChatHistory.get_thread(other, entry.id) == []
+    assert ChatHistory.delete_thread(other, entry.id) == {:error, :not_found}
 
     {:ok, view, _html} = live(log_in_user(build_conn(), other), ~p"/it-support")
     view |> element("#history-btn") |> render_click()
@@ -113,8 +113,9 @@ defmodule AskDriveWeb.ChatHistoryTest do
 
     [entry] = ChatHistory.list(user)
     assert entry.tier == 2
-    assert entry.summary == "外部記憶媒体の接続は禁止されています [1]。"
-    assert [%{"name" => "guide.pdf", "page" => 5}] = entry.sources
+    [saved] = ChatHistory.get_thread(user, entry.id)
+    assert saved.summary == "外部記憶媒体の接続は禁止されています [1]。"
+    assert [%{"name" => "guide.pdf", "page" => 5}] = saved.sources
 
     # still there: opened with its excerpts
     view |> element("#reset-chat-btn") |> render_click()

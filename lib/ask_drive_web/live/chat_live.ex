@@ -54,6 +54,12 @@ defmodule AskDriveWeb.ChatLive do
      |> assign(:history_query, "")
      |> assign(:history_count, 0)
      |> stream(:history, [])
+     # threads (F-431): the one being answered, the one a follow-up is being typed for, and
+     # the latest question (scrolled to)
+     |> assign(:pending, nil)
+     |> assign(:followup_thread, nil)
+     |> assign(:followup_form, to_form(%{"question" => ""}, as: :followup))
+     |> assign(:latest_question, nil)
      |> assign(:form, to_form(%{"question" => ""}))}
   end
 
@@ -62,31 +68,31 @@ defmodule AskDriveWeb.ChatLive do
     {:noreply, assign(socket, form: to_form(%{"question" => question}))}
   end
 
+  # A new question (F-431): a thread of its own, answered without what came before it
   @impl true
   def handle_event("send_message", %{"question" => question}, socket) do
-    trimmed = String.trim(question)
+    {:noreply, ask(socket, question, Ecto.UUID.generate(), :new)}
+  end
 
-    if trimmed == "" or socket.assigns.loading do
-      {:noreply, socket}
-    else
-      user_msg = %{
-        id: System.unique_integer([:positive]),
-        role: :user,
-        content: trimmed,
-        inserted_at: DateTime.utc_now()
-      }
+  # A follow-up to an answer: added to that thread, and answered in the light of it
+  def handle_event("start_followup", %{"thread" => thread}, socket) do
+    {:noreply,
+     socket
+     |> assign(:followup_thread, thread)
+     |> assign(:followup_form, to_form(%{"question" => ""}, as: :followup))}
+  end
 
-      # Answer off the LiveView process: a query embedding can wait on a busy local model
-      # (e.g. while a batch is generating), and doing it inline froze the page with no
-      # feedback until it finished. The question shows at once with a "searching" bubble.
-      {:noreply,
-       socket
-       |> assign(:messages, socket.assigns.messages ++ [user_msg])
-       |> assign(:loading, true)
-       |> assign(:form, to_form(%{"question" => ""}))
-       # bind: the task must search this app's database, not the platform's (spec 6.11)
-       |> start_async(:answer, AskDrive.Apps.bind(fn -> Answering.ask(trimmed) end))}
-    end
+  def handle_event("cancel_followup", _params, socket),
+    do: {:noreply, assign(socket, :followup_thread, nil)}
+
+  def handle_event(
+        "send_followup",
+        %{"followup" => %{"question" => question, "thread" => thread}},
+        socket
+      ) do
+    if Enum.any?(socket.assigns.messages, &(&1.thread == thread)),
+      do: {:noreply, ask(socket, question, thread, :follow_up)},
+      else: {:noreply, assign(socket, :followup_thread, nil)}
   end
 
   # 停止: the search still running and/or the AI summaries still being written. Killing the
@@ -99,6 +105,7 @@ defmodule AskDriveWeb.ChatLive do
           socket
           |> cancel_async(:answer)
           |> assign(:loading, false)
+          |> assign(:pending, nil)
           |> put_flash(:info, gettext("Stopped answering the question.")),
         else: socket
 
@@ -119,10 +126,10 @@ defmodule AskDriveWeb.ChatLive do
 
   @impl true
   def handle_event("reset_chat", _params, socket) do
-    {:noreply, assign(socket, :messages, [])}
+    {:noreply, socket |> assign(:messages, []) |> assign(:followup_thread, nil)}
   end
 
-  # The history panel (F-430): the user's own earlier questions, newest first
+  # The history panel (F-430): the user's own earlier threads, newest first
   def handle_event("toggle_history", _params, socket) do
     if socket.assigns.history_open? do
       {:noreply, assign(socket, :history_open?, false)}
@@ -139,26 +146,31 @@ defmodule AskDriveWeb.ChatLive do
     {:noreply, socket |> assign(:history_query, query) |> load_history()}
   end
 
-  # Shows an earlier question and its answer again, below the conversation
-  def handle_event("history_open", %{"id" => id}, socket) do
-    case ChatHistory.get(socket.assigns.current_user, id) do
-      nil ->
+  # Shows an earlier thread again — its question and every follow-up — below the
+  # conversation; a follow-up to it continues the same thread
+  def handle_event("history_open", %{"id" => key}, socket) do
+    case ChatHistory.get_thread(socket.assigns.current_user, key) do
+      [] ->
         {:noreply, socket}
 
-      entry ->
+      entries ->
+        restored = history_messages(entries)
+        others = Enum.reject(socket.assigns.messages, &(&1.thread == key))
+
         {:noreply,
          socket
-         |> assign(:messages, socket.assigns.messages ++ history_messages(entry))
+         |> assign(:messages, others ++ restored)
+         |> assign(:latest_question, hd(restored).id)
          |> assign(:history_open?, false)}
     end
   end
 
-  def handle_event("history_delete", %{"id" => id}, socket) do
-    case ChatHistory.delete(socket.assigns.current_user, id) do
-      {:ok, entry} ->
+  def handle_event("history_delete", %{"id" => key}, socket) do
+    case ChatHistory.delete_thread(socket.assigns.current_user, key) do
+      {:ok, _} ->
         {:noreply,
          socket
-         |> stream_delete(:history, entry)
+         |> stream_delete_by_dom_id(:history, "history-#{key}")
          |> update(:history_count, &max(&1 - 1, 0))}
 
       _ ->
@@ -166,20 +178,101 @@ defmodule AskDriveWeb.ChatLive do
     end
   end
 
+  # Asks `question` in `thread`: a new one (`:new`) or a follow-up (`:follow_up`), which is
+  # searched with the thread's earlier questions and summarised with its exchanges (F-431)
+  defp ask(socket, question, thread, kind) do
+    trimmed = String.trim(question)
+
+    if trimmed == "" or socket.assigns.loading do
+      socket
+    else
+      in_thread = Enum.filter(socket.assigns.messages, &(&1.thread == thread))
+      context = if kind == :follow_up, do: thread_context(in_thread), else: []
+
+      opts =
+        if kind == :follow_up,
+          do: [context: Enum.map(context, & &1.question), exclude_qa_ids: shown_qa_ids(in_thread)],
+          else: []
+
+      user_msg = %{
+        id: System.unique_integer([:positive]),
+        role: :user,
+        thread: thread,
+        follow_up?: kind == :follow_up,
+        content: trimmed,
+        inserted_at: DateTime.utc_now()
+      }
+
+      # Answer off the LiveView process: a query embedding can wait on a busy local model
+      # (e.g. while a batch is generating), and doing it inline froze the page with no
+      # feedback until it finished. The question shows at once with a "searching" bubble.
+      socket
+      |> assign(:messages, add_to_thread(socket.assigns.messages, thread, [user_msg]))
+      |> assign(:latest_question, user_msg.id)
+      |> assign(:loading, true)
+      |> assign(:pending, %{thread: thread, context: context})
+      |> assign(:followup_thread, nil)
+      |> then(&if(kind == :new, do: assign(&1, :form, to_form(%{"question" => ""})), else: &1))
+      # bind: the task must search this app's database, not the platform's (spec 6.11)
+      |> start_async(:answer, AskDrive.Apps.bind(fn -> Answering.ask(trimmed, opts) end))
+    end
+  end
+
+  # the thread's exchanges so far: each question with the answer shown for it
+  defp thread_context(messages) do
+    {turns, _question} =
+      Enum.reduce(messages, {[], nil}, fn
+        %{role: :user, content: question}, {turns, _} ->
+          {turns, question}
+
+        %{role: :assistant} = answer, {turns, question} when is_binary(question) ->
+          {turns ++ [%{question: question, answer: answer_text(answer)}], nil}
+
+        _, acc ->
+          acc
+      end)
+
+    turns
+  end
+
+  defp answer_text(%{summary: %{text: text}}) when is_binary(text) and text != "", do: text
+  defp answer_text(%{answer: answer}) when is_binary(answer), do: answer
+  defp answer_text(_), do: nil
+
+  defp shown_qa_ids(messages),
+    do: for(%{role: :assistant, qa_pair: %{id: id}} <- messages, do: id)
+
+  # after the thread's last message (its follow-ups stay together), or at the end
+  defp add_to_thread(messages, thread, new) do
+    case messages |> Enum.with_index() |> Enum.filter(fn {m, _} -> m.thread == thread end) do
+      [] ->
+        messages ++ new
+
+      in_thread ->
+        {_, last} = List.last(in_thread)
+        {before, rest} = Enum.split(messages, last + 1)
+        before ++ new ++ rest
+    end
+  end
+
   @impl true
   def handle_async(:answer, {:ok, result}, socket) do
     summarise? = result.tier == 2 and result.chunks != [] and ChatSummary.enabled?()
-    entry = ChatHistory.record(socket.assigns.current_user, result)
+    %{thread: thread, context: context} = socket.assigns.pending
+    entry = ChatHistory.record(socket.assigns.current_user, result, thread)
 
     assistant_msg = %{
       id: System.unique_integer([:positive]),
       role: :assistant,
+      thread: thread,
       tier: result.tier,
       content: result.answer,
       answer: result.answer,
       chunks: result.chunks,
       qa_pair: result.qa_pair,
       question: result.question,
+      # what was searched (a follow-up: with the thread's questions), highlighted in excerpts
+      highlight: Map.get(result, :search_query, result.question),
       index_empty?: Map.get(result, :index_empty?, false),
       # Live AI summary of the excerpts (spec 6.4.4): shown above them, streamed in
       summary: if(summarise?, do: %{status: :running, text: "", thinking: ""}),
@@ -189,8 +282,9 @@ defmodule AskDriveWeb.ChatLive do
 
     socket =
       socket
-      |> assign(:messages, socket.assigns.messages ++ [assistant_msg])
+      |> assign(:messages, add_to_thread(socket.assigns.messages, thread, [assistant_msg]))
       |> assign(:loading, false)
+      |> assign(:pending, nil)
 
     socket =
       if summarise? do
@@ -201,9 +295,12 @@ defmodule AskDriveWeb.ChatLive do
           socket,
           {:summary, id},
           AskDrive.Apps.bind(fn ->
-            ChatSummary.generate(result.question, result.chunks, fn event ->
-              send(lv, {:summary_delta, id, event})
-            end)
+            ChatSummary.generate(
+              result.question,
+              result.chunks,
+              fn event -> send(lv, {:summary_delta, id, event}) end,
+              context: context
+            )
           end)
         )
       else
@@ -240,6 +337,7 @@ defmodule AskDriveWeb.ChatLive do
     {:noreply,
      socket
      |> assign(:loading, false)
+     |> assign(:pending, nil)
      |> put_flash(:error, "回答の検索中にエラーが発生しました。しばらくしてからもう一度お試しください。")}
   end
 
@@ -264,20 +362,28 @@ defmodule AskDriveWeb.ChatLive do
   end
 
   defp load_history(socket) do
-    entries = ChatHistory.list(socket.assigns.current_user, socket.assigns.history_query)
+    threads = ChatHistory.list(socket.assigns.current_user, socket.assigns.history_query)
 
     socket
-    |> assign(:history_count, length(entries))
-    |> stream(:history, entries, reset: true)
+    |> assign(:history_count, length(threads))
+    |> stream(:history, threads, reset: true)
   end
 
-  # An entry as the question and answer bubbles, marked as from the history
-  defp history_messages(entry) do
+  # A thread's entries as question and answer bubbles, marked as from the history
+  defp history_messages(entries) do
+    entries
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {entry, index} -> history_entry_messages(entry, index > 0) end)
+  end
+
+  defp history_entry_messages(entry, follow_up?) do
     restored = ChatHistory.restore(entry)
 
     user_msg = %{
       id: System.unique_integer([:positive]),
       role: :user,
+      thread: entry.thread_key,
+      follow_up?: follow_up?,
       content: entry.question,
       inserted_at: entry.asked_at,
       history_at: entry.asked_at
@@ -286,6 +392,7 @@ defmodule AskDriveWeb.ChatLive do
     assistant_msg = %{
       id: System.unique_integer([:positive]),
       role: :assistant,
+      thread: entry.thread_key,
       tier: entry.tier,
       content: entry.answer || "",
       answer: entry.answer,
@@ -479,10 +586,16 @@ defmodule AskDriveWeb.ChatLive do
                   class="flex-1 min-w-0 text-left"
                 >
                   <span class="block text-sm text-zinc-800 dark:text-zinc-200 line-clamp-2 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition">
-                    {entry.question}
+                    {entry.title}
                   </span>
                   <span class="mt-0.5 flex items-center gap-2 text-[10px] text-zinc-400">
                     {format_datetime(entry.asked_at)}
+                    <span
+                      :if={entry.follow_ups > 0}
+                      class="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300"
+                    >
+                      {gettext("%{count} follow-ups", count: entry.follow_ups)}
+                    </span>
                     <span class={[
                       "px-1.5 py-0.5 rounded-full",
                       if(entry.tier == 3,
@@ -500,7 +613,7 @@ defmodule AskDriveWeb.ChatLive do
                   id={"history-delete-#{entry.id}"}
                   phx-click="history_delete"
                   phx-value-id={entry.id}
-                  data-confirm={gettext("Delete this question from your history?")}
+                  data-confirm={gettext("Delete this question and its follow-ups from your history?")}
                   title={gettext("Delete")}
                   class="shrink-0 p-1.5 rounded-lg text-zinc-400 opacity-60 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition"
                 >
@@ -578,6 +691,7 @@ defmodule AskDriveWeb.ChatLive do
             id="chat-messages"
             phx-hook=".ChatScroll"
             data-count={length(@messages)}
+            data-latest={@latest_question}
             class="flex-1 overflow-y-auto space-y-6 pr-2 mb-4 scroll-smooth"
           >
             <%= if @messages == [] do %>
@@ -595,328 +709,423 @@ defmodule AskDriveWeb.ChatLive do
                 </p>
               </div>
             <% else %>
-              <%= for msg <- @messages do %>
-                <%= if msg.role == :user do %>
-                  <div id={"msg-#{msg.id}"} data-role="user" class="flex justify-end scroll-mt-2">
-                    <div class="max-w-2xl rounded-2xl rounded-tr-sm bg-indigo-600 text-white px-4 py-3 shadow-sm text-sm">
-                      <p class="whitespace-pre-wrap">{msg.content}</p>
-                      <span class="text-[10px] text-indigo-200 block text-right mt-1">
-                        <span :if={msg[:history_at]} class="mr-1">
-                          <.icon name="hero-clock" class="w-3 h-3" /> {gettext("From history")}
-                        </span>
-                        {if msg[:history_at],
-                          do: format_datetime(msg.history_at),
-                          else: format_time(msg.inserted_at)}
-                      </span>
-                    </div>
-                  </div>
-                <% else %>
-                  <div id={"msg-#{msg.id}"} data-role="assistant" class="flex justify-start">
-                    <div class="max-w-3xl w-full rounded-2xl rounded-tl-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-4 text-sm shadow-sm space-y-3">
-                      <%!-- Tier Badge --%>
-                      <div class="flex items-center justify-between pb-2 border-b border-zinc-200/60 dark:border-zinc-800">
-                        <%= case msg.tier do %>
-                          <% 2 -> %>
-                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/50">
-                              <.icon name="hero-document-magnifying-glass" class="w-3.5 h-3.5" />
-                              {if msg[:summary],
-                                do: gettext("AI Summary & Sources"),
-                                else: gettext("Relevant excerpts")}
+              <%!-- Threads (F-431): a question, its answer, and the follow-ups to it --%>
+              <%= for {thread, thread_messages} <- threads(@messages) do %>
+                <div
+                  id={"thread-#{thread}"}
+                  data-thread={thread}
+                  class="space-y-4 p-3 sm:p-4 rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white/60 dark:bg-zinc-950/30"
+                >
+                  <%= for msg <- thread_messages do %>
+                    <%= if msg.role == :user do %>
+                      <div id={"msg-#{msg.id}"} data-role="user" class="flex justify-end scroll-mt-2">
+                        <div class="max-w-2xl rounded-2xl rounded-tr-sm bg-indigo-600 text-white px-4 py-3 shadow-sm text-sm">
+                          <p
+                            :if={msg[:follow_up?]}
+                            class="text-[10px] font-semibold text-indigo-200 mb-1 flex items-center gap-1"
+                          >
+                            <.icon name="hero-arrow-uturn-right" class="w-3 h-3" /> {gettext(
+                              "Follow-up"
+                            )}
+                          </p>
+                          <p class="whitespace-pre-wrap">{msg.content}</p>
+                          <span class="text-[10px] text-indigo-200 block text-right mt-1">
+                            <span :if={msg[:history_at]} class="mr-1">
+                              <.icon name="hero-clock" class="w-3 h-3" /> {gettext("From history")}
                             </span>
-                          <% 3 -> %>
-                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50">
-                              <.icon name="hero-clock" class="w-3.5 h-3.5" />
-                              {if msg[:index_empty?],
-                                do: gettext("Unanswered (no documents ingested)"),
-                                else: gettext("Unanswered (will generate in nightly batch)")}
-                            </span>
-                          <% _ -> %>
-                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                              <.icon name="hero-check-circle" class="w-3.5 h-3.5" /> {gettext(
-                                "Answer"
-                              )}
-                            </span>
-                        <% end %>
-                        <span class="text-[10px] text-zinc-400">
-                          {if msg[:history_at],
-                            do: format_datetime(msg.history_at),
-                            else: format_time(msg.inserted_at)}
-                        </span>
+                            {if msg[:history_at],
+                              do: format_datetime(msg.history_at),
+                              else: format_time(msg.inserted_at)}
+                          </span>
+                        </div>
                       </div>
-
-                      <%!-- Tier 0 / Tier 1 Direct Answer --%>
-                      <%= if msg.tier in [0, 1] do %>
-                        <div class="space-y-2">
-                          <div class="text-zinc-900 dark:text-zinc-100 font-medium text-sm leading-relaxed whitespace-pre-wrap">
-                            {msg.content}
-                          </div>
-
-                          <%= if msg.qa_pair do %>
-                            <div class="pt-2 border-t border-zinc-200/50 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-500">
-                              <div class="flex items-center gap-2">
-                                <%= if msg.qa_pair.document do %>
-                                  <span class="text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1">
-                                    <.icon name="hero-document-text" class="w-3.5 h-3.5" />
-                                    {msg.qa_pair.document.name}
-                                  </span>
-                                  <%= if msg.qa_pair.document.web_view_link do %>
-                                    <.link
-                                      href={msg.qa_pair.document.web_view_link}
-                                      target="_blank"
-                                      class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center gap-0.5"
-                                    >
-                                      {gettext("Open in Drive")}
-                                      <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
-                                    </.link>
-                                  <% end %>
-                                <% end %>
-                              </div>
-
-                              <%= if msg.qa_pair.generated_at do %>
-                                <span class="text-zinc-400">
-                                  {gettext("Generated at: %{date}",
-                                    date:
-                                      AskDrive.Clock.format(
-                                        msg.qa_pair.generated_at,
-                                        "%Y-%m-%d %H:%M"
-                                      )
+                    <% else %>
+                      <div id={"msg-#{msg.id}"} data-role="assistant" class="flex justify-start">
+                        <div class="max-w-3xl w-full rounded-2xl rounded-tl-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-4 text-sm shadow-sm space-y-3">
+                          <%!-- Tier Badge --%>
+                          <div class="flex items-center justify-between pb-2 border-b border-zinc-200/60 dark:border-zinc-800">
+                            <%= case msg.tier do %>
+                              <% 2 -> %>
+                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/50">
+                                  <.icon name="hero-document-magnifying-glass" class="w-3.5 h-3.5" />
+                                  {if msg[:summary],
+                                    do: gettext("AI Summary & Sources"),
+                                    else: gettext("Relevant excerpts")}
+                                </span>
+                              <% 3 -> %>
+                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50">
+                                  <.icon name="hero-clock" class="w-3.5 h-3.5" />
+                                  {if msg[:index_empty?],
+                                    do: gettext("Unanswered (no documents ingested)"),
+                                    else: gettext("Unanswered (will generate in nightly batch)")}
+                                </span>
+                              <% _ -> %>
+                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                  <.icon name="hero-check-circle" class="w-3.5 h-3.5" /> {gettext(
+                                    "Answer"
                                   )}
                                 </span>
+                            <% end %>
+                            <span class="text-[10px] text-zinc-400">
+                              {if msg[:history_at],
+                                do: format_datetime(msg.history_at),
+                                else: format_time(msg.inserted_at)}
+                            </span>
+                          </div>
+
+                          <%!-- Tier 0 / Tier 1 Direct Answer --%>
+                          <%= if msg.tier in [0, 1] do %>
+                            <div class="space-y-2">
+                              <div class="text-zinc-900 dark:text-zinc-100 font-medium text-sm leading-relaxed whitespace-pre-wrap">
+                                {msg.content}
+                              </div>
+
+                              <%= if msg.qa_pair do %>
+                                <div class="pt-2 border-t border-zinc-200/50 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-500">
+                                  <div class="flex items-center gap-2">
+                                    <%= if msg.qa_pair.document do %>
+                                      <span class="text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1">
+                                        <.icon name="hero-document-text" class="w-3.5 h-3.5" />
+                                        {msg.qa_pair.document.name}
+                                      </span>
+                                      <%= if msg.qa_pair.document.web_view_link do %>
+                                        <.link
+                                          href={msg.qa_pair.document.web_view_link}
+                                          target="_blank"
+                                          class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center gap-0.5"
+                                        >
+                                          {gettext("Open in Drive")}
+                                          <.icon
+                                            name="hero-arrow-top-right-on-square"
+                                            class="w-3 h-3"
+                                          />
+                                        </.link>
+                                      <% end %>
+                                    <% end %>
+                                  </div>
+
+                                  <%= if msg.qa_pair.generated_at do %>
+                                    <span class="text-zinc-400">
+                                      {gettext("Generated at: %{date}",
+                                        date:
+                                          AskDrive.Clock.format(
+                                            msg.qa_pair.generated_at,
+                                            "%Y-%m-%d %H:%M"
+                                          )
+                                      )}
+                                    </span>
+                                  <% end %>
+                                </div>
                               <% end %>
                             </div>
                           <% end %>
-                        </div>
-                      <% end %>
 
-                      <%!-- Message Content / Explanation for Tier 3 --%>
-                      <%= if msg.tier == 3 do %>
-                        <div
-                          :if={msg[:index_empty?]}
-                          class="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed space-y-1"
-                        >
-                          <p>{gettext("No searchable documents have been ingested yet.")}</p>
-                          <p class="text-zinc-500">
-                            {gettext(
-                              "Google Drive synchronization or ingestion may not be finished. Please check with an administrator."
-                            )}
-                          </p>
-                        </div>
-                        <div
-                          :if={!msg[:index_empty?]}
-                          class="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed space-y-1"
-                        >
-                          <p>
-                            {gettext(
-                              "Could not find a clear statement for this question in the current index."
-                            )}
-                          </p>
-                          <p class="text-zinc-500">
-                            {gettext(
-                              "Your question has been logged. Answers will be generated during the nightly batch."
-                            )}
-                          </p>
-                        </div>
-                      <% end %>
-
-                      <%!-- From the history, its excerpts re-indexed since (F-430): the summary
-                            as it was, and what the sources were --%>
-                      <div
-                        :if={msg[:missing_sources] not in [nil, []]}
-                        id={"history-sources-#{msg.id}"}
-                        class="space-y-2"
-                      >
-                        <div
-                          :if={msg[:summary]}
-                          class="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-900/60 text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed"
-                        >
-                          {summary_html(msg.summary.text, msg.id, 0)}
-                        </div>
-                        <p class="text-xs text-zinc-500">
-                          {gettext(
-                            "The documents have been updated since, so the excerpts can't be shown. Sources at the time:"
-                          )}
-                        </p>
-                        <ol class="space-y-1 text-xs">
-                          <li
-                            :for={{source, n} <- Enum.with_index(msg.missing_sources, 1)}
-                            class="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300"
-                          >
-                            <span class="shrink-0 px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-bold">
-                              [{n}]
-                            </span>
-                            {source["name"] || gettext("Document")}
-                            <span :if={source["page"]} class="text-zinc-500">p.{source["page"]}</span>
-                            <.link
-                              :if={source["link"]}
-                              href={source["link"]}
-                              target="_blank"
-                              class="text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 inline-flex items-center gap-0.5 transition"
+                          <%!-- Message Content / Explanation for Tier 3 --%>
+                          <%= if msg.tier == 3 do %>
+                            <div
+                              :if={msg[:index_empty?]}
+                              class="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed space-y-1"
                             >
-                              {gettext("Open in Drive")}
-                              <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
-                            </.link>
-                          </li>
-                        </ol>
-                      </div>
-
-                      <%!-- Tier 2 Excerpt Sources --%>
-                      <%= if msg.tier == 2 and msg.chunks != [] do %>
-                        <div class="space-y-3">
-                          <%!-- AI summary grounded in the excerpts below (spec 6.4.4) --%>
-                          <div
-                            :if={msg[:summary]}
-                            id={"summary-#{msg.id}"}
-                            class="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-900/60 space-y-2"
-                          >
-                            <div class="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
-                              <.icon name="hero-sparkles" class="w-4 h-4" /> {gettext("AI Summary")}
-                              <span class="font-normal text-[10px] text-indigo-500/80">
-                                {gettext("(Grounded solely on the cited excerpts below)")}
-                              </span>
-                            </div>
-                            <%= case msg.summary do %>
-                              <% %{status: :cancelled, text: ""} -> %>
-                                <p class="text-xs text-zinc-500">
-                                  {gettext("Summary stopped. Please check the excerpts below.")}
-                                </p>
-                              <% %{status: :failed} -> %>
-                                <p class="text-xs text-zinc-500">
-                                  {gettext(
-                                    "Could not create summary. Please check the excerpts below."
-                                  )}
-                                </p>
-                              <% %{status: :running, text: "", thinking: thinking} when thinking != "" -> %>
-                                <p class="text-xs text-zinc-500 flex items-center gap-1.5">
-                                  <.icon name="hero-arrow-path" class="w-3.5 h-3.5 animate-spin" />
-                                  {gettext("Thinking… (%{count} chars)",
-                                    count: String.length(thinking)
-                                  )}
-                                </p>
-                              <% %{status: :running, text: ""} -> %>
-                                <p class="text-xs text-zinc-500 flex items-center gap-1.5">
-                                  <.icon name="hero-arrow-path" class="w-3.5 h-3.5 animate-spin" />
-                                  {gettext("Generating summary…")}{if @summary_local?,
-                                    do: gettext(" (local LLMs may take several seconds)")}
-                                </p>
-                              <% summary -> %>
-                                <div class="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed">
-                                  {summary_html(summary.text, msg.id, length(msg.chunks))}<span
-                                    :if={summary.status == :running}
-                                    class="inline-block w-1.5 h-3.5 ml-0.5 bg-indigo-400 animate-pulse align-middle"
-                                  ></span>
-                                </div>
-                                <p
-                                  :if={summary.status == :cancelled}
-                                  class="text-[10px] text-zinc-400"
-                                >
-                                  {gettext("(Stopped)")}
-                                </p>
-                                <p :if={summary.status == :done} class="text-[10px] text-zinc-400">
-                                  {gettext(
-                                    "AI summaries may contain errors. Always verify key details against the cited sources."
-                                  )}
-                                </p>
-                            <% end %>
-                            <%!-- A reasoning model's thinking: kept, but collapsed by default --%>
-                            <details
-                              :if={Map.get(msg.summary, :thinking, "") != ""}
-                              class="text-xs"
-                            >
-                              <summary class="cursor-pointer text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 select-none">
-                                {gettext("Show AI thinking process (%{count} chars)",
-                                  count: String.length(msg.summary.thinking)
+                              <p>{gettext("No searchable documents have been ingested yet.")}</p>
+                              <p class="text-zinc-500">
+                                {gettext(
+                                  "Google Drive synchronization or ingestion may not be finished. Please check with an administrator."
                                 )}
-                              </summary>
-                              <div class="mt-1.5 text-[11px] text-zinc-500 bg-white/60 dark:bg-zinc-900/60 p-2 rounded-md leading-relaxed max-h-60 overflow-y-auto">
-                                {excerpt_html([{:text, msg.summary.thinking}])}
-                              </div>
-                            </details>
+                              </p>
+                            </div>
+                            <div
+                              :if={!msg[:index_empty?]}
+                              class="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed space-y-1"
+                            >
+                              <p>
+                                {gettext(
+                                  "Could not find a clear statement for this question in the current index."
+                                )}
+                              </p>
+                              <p class="text-zinc-500">
+                                {gettext(
+                                  "Your question has been logged. Answers will be generated during the nightly batch."
+                                )}
+                              </p>
+                            </div>
+                          <% end %>
+
+                          <%!-- From the history, its excerpts re-indexed since (F-430): the summary
+                            as it was, and what the sources were --%>
+                          <div
+                            :if={msg[:missing_sources] not in [nil, []]}
+                            id={"history-sources-#{msg.id}"}
+                            class="space-y-2"
+                          >
+                            <div
+                              :if={msg[:summary]}
+                              class="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-900/60 text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed"
+                            >
+                              {summary_html(msg.summary.text, msg.id, 0)}
+                            </div>
+                            <p class="text-xs text-zinc-500">
+                              {gettext(
+                                "The documents have been updated since, so the excerpts can't be shown. Sources at the time:"
+                              )}
+                            </p>
+                            <ol class="space-y-1 text-xs">
+                              <li
+                                :for={{source, n} <- Enum.with_index(msg.missing_sources, 1)}
+                                class="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300"
+                              >
+                                <span class="shrink-0 px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-bold">
+                                  [{n}]
+                                </span>
+                                {source["name"] || gettext("Document")}
+                                <span :if={source["page"]} class="text-zinc-500">p.{source["page"]}</span>
+                                <.link
+                                  :if={source["link"]}
+                                  href={source["link"]}
+                                  target="_blank"
+                                  class="text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 inline-flex items-center gap-0.5 transition"
+                                >
+                                  {gettext("Open in Drive")}
+                                  <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
+                                </.link>
+                              </li>
+                            </ol>
                           </div>
 
-                          <p class="text-xs text-zinc-500">
-                            {if msg[:summary],
-                              do: gettext("Sources"),
-                              else: gettext("Relevant excerpts")} {gettext(
-                              "(Excerpts with search terms highlighted):"
-                            )}
-                          </p>
-                          <div class="space-y-2">
-                            <%= for {chunk, n} <- Enum.with_index(msg.chunks, 1) do %>
+                          <%!-- Tier 2 Excerpt Sources --%>
+                          <%= if msg.tier == 2 and msg.chunks != [] do %>
+                            <div class="space-y-3">
+                              <%!-- AI summary grounded in the excerpts below (spec 6.4.4) --%>
                               <div
-                                id={"src-#{msg.id}-#{n}"}
-                                class="p-3 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200/70 dark:border-zinc-800 space-y-1.5 scroll-mt-4 target:ring-2 target:ring-indigo-400"
+                                :if={msg[:summary]}
+                                id={"summary-#{msg.id}"}
+                                class="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-900/60 space-y-2"
                               >
-                                <div class="flex items-center justify-between text-xs font-medium">
-                                  <span class="text-indigo-600 dark:text-indigo-400 flex items-center gap-1 truncate max-w-md">
-                                    <span class="shrink-0 px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-bold">
-                                      [{n}]
-                                    </span>
-                                    <.icon name="hero-document-text" class="w-4 h-4 shrink-0" />
-                                    {(chunk.document && chunk.document.name) || gettext("Document")}
-                                    <span
-                                      :if={chunk.page}
-                                      class="ml-1 px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-[10px] font-semibold text-indigo-700 dark:text-indigo-300"
-                                    >
-                                      p.{chunk.page}
-                                    </span>
+                                <div class="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+                                  <.icon name="hero-sparkles" class="w-4 h-4" /> {gettext(
+                                    "AI Summary"
+                                  )}
+                                  <span class="font-normal text-[10px] text-indigo-500/80">
+                                    {gettext("(Grounded solely on the cited excerpts below)")}
                                   </span>
-                                  <%= if chunk.document && chunk.document.web_view_link do %>
-                                    <.link
-                                      href={drive_link(chunk)}
-                                      target="_blank"
-                                      title={
-                                        chunk.page &&
-                                          "p.#{chunk.page}"
-                                      }
-                                      class="text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center gap-0.5 transition shrink-0"
+                                </div>
+                                <%= case msg.summary do %>
+                                  <% %{status: :cancelled, text: ""} -> %>
+                                    <p class="text-xs text-zinc-500">
+                                      {gettext("Summary stopped. Please check the excerpts below.")}
+                                    </p>
+                                  <% %{status: :failed} -> %>
+                                    <p class="text-xs text-zinc-500">
+                                      {gettext(
+                                        "Could not create summary. Please check the excerpts below."
+                                      )}
+                                    </p>
+                                  <% %{status: :running, text: "", thinking: thinking} when thinking != "" -> %>
+                                    <p class="text-xs text-zinc-500 flex items-center gap-1.5">
+                                      <.icon name="hero-arrow-path" class="w-3.5 h-3.5 animate-spin" />
+                                      {gettext("Thinking… (%{count} chars)",
+                                        count: String.length(thinking)
+                                      )}
+                                    </p>
+                                  <% %{status: :running, text: ""} -> %>
+                                    <p class="text-xs text-zinc-500 flex items-center gap-1.5">
+                                      <.icon name="hero-arrow-path" class="w-3.5 h-3.5 animate-spin" />
+                                      {gettext("Generating summary…")}{if @summary_local?,
+                                        do: gettext(" (local LLMs may take several seconds)")}
+                                    </p>
+                                  <% summary -> %>
+                                    <div class="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed">
+                                      {summary_html(summary.text, msg.id, length(msg.chunks))}<span
+                                        :if={summary.status == :running}
+                                        class="inline-block w-1.5 h-3.5 ml-0.5 bg-indigo-400 animate-pulse align-middle"
+                                      ></span>
+                                    </div>
+                                    <p
+                                      :if={summary.status == :cancelled}
+                                      class="text-[10px] text-zinc-400"
                                     >
-                                      {if chunk.page,
-                                        do: gettext("Open in Drive (p.%{page})", page: chunk.page),
-                                        else: gettext("Open in Drive")}
-                                      <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
-                                    </.link>
-                                  <% end %>
-                                </div>
-
-                                <%= if chunk.heading && chunk.heading != "全体" do %>
-                                  <div class="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
-                                    § {chunk.heading}
-                                  </div>
+                                      {gettext("(Stopped)")}
+                                    </p>
+                                    <p :if={summary.status == :done} class="text-[10px] text-zinc-400">
+                                      {gettext(
+                                        "AI summaries may contain errors. Always verify key details against the cited sources."
+                                      )}
+                                    </p>
                                 <% end %>
-
-                                <% snippet = Snippet.build(chunk.content, msg[:question]) %>
-                                <div class="text-sm text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900 p-3 rounded-md leading-relaxed">
-                                  {excerpt_html(snippet.segments, snippet.before?, snippet.after?)}
-                                </div>
-                                <details class="text-xs">
+                                <%!-- A reasoning model's thinking: kept, but collapsed by default --%>
+                                <details
+                                  :if={Map.get(msg.summary, :thinking, "") != ""}
+                                  class="text-xs"
+                                >
                                   <summary class="cursor-pointer text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 select-none">
-                                    {gettext("Show full text")}
+                                    {gettext("Show AI thinking process (%{count} chars)",
+                                      count: String.length(msg.summary.thinking)
+                                    )}
                                   </summary>
-                                  <div class="mt-1.5 text-xs text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-900 p-2 rounded-md leading-relaxed max-h-72 overflow-y-auto">
-                                    {excerpt_html(Snippet.full(chunk.content, msg[:question]))}
+                                  <div class="mt-1.5 text-[11px] text-zinc-500 bg-white/60 dark:bg-zinc-900/60 p-2 rounded-md leading-relaxed max-h-60 overflow-y-auto">
+                                    {excerpt_html([{:text, msg.summary.thinking}])}
                                   </div>
                                 </details>
                               </div>
-                            <% end %>
-                          </div>
+
+                              <p class="text-xs text-zinc-500">
+                                {if msg[:summary],
+                                  do: gettext("Sources"),
+                                  else: gettext("Relevant excerpts")} {gettext(
+                                  "(Excerpts with search terms highlighted):"
+                                )}
+                              </p>
+                              <div class="space-y-2">
+                                <%= for {chunk, n} <- Enum.with_index(msg.chunks, 1) do %>
+                                  <div
+                                    id={"src-#{msg.id}-#{n}"}
+                                    class="p-3 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200/70 dark:border-zinc-800 space-y-1.5 scroll-mt-4 target:ring-2 target:ring-indigo-400"
+                                  >
+                                    <div class="flex items-center justify-between text-xs font-medium">
+                                      <span class="text-indigo-600 dark:text-indigo-400 flex items-center gap-1 truncate max-w-md">
+                                        <span class="shrink-0 px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-bold">
+                                          [{n}]
+                                        </span>
+                                        <.icon name="hero-document-text" class="w-4 h-4 shrink-0" />
+                                        {(chunk.document && chunk.document.name) ||
+                                          gettext("Document")}
+                                        <span
+                                          :if={chunk.page}
+                                          class="ml-1 px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-[10px] font-semibold text-indigo-700 dark:text-indigo-300"
+                                        >
+                                          p.{chunk.page}
+                                        </span>
+                                      </span>
+                                      <%= if chunk.document && chunk.document.web_view_link do %>
+                                        <.link
+                                          href={drive_link(chunk)}
+                                          target="_blank"
+                                          title={
+                                            chunk.page &&
+                                              "p.#{chunk.page}"
+                                          }
+                                          class="text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center gap-0.5 transition shrink-0"
+                                        >
+                                          {if chunk.page,
+                                            do:
+                                              gettext("Open in Drive (p.%{page})", page: chunk.page),
+                                            else: gettext("Open in Drive")}
+                                          <.icon
+                                            name="hero-arrow-top-right-on-square"
+                                            class="w-3 h-3"
+                                          />
+                                        </.link>
+                                      <% end %>
+                                    </div>
+
+                                    <%= if chunk.heading && chunk.heading != "全体" do %>
+                                      <div class="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                                        § {chunk.heading}
+                                      </div>
+                                    <% end %>
+
+                                    <% snippet =
+                                      Snippet.build(chunk.content, msg[:highlight] || msg[:question]) %>
+                                    <div class="text-sm text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900 p-3 rounded-md leading-relaxed">
+                                      {excerpt_html(snippet.segments, snippet.before?, snippet.after?)}
+                                    </div>
+                                    <details class="text-xs">
+                                      <summary class="cursor-pointer text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 select-none">
+                                        {gettext("Show full text")}
+                                      </summary>
+                                      <div class="mt-1.5 text-xs text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-900 p-2 rounded-md leading-relaxed max-h-72 overflow-y-auto">
+                                        {excerpt_html(
+                                          Snippet.full(
+                                            chunk.content,
+                                            msg[:highlight] || msg[:question]
+                                          )
+                                        )}
+                                      </div>
+                                    </details>
+                                  </div>
+                                <% end %>
+                              </div>
+                            </div>
+                          <% end %>
                         </div>
-                      <% end %>
+                      </div>
+                    <% end %>
+                  <% end %>
+                  <div
+                    :if={(@loading and @pending) && @pending.thread == thread}
+                    id="answer-loading"
+                    class="flex justify-start"
+                  >
+                    <div class="rounded-2xl rounded-tl-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-4 py-3 text-xs text-zinc-500 flex items-center gap-2 shadow-sm">
+                      <.icon name="hero-arrow-path" class="w-4 h-4 animate-spin" /> {gettext(
+                        "Searching for answers…"
+                      )}
                     </div>
                   </div>
-                <% end %>
-              <% end %>
-              <div :if={@loading} id="answer-loading" class="flex justify-start">
-                <div class="rounded-2xl rounded-tl-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-4 py-3 text-xs text-zinc-500 flex items-center gap-2 shadow-sm">
-                  <.icon name="hero-arrow-path" class="w-4 h-4 animate-spin" /> {gettext(
-                    "Searching for answers…"
-                  )}
+
+                  <%!-- A follow-up to this thread's answer --%>
+                  <%= cond do %>
+                    <% @followup_thread == thread -> %>
+                      <.form
+                        for={@followup_form}
+                        id={"followup-form-#{thread}"}
+                        phx-submit="send_followup"
+                        class="flex flex-wrap items-center gap-2 pl-1"
+                      >
+                        <input type="hidden" name="followup[thread]" value={thread} />
+                        <input
+                          type="text"
+                          name="followup[question]"
+                          id={"followup-input-#{thread}"}
+                          value=""
+                          phx-mounted={JS.focus()}
+                          placeholder={gettext("Ask more about this answer...")}
+                          autocomplete="off"
+                          class="flex-1 min-w-[12rem] px-3 py-2 rounded-xl border border-indigo-300 dark:border-indigo-800 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                        />
+                        <button
+                          type="submit"
+                          id={"followup-send-#{thread}"}
+                          disabled={@loading}
+                          class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium flex items-center gap-1.5 shadow-sm transition disabled:opacity-50"
+                        >
+                          <.icon name="hero-arrow-uturn-right" class="w-3.5 h-3.5" /> {gettext(
+                            "Ask a follow-up"
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          id={"followup-cancel-#{thread}"}
+                          phx-click="cancel_followup"
+                          class="px-3 py-2 rounded-xl text-xs text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+                        >
+                          {gettext("Cancel")}
+                        </button>
+                      </.form>
+                    <% match?(%{role: :assistant}, List.last(thread_messages)) -> %>
+                      <div class="flex justify-start pl-1">
+                        <button
+                          type="button"
+                          id={"followup-btn-#{thread}"}
+                          phx-click="start_followup"
+                          phx-value-thread={thread}
+                          disabled={@loading}
+                          class="text-xs px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 flex items-center gap-1.5 transition disabled:opacity-40"
+                        >
+                          <.icon name="hero-arrow-uturn-right" class="w-3.5 h-3.5" /> {gettext(
+                            "Ask a follow-up about this answer"
+                          )}
+                        </button>
+                      </div>
+                    <% true -> %>
+                  <% end %>
                 </div>
-              </div>
+              <% end %>
             <% end %>
           </div>
           <script :type={Phoenix.LiveView.ColocatedHook} name=".ChatScroll">
-            // When a message is added — a question sent, its answer arriving, or one opened
-            // from the history — bring the latest question to the top of the chat area, with
+            // When a message is added — a question or a follow-up sent, its answer arriving, or
+            // a thread opened from the history — bring the latest question (data-latest; a
+            // follow-up may be in a thread above the last) to the top of the chat area, with
             // its answer below: a long answer is then read from its start. Scrolling again when
             // the answer arrives matters: when the question was sent, there may not have been
             // enough below it to bring it to the top. Updates that add no message (a summary
@@ -930,8 +1139,8 @@ defmodule AskDriveWeb.ChatLive do
                 const grew = Number(this.el.dataset.count) > Number(this.count)
                 this.count = this.el.dataset.count
                 if (!grew) return
-                const questions = this.el.querySelectorAll("[data-role='user']")
-                const last = questions[questions.length - 1]
+                const latest = this.el.dataset.latest
+                const last = latest && document.getElementById(`msg-${latest}`)
                 if (!last) return
                 const top = last.getBoundingClientRect().top - this.el.getBoundingClientRect().top
                 this.el.scrollTo({top: this.el.scrollTop + top - 8, behavior: "smooth"})
@@ -939,8 +1148,13 @@ defmodule AskDriveWeb.ChatLive do
             }
           </script>
 
-          <%!-- Bottom Input Bar --%>
-          <div class="pt-2 border-t border-zinc-200 dark:border-zinc-800">
+          <%!-- Bottom Input Bar: a new question (a thread of its own, F-431) --%>
+          <div class="pt-2 border-t border-zinc-200 dark:border-zinc-800 space-y-1.5">
+            <p :if={@messages != []} id="new-question-hint" class="text-[11px] text-zinc-500">
+              {gettext(
+                "This starts a new question, unrelated to the ones above. To ask more about an answer, use \"Ask a follow-up about this answer\" under it."
+              )}
+            </p>
             <.form
               for={@form}
               id="chat-form"
@@ -954,7 +1168,7 @@ defmodule AskDriveWeb.ChatLive do
                   name="question"
                   id="chat-input"
                   value={@form[:question].value}
-                  placeholder={gettext("Ask a question about Google Drive documents...")}
+                  placeholder={gettext("Ask a new question about Google Drive documents...")}
                   class="w-full px-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition"
                   autocomplete="off"
                 />
@@ -976,8 +1190,8 @@ defmodule AskDriveWeb.ChatLive do
                 disabled={@loading}
                 class="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm flex items-center gap-1.5 shadow-sm transition disabled:opacity-50"
               >
-                <span>{gettext("Send")}</span>
-                <.icon name="hero-paper-airplane" class="w-4 h-4" />
+                <.icon name="hero-plus" class="w-4 h-4" />
+                <span>{gettext("New question")}</span>
               </button>
             </.form>
           </div>
@@ -985,6 +1199,13 @@ defmodule AskDriveWeb.ChatLive do
       <% end %>
     </Layouts.app>
     """
+  end
+
+  # the messages by thread, in the order the threads appear
+  defp threads(messages) do
+    messages
+    |> Enum.chunk_by(& &1.thread)
+    |> Enum.map(fn [first | _] = in_thread -> {first.thread, in_thread} end)
   end
 
   defp summarising?(messages),

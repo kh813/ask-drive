@@ -4,7 +4,7 @@ defmodule AskDrive.MixProject do
   def project do
     [
       app: :ask_drive,
-      version: "0.1.33",
+      version: "0.1.34",
       elixir: "~> 1.17",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -92,7 +92,10 @@ defmodule AskDrive.MixProject do
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind ask_drive", "esbuild ask_drive"],
+      # compile first: the colocated hooks (<script :type={ColocatedHook}>) reach the JS
+      # bundle only from compiled code; without it a release bundled the previous build's hooks
       "assets.deploy": [
+        "compile",
         "tailwind ask_drive --minify",
         "esbuild ask_drive --minify",
         "phx.digest"
