@@ -61,6 +61,28 @@ defmodule AskDriveWeb.AdminUpdateTest do
     assert AskDrive.Updates.status().by == admin.email
   end
 
+  test "on the latest version (or before any check) 今すぐアップデート can't be pressed", %{conn: conn} do
+    AskDrive.Updates.save_platform(%{update_latest_version: nil})
+    {:ok, view, _html} = live(conn, "/admin?tab=update")
+    assert has_element?(view, "#start-update-btn[disabled]", "今すぐアップデート")
+    assert has_element?(view, "#start-update-hint", "今すぐ確認")
+
+    AskDrive.Updates.save_platform(%{update_latest_version: AskDrive.version()})
+    {:ok, view, _html} = live(conn, "/admin?tab=update")
+    assert has_element?(view, "#start-update-btn[disabled]")
+    assert has_element?(view, "#start-update-hint", "最新版で稼働しています")
+
+    # and the server refuses it too
+    view |> form("#start-update-form", %{"wait" => "boundary"}) |> render_submit()
+    assert AskDrive.Updates.status().phase == :idle
+    refute_received :restarted
+
+    AskDrive.Updates.save_platform(%{update_latest_version: "99.0.0"})
+    {:ok, view, _html} = live(conn, "/admin?tab=update")
+    refute has_element?(view, "#start-update-btn[disabled]")
+    refute has_element?(view, "#start-update-hint")
+  end
+
   test "only the platform screen has the update tab, not a desk's", %{conn: conn, admin: admin} do
     {:ok, view, _html} = live(conn, "/admin")
     assert has_element?(view, "#tab-update")

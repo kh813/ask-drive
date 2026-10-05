@@ -677,12 +677,15 @@ defmodule AskDriveWeb.AdminLive do
   def handle_event("start_update", params, %{assigns: %{scope: :platform}} = socket) do
     user = socket.assigns.current_user
     wait = if params["wait"] == "batch_end", do: :batch_end, else: :boundary
+    available = AskDrive.Updates.available_version(socket.assigns.setting)
 
-    case AskDrive.Updates.start(
-           by: (user && user.email) || "管理者",
-           wait: wait,
-           to: AskDrive.Updates.available_version(socket.assigns.setting)
-         ) do
+    # already on the latest version: nothing to update to (the button is disabled too)
+    result =
+      if available,
+        do: AskDrive.Updates.start(by: (user && user.email) || "管理者", wait: wait, to: available),
+        else: {:error, :up_to_date}
+
+    case result do
       :ok ->
         {:noreply,
          socket
@@ -691,6 +694,9 @@ defmodule AskDriveWeb.AdminLive do
 
       {:error, :busy} ->
         {:noreply, put_flash(socket, :error, "アップデートはすでに進行中です。")}
+
+      {:error, :up_to_date} ->
+        {:noreply, put_flash(socket, :info, "最新版で稼働しています。アップデートはありません。")}
     end
   end
 

@@ -147,15 +147,23 @@ defmodule AskDriveWeb.UpdatePanel do
               <span>バッチが終わるまで待ってから再起動する（夜間バッチ中だと朝までかかることがあります）</span>
             </label>
           </fieldset>
-          <button
-            type="submit"
-            id="start-update-btn"
-            data-confirm={"AskDrive を#{if @available, do: " v#{@available} に", else: "最新版に"}アップデートしますか？ビルドが終わると、30 秒ほど再起動します。"}
-            class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm flex items-center gap-1.5 transition"
-          >
-            <.icon name="hero-arrow-down-tray" class="w-4 h-4" />
-            {if @available, do: "v#{@available} にアップデート", else: "最新版でアップデート（再ビルド）"}
-          </button>
+          <div class="flex flex-wrap items-center gap-3">
+            <%!-- only when a newer version is out: nothing to do on the latest one --%>
+            <button
+              type="submit"
+              id="start-update-btn"
+              disabled={!@available}
+              data-confirm={"AskDrive を v#{@available} にアップデートしますか？ビルドが終わると、30 秒ほど再起動します。"}
+              class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm flex items-center gap-1.5 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo-600"
+            >
+              <.icon name="hero-arrow-down-tray" class="w-4 h-4" /> 今すぐアップデート
+            </button>
+            <span :if={!@available} id="start-update-hint" class="text-xs text-zinc-500">
+              {if @setting.update_latest_version,
+                do: "最新版で稼働しています。",
+                else: "「今すぐ確認」で最新版を確認すると、アップデートできるようになります。"}
+            </span>
+          </div>
         </form>
       </div>
 
