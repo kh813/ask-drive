@@ -591,7 +591,8 @@ defmodule AskDrive.LLM do
         :temperature,
         :timeout,
         :think,
-        :on_thinking
+        :on_thinking,
+        :json_schema
       ])
     )
   end

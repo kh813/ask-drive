@@ -8,7 +8,8 @@ defmodule AskDrive.Drive.Client do
 
   @base_url "https://www.googleapis.com/drive/v3"
   @max_retries 5
-  @base_backoff_ms 1000
+  # test.exs sets 0 so the retry paths run without waiting out real backoffs
+  @base_backoff_ms Application.compile_env(:ask_drive, :drive_base_backoff_ms, 1000)
 
   @doc """
   Gets metadata for a specific Drive file or folder.
@@ -132,7 +133,7 @@ defmodule AskDrive.Drive.Client do
       headers = [{"authorization", "Bearer #{token}"} | Keyword.get(opts, :headers, [])]
       req_opts = opts |> Keyword.put(:headers, headers)
 
-      case Req.request([method: method, url: url] ++ req_opts) do
+      case send_request(method, url, req_opts) do
         {:ok, %{status: 200, body: body}} ->
           {:ok, body}
 
@@ -164,7 +165,7 @@ defmodule AskDrive.Drive.Client do
       headers = [{"authorization", "Bearer #{token}"} | Keyword.get(opts, :headers, [])]
       req_opts = opts |> Keyword.put(:headers, headers) |> Keyword.put(:raw, true)
 
-      case Req.request([method: method, url: url] ++ req_opts) do
+      case send_request(method, url, req_opts) do
         {:ok, %{status: 200, body: body}} ->
           {:ok, body}
 
@@ -190,8 +191,24 @@ defmodule AskDrive.Drive.Client do
     end
   end
 
+  # Finch can raise out of a request instead of returning an error: a pooled keep-alive
+  # connection still holding a late response to an earlier request fails its response match
+  # with a CaseClauseError ({:status, other_ref, 200}). Treat that like a network error so it
+  # gets the backoff retries (the pool drops the connection, the retry gets a fresh one)
+  # rather than failing the document for the night.
+  defp send_request(method, url, req_opts) do
+    Req.request(
+      [method: method, url: url] ++
+        req_opts ++ Application.get_env(:ask_drive, :drive_req_options, [])
+    )
+  rescue
+    e ->
+      Logger.warning("Drive API request raised: #{Exception.message(e)}")
+      {:error, {:exception, Exception.message(e)}}
+  end
+
   defp backoff_sleep(attempt) do
-    jitter = :rand.uniform(500)
+    jitter = if @base_backoff_ms > 0, do: :rand.uniform(500), else: 0
     sleep_ms = (@base_backoff_ms * :math.pow(2, attempt - 1) + jitter) |> round()
 
     Logger.warning(

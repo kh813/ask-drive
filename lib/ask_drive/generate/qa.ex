@@ -7,9 +7,23 @@ defmodule AskDrive.Generate.QA do
   alias AskDrive.LLM
   alias AskDrive.LLM.Semaphore
 
+  require Logger
+
   # 3〜5 QA pairs in JSON take a few hundred tokens; the cap stops a model that starts
   # repeating itself from holding the GPU until the timeout
   @max_tokens 1536
+
+  # Handed to Ollama as `format`, so the model can't emit broken JSON: an answer quoting the
+  # document with an unescaped " or a line break used to fail whole chunks night after night
+  @qa_schema %{
+    type: "array",
+    minItems: 1,
+    items: %{
+      type: "object",
+      properties: %{question: %{type: "string"}, answer: %{type: "string"}},
+      required: ["question", "answer"]
+    }
+  }
 
   @system_prompt """
   あなたは社内ナレッジの想定質問回答（QA）を生成するAIアシスタントです。
@@ -57,7 +71,8 @@ defmodule AskDrive.Generate.QA do
         LLM.generate(model, prompt,
           system: @system_prompt,
           num_ctx: num_ctx,
-          max_tokens: @max_tokens
+          max_tokens: @max_tokens,
+          json_schema: @qa_schema
         )
       end)
 
@@ -91,7 +106,8 @@ defmodule AskDrive.Generate.QA do
         LLM.generate(model, retry_prompt,
           system: @system_prompt,
           num_ctx: num_ctx,
-          max_tokens: @max_tokens
+          max_tokens: @max_tokens,
+          json_schema: @qa_schema
         )
       end)
 
@@ -102,13 +118,34 @@ defmodule AskDrive.Generate.QA do
             {:ok, to_pairs(qa_list, chunk)}
 
           other ->
-            {:error, "JSON parse failed after retry: #{inspect(other) |> String.slice(0, 200)}"}
+            Logger.warning(
+              "QA: unparsable output for chunk #{chunk.id}: #{String.slice(response, 0, 4000)}"
+            )
+
+            {:error, "JSON parse failed after retry: " <> describe_parse_failure(other)}
         end
 
       {:error, reason} ->
         {:error, reason}
     end
   end
+
+  # The batch log shows this message, so point at the spot the JSON broke rather than its
+  # first 200 characters (which were always the well-formed start)
+  @doc false
+  def describe_parse_failure({:error, %Jason.DecodeError{position: pos, data: data} = e})
+      when is_binary(data) do
+    from = max(pos - 60, 0)
+    before = data |> binary_part(from, pos - from) |> scrub()
+    rest = data |> binary_part(pos, min(60, byte_size(data) - pos)) |> scrub()
+    "#{Exception.message(e)}: …#{before}⟨ここ⟩#{rest}…"
+  end
+
+  def describe_parse_failure({:ok, []}), do: "質問と回答の組が 1 件もありません"
+  def describe_parse_failure(other), do: inspect(other) |> String.slice(0, 200)
+
+  # Byte offsets can cut a multibyte character in half
+  defp scrub(bin), do: bin |> String.chunk(:valid) |> Enum.filter(&String.valid?/1) |> Enum.join()
 
   @doc """
   Extracts and parses JSON array from LLM text response.

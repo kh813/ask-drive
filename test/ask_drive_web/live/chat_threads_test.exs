@@ -149,6 +149,19 @@ defmodule AskDriveWeb.ChatThreadsTest do
     # (a summary may take two passes: let the first question's requests go)
     flush_generates()
     [thread] = threads(view)
+
+    # the follow-up comes right after the summary, before the excerpts (which are 3 lines,
+    # opened by a click), so it isn't pushed out of sight
+    order =
+      view
+      |> render()
+      |> LazyHTML.from_fragment()
+      |> LazyHTML.query("#followup-btn-#{thread}, [id^='src-']")
+      |> LazyHTML.attribute("id")
+
+    assert hd(order) == "followup-btn-#{thread}"
+    assert has_element?(view, "[id^='excerpt-'].line-clamp-3")
+
     follow_up(view, thread, "それは外付けHDDも同じ？")
     render_async(view, 20_000)
 

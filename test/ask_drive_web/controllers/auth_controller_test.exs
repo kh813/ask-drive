@@ -33,7 +33,7 @@ defmodule AskDriveWeb.AuthControllerTest do
     # to "localhost") instead of the request, Google would send everyone's browser back to
     # "localhost" — which resolves to their own machine, not the server.
     conn =
-      conn |> Map.put(:host, "192.168.11.42") |> Map.put(:port, 4000) |> get(~p"/auth/google")
+      conn |> Map.put(:host, "192.168.1.50") |> Map.put(:port, 4000) |> get(~p"/auth/google")
 
     redirect_uri =
       redirected_to(conn)
@@ -42,7 +42,7 @@ defmodule AskDriveWeb.AuthControllerTest do
       |> URI.decode_query()
       |> Map.fetch!("redirect_uri")
 
-    assert redirect_uri == "http://192.168.11.42:4000/auth/google/callback"
+    assert redirect_uri == "http://192.168.1.50:4000/auth/google/callback"
   end
 
   test "GET /auth/google/callback with invalid state redirects with error", %{conn: conn} do

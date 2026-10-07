@@ -57,6 +57,9 @@ defmodule AskDrive.LLM.Providers.Ollama do
       }
       |> maybe_put(:think, think)
       |> maybe_put(:system, Keyword.get(opts, :system))
+      # Structured output: Ollama constrains sampling to the schema, so the text is valid
+      # JSON even when the answer quotes the document ("…" or line breaks inside a string)
+      |> maybe_put(:format, Keyword.get(opts, :json_schema))
       |> put_keep_alive(opts)
 
     url = base_url(opts) <> "/api/generate"

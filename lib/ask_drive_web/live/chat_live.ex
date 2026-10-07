@@ -967,6 +967,16 @@ defmodule AskDriveWeb.ChatLive do
                                 </details>
                               </div>
 
+                              <%!-- Follow-up right after the answer, before the excerpts that
+                                    would push it out of sight --%>
+                              <.followup_controls
+                                :if={msg.id == List.last(thread_messages).id}
+                                thread={thread}
+                                followup_thread={@followup_thread}
+                                followup_form={@followup_form}
+                                loading={@loading}
+                              />
+
                               <p class="text-xs text-zinc-500">
                                 {if msg[:summary],
                                   do: gettext("Sources"),
@@ -1025,8 +1035,23 @@ defmodule AskDriveWeb.ChatLive do
 
                                     <% snippet =
                                       Snippet.build(chunk.content, msg[:highlight] || msg[:question]) %>
-                                    <div class="text-sm text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900 p-3 rounded-md leading-relaxed">
-                                      {excerpt_html(snippet.segments, snippet.before?, snippet.after?)}
+                                    <%!-- 3 lines so the follow-up stays in sight; click to open or
+                                          close (「全文を表示」 has the whole chunk) --%>
+                                    <%!-- the clamp is on the inner block: on the padded one, the 4th line peeked through --%>
+                                    <div
+                                      phx-click={
+                                        JS.toggle_class("line-clamp-3", to: "#excerpt-#{msg.id}-#{n}")
+                                      }
+                                      title={gettext("Click to show or hide the whole excerpt")}
+                                      class="cursor-pointer text-sm text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900 p-3 rounded-md leading-relaxed hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition-colors"
+                                    >
+                                      <div id={"excerpt-#{msg.id}-#{n}"} class="line-clamp-3">
+                                        {excerpt_html(
+                                          snippet.segments,
+                                          snippet.before?,
+                                          snippet.after?
+                                        )}
+                                      </div>
                                     </div>
                                     <details class="text-xs">
                                       <summary class="cursor-pointer text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 select-none">
@@ -1046,6 +1071,18 @@ defmodule AskDriveWeb.ChatLive do
                               </div>
                             </div>
                           <% end %>
+
+                          <%!-- Follow-up for an answer without excerpts: at its end --%>
+                          <.followup_controls
+                            :if={
+                              msg.id == List.last(thread_messages).id and
+                                not (msg.tier == 2 and msg.chunks != [])
+                            }
+                            thread={thread}
+                            followup_thread={@followup_thread}
+                            followup_form={@followup_form}
+                            loading={@loading}
+                          />
                         </div>
                       </div>
                     <% end %>
@@ -1061,63 +1098,6 @@ defmodule AskDriveWeb.ChatLive do
                       )}
                     </div>
                   </div>
-
-                  <%!-- A follow-up to this thread's answer --%>
-                  <%= cond do %>
-                    <% @followup_thread == thread -> %>
-                      <.form
-                        for={@followup_form}
-                        id={"followup-form-#{thread}"}
-                        phx-submit="send_followup"
-                        class="flex flex-wrap items-center gap-2 pl-1"
-                      >
-                        <input type="hidden" name="followup[thread]" value={thread} />
-                        <input
-                          type="text"
-                          name="followup[question]"
-                          id={"followup-input-#{thread}"}
-                          value=""
-                          phx-mounted={JS.focus()}
-                          placeholder={gettext("Ask more about this answer...")}
-                          autocomplete="off"
-                          class="flex-1 min-w-[12rem] px-3 py-2 rounded-xl border border-indigo-300 dark:border-indigo-800 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                        />
-                        <button
-                          type="submit"
-                          id={"followup-send-#{thread}"}
-                          disabled={@loading}
-                          class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium flex items-center gap-1.5 shadow-sm transition disabled:opacity-50"
-                        >
-                          <.icon name="hero-arrow-uturn-right" class="w-3.5 h-3.5" /> {gettext(
-                            "Ask a follow-up"
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          id={"followup-cancel-#{thread}"}
-                          phx-click="cancel_followup"
-                          class="px-3 py-2 rounded-xl text-xs text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
-                        >
-                          {gettext("Cancel")}
-                        </button>
-                      </.form>
-                    <% match?(%{role: :assistant}, List.last(thread_messages)) -> %>
-                      <div class="flex justify-start pl-1">
-                        <button
-                          type="button"
-                          id={"followup-btn-#{thread}"}
-                          phx-click="start_followup"
-                          phx-value-thread={thread}
-                          disabled={@loading}
-                          class="text-xs px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 flex items-center gap-1.5 transition disabled:opacity-40"
-                        >
-                          <.icon name="hero-arrow-uturn-right" class="w-3.5 h-3.5" /> {gettext(
-                            "Ask a follow-up about this answer"
-                          )}
-                        </button>
-                      </div>
-                    <% true -> %>
-                  <% end %>
                 </div>
               <% end %>
             <% end %>
@@ -1198,6 +1178,69 @@ defmodule AskDriveWeb.ChatLive do
         </div>
       <% end %>
     </Layouts.app>
+    """
+  end
+
+  # 「この回答に追加で質問」 and, once pressed, its input (F-431): under a thread's last answer
+  attr :thread, :string, required: true
+  attr :followup_thread, :string, default: nil
+  attr :followup_form, :any, required: true
+  attr :loading, :boolean, default: false
+
+  def followup_controls(assigns) do
+    ~H"""
+    <%= cond do %>
+      <% @followup_thread == @thread -> %>
+        <.form
+          for={@followup_form}
+          id={"followup-form-#{@thread}"}
+          phx-submit="send_followup"
+          class="flex flex-wrap items-center gap-2 pl-1"
+        >
+          <input type="hidden" name="followup[thread]" value={@thread} />
+          <input
+            type="text"
+            name="followup[question]"
+            id={"followup-input-#{@thread}"}
+            value=""
+            phx-mounted={JS.focus()}
+            placeholder={gettext("Ask more about this answer...")}
+            autocomplete="off"
+            class="flex-1 min-w-[12rem] px-3 py-2 rounded-xl border border-indigo-300 dark:border-indigo-800 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+          />
+          <button
+            type="submit"
+            id={"followup-send-#{@thread}"}
+            disabled={@loading}
+            class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium flex items-center gap-1.5 shadow-sm transition disabled:opacity-50"
+          >
+            <.icon name="hero-arrow-uturn-right" class="w-3.5 h-3.5" /> {gettext("Ask a follow-up")}
+          </button>
+          <button
+            type="button"
+            id={"followup-cancel-#{@thread}"}
+            phx-click="cancel_followup"
+            class="px-3 py-2 rounded-xl text-xs text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+          >
+            {gettext("Cancel")}
+          </button>
+        </.form>
+      <% true -> %>
+        <div class="flex justify-start pl-1">
+          <button
+            type="button"
+            id={"followup-btn-#{@thread}"}
+            phx-click="start_followup"
+            phx-value-thread={@thread}
+            disabled={@loading}
+            class="text-xs px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 flex items-center gap-1.5 transition disabled:opacity-40"
+          >
+            <.icon name="hero-arrow-uturn-right" class="w-3.5 h-3.5" /> {gettext(
+              "Ask a follow-up about this answer"
+            )}
+          </button>
+        </div>
+    <% end %>
     """
   end
 

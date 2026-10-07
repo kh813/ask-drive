@@ -19,6 +19,9 @@ config :ask_drive, auth_disabled_by_default: false
 # Never let the runtime clock start a real nightly batch in the middle of a test run.
 config :ask_drive, auto_nightly_batch: false
 
+# Drive API retries back off for seconds in production; tests exercise them without waiting.
+config :ask_drive, drive_base_backoff_ms: 0
+
 # Updating from the admin screen (F-1501): no nightly check, and state kept out of log/
 config :ask_drive,
   auto_update_check: false,

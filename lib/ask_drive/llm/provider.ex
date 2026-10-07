@@ -11,6 +11,8 @@ defmodule AskDrive.LLM.Provider do
     * `:timeout` — receive timeout in milliseconds
     * `:system` — system prompt (generation only)
     * `:num_ctx` — context length, honoured by Ollama only
+    * `:json_schema` — JSON schema the output must follow, honoured by Ollama only (others
+      ignore it, so callers still parse defensively)
     * `:max_tokens` / `:temperature` — generation limits
     * `:expected_dim` — embedding dimension the caller requires
   """

@@ -67,4 +67,23 @@ defmodule AskDrive.Generate.QATest do
       assert {:ok, []} = QA.parse_qa_json("[1, 2, 3]")
     end
   end
+
+  describe "describe_parse_failure/1" do
+    test "points at where the JSON broke, not at its well-formed start" do
+      message =
+        QA.parse_qa_json(~s([{"question": "様式は？", "answer": "「"D-11"」を使います。"}]))
+        |> QA.describe_parse_failure()
+
+      assert message =~ ~s(「"⟨ここ⟩D-11)
+    end
+
+    test "cuts on character boundaries when the window starts mid-character" do
+      message =
+        QA.parse_qa_json(~s([{"question": "#{String.duplicate("あ", 40)}", "answer": "途中))
+        |> QA.describe_parse_failure()
+
+      assert String.valid?(message)
+      assert message =~ "途中⟨ここ⟩"
+    end
+  end
 end

@@ -21,7 +21,7 @@ msgstr "%{count} チャンクを検索対象にしています"
 msgid "(%{minutes} min remaining)"
 msgstr "（残り %{minutes} 分）"
 
-#: lib/ask_drive_web/live/chat_live.ex:973
+#: lib/ask_drive_web/live/chat_live.ex:983
 #, elixir-autogen, elixir-format
 msgid "(Excerpts with search terms highlighted):"
 msgstr "（原文の抜粋。質問の語をハイライトしています）:"
@@ -87,7 +87,7 @@ msgid "An administrator needs to configure Google Secure LDAP or Google Login (O
 msgstr "管理者は、全体管理の「全体設定」→「組織（Google Workspace）」→「ログインの方法」で Google Secure LDAP または Google ログイン（OAuth）を有効にしてください。"
 
 #: lib/ask_drive_web/live/chat_live.ex:764
-#: lib/ask_drive_web/live/chat_live.ex:1219
+#: lib/ask_drive_web/live/chat_live.ex:1262
 #, elixir-autogen, elixir-format
 msgid "Answer"
 msgstr "回答"
@@ -149,7 +149,7 @@ msgid "Desk list"
 msgstr "窓口一覧"
 
 #: lib/ask_drive_web/live/chat_live.ex:879
-#: lib/ask_drive_web/live/chat_live.ex:990
+#: lib/ask_drive_web/live/chat_live.ex:1000
 #, elixir-autogen, elixir-format
 msgid "Document"
 msgstr "ドキュメント"
@@ -274,12 +274,12 @@ msgstr "Google ログイン（SSO）と Google Drive の連携で、このドメ
 
 #: lib/ask_drive_web/live/chat_live.ex:797
 #: lib/ask_drive_web/live/chat_live.ex:887
-#: lib/ask_drive_web/live/chat_live.ex:1011
+#: lib/ask_drive_web/live/chat_live.ex:1021
 #, elixir-autogen, elixir-format
 msgid "Open in Drive"
 msgstr "Drive で開く"
 
-#: lib/ask_drive_web/live/chat_live.ex:1010
+#: lib/ask_drive_web/live/chat_live.ex:1020
 #, elixir-autogen, elixir-format
 msgid "Open in Drive (p.%{page})"
 msgstr "Drive で開く（p.%{page}）"
@@ -327,7 +327,7 @@ msgid "Release"
 msgstr "解除"
 
 #: lib/ask_drive_web/live/chat_live.ex:753
-#: lib/ask_drive_web/live/chat_live.ex:973
+#: lib/ask_drive_web/live/chat_live.ex:983
 #, elixir-autogen, elixir-format
 msgid "Relevant excerpts"
 msgstr "関連しそうな箇所（原文抜粋）"
@@ -342,7 +342,7 @@ msgstr "会話をリセット"
 msgid "Return to Chat"
 msgstr "チャットに戻る"
 
-#: lib/ask_drive_web/live/chat_live.ex:1059
+#: lib/ask_drive_web/live/chat_live.ex:1096
 #, elixir-autogen, elixir-format
 msgid "Searching for answers…"
 msgstr "回答を検索しています…"
@@ -357,7 +357,7 @@ msgstr "相談したい窓口を選んでください。"
 msgid "Show AI thinking process (%{count} chars)"
 msgstr "AI の思考過程を表示（%{count}字）"
 
-#: lib/ask_drive_web/live/chat_live.ex:1033
+#: lib/ask_drive_web/live/chat_live.ex:1058
 #, elixir-autogen, elixir-format
 msgid "Show full text"
 msgstr "全文を表示"
@@ -388,7 +388,7 @@ msgstr "Google でログイン"
 msgid "Something went wrong!"
 msgstr "エラーが発生しました"
 
-#: lib/ask_drive_web/live/chat_live.ex:972
+#: lib/ask_drive_web/live/chat_live.ex:982
 #, elixir-autogen, elixir-format
 msgid "Sources"
 msgstr "引用元"
@@ -540,12 +540,12 @@ msgstr "@%{domain} は省略できます（自動で補完されます）。組�
 msgid "(Stopped)"
 msgstr "（中止しました）"
 
-#: lib/ask_drive_web/live/chat_live.ex:1185
+#: lib/ask_drive_web/live/chat_live.ex:1165
 #, elixir-autogen, elixir-format
 msgid "Stop"
 msgstr "停止"
 
-#: lib/ask_drive_web/live/chat_live.ex:1181
+#: lib/ask_drive_web/live/chat_live.ex:1161
 #, elixir-autogen, elixir-format
 msgid "Stop answering"
 msgstr "回答の生成を停止"
@@ -565,7 +565,7 @@ msgstr "要約を中止しました。下の抜粋をご確認ください。"
 msgid "Delete"
 msgstr "削除"
 
-#: lib/ask_drive_web/live/chat_live.ex:1218
+#: lib/ask_drive_web/live/chat_live.ex:1261
 #, elixir-autogen, elixir-format
 msgid "Excerpts"
 msgstr "抜粋"
@@ -605,7 +605,7 @@ msgstr "質問を検索"
 msgid "The documents have been updated since, so the excerpts can't be shown. Sources at the time:"
 msgstr "その後、文書が更新されたため抜粋は表示できません。当時の引用元:"
 
-#: lib/ask_drive_web/live/chat_live.ex:1217
+#: lib/ask_drive_web/live/chat_live.ex:1260
 #, elixir-autogen, elixir-format
 msgid "Unanswered"
 msgstr "未回答"
@@ -685,27 +685,27 @@ msgstr "個人の Gmail（@gmail.com）を使う、またはどの Google アカ
 msgid "%{count} follow-ups"
 msgstr "追加の質問 %{count} 件"
 
-#: lib/ask_drive_web/live/chat_live.ex:1091
+#: lib/ask_drive_web/live/chat_live.ex:1217
 #, elixir-autogen, elixir-format
 msgid "Ask a follow-up"
 msgstr "追加で質問"
 
-#: lib/ask_drive_web/live/chat_live.ex:1114
+#: lib/ask_drive_web/live/chat_live.ex:1238
 #, elixir-autogen, elixir-format
 msgid "Ask a follow-up about this answer"
 msgstr "この回答に追加で質問"
 
-#: lib/ask_drive_web/live/chat_live.ex:1171
+#: lib/ask_drive_web/live/chat_live.ex:1151
 #, elixir-autogen, elixir-format
 msgid "Ask a new question about Google Drive documents..."
 msgstr "Google Drive の文書について、新しい質問を入力してください..."
 
-#: lib/ask_drive_web/live/chat_live.ex:1081
+#: lib/ask_drive_web/live/chat_live.ex:1207
 #, elixir-autogen, elixir-format
 msgid "Ask more about this answer..."
 msgstr "この回答について、追加で質問してください..."
 
-#: lib/ask_drive_web/live/chat_live.ex:1101
+#: lib/ask_drive_web/live/chat_live.ex:1225
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr "キャンセル"
@@ -720,12 +720,17 @@ msgstr "この質問と追加の質問を、履歴から削除しますか？"
 msgid "Follow-up"
 msgstr "追加の質問"
 
-#: lib/ask_drive_web/live/chat_live.ex:1194
+#: lib/ask_drive_web/live/chat_live.ex:1174
 #, elixir-autogen, elixir-format
 msgid "New question"
 msgstr "新しい質問"
 
-#: lib/ask_drive_web/live/chat_live.ex:1154
+#: lib/ask_drive_web/live/chat_live.ex:1134
 #, elixir-autogen, elixir-format
 msgid "This starts a new question, unrelated to the ones above. To ask more about an answer, use \"Ask a follow-up about this answer\" under it."
 msgstr "ここからは、上とは別の新しい質問になります。回答についてさらに聞くときは、その回答の下の「この回答に追加で質問」を使ってください。"
+
+#: lib/ask_drive_web/live/chat_live.ex:1045
+#, elixir-autogen, elixir-format
+msgid "Click to show or hide the whole excerpt"
+msgstr "クリックで抜粋の全体を表示・折りたたみ"

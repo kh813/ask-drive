@@ -26,7 +26,7 @@ msgstr ""
 msgid "(%{minutes} min remaining)"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:973
+#: lib/ask_drive_web/live/chat_live.ex:983
 #, elixir-autogen, elixir-format
 msgid "(Excerpts with search terms highlighted):"
 msgstr ""
@@ -92,7 +92,7 @@ msgid "An administrator needs to configure Google Secure LDAP or Google Login (O
 msgstr ""
 
 #: lib/ask_drive_web/live/chat_live.ex:764
-#: lib/ask_drive_web/live/chat_live.ex:1219
+#: lib/ask_drive_web/live/chat_live.ex:1262
 #, elixir-autogen, elixir-format
 msgid "Answer"
 msgstr ""
@@ -154,7 +154,7 @@ msgid "Desk list"
 msgstr ""
 
 #: lib/ask_drive_web/live/chat_live.ex:879
-#: lib/ask_drive_web/live/chat_live.ex:990
+#: lib/ask_drive_web/live/chat_live.ex:1000
 #, elixir-autogen, elixir-format
 msgid "Document"
 msgstr ""
@@ -279,12 +279,12 @@ msgstr ""
 
 #: lib/ask_drive_web/live/chat_live.ex:797
 #: lib/ask_drive_web/live/chat_live.ex:887
-#: lib/ask_drive_web/live/chat_live.ex:1011
+#: lib/ask_drive_web/live/chat_live.ex:1021
 #, elixir-autogen, elixir-format
 msgid "Open in Drive"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1010
+#: lib/ask_drive_web/live/chat_live.ex:1020
 #, elixir-autogen, elixir-format
 msgid "Open in Drive (p.%{page})"
 msgstr ""
@@ -332,7 +332,7 @@ msgid "Release"
 msgstr ""
 
 #: lib/ask_drive_web/live/chat_live.ex:753
-#: lib/ask_drive_web/live/chat_live.ex:973
+#: lib/ask_drive_web/live/chat_live.ex:983
 #, elixir-autogen, elixir-format
 msgid "Relevant excerpts"
 msgstr ""
@@ -347,7 +347,7 @@ msgstr ""
 msgid "Return to Chat"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1059
+#: lib/ask_drive_web/live/chat_live.ex:1096
 #, elixir-autogen, elixir-format
 msgid "Searching for answers…"
 msgstr ""
@@ -362,7 +362,7 @@ msgstr ""
 msgid "Show AI thinking process (%{count} chars)"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1033
+#: lib/ask_drive_web/live/chat_live.ex:1058
 #, elixir-autogen, elixir-format
 msgid "Show full text"
 msgstr ""
@@ -393,7 +393,7 @@ msgstr ""
 msgid "Something went wrong!"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:972
+#: lib/ask_drive_web/live/chat_live.ex:982
 #, elixir-autogen, elixir-format
 msgid "Sources"
 msgstr ""
@@ -545,12 +545,12 @@ msgstr ""
 msgid "(Stopped)"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1185
+#: lib/ask_drive_web/live/chat_live.ex:1165
 #, elixir-autogen, elixir-format
 msgid "Stop"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1181
+#: lib/ask_drive_web/live/chat_live.ex:1161
 #, elixir-autogen, elixir-format
 msgid "Stop answering"
 msgstr ""
@@ -570,7 +570,7 @@ msgstr ""
 msgid "Delete"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1218
+#: lib/ask_drive_web/live/chat_live.ex:1261
 #, elixir-autogen, elixir-format
 msgid "Excerpts"
 msgstr ""
@@ -610,7 +610,7 @@ msgstr ""
 msgid "The documents have been updated since, so the excerpts can't be shown. Sources at the time:"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1217
+#: lib/ask_drive_web/live/chat_live.ex:1260
 #, elixir-autogen, elixir-format
 msgid "Unanswered"
 msgstr ""
@@ -690,27 +690,27 @@ msgstr ""
 msgid "%{count} follow-ups"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1091
+#: lib/ask_drive_web/live/chat_live.ex:1217
 #, elixir-autogen, elixir-format
 msgid "Ask a follow-up"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1114
+#: lib/ask_drive_web/live/chat_live.ex:1238
 #, elixir-autogen, elixir-format
 msgid "Ask a follow-up about this answer"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1171
+#: lib/ask_drive_web/live/chat_live.ex:1151
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Ask a new question about Google Drive documents..."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1081
+#: lib/ask_drive_web/live/chat_live.ex:1207
 #, elixir-autogen, elixir-format
 msgid "Ask more about this answer..."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1101
+#: lib/ask_drive_web/live/chat_live.ex:1225
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr ""
@@ -725,12 +725,17 @@ msgstr ""
 msgid "Follow-up"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1194
+#: lib/ask_drive_web/live/chat_live.ex:1174
 #, elixir-autogen, elixir-format
 msgid "New question"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1154
+#: lib/ask_drive_web/live/chat_live.ex:1134
 #, elixir-autogen, elixir-format
 msgid "This starts a new question, unrelated to the ones above. To ask more about an answer, use \"Ask a follow-up about this answer\" under it."
+msgstr ""
+
+#: lib/ask_drive_web/live/chat_live.ex:1045
+#, elixir-autogen, elixir-format
+msgid "Click to show or hide the whole excerpt"
 msgstr ""
