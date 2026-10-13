@@ -61,6 +61,38 @@ defmodule AskDrive.ChatSummaryTest do
     refute prompt =~ "必ず日本語"
   end
 
+  test "every answer style (F-432) keeps the grounding rules, in both languages", %{chunk: chunk} do
+    for style <- Settings.Setting.chat_answer_styles() do
+      ja = ChatSummary.build_prompt("USBメモリの利用ルールは？", [chunk], nil, [], style)
+      assert ja =~ "必ず日本語で答えてください"
+      assert ja =~ "抜粋に書かれている内容だけを使ってください"
+      assert ja =~ "[1] のように付けてください"
+      assert ja =~ "資料からは確認できませんでした"
+      refute ja =~ "__CHARS__"
+
+      en = ChatSummary.build_prompt("What are the rules for USB drives?", [chunk], nil, [], style)
+      assert en =~ "Use only what the excerpts say"
+      assert en =~ "like [1]"
+      assert en =~ "The documents don't cover this"
+      refute en =~ "__WORDS__"
+    end
+
+    assert ChatSummary.build_prompt("USBは？", [chunk], nil, [], "detailed") =~ "800字以内"
+  end
+
+  test "the answer style defaults to concise and only takes known styles" do
+    setting = Settings.get_setting!()
+    assert setting.chat_answer_style == "concise"
+    assert ChatSummary.style(setting) == "concise"
+    assert ChatSummary.style(%{chat_answer_style: nil}) == "concise"
+
+    assert {:error, cs} = Settings.update_setting(setting, %{chat_answer_style: "poetic"})
+    assert cs.errors[:chat_answer_style]
+
+    assert {:ok, updated} = Settings.update_setting(setting, %{chat_answer_style: "plain"})
+    assert ChatSummary.style(updated) == "plain"
+  end
+
   test "chat can use its own provider/model while the batch stays local" do
     setting = Settings.get_setting!()
     assert ChatSummary.provider_and_model(setting) == {"ollama", setting.batch_model}

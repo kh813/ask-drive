@@ -16,22 +16,125 @@ defmodule AskDrive.ChatSummary do
   @max_excerpt_chars 1_200
   @timeout 120_000
 
-  # Answers were far too long for a chat reply. The prompt asks for a budget and max_tokens
-  # (Ollama: num_predict) enforces a hard stop a little above it.
-  @ja_chars 250
-  @en_words 150
-  @max_tokens 450
-  # What is shown is cut at this many characters whatever the model does (and generation is
-  # stopped there), so a model that ignores the budget still can't flood the chat.
-  @ja_display_cap 300
-  @en_display_cap 1_200
   # A reasoning model's hidden thinking isn't shown, but it mustn't run forever either.
   @raw_cap 8_000
 
-  @system_prompt """
-  あなたは社内文書の検索アシスタントです。与えられた「抜粋」だけを根拠に、質問と同じ言語で、短く簡潔に答えます。
-  抜粋に書かれていないことは推測で補わず、一般論も前置きも付け加えません。
-  """
+  # Answer styles (spec F-432), picked in the admin settings (`chat_answer_style`). Each sets
+  # the tone and the length: the prompt asks for a budget (ja_chars / en_words), max_tokens
+  # (Ollama: num_predict) enforces a hard stop a little above it, and what is shown is cut at
+  # ja_cap / en_cap characters whatever the model does (generation is stopped there), so a
+  # model that ignores the budget still can't flood the chat. "concise" keeps the POC's short
+  # answers, which small local models follow best; the others suit a cloud model (Gemini, …).
+  # Whatever the style, the answer rests only on the excerpts, cites them as [n] and says so
+  # when they don't answer the question (F-416): those rules are in every prompt.
+  @styles %{
+    "concise" => %{
+      label: "簡潔（一般論・前置きなし）",
+      description: "250字以内で要点だけを答えます（3点以内の箇条書き）。小さなローカルモデル向け。",
+      ja_chars: 250,
+      en_words: 150,
+      max_tokens: 450,
+      ja_cap: 300,
+      en_cap: 1_200,
+      system: """
+      あなたは社内文書の検索アシスタントです。与えられた「抜粋」だけを根拠に、質問と同じ言語で、短く簡潔に答えます。
+      抜粋に書かれていないことは推測で補わず、一般論も前置きも付け加えません。
+      """,
+      ja_rules: """
+      - __CHARS__字以内で答えてください。要点が複数あれば3点以内の箇条書きにしてください。前置き・まとめ・繰り返しは不要です。
+      """,
+      en_rules: """
+      - Keep it under __WORDS__ words; use at most 3 bullet points if there are several points. No preamble or recap.
+      """
+    },
+    "conversational" => %{
+      label: "対話調（同僚に丁寧に説明）",
+      description: "同僚に話すような丁寧で自然な口調で、結論 → 要点の箇条書き → 一言の補足の順に答えます（500字以内）。",
+      ja_chars: 500,
+      en_words: 300,
+      max_tokens: 900,
+      ja_cap: 600,
+      en_cap: 2_400,
+      system: """
+      あなたは社内文書の検索アシスタントです。社内の同僚に説明するように、丁寧で自然な口調で答えます。
+      与えられた「抜粋」だけを根拠に、質問と同じ言語で答え、抜粋に書かれていないことは推測や一般論で補いません。
+      """,
+      ja_rules: """
+      - 同僚に話しかけるように、丁寧で自然な口調（です・ます調）で、__CHARS__字以内で答えてください。
+      - 最初の1〜2文で質問に答え、要点が複数あれば5点以内の箇条書きで示してください。抜粋に注意点や問い合わせ先があれば、最後に一言添えてください。
+      - 挨拶や、質問の言い直しは不要です。
+      """,
+      en_rules: """
+      - Answer in a polite, natural tone, as if explaining to a colleague, in under __WORDS__ words.
+      - Answer the question in the first sentence or two, then list the key points (at most 5 bullets) if there are several. If the excerpts mention caveats or whom to contact, add a short closing note.
+      - No greetings, and don't restate the question.
+      """
+    },
+    "detailed" => %{
+      label: "詳しく（条件・手順・例外まで）",
+      description: "結論のあと、抜粋にある手順・条件・例外・期限を番号付きリストや箇条書きで整理して答えます（800字以内）。",
+      ja_chars: 800,
+      en_words: 450,
+      max_tokens: 1_400,
+      ja_cap: 1_000,
+      en_cap: 3_600,
+      system: """
+      あなたは社内文書の検索アシスタントです。与えられた「抜粋」だけを根拠に、質問と同じ言語で、丁寧に漏れなく整理して答えます。
+      抜粋に書かれていないことは推測や一般論で補いません。
+      """,
+      ja_rules: """
+      - __CHARS__字以内で、です・ます調で答えてください。
+      - 最初に結論を1文で述べ、続けて抜粋にある手順は番号付きリスト、条件・例外・期限・注意点は箇条書きで整理してください。
+      - 抜粋同士で内容が食い違う場合は、両方を示し、食い違っていることを書いてください。
+      """,
+      en_rules: """
+      - Keep it under __WORDS__ words.
+      - State the conclusion in one sentence first, then lay out the steps from the excerpts as a numbered list and the conditions, exceptions, deadlines and caveats as bullet points.
+      - If the excerpts disagree, give both and say that they disagree.
+      """
+    },
+    "plain" => %{
+      label: "やさしく（新しいメンバー向け）",
+      description: "専門用語や略語をかみ砕き、配属されたばかりの人にも分かる言葉で答えます（500字以内）。",
+      ja_chars: 500,
+      en_words: 300,
+      max_tokens: 900,
+      ja_cap: 600,
+      en_cap: 2_400,
+      system: """
+      あなたは社内文書の検索アシスタントです。社内に来たばかりの人にも分かるように、やさしい言葉で丁寧に答えます。
+      与えられた「抜粋」だけを根拠に、質問と同じ言語で答え、抜粋に書かれていないことは推測や一般論で補いません。
+      """,
+      ja_rules: """
+      - 配属されたばかりの人にも分かるように、やさしい言葉（です・ます調）で、__CHARS__字以内で答えてください。
+      - 専門用語や略語は、抜粋にある説明を使って言い換えてください。抜粋に説明が無い用語の意味は付け加えないでください。
+      - 最初に結論を1文で述べ、要点が複数あれば5点以内の箇条書きにしてください。
+      """,
+      en_rules: """
+      - Use plain, simple words that someone new to the company would understand, in under __WORDS__ words.
+      - Explain jargon and abbreviations using what the excerpts say about them; don't add meanings the excerpts don't give.
+      - State the conclusion in one sentence first, then list the key points (at most 5 bullets) if there are several.
+      """
+    }
+  }
+  @style_order ~w(concise conversational detailed plain)
+  @default_style "concise"
+
+  @doc "The answer styles as `{label, value}` pairs for a select, in display order (F-432)."
+  def style_options, do: Enum.map(@style_order, &{@styles[&1].label, &1})
+
+  @doc "A one-line explanation of an answer style, for the admin settings."
+  def style_description(style), do: style_config(style).description
+
+  @doc "The answer style the settings pick; an unknown or missing one falls back to concise."
+  def style(setting) do
+    case Map.get(setting, :chat_answer_style) do
+      style when is_map_key(@styles, style) -> style
+      _ -> @default_style
+    end
+  end
+
+  defp style_config(style), do: Map.get(@styles, style, @styles[@default_style])
 
   @doc "Whether chat summaries are switched on in the settings."
   def enabled?(setting \\ Settings.get_setting!()),
@@ -55,8 +158,10 @@ defmodule AskDrive.ChatSummary do
     setting = Settings.get_setting!()
     {provider, model} = provider_and_model(setting)
     model = available_model(provider, model, setting)
+    style = style(setting)
+    config = style_config(style)
     ja? = japanese?(question)
-    cap = if ja?, do: @ja_display_cap, else: @en_display_cap
+    cap = if ja?, do: config.ja_cap, else: config.en_cap
     thinks? = reasoning_model?(model)
 
     reset_state()
@@ -68,9 +173,9 @@ defmodule AskDrive.ChatSummary do
       [
         setting: setting,
         provider: provider,
-        system: @system_prompt,
+        system: config.system,
         timeout: @timeout,
-        max_tokens: if(thinks?, do: nil, else: @max_tokens),
+        max_tokens: if(thinks?, do: nil, else: config.max_tokens),
         temperature: 0.2,
         think: thinks?,
         on_thinking: fn thought ->
@@ -96,7 +201,12 @@ defmodule AskDrive.ChatSummary do
     end
 
     result =
-      LLM.generate_stream(model, build_prompt(question, chunks, model, context), opts, filtered)
+      LLM.generate_stream(
+        model,
+        build_prompt(question, chunks, model, context, style),
+        opts,
+        filtered
+      )
 
     with {:ok, _} <- result do
       raw = Process.get({__MODULE__, :raw}, "")
@@ -117,7 +227,16 @@ defmodule AskDrive.ChatSummary do
 
       if ambiguous? or wrong_language? do
         notes = if ambiguous?, do: raw, else: Enum.join([thinking, answer], "\n")
-        finalize(question, chunks, notes, provider, model, setting, cap, on_event, context)
+
+        finalize(question, chunks, notes, %{
+          provider: provider,
+          model: model,
+          setting: setting,
+          style: style,
+          cap: cap,
+          on_event: on_event,
+          context: context
+        })
       else
         emit(:answer, String.slice(answer, 0, cap), on_event)
         {:ok, %{text: cap_text(answer, cap, on_event), thinking: thinking}}
@@ -127,22 +246,24 @@ defmodule AskDrive.ChatSummary do
 
   # Second pass: the first output (thinking and/or a wrong-language answer) becomes notes, and
   # the model is asked for the conclusion only, in the question's language, within budget.
-  defp finalize(question, chunks, notes, provider, model, setting, cap, on_event, context) do
+  defp finalize(question, chunks, notes, run) do
+    %{model: model, style: style, cap: cap, on_event: on_event} = run
+    config = style_config(style)
     on_event.(:answer_reset)
     Process.put({__MODULE__, :raw}, "")
     Process.put({__MODULE__, :sent}, %{answer: 0, thinking: 0})
 
     opts = [
-      setting: setting,
-      provider: provider,
-      system: @system_prompt,
+      setting: run.setting,
+      provider: run.provider,
+      system: config.system,
       timeout: @timeout,
-      max_tokens: @max_tokens,
+      max_tokens: config.max_tokens,
       temperature: 0.2,
       think: false
     ]
 
-    prompt = finalize_prompt(question, chunks, notes, model, context)
+    prompt = finalize_prompt(question, chunks, notes, model, run.context, style)
 
     stream = fn piece ->
       raw = Process.get({__MODULE__, :raw}) <> piece
@@ -185,8 +306,15 @@ defmodule AskDrive.ChatSummary do
   defp available_model(_provider, model, _setting), do: model
 
   @doc "The prompt for the second pass: excerpts, the first attempt as notes, the rules."
-  def finalize_prompt(question, chunks, notes, model \\ nil, context \\ []) do
-    base = build_prompt(question, chunks, nil, context)
+  def finalize_prompt(
+        question,
+        chunks,
+        notes,
+        model \\ nil,
+        context \\ [],
+        style \\ @default_style
+      ) do
+    base = build_prompt(question, chunks, nil, context, style)
     notes = (notes || "") |> String.trim() |> String.slice(-3_000, 3_000)
 
     intro =
@@ -315,7 +443,7 @@ defmodule AskDrive.ChatSummary do
   end
 
   @doc "The prompt: the question, numbered excerpts with their source, and the rules."
-  def build_prompt(question, chunks, model \\ nil, context \\ []) do
+  def build_prompt(question, chunks, model \\ nil, context \\ [], style \\ @default_style) do
     excerpts =
       chunks
       |> Enum.with_index(1)
@@ -326,8 +454,8 @@ defmodule AskDrive.ChatSummary do
 
     prompt =
       if japanese?(question),
-        do: ja_context(context) <> ja_prompt(question, excerpts),
-        else: en_context(context) <> en_prompt(question, excerpts)
+        do: ja_context(context) <> ja_prompt(question, excerpts, style_config(style)),
+        else: en_context(context) <> en_prompt(question, excerpts, style_config(style))
 
     # qwen3's own switch for "answer directly, no reasoning" (Ollama's think:false alone did
     # not stop it on the POC machine: the chat showed pages of English reasoning)
@@ -374,7 +502,7 @@ defmodule AskDrive.ChatSummary do
     "The conversation so far (the next question continues it; words like \"it\" refer to it):\n#{turns}\n\n"
   end
 
-  defp ja_prompt(question, excerpts) do
+  defp ja_prompt(question, excerpts, config) do
     """
     質問: #{question}
 
@@ -383,14 +511,14 @@ defmodule AskDrive.ChatSummary do
 
     指示:
     - 必ず日本語で答えてください。
-    - #{@ja_chars}字以内で答えてください。要点が複数あれば3点以内の箇条書きにしてください。前置き・まとめ・繰り返しは不要です。
+    #{style_rules(config.ja_rules, "__CHARS__", config.ja_chars)}
     - 抜粋に書かれている内容だけを使ってください。
     - 根拠にした抜粋の番号を、該当する文の末尾に [1] のように付けてください。
     - 抜粋から答えられない場合は「資料からは確認できませんでした。」とだけ答えてください。
     """
   end
 
-  defp en_prompt(question, excerpts) do
+  defp en_prompt(question, excerpts, config) do
     """
     Question: #{question}
 
@@ -399,12 +527,16 @@ defmodule AskDrive.ChatSummary do
 
     Instructions:
     - Answer in the same language as the question.
-    - Keep it under #{@en_words} words; use at most 3 bullet points if there are several points. No preamble or recap.
+    #{style_rules(config.en_rules, "__WORDS__", config.en_words)}
     - Use only what the excerpts say.
     - Cite the excerpt(s) you rely on at the end of the sentence, like [1].
     - If the excerpts don't answer the question, reply only: "The documents don't cover this."
     """
   end
+
+  # the style's own lines of the instructions, with its length budget filled in
+  defp style_rules(rules, placeholder, budget),
+    do: rules |> String.replace(placeholder, to_string(budget)) |> String.trim_trailing()
 
   @doc "Whether the question is written in Japanese (contains kana or kanji)."
   def japanese?(text) when is_binary(text),

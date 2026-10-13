@@ -8,6 +8,8 @@ defmodule AskDrive.Settings.Setting do
   @generation_providers ~w(ollama lmstudio gemini anthropic openai)
   @embedding_providers ~w(ollama lmstudio gemini openai)
   @drive_auth_modes ~w(oauth service_account)
+  # how the chat summary answers (spec F-432); prompts and length budgets: AskDrive.ChatSummary
+  @chat_answer_styles ~w(concise conversational detailed plain)
 
   @api_key_fields [:openai_api_key, :anthropic_api_key, :gemini_api_key]
   @base_url_fields [
@@ -43,6 +45,7 @@ defmodule AskDrive.Settings.Setting do
     # nil = same as llm_provider / batch_model (spec F-415)
     field :chat_summary_provider, :string
     field :chat_summary_model, :string
+    field :chat_answer_style, :string, default: "concise"
     field :allowed_domain, :string
     # first-access web setup (spec 6.12); set by AskDrive.Setup, not cast from forms
     field :setup_completed_at, :utc_datetime
@@ -152,6 +155,8 @@ defmodule AskDrive.Settings.Setting do
   """
   def drive_auth_modes, do: @drive_auth_modes
 
+  def chat_answer_styles, do: @chat_answer_styles
+
   @doc """
   Sign-in with LDAP (spec 6.13). Validates the client certificate and key as a pair whenever
   either changes, and requires them (and a base DN, explicit or from the domain) to enable.
@@ -235,6 +240,7 @@ defmodule AskDrive.Settings.Setting do
         :cloud_llm_model,
         :chat_summary_provider,
         :chat_summary_model,
+        :chat_answer_style,
         :allowed_domain,
         :maintenance_mode,
         :auto_batch_enabled,
@@ -262,7 +268,8 @@ defmodule AskDrive.Settings.Setting do
       :similarity_threshold,
       :llm_provider,
       :embed_provider,
-      :embedding_dim
+      :embedding_dim,
+      :chat_answer_style
     ])
     |> validate_number(:batch_start_hour, greater_than_or_equal_to: 0, less_than_or_equal_to: 23)
     |> validate_number(:batch_end_hour, greater_than_or_equal_to: 0, less_than_or_equal_to: 23)
@@ -296,6 +303,7 @@ defmodule AskDrive.Settings.Setting do
     |> validate_inclusion(:drive_auth_mode, @drive_auth_modes, message: "は対応していない認証方式です")
     |> validate_base_urls()
     |> validate_chat_summary_provider()
+    |> validate_inclusion(:chat_answer_style, @chat_answer_styles, message: "は対応していない回答スタイルです")
     |> update_change(:allowed_domain, &normalize_domain/1)
     |> validate_format(
       :allowed_domain,

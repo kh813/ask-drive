@@ -23,7 +23,7 @@ defmodule AskDriveWeb.AdminLive do
   alias AskDrive.Drive.{Client, ServiceAccount}
   alias AskDrive.LLM
   alias AskDrive.QA.QAPair
-  alias AskDrive.{Accounts, Documents, HealthCheck, QA, Repo, Settings, Vector}
+  alias AskDrive.{Accounts, ChatSummary, Documents, HealthCheck, QA, Repo, Settings, Vector}
   alias AskDrive.Runtime.Mode
 
   @impl true
@@ -4753,6 +4753,36 @@ defmodule AskDriveWeb.AdminLive do
                     <p class="text-[11px] text-zinc-500 leading-relaxed sm:pt-6">
                       夜間バッチ（QA 生成）は上の回答生成プロバイダ、チャットの要約はこちらを使います。クラウドを選ぶと、質問と検索された抜粋が API 提供元に送信されます。
                     </p>
+                  </div>
+
+                  <%!-- How the chat summary answers (spec F-432). Every style keeps the
+                        grounding rules: excerpts only, [n] citations, "not found" answer. --%>
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <.input
+                      field={@form[:chat_answer_style]}
+                      type="select"
+                      label="チャット要約の回答スタイル"
+                      options={ChatSummary.style_options()}
+                    />
+                    <div class="sm:col-span-2 sm:pt-6 space-y-1">
+                      <ul id="chat-answer-styles" class="space-y-0.5">
+                        <li
+                          :for={{label, style} <- ChatSummary.style_options()}
+                          class={[
+                            "text-[11px] leading-relaxed transition-colors",
+                            if(to_string(@form[:chat_answer_style].value) == style,
+                              do: "text-zinc-800 font-medium",
+                              else: "text-zinc-500"
+                            )
+                          ]}
+                        >
+                          {label}: {ChatSummary.style_description(style)}
+                        </li>
+                      </ul>
+                      <p class="text-[11px] text-zinc-500 leading-relaxed">
+                        どのスタイルでも、抜粋だけを根拠にし、引用元の番号 [1] を付け、抜粋から答えられないときは「資料からは確認できませんでした。」と答えます。小さなローカルモデルでは「簡潔」以外の指示（口調・字数）が守られにくいため、クラウド API（Gemini 等）での利用をおすすめします。
+                      </p>
+                    </div>
                   </div>
 
                   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
