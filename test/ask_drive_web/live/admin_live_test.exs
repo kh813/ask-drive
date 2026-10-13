@@ -83,23 +83,26 @@ defmodule AskDriveWeb.AdminLiveTest do
       # no shared app password any more (F-1113): the old card is gone
       refute has_element?(view, "#app-admin-password-form")
 
+      # nothing to switch on before a password is saved
+      html = view |> element("#toggle-access-password") |> render_click()
+      assert html =~ "先にパスワードを保存してください"
+
       html =
         view
         |> form("#access-password-form", %{
-          "access_password" => %{
-            "enabled" => "true",
-            "password" => "aikotoba123",
-            "confirmation" => "aikotoba123"
-          }
+          "access_password" => %{"password" => "aikotoba123", "confirmation" => "aikotoba123"}
         })
         |> render_submit()
 
-      assert html =~ "窓口アクセスパスワードを設定しました。"
-      assert html =~ "利用制限: 有効"
+      # saving the password doesn't switch the restriction on (F-206)
+      assert html =~ "窓口アクセスパスワードを保存しました。"
+      assert has_element?(view, "#toggle-access-password[aria-checked=false]")
 
-      html = view |> element("#disable-access-password-btn") |> render_click()
-      assert html =~ "窓口アクセスパスワードを無効化しました。"
-      assert html =~ "利用制限: 無効"
+      view |> element("#toggle-access-password") |> render_click()
+      assert has_element?(view, "#toggle-access-password[aria-checked=true]")
+
+      view |> element("#toggle-access-password") |> render_click()
+      assert has_element?(view, "#toggle-access-password[aria-checked=false]")
     end
 
     test "the platform's app list shows each app's administrators, or that there are none", %{

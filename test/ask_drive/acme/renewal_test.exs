@@ -41,7 +41,6 @@ defmodule AskDrive.ACME.RenewalTest do
         Settings.get_setting!(),
         Map.merge(
           %{
-            "acme_enabled" => "true",
             "acme_hostname" => @host,
             "acme_dns_zone" => "example.com",
             "valuedomain_api_key" => "vd-key"
@@ -50,6 +49,7 @@ defmodule AskDrive.ACME.RenewalTest do
         )
       )
 
+    {:ok, setting} = Settings.set_acme_enabled(setting, true)
     setting
   end
 
@@ -94,6 +94,22 @@ defmodule AskDrive.ACME.RenewalTest do
     setting = Settings.get_setting!()
     refute setting.acme_last_ok
     assert setting.acme_last_result =~ "TXT レコードを確認できませんでした"
+  end
+
+  test "a run by hand needs the values saved, not automatic renewal switched on" do
+    {:ok, _} =
+      Settings.update_acme(Settings.get_setting!(), %{
+        "acme_hostname" => @host,
+        "acme_dns_zone" => "example.com",
+        "valuedomain_api_key" => "vd-key"
+      })
+
+    setting = Settings.get_setting!()
+    refute setting.acme_enabled
+    assert Renewal.ready?(setting)
+    refute Renewal.configured?(setting)
+    run_and_wait()
+    assert SSL.current()["source"] == "letsencrypt"
   end
 
   test "a run needs the settings, and only one runs at a time" do
@@ -157,8 +173,7 @@ defmodule AskDrive.ACME.RenewalTest do
 
   describe "settings" do
     test "turning it on needs the host, its zone and the API key" do
-      assert {:error, cs} =
-               Settings.update_acme(Settings.get_setting!(), %{"acme_enabled" => "true"})
+      assert {:error, cs} = Settings.set_acme_enabled(Settings.get_setting!(), true)
 
       assert cs.errors[:acme_hostname]
       assert cs.errors[:acme_dns_zone]

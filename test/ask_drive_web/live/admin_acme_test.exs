@@ -41,10 +41,13 @@ defmodule AskDriveWeb.AdminAcmeTest do
     assert has_element?(view, "#run-acme-btn[disabled]")
     assert has_element?(view, "#test-acme-dns-btn[disabled]")
 
+    # automatic renewal can't be switched on before the values are saved
+    view |> element("#toggle-acme") |> render_click()
+    refute Settings.get_setting!().acme_enabled
+
     view
     |> form("#acme-form", %{
       "acme" => %{
-        "acme_enabled" => "true",
         "acme_hostname" => "ask.example.com",
         "acme_dns_zone" => "example.com",
         "valuedomain_api_key" => "secret-vd-key",
@@ -54,12 +57,16 @@ defmodule AskDriveWeb.AdminAcmeTest do
     |> render_submit()
 
     setting = Settings.get_setting!()
-    assert setting.acme_enabled
+    # saving doesn't switch automatic renewal on (F-206), but a run by hand is possible
+    refute setting.acme_enabled
     assert setting.acme_staging
     assert setting.valuedomain_api_key == "secret-vd-key"
 
     refute render(view) =~ "secret-vd-key"
     refute has_element?(view, "#run-acme-btn[disabled]")
+
+    view |> element("#toggle-acme") |> render_click()
+    assert Settings.get_setting!().acme_enabled
 
     # the DNS test reads the zone and changes nothing
     view |> element("#test-acme-dns-btn") |> render_click()
@@ -75,7 +82,6 @@ defmodule AskDriveWeb.AdminAcmeTest do
       view
       |> form("#acme-form", %{
         "acme" => %{
-          "acme_enabled" => "true",
           "acme_hostname" => "ask.other.org",
           "acme_dns_zone" => "example.com",
           "valuedomain_api_key" => "k"
@@ -84,6 +90,6 @@ defmodule AskDriveWeb.AdminAcmeTest do
       |> render_submit()
 
     assert html =~ "サブドメインにしてください"
-    refute Settings.get_setting!().acme_enabled
+    refute Settings.get_setting!().acme_hostname
   end
 end

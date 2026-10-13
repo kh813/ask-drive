@@ -40,12 +40,18 @@ defmodule AskDrive.ACME.Renewal do
 
   # --- When a certificate is needed ---------------------------------------------------------
 
-  @doc "Whether the settings are complete enough for a run (and HTTPS is on)."
-  def configured?(setting) do
-    setting != nil and setting.acme_enabled and SSL.enabled?() and
-      present?(setting.acme_hostname) and present?(setting.acme_dns_zone) and
-      present?(setting.valuedomain_api_key)
+  @doc """
+  Whether the saved values are complete enough for a run (and HTTPS is on). A run by hand
+  (「今すぐ取得」) needs only this, so a staging certificate can be tried before automatic
+  renewal is switched on.
+  """
+  def ready?(setting) do
+    setting != nil and SSL.enabled?() and present?(setting.acme_hostname) and
+      present?(setting.acme_dns_zone) and present?(setting.valuedomain_api_key)
   end
+
+  @doc "Whether automatic renewal is on and can run (F-206)."
+  def configured?(setting), do: ready?(setting) and setting.acme_enabled == true
 
   @doc """
   Whether the served certificate (`SSL.current/0`'s metadata) should be replaced by a new
@@ -117,7 +123,7 @@ defmodule AskDrive.ACME.Renewal do
   def handle_call({:run, by}, _from, state) do
     setting = Settings.platform_setting()
 
-    if configured?(setting) do
+    if ready?(setting) do
       Settings.record_acme_result(%{acme_checked_at: DateTime.utc_now(:second)})
       server = self()
       log = fn line -> send(server, {:log, line}) end

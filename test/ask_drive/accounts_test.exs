@@ -92,10 +92,17 @@ defmodule AskDrive.AccountsTest do
     setting = Settings.get_setting!()
     assert AdminAccess.verify_access_password("any_candidate", setting) == true
 
-    # Set access password
-    {:ok, updated} = AdminAccess.set_access_password(setting, "secret12345")
+    # nothing to switch on without a password
+    assert {:error, :no_password} = AdminAccess.enable_access_password(setting)
+
+    # Set access password: saved, not yet on (F-206)
+    {:ok, saved} = AdminAccess.set_access_password(setting, "secret12345")
+    refute saved.access_password_enabled
+    assert is_binary(saved.access_password_hash)
+    assert AdminAccess.verify_access_password("wrongpassword", saved) == true
+
+    {:ok, updated} = AdminAccess.enable_access_password(saved)
     assert updated.access_password_enabled == true
-    assert is_binary(updated.access_password_hash)
 
     assert AdminAccess.verify_access_password("secret12345", updated) == true
     assert AdminAccess.verify_access_password("wrongpassword", updated) == false

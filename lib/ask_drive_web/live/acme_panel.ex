@@ -19,6 +19,7 @@ defmodule AskDriveWeb.AcmePanel do
       assigns
       |> assign(:running?, match?(%{running?: true}, assigns.status))
       |> assign(:configured?, Renewal.configured?(assigns.setting))
+      |> assign(:ready?, Renewal.ready?(assigns.setting))
       |> assign(:renew_after, Renewal.renew_after())
 
     ~H"""
@@ -48,7 +49,7 @@ defmodule AskDriveWeb.AcmePanel do
               @running? -> "取得中…"
               @configured? -> "有効"
               @setting.acme_enabled -> "設定が足りません"
-              true -> "無効"
+              true -> "自動更新は無効"
             end}
           </span>
         </div>
@@ -90,12 +91,15 @@ defmodule AskDriveWeb.AcmePanel do
         <p :for={line <- Enum.reverse(@status.log)} class="whitespace-pre-wrap break-all">{line}</p>
       </div>
 
+      <AskDriveWeb.FeatureToggle.toggle
+        id="toggle-acme"
+        feature="acme"
+        on={@setting.acme_enabled == true}
+        label="夜間の自動更新"
+        hint="ホスト名・ドメイン・API キーを保存してから有効にできます。「今すぐ取得」は無効のままでも使えます（先に staging で試せます）"
+      />
+
       <.form for={@form} id="acme-form" phx-submit="save_acme" class="space-y-3">
-        <.input
-          field={@form[:acme_enabled]}
-          type="checkbox"
-          label="Let's Encrypt の証明書を自動で取得・更新する"
-        />
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <.input
             field={@form[:acme_hostname]}
@@ -129,7 +133,7 @@ defmodule AskDriveWeb.AcmePanel do
           label="テスト用（staging）の証明書を取得する（ブラウザでは警告が出ます。設定の確認用）"
         />
         <p class="text-[11px] text-zinc-500 leading-relaxed">
-          API キーはバリュードメインの「API」設定で発行し、暗号化して保存します。バリュードメインの DNS API はドメインのレコードをまとめて書き換える方式のため、変更の前に毎回レコード全体をサーバーの
+          「保存」は値を保存するだけで、自動更新の有効・無効は上のスイッチで切り替えます。API キーはバリュードメインの「API」設定で発行し、暗号化して保存します。バリュードメインの DNS API はドメインのレコードをまとめて書き換える方式のため、変更の前に毎回レコード全体をサーバーの
           <code class="font-mono">ssl/acme/dns_backup/</code>
           に保存し、変更後に読み直して TXT レコード以外が変わっていないことを確かめます。初めて使うときは「テスト用」で取得できることを確かめてから、本番の証明書に切り替えてください（本番には失敗回数の制限があります）。
         </p>
@@ -156,7 +160,7 @@ defmodule AskDriveWeb.AcmePanel do
             type="button"
             id="run-acme-btn"
             phx-click="run_acme"
-            disabled={not @configured? or @running?}
+            disabled={not @ready? or @running?}
             data-confirm="Let's Encrypt から証明書を取得し、HTTPS を再起動して適用します。DNS に一時的な TXT レコードを追加し、確認後に削除します。続行しますか？"
             class="px-4 py-2 rounded-lg border border-emerald-300 text-emerald-800 dark:text-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed"
           >

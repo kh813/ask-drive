@@ -65,6 +65,11 @@ defmodule AskDrive.Settings do
     |> Repo.update()
   end
 
+  @doc "Switches automatic Let's Encrypt renewal on or off (F-206)."
+  def set_acme_enabled(%Setting{} = setting, on?) do
+    setting |> Setting.acme_enabled_changeset(on?) |> Repo.update()
+  end
+
   @doc "Records what a Let's Encrypt run found (F-1011), on the platform row."
   def record_acme_result(attrs) do
     AskDrive.Apps.platform(fn ->

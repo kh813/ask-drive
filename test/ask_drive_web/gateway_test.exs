@@ -25,6 +25,7 @@ defmodule AskDriveWeb.GatewayTest do
       )
 
     :ok = Gateway.save!(settings)
+    :ok = Gateway.set_enabled!(true)
   end
 
   defp from(conn, ip), do: %{conn | remote_ip: ip}
@@ -87,13 +88,34 @@ defmodule AskDriveWeb.GatewayTest do
     assert (build_conn() |> from({10, 0, 0, 4}) |> get("/login")).status == 403
   end
 
-  test "gateway-off opens the gate again" do
+  test "saving the values doesn't switch the check on (F-206)" do
+    {:ok, settings} =
+      Gateway.validate(%{"secret" => @secret, "public_url" => "https://app.example.com"})
+
+    :ok = Gateway.save!(settings)
+    refute Gateway.enabled?()
+    refute (build_conn() |> from(@outside) |> get("/login")).status == 403
+  end
+
+  test "gateway-off opens the gate again, keeping the values" do
     enable!()
     :ok = Gateway.disable!()
     refute Gateway.enabled?()
     refute (build_conn() |> from(@outside) |> get("/login")).status == 403
-    # the public URL is kept for next time
+    # the values are kept for next time
     assert Gateway.settings().public_url == "https://app.example.com"
+    assert Gateway.settings().secret == @secret
+  end
+
+  test "a v0.1.38 file (a secret, no enabled) stays on" do
+    File.mkdir_p!(Path.dirname(Gateway.file()))
+
+    File.write!(
+      Gateway.file(),
+      Jason.encode!(%{"secret" => @secret, "public_url" => "https://a.example.com"})
+    )
+
+    assert Gateway.enabled?()
   end
 
   test "the settings file is readable only by the server's user" do
@@ -108,8 +130,9 @@ defmodule AskDriveWeb.GatewayTest do
 
       assert msg =~ "16 文字以上"
 
-      assert {:error, [msg]} = Gateway.validate(%{"secret" => @secret, "public_url" => ""})
-      assert msg =~ "公開 URL が必要"
+      # the values can be saved one at a time; switching on needs both
+      assert {:ok, partial} = Gateway.validate(%{"secret" => @secret, "public_url" => ""})
+      assert Gateway.enable_problems(partial) == ["公開 URL を保存してください"]
 
       for bad <- ["http://app.example.com", "https://app.example.com/path", "app.example.com"] do
         assert {:error, [msg]} = Gateway.validate(%{"secret" => @secret, "public_url" => bad})

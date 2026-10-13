@@ -55,18 +55,17 @@ defmodule AskDriveWeb.OAuthToggleTest do
     assert has_element?(view, "#org-settings #oauth-settings", "ログイン: 有効")
     assert has_element?(view, "#org-settings #ldap-settings")
 
-    view
-    |> form("#oauth-form", %{"setting" => %{"oauth_login_enabled" => "false"}})
-    |> render_submit()
+    # the switch applies at once; the form's 「保存」 doesn't touch it (F-206)
+    view |> element("#toggle-oauth-login") |> render_click()
 
     refute Settings.platform_setting!().oauth_login_enabled
     # Drive sync keeps using the same OAuth client
     assert has_element?(view, "#oauth-settings", "ログイン: 無効（Drive 同期のみ）")
 
-    view
-    |> form("#oauth-form", %{"setting" => %{"oauth_login_enabled" => "true"}})
-    |> render_submit()
+    view |> form("#oauth-form") |> render_submit()
+    refute Settings.platform_setting!().oauth_login_enabled
 
+    view |> element("#toggle-oauth-login") |> render_click()
     assert Settings.platform_setting!().oauth_login_enabled
   end
 

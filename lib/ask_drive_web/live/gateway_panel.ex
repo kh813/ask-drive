@@ -7,13 +7,12 @@ defmodule AskDriveWeb.GatewayPanel do
   """
   use AskDriveWeb, :html
 
-  alias AskDrive.Gateway
-
+  attr :gw, :map, required: true, doc: "`AskDrive.Gateway.settings/0`, refreshed on each change"
   attr :peer_ip, :string, default: nil
   attr :via_gateway, :boolean, default: false
 
   def gateway_section(assigns) do
-    assigns = assign(assigns, :gw, Gateway.settings())
+    assigns = assign(assigns, :on?, assigns.gw.enabled and assigns.gw.secret != nil)
 
     ~H"""
     <div id="gateway-settings" class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3">
@@ -26,13 +25,13 @@ defmodule AskDriveWeb.GatewayPanel do
           id="gateway-state"
           class={[
             "text-[11px] font-medium px-2 py-0.5 rounded-full",
-            if(@gw.secret,
+            if(@on?,
               do: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
               else: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
             )
           ]}
         >
-          {if @gw.secret, do: "有効（ゲートウェイ経由のみ）", else: "無効"}
+          {if @on?, do: "有効（ゲートウェイ経由のみ）", else: "無効"}
         </span>
       </div>
       <p class="text-xs text-zinc-500 leading-relaxed">
@@ -46,6 +45,15 @@ defmodule AskDriveWeb.GatewayPanel do
             else: "直接（#{@peer_ip || "不明"}）"}
         </span>
       </p>
+
+      <AskDriveWeb.FeatureToggle.toggle
+        id="toggle-gateway"
+        feature="gateway"
+        on={@on?}
+        label="API ゲートウェイの確認"
+        hint="秘密のヘッダーの値と公開 URL を保存してから有効にできます。有効にした時点から、ヘッダーのない直接アクセスを拒否します"
+        confirm_on="API ゲートウェイの確認を有効にします。ゲートウェイを通らない接続（サーバー自身と許可した IP を除く）は、すぐに拒否されます。続行しますか？"
+      />
 
       <form id="gateway-form" phx-submit="save_gateway" class="space-y-3">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -84,15 +92,8 @@ defmodule AskDriveWeb.GatewayPanel do
             />
           </label>
         </div>
-        <label
-          :if={@gw.secret}
-          class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400"
-        >
-          <input type="checkbox" name="gateway[disable]" value="true" class="rounded border-zinc-300" />
-          ゲートウェイの確認をやめる（秘密の値を削除し、直接アクセスを受け付ける）
-        </label>
         <p class="text-[11px] text-zinc-400 leading-relaxed">
-          有効にできるのは、この画面がゲートウェイ経由（同じ秘密の値）・サーバー自身（localhost）・直接アクセスを許可する IP のいずれかから開かれているときだけです（自分を締め出さないため）。サーバー自身からは常に直接アクセスできます。締め出された場合はサーバー上で
+          「保存」は値を保存するだけで、確認の有効・無効は上のスイッチで切り替えます。有効にできるのは、この画面がゲートウェイ経由（同じ秘密の値）・サーバー自身（localhost）・直接アクセスを許可する IP のいずれかから開かれているときだけです（自分を締め出さないため）。サーバー自身からは常に直接アクセスできます。締め出された場合はサーバー上で
           <code class="font-mono">./app.sh network gateway-off</code>
           を実行してください（再起動なしで反映）。秘密の値はメールに書かず、安全な方法で受け取ってください。
         </p>
@@ -100,7 +101,6 @@ defmodule AskDriveWeb.GatewayPanel do
           <button
             type="submit"
             id="save-gateway-btn"
-            data-confirm="API ゲートウェイの設定を保存しますか？有効にすると、ゲートウェイを通らない接続はすぐに拒否されます。"
             class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
           >
             保存

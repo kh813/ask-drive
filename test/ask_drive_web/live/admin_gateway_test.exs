@@ -20,10 +20,16 @@ defmodule AskDriveWeb.AdminGatewayTest do
     :ok
   end
 
-  test "turned on from the server itself; the secret is never shown", %{conn: conn} do
+  test "saved first, then switched on from the server itself; the secret is never shown",
+       %{conn: conn} do
     {:ok, view, _html} = live(conn, "/admin?tab=settings")
     assert has_element?(view, "#gateway-form")
     assert has_element?(view, "#gateway-state", "無効")
+
+    # switching on with nothing saved says what is missing
+    html = view |> element("#toggle-gateway") |> render_click()
+    assert html =~ "秘密のヘッダーの値を保存してください"
+    refute Gateway.enabled?()
 
     view
     |> form("#gateway-form", %{
@@ -31,9 +37,18 @@ defmodule AskDriveWeb.AdminGatewayTest do
     })
     |> render_submit()
 
-    assert Gateway.enabled?()
+    # saving keeps it off (F-206)
+    refute Gateway.enabled?()
     assert Gateway.settings().public_url == "https://app.example.com"
+
+    view |> element("#toggle-gateway") |> render_click()
+    assert Gateway.enabled?()
+    assert has_element?(view, "#toggle-gateway[aria-checked=true]")
     refute render(view) =~ @secret
+
+    view |> element("#toggle-gateway") |> render_click()
+    refute Gateway.enabled?()
+    assert Gateway.settings().secret == @secret
   end
 
   test "invalid settings are refused with the reason", %{conn: conn} do

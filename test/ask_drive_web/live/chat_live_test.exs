@@ -298,7 +298,8 @@ defmodule AskDriveWeb.ChatLiveTest do
     alias AskDrive.Settings
 
     setup do
-      {:ok, _} = AdminAccess.set_access_password(Settings.get_setting!(), "pass12345")
+      {:ok, setting} = AdminAccess.set_access_password(Settings.get_setting!(), "pass12345")
+      {:ok, _} = AdminAccess.enable_access_password(setting)
       :ok
     end
 

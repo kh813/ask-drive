@@ -45,11 +45,9 @@ defmodule AskDriveWeb.AdminUpdateTest do
     assert has_element?(view, "#update-latest", "v99.0.0")
     assert has_element?(view, "#update-available-badge", "v99.0.0")
 
-    view
-    |> form("#update-settings-form", %{
-      "setting" => %{"update_check_enabled" => "false", "update_auto_apply" => "true"}
-    })
-    |> render_submit()
+    # switches apply at once (F-206)
+    view |> element("#toggle-update-check") |> render_click()
+    view |> element("#toggle-update-auto-apply") |> render_click()
 
     setting = AskDrive.Settings.platform_setting!()
     refute setting.update_check_enabled

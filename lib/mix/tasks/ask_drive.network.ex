@@ -53,11 +53,11 @@ defmodule Mix.Tasks.AskDrive.Network do
   defp gateway_status do
     g = AskDrive.Gateway.settings()
 
-    if g.secret do
+    if AskDrive.Gateway.enabled?() do
       direct = if g.direct_ranges == [], do: "なし", else: Enum.join(g.direct_ranges, ", ")
       "有効（公開 URL: #{g.public_url}、直接アクセスを許可: サーバー自身・#{direct}）"
     else
-      "無効"
+      if g.secret, do: "無効（設定は保存済み）", else: "無効"
     end
   end
 end

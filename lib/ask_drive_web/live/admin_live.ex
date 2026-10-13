@@ -65,6 +65,7 @@ defmodule AskDriveWeb.AdminLive do
       |> assign(:ac, %{})
       |> assign(:peer_ip, peer_ip(socket))
       |> assign(:gateway_header, gateway_header(socket))
+      |> assign(:gateway_settings, AskDrive.Gateway.settings())
       |> assign(:peer_cert, peer_cert(socket))
       |> assign(:issued_cert, nil)
       |> assign(:drive_sync_test, nil)
@@ -290,7 +291,7 @@ defmodule AskDriveWeb.AdminLive do
   def handle_event("ssl_upload_change", _params, socket), do: {:noreply, socket}
 
   # The LDAP form keeps what is being typed (a re-render must not reset it) and fills in the
-  # Google defaults when sign-in is switched on (spec F-1306).
+  # Google defaults for what is blank (spec F-1306).
   def handle_event("ldap_change", %{"ldap" => params}, socket) do
     {:noreply, assign(socket, :ldap_form, autofill_ldap(params, socket.assigns.setting))}
   end
@@ -301,7 +302,13 @@ defmodule AskDriveWeb.AdminLive do
   # the test runs on the form's contents, saved or not, including newly chosen files.
   def handle_event("save_ldap", params, socket) do
     socket = take_ldap_uploads(socket)
-    form = autofill_ldap(Map.get(params, "ldap", %{}), socket.assigns.setting)
+    # whether LDAP sign-in is on is its switch's business (F-206), not the form's
+    form =
+      params
+      |> Map.get("ldap", %{})
+      |> Map.put("ldap_enabled", to_string(socket.assigns.setting.ldap_enabled == true))
+      |> autofill_ldap(socket.assigns.setting)
+
     uploads = Map.new(socket.assigns.ldap_pending, fn {kind, {_name, pem}} -> {kind, pem} end)
     socket = assign(socket, :ldap_form, form)
 
@@ -656,23 +663,25 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
-  # API gateway (F-1014): turning it on only from a connection that will still get in
+  # API gateway (F-1014): the values; while the check is on, only from a connection that will
+  # still get in with them
   def handle_event(
         "save_gateway",
         %{"gateway" => params},
         %{assigns: %{scope: :platform}} = socket
       ) do
     with {:ok, new} <- AskDrive.Gateway.validate(params),
-         :ok <- still_reachable(new, socket) do
+         :ok <- if(new.enabled, do: still_reachable(new, socket), else: :ok) do
       :ok = AskDrive.Gateway.save!(new)
 
       {:noreply,
-       put_flash(
-         socket,
+       socket
+       |> assign(:gateway_settings, AskDrive.Gateway.settings())
+       |> put_flash(
          :info,
-         if(new.secret,
-           do: "API ゲートウェイの設定を保存しました。ゲートウェイを通らない接続は拒否されます。",
-           else: "API ゲートウェイの確認を無効にしました。"
+         if(new.enabled,
+           do: "API ゲートウェイの設定を保存しました（確認は有効のままです）。",
+           else: "API ゲートウェイの設定を保存しました。確認は「API ゲートウェイの確認」のスイッチで有効にします。"
          )
        )}
     else
@@ -754,26 +763,6 @@ defmodule AskDriveWeb.AdminLive do
     {:noreply, assign(socket, :update_status, AskDrive.Updates.status())}
   end
 
-  def handle_event(
-        "save_update_settings",
-        %{"setting" => params},
-        %{assigns: %{scope: :platform}} = socket
-      ) do
-    attrs = Map.take(params, ["update_check_enabled", "update_auto_apply"])
-
-    case Settings.update_setting(socket.assigns.setting, attrs) do
-      {:ok, updated} ->
-        {:noreply,
-         socket
-         |> assign(:setting, updated)
-         |> assign(:form, to_form(Settings.change_setting(updated)))
-         |> put_flash(:info, "夜間のアップデートの設定を保存しました。")}
-
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "保存できませんでした。")}
-    end
-  end
-
   # Let's Encrypt (spec F-1009 – F-1012), platform scope only
   def handle_event("save_acme", %{"acme" => params}, %{assigns: %{scope: :platform}} = socket) do
     case Settings.update_acme(socket.assigns.setting, params) do
@@ -817,7 +806,7 @@ defmodule AskDriveWeb.AdminLive do
         {:noreply, put_flash(socket, :error, "証明書の取得はすでに実行中です。")}
 
       {:error, :not_configured} ->
-        {:noreply, put_flash(socket, :error, "先に設定を保存し、自動取得を有効にしてください。")}
+        {:noreply, put_flash(socket, :error, "先にホスト名・ドメイン・API キーを保存してください。")}
     end
   end
 
@@ -1261,21 +1250,15 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   @impl true
+  # Saves the password only; the restriction is switched on and off separately (F-206)
   def handle_event("save_access_password", %{"access_password" => params}, socket) do
-    enabled = params["enabled"] in ["true", "1", true]
     new_password = params["password"] || ""
     confirmation = params["confirmation"] || ""
 
     result =
-      if enabled do
-        if new_password != confirmation do
-          {:error, :mismatch}
-        else
-          AdminAccess.set_access_password(socket.assigns.setting, new_password)
-        end
-      else
-        AdminAccess.disable_access_password(socket.assigns.setting)
-      end
+      if new_password != confirmation,
+        do: {:error, :mismatch},
+        else: AdminAccess.set_access_password(socket.assigns.setting, new_password)
 
     case result do
       {:ok, updated} ->
@@ -1284,9 +1267,9 @@ defmodule AskDriveWeb.AdminLive do
          |> assign(:setting, updated)
          |> put_flash(
            :info,
-           if(enabled,
-             do: "窓口アクセスパスワードを設定しました。",
-             else: "窓口アクセスパスワードを無効化しました。"
+           if(updated.access_password_enabled,
+             do: "窓口アクセスパスワードを変更しました。",
+             else: "窓口アクセスパスワードを保存しました。利用制限は「パスワードによる利用制限」のスイッチで有効にします。"
            )
          )
          |> load_dashboard_data()}
@@ -1296,18 +1279,38 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
-  @impl true
-  def handle_event("disable_access_password", _params, socket) do
-    case AdminAccess.disable_access_password(socket.assigns.setting) do
-      {:ok, updated} ->
-        {:noreply,
-         socket
-         |> assign(:setting, updated)
-         |> put_flash(:info, "窓口アクセスパスワードを無効化しました。")
-         |> load_dashboard_data()}
+  # --- On/off switches (F-206): apply at once, separately from saving the values ---
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "無効化できませんでした: #{inspect(reason)}")}
+  @setting_toggles %{
+    "auto_batch" => {:auto_batch_enabled, "夜間の自動実行"},
+    "maintenance_mode" => {:maintenance_mode, "メンテナンスモード"},
+    "serve_stale_qa" => {:serve_stale_qa, "Stale な QA の配信"},
+    "daytime_llm" => {:daytime_llm_enabled, "営業時間中の LLM 生成"},
+    "chat_summary" => {:chat_summary_enabled, "チャットの AI 要約"},
+    "update_check" => {:update_check_enabled, "毎晩の新しいバージョンの確認"},
+    "update_auto_apply" => {:update_auto_apply, "自動アップデート"}
+  }
+  @platform_toggles ~w(update_check update_auto_apply oauth_login ldap gateway acme)
+
+  def handle_event("toggle_feature", %{"feature" => feature, "on" => on}, socket) do
+    on? = on == "true"
+
+    result =
+      if feature in @platform_toggles and socket.assigns.scope != :platform,
+        do: {:error, "この画面では切り替えられません", "この機能"},
+        else: set_feature(feature, on?, socket)
+
+    case result do
+      {:ok, socket, label} ->
+        {:noreply, put_flash(socket, :info, "#{label}を#{if on?, do: "有効", else: "無効"}にしました。")}
+
+      {:error, message, label} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "#{label}を#{if on?, do: "有効", else: "無効"}にできませんでした: #{message}"
+         )}
     end
   end
 
@@ -3602,16 +3605,13 @@ defmodule AskDriveWeb.AdminLive do
                       利用者がログイン画面から Google アカウントでサインインできるようにします（上記の OAuth クライアントを使用します）。<strong>Google ログインを無効にしていても、上記の Drive 同期は問題なく利用できます。</strong>
                     </p>
 
-                    <input type="hidden" name="setting[oauth_login_enabled]" value="false" />
-                    <label class="flex items-center gap-2.5 text-sm font-medium text-zinc-800 dark:text-zinc-200 cursor-pointer pt-1">
-                      <input
-                        type="checkbox"
-                        name="setting[oauth_login_enabled]"
-                        value="true"
-                        checked={@setting.oauth_login_enabled != false}
-                        class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
-                      /> Google ログインを有効にする
-                    </label>
+                    <AskDriveWeb.FeatureToggle.toggle
+                      id="toggle-oauth-login"
+                      feature="oauth_login"
+                      on={@setting.oauth_login_enabled != false}
+                      label="Google ログイン"
+                      hint="ログイン画面に「Google でログイン」を表示する（上の OAuth クライアントを保存してから有効にできます）"
+                    />
 
                     <.redirect_uri_help />
                   </div>
@@ -3668,17 +3668,15 @@ defmodule AskDriveWeb.AdminLive do
                   </p>
                 </div>
 
+                <AskDriveWeb.FeatureToggle.toggle
+                  id="toggle-ldap"
+                  feature="ldap"
+                  on={@setting.ldap_enabled == true}
+                  label="LDAP でのログイン"
+                  hint="下の設定（クライアント証明書と秘密鍵を含む）を保存してから有効にできます。有効の間に保存すると、設定が足りない場合は保存できません"
+                  confirm_off="LDAP でのログインを無効にします。LDAP でしかログインできない利用者は入れなくなります。続行しますか？"
+                />
                 <form id="ldap-form" phx-submit="save_ldap" phx-change="ldap_change" class="space-y-4">
-                  <label class="flex items-center gap-2 text-sm text-zinc-800 dark:text-zinc-200">
-                    <input type="hidden" name="ldap[ldap_enabled]" value="false" />
-                    <input
-                      type="checkbox"
-                      name="ldap[ldap_enabled]"
-                      value="true"
-                      checked={@ldap_form["ldap_enabled"] == "true"}
-                      class="rounded border-zinc-300"
-                    /> LDAP でのログインを有効にする
-                  </label>
                   <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                     <label class="space-y-1 sm:col-span-2">
                       <span class="block font-medium">LDAP サーバー</span>
@@ -4096,21 +4094,20 @@ defmodule AskDriveWeb.AdminLive do
                     この窓口のチャット利用を限定するためのパスワードです。有効にすると、正しいパスワードを入力したユーザーのみがチャットを利用できるようになります。
                   </p>
                 </div>
-                <div>
-                  <span class={[
-                    "text-xs px-2.5 py-1 rounded-full font-medium inline-flex items-center gap-1.5",
-                    if(@setting.access_password_enabled,
-                      do:
-                        "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800",
-                      else:
-                        "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700"
-                    )
-                  ]}>
-                    <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
-                    {if @setting.access_password_enabled, do: "利用制限: 有効", else: "利用制限: 無効"}
-                  </span>
-                </div>
               </div>
+
+              <AskDriveWeb.FeatureToggle.toggle
+                id="toggle-access-password"
+                feature="access_password"
+                on={@setting.access_password_enabled == true}
+                label="パスワードによる利用制限"
+                hint={
+                  if @setting.access_password_hash,
+                    do: "有効にすると、パスワードを入力した人だけがこの窓口のチャットを使えます",
+                    else: "先に下でパスワードを保存してください"
+                }
+                confirm_on="パスワードによる利用制限を有効にします。パスワードを知らない利用者はこの窓口を使えなくなります。続行しますか？"
+              />
 
               <.form
                 for={@access_password_form}
@@ -4118,12 +4115,11 @@ defmodule AskDriveWeb.AdminLive do
                 phx-submit="save_access_password"
                 class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end"
               >
-                <input type="hidden" name="access_password[enabled]" value="true" />
                 <.input
                   field={@access_password_form[:password]}
                   type="password"
                   value=""
-                  label={"#{if @setting.access_password_enabled, do: "新しいパスワード", else: "窓口アクセスパスワード"}（#{AdminAccess.min_password_length()} 文字以上）"}
+                  label={"#{if @setting.access_password_hash, do: "新しいパスワード", else: "窓口アクセスパスワード"}（#{AdminAccess.min_password_length()} 文字以上）"}
                   autocomplete="new-password"
                   required
                 />
@@ -4143,17 +4139,7 @@ defmodule AskDriveWeb.AdminLive do
                     id="save-access-password-btn"
                     class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition whitespace-nowrap"
                   >
-                    {if @setting.access_password_enabled, do: "パスワードを変更", else: "パスワードを設定して有効化"}
-                  </button>
-                  <button
-                    :if={@setting.access_password_enabled}
-                    type="button"
-                    id="disable-access-password-btn"
-                    phx-click="disable_access_password"
-                    data-confirm="窓口アクセスパスワードによる利用制限を無効化しますか？"
-                    class="px-4 py-2.5 rounded-xl border border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium text-xs transition whitespace-nowrap"
-                  >
-                    利用制限を解除
+                    {if @setting.access_password_hash, do: "パスワードを変更", else: "パスワードを保存"}
                   </button>
                 </div>
               </.form>
@@ -5043,30 +5029,41 @@ defmodule AskDriveWeb.AdminLive do
                   :if={@scope == :app}
                   class="pt-2 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3"
                 >
-                  <.input
-                    field={@form[:auto_batch_enabled]}
-                    type="checkbox"
-                    label="夜間の自動実行（Google Drive の同期・取り込み・QA 生成を夜間枠に自動で行う。オフでも手動実行はできる。新しい窓口は設定中のためオフで始まる）"
+                  <%!-- On/off switches apply at once; 「設定を保存」 saves only values (F-206) --%>
+                  <AskDriveWeb.FeatureToggle.toggle
+                    id="toggle-auto-batch"
+                    feature="auto_batch"
+                    on={@setting.auto_batch_enabled}
+                    label="夜間の自動実行"
+                    hint="Google Drive の同期・取り込み・QA 生成を夜間枠に自動で行う。オフでも手動実行はできる。新しい窓口は設定中のためオフで始まる"
                   />
-                  <.input
-                    field={@form[:maintenance_mode]}
-                    type="checkbox"
-                    label="メンテナンスモード（チャット画面を停止し告知を表示する）"
+                  <AskDriveWeb.FeatureToggle.toggle
+                    id="toggle-maintenance"
+                    feature="maintenance_mode"
+                    on={@setting.maintenance_mode}
+                    label="メンテナンスモード"
+                    hint="チャット画面を停止し、上の告知メッセージを表示する"
+                    confirm_on="メンテナンスモードにすると、この窓口のチャットはすぐに使えなくなります。続行しますか？"
                   />
-                  <.input
-                    field={@form[:serve_stale_qa]}
-                    type="checkbox"
-                    label="無効化（Stale）されたQAを警告付きで配信する"
+                  <AskDriveWeb.FeatureToggle.toggle
+                    id="toggle-serve-stale"
+                    feature="serve_stale_qa"
+                    on={@setting.serve_stale_qa}
+                    label="無効化（Stale）された QA を警告付きで配信する"
                   />
-                  <.input
-                    field={@form[:daytime_llm_enabled]}
-                    type="checkbox"
-                    label="営業時間中のLLM生成を例外的に許可する (RAM消費に注意)"
+                  <AskDriveWeb.FeatureToggle.toggle
+                    id="toggle-daytime-llm"
+                    feature="daytime_llm"
+                    on={@setting.daytime_llm_enabled}
+                    label="営業時間中の LLM 生成を例外的に許可する"
+                    hint="RAM の消費に注意"
                   />
-                  <.input
-                    field={@form[:chat_summary_enabled]}
-                    type="checkbox"
-                    label="チャットで検索結果の AI 要約を表示する（回答生成プロバイダを使用。クラウドの場合は抜粋が社外に送信されます）"
+                  <AskDriveWeb.FeatureToggle.toggle
+                    id="toggle-chat-summary"
+                    feature="chat_summary"
+                    on={Map.get(@setting, :chat_summary_enabled, true)}
+                    label="チャットで検索結果の AI 要約を表示する"
+                    hint="上のチャット要約プロバイダを使用。クラウドの場合は質問と抜粋が社外に送信されます"
                   />
                 </div>
 
@@ -5469,6 +5466,7 @@ defmodule AskDriveWeb.AdminLive do
 
               <%!-- API gateway in front (spec F-1014) --%>
               <AskDriveWeb.GatewayPanel.gateway_section
+                gw={@gateway_settings}
                 peer_ip={@peer_ip}
                 via_gateway={AskDrive.Gateway.valid_secret?(@gateway_header)}
               />
@@ -6250,6 +6248,92 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
+  # --- Switching a feature on or off (F-206) ---------------------------------------------
+  # {:ok, socket, label} or {:error, message, label}. Turning on checks the saved values.
+
+  defp set_feature(feature, on?, socket) when is_map_key(@setting_toggles, feature) do
+    {field, label} = @setting_toggles[feature]
+
+    case Settings.update_setting(socket.assigns.setting, %{field => on?}) do
+      {:ok, updated} -> {:ok, refresh_setting(socket, updated), label}
+      {:error, changeset} -> {:error, changeset_messages(changeset), label}
+    end
+  end
+
+  defp set_feature("oauth_login", on?, socket) do
+    label = "Google ログイン"
+
+    if on? and not AskDrive.Drive.OAuth.client_configured?() do
+      {:error, "先に OAuth クライアント ID とシークレットを保存してください", label}
+    else
+      case Settings.update_setting(socket.assigns.setting, %{oauth_login_enabled: on?}) do
+        {:ok, updated} -> {:ok, refresh_setting(socket, updated), label}
+        {:error, changeset} -> {:error, changeset_messages(changeset), label}
+      end
+    end
+  end
+
+  defp set_feature("ldap", on?, socket) do
+    case Settings.update_ldap(socket.assigns.setting, %{"ldap_enabled" => to_string(on?)}) do
+      {:ok, updated} ->
+        {:ok, socket |> refresh_setting(updated) |> assign(:ldap_form, ldap_form(updated)),
+         "LDAP でのログイン"}
+
+      {:error, changeset} ->
+        {:error, changeset_messages(changeset), "LDAP でのログイン"}
+    end
+  end
+
+  defp set_feature("access_password", on?, socket) do
+    label = "パスワードによる利用制限"
+
+    result =
+      if on?,
+        do: AdminAccess.enable_access_password(socket.assigns.setting),
+        else: AdminAccess.disable_access_password(socket.assigns.setting)
+
+    case result do
+      {:ok, updated} -> {:ok, socket |> assign(:setting, updated) |> load_dashboard_data(), label}
+      {:error, :no_password} -> {:error, "先にパスワードを保存してください", label}
+      {:error, reason} -> {:error, inspect(reason), label}
+    end
+  end
+
+  defp set_feature("gateway", on?, socket) do
+    label = "API ゲートウェイの確認"
+    current = AskDrive.Gateway.settings()
+    problems = if on?, do: AskDrive.Gateway.enable_problems(current), else: []
+
+    with [] <- problems,
+         :ok <- if(on?, do: still_reachable(current, socket), else: :ok) do
+      :ok = AskDrive.Gateway.set_enabled!(on?)
+      {:ok, assign(socket, :gateway_settings, AskDrive.Gateway.settings()), label}
+    else
+      {:error, [message]} -> {:error, message, label}
+      problems when is_list(problems) -> {:error, Enum.join(problems, "／"), label}
+    end
+  end
+
+  defp set_feature("acme", on?, socket) do
+    label = "Let's Encrypt の自動更新"
+
+    case Settings.set_acme_enabled(socket.assigns.setting, on?) do
+      {:ok, updated} ->
+        {:ok, socket |> refresh_setting(updated) |> assign(:acme_form, acme_form(updated)), label}
+
+      {:error, changeset} ->
+        {:error, changeset_messages(changeset), label}
+    end
+  end
+
+  defp set_feature(_feature, _on?, _socket), do: {:error, "不明な機能です", "この機能"}
+
+  defp refresh_setting(socket, updated),
+    do:
+      socket
+      |> assign(:setting, updated)
+      |> assign(:form, to_form(Settings.change_setting(updated)))
+
   # the Let's Encrypt form (F-1009); the API key is never echoed back
   defp acme_form(setting),
     do: to_form(AskDrive.Settings.Setting.acme_changeset(setting, %{}), as: :acme)
@@ -6266,7 +6350,8 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   # switched on with blank fields: Google's server, LDAPS port and the domain's base DN
-  defp autofill_ldap(%{"ldap_enabled" => "true"} = form, setting) do
+  # Google's defaults for what is left blank (F-1306)
+  defp autofill_ldap(form, setting) do
     fill = fn form, key, value ->
       if String.trim(form[key] || "") == "" and value, do: Map.put(form, key, value), else: form
     end
@@ -6276,8 +6361,6 @@ defmodule AskDriveWeb.AdminLive do
     |> fill.("ldap_port", to_string(AskDrive.Ldap.default_port()))
     |> fill.("ldap_base_dn", AskDrive.Ldap.domain_base_dn(setting.allowed_domain))
   end
-
-  defp autofill_ldap(form, _setting), do: form
 
   # newly chosen PEM files, kept (with their names) until saved, so a test and then a save
   # don't need the files chosen twice
@@ -6411,7 +6494,7 @@ defmodule AskDriveWeb.AdminLive do
        else:
          {:error,
           [
-            "この接続（#{socket.assigns.peer_ip || "不明"}）は、保存すると拒否されます。ゲートウェイ経由で開き直すか、サーバー自身（localhost）から操作するか、この IP を「直接アクセスを許可する IP」に入れてください"
+            "この接続（#{socket.assigns.peer_ip || "不明"}）が拒否されるようになります。ゲートウェイ経由で開き直すか、サーバー自身（localhost）から操作するか、この IP を「直接アクセスを許可する IP」に保存してください"
           ]}
   end
 

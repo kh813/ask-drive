@@ -196,18 +196,26 @@ defmodule AskDrive.Accounts.AdminAccess do
   end
 
   @doc """
-  Sets or updates the app access password.
+  Sets or updates the app access password. Whether the restriction is on is switched
+  separately (`enable_access_password/1`, spec F-206).
   """
   def set_access_password(%Settings.Setting{} = setting, password) when is_binary(password) do
     with :ok <- validate_password(password) do
       setting
-      |> Ecto.Changeset.change(%{
-        access_password_hash: hash_password(password),
-        access_password_enabled: true
-      })
+      |> Ecto.Changeset.change(%{access_password_hash: hash_password(password)})
       |> AskDrive.Repo.update()
     end
   end
+
+  @doc "Switches the restriction on; needs a saved password (`{:error, :no_password}`)."
+  def enable_access_password(%Settings.Setting{access_password_hash: hash} = setting)
+      when is_binary(hash) and hash != "" do
+    setting
+    |> Ecto.Changeset.change(%{access_password_enabled: true})
+    |> AskDrive.Repo.update()
+  end
+
+  def enable_access_password(_setting), do: {:error, :no_password}
 
   @doc """
   Disables the app access password.

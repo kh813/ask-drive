@@ -239,35 +239,26 @@ defmodule AskDriveWeb.UpdatePanel do
         <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
           <.icon name="hero-moon" class="w-5 h-5 text-indigo-600" /> 夜間のアップデート
         </h2>
-        <.form
-          for={@form}
-          id="update-settings-form"
-          phx-submit="save_update_settings"
-          class="space-y-3"
-        >
-          <.input
-            field={@form[:update_check_enabled]}
-            type="checkbox"
-            label="毎晩、新しいバージョンを確認する（夜間枠の開始時。見つかるとこの画面と管理画面の見出しに表示）"
+        <div id="update-settings" class="space-y-2">
+          <AskDriveWeb.FeatureToggle.toggle
+            id="toggle-update-check"
+            feature="update_check"
+            on={@setting.update_check_enabled == true}
+            label="毎晩、新しいバージョンを確認する"
+            hint="夜間枠の開始時。見つかるとこの画面と管理画面の見出しに表示"
           />
-          <.input
-            field={@form[:update_auto_apply]}
-            type="checkbox"
-            label="新しいバージョンが見つかったら自動でアップデートする（夜間バッチより先に行い、バッチは再起動後に始まります）"
+          <AskDriveWeb.FeatureToggle.toggle
+            id="toggle-update-auto-apply"
+            feature="update_auto_apply"
+            on={@setting.update_auto_apply == true}
+            label="新しいバージョンが見つかったら自動でアップデートする"
+            hint="夜間バッチより先に行い、バッチは再起動後に始まります"
+            confirm_on="新しいバージョンが見つかった夜に、自動でアップデートして再起動するようにします。続行しますか？"
           />
           <p class="text-[11px] text-zinc-500 leading-relaxed">
             自動アップデートでも、ビルドに失敗した場合は稼働中のバージョンのまま動き続けます。再起動による自動の切り替えには、AskDrive が常駐サービス（<code class="font-mono">./app.sh service install</code>）として登録されている必要があります。
           </p>
-          <div class="flex justify-end">
-            <button
-              type="submit"
-              id="save-update-settings-btn"
-              class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
-            >
-              保存
-            </button>
-          </div>
-        </.form>
+        </div>
       </div>
 
       <%!-- Notices to Google Chat (F-1507) --%>

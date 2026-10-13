@@ -222,13 +222,13 @@ defmodule AskDrive.Settings.Setting do
   @host_name ~r/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/
 
   @doc """
-  The Let's Encrypt settings form (spec F-1009): turning it on needs the host name, the DNS
-  zone it belongs to and the Value-Domain API key (kept when left blank).
+  The Let's Encrypt settings form (spec F-1009): the values only — whether automatic renewal
+  is on is switched separately (`acme_enabled_changeset/2`, F-206). The API key is kept when
+  left blank. While renewal is on, the host, the zone and the key can't be emptied.
   """
   def acme_changeset(setting, attrs) do
     setting
     |> cast(attrs, [
-      :acme_enabled,
       :acme_hostname,
       :acme_dns_zone,
       :acme_email,
@@ -244,11 +244,23 @@ defmodule AskDrive.Settings.Setting do
       message: "はメールアドレスの形式で入力してください"
     )
     |> validate_acme_zone()
+    |> validate_acme_complete()
+  end
+
+  @doc "Switches automatic Let's Encrypt renewal on or off; on needs the values saved."
+  def acme_enabled_changeset(setting, on?) do
+    setting
+    |> change(acme_enabled: on?)
+    |> validate_acme_complete()
+  end
+
+  defp validate_acme_complete(changeset) do
+    changeset
     |> then(fn cs ->
       if get_field(cs, :acme_enabled) do
         cs
         |> validate_required([:acme_hostname, :acme_dns_zone],
-          message: "を入力してください（自動取得を有効にする場合）"
+          message: "を保存してください（自動更新を有効にする場合）"
         )
         |> check_present(
           get_field(cs, :valuedomain_api_key),

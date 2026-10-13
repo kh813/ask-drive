@@ -5,7 +5,8 @@ defmodule AskDrive.Gateway do
   only they see its login page.
 
   The gateway adds a secret header (`X-Apigw-Secret`) to every request it forwards. With a
-  secret set here, a request without it — someone going around the gateway — is refused with
+  secret set here and the check switched on (`enabled`, a separate switch from saving the
+  values, F-206), a request without it — someone going around the gateway — is refused with
   403 (`AskDriveWeb.Plugs.GatewayGate`, which runs before anything else, the LiveView socket
   included). Requests that carry it are the gateway's: its X-Forwarded-For is believed for
   the client's address (as from a trusted proxy, F-1013), and the URLs AskDrive builds use the
@@ -32,7 +33,10 @@ defmodule AskDrive.Gateway do
 
   # --- Reading --------------------------------------------------------------------
 
-  @doc "`%{secret: string | nil, public_url: string | nil, direct_ranges: [string]}`."
+  @doc """
+  `%{enabled: boolean, secret: string | nil, public_url: string | nil, direct_ranges: [string]}`.
+  A file from v0.1.38 has no `enabled`: a secret there meant on.
+  """
   def settings do
     stat = {file(), File.stat(file())}
     key = {__MODULE__, :cache}
@@ -55,15 +59,30 @@ defmodule AskDrive.Gateway do
            do: map,
            else: (_ -> %{})
 
+    secret = blank_to_nil(stored["secret"])
+
     %{
-      secret: blank_to_nil(stored["secret"]),
+      enabled: Map.get(stored, "enabled", secret != nil) == true,
+      secret: secret,
       public_url: blank_to_nil(stored["public_url"]),
       direct_ranges: stored["direct_ranges"] || []
     }
   end
 
-  @doc "Whether requests must come through the gateway (a secret is set)."
-  def enabled?, do: settings().secret != nil
+  @doc "Whether requests must come through the gateway (switched on, with a secret)."
+  def enabled? do
+    s = settings()
+    s.enabled and s.secret != nil
+  end
+
+  @doc "What is missing before the check can be switched on (`[]` when nothing)."
+  def enable_problems(settings \\ settings()) do
+    [
+      is_nil(settings.secret) && "秘密のヘッダーの値を保存してください",
+      is_nil(settings.public_url) && "公開 URL を保存してください"
+    ]
+    |> Enum.filter(&is_binary/1)
+  end
 
   @doc "Whether `value` (the header a request carried) is the secret. Constant time."
   def valid_secret?(value) when is_binary(value) do
@@ -98,19 +117,15 @@ defmodule AskDrive.Gateway do
   # --- Changing -------------------------------------------------------------------
 
   @doc """
-  Validates `%{"secret", "public_url", "direct_ranges", "disable"}`. A blank secret keeps the
-  stored one; `"disable" => "true"` removes it (the gate opens). Returns `{:ok, settings}` or
-  `{:error, [message]}`.
+  Validates the values `%{"secret", "public_url", "direct_ranges"}` (whether the check is on
+  is kept as it is). A blank secret keeps the stored one. While the check is on, the secret
+  and the public URL can't be emptied. Returns `{:ok, settings}` or `{:error, [message]}`.
   """
   def validate(params) do
     current = settings()
 
     secret =
-      cond do
-        params["disable"] in ["true", true] -> nil
-        blank?(params["secret"]) -> current.secret
-        true -> String.trim(params["secret"])
-      end
+      if blank?(params["secret"]), do: current.secret, else: String.trim(params["secret"])
 
     public_url = params |> Map.get("public_url", current.public_url) |> blank_to_nil()
     public_url = public_url && public_url |> String.trim() |> String.trim_trailing("/")
@@ -129,7 +144,7 @@ defmodule AskDrive.Gateway do
         secret && Regex.match?(~r/[\s"\\]/, secret) && "秘密の値に空白・引用符・バックスラッシュは使えません",
         public_url && not valid_public_url?(public_url) &&
           "公開 URL は https://app.example.com の形（パスなし）で入力してください",
-        secret && is_nil(public_url) && "ゲートウェイを有効にするには公開 URL が必要です",
+        current.enabled && is_nil(public_url) && "有効の間は公開 URL を空にできません（先に無効にしてください）",
         match?({:error, _}, ranges) &&
           "直接アクセスを許可する IP として読み取れません: #{elem(ranges, 1) |> List.wrap() |> Enum.join("、")}"
       ]
@@ -137,7 +152,9 @@ defmodule AskDrive.Gateway do
 
     if errors == [] do
       {:ok, ranges} = ranges
-      {:ok, %{secret: secret, public_url: public_url, direct_ranges: ranges}}
+
+      {:ok,
+       %{enabled: current.enabled, secret: secret, public_url: public_url, direct_ranges: ranges}}
     else
       {:error, errors}
     end
@@ -162,6 +179,7 @@ defmodule AskDrive.Gateway do
       file(),
       Jason.encode!(
         %{
+          "enabled" => settings.enabled,
           "secret" => settings.secret,
           "public_url" => settings.public_url,
           "direct_ranges" => settings.direct_ranges
@@ -175,8 +193,11 @@ defmodule AskDrive.Gateway do
     :ok
   end
 
-  @doc "Removes the secret (`./app.sh network gateway-off`): direct access works again."
-  def disable!, do: save!(%{settings() | secret: nil})
+  @doc "Switches the check on or off, keeping the values."
+  def set_enabled!(on?), do: save!(%{settings() | enabled: on?})
+
+  @doc "Switches the check off (`./app.sh network gateway-off`): direct access works again."
+  def disable!, do: set_enabled!(false)
 
   defp blank?(v), do: not is_binary(v) or String.trim(v) == ""
   defp blank_to_nil(v), do: if(blank?(v), do: nil, else: v)
