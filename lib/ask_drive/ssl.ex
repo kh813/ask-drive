@@ -129,8 +129,18 @@ defmodule AskDrive.SSL do
   @doc "Metadata of the certificate being served (cached; see `put_endpoint_config/0`)."
   def current, do: :persistent_term.get({__MODULE__, :meta}, nil)
 
-  @doc "HSTS only once a certificate of the admin's own is in place (never self-signed)."
-  def hsts?, do: enabled?() and match?(%{"source" => "custom"}, current())
+  @doc """
+  HSTS only once a publicly trusted certificate is in place: the admin's own, or one from
+  Let's Encrypt's production environment — never self-signed or Let's Encrypt staging.
+  """
+  def hsts? do
+    enabled?() and
+      case current() do
+        %{"source" => "custom"} -> true
+        %{"source" => "letsencrypt"} = meta -> meta["acme_staging"] != true
+        _ -> false
+      end
+  end
 
   # --- Self-signed ------------------------------------------------------------------
 
@@ -562,7 +572,8 @@ defmodule AskDrive.SSL do
   @doc """
   Installs a validated certificate and restarts the endpoint. The current files move to
   `previous/`; if the endpoint doesn't come back with the new ones they are restored.
-  `source` is "custom" (uploaded) or "self_signed" (regenerated).
+  `source` is "custom" (uploaded), "letsencrypt" (`AskDrive.ACME.Renewal`) or "self_signed"
+  (regenerated).
   """
   def install(%{cert: cert, key: key} = pem, info, source \\ "custom") do
     staging = Path.join(ssl_dir(), "staging")

@@ -25,6 +25,7 @@ config :ask_drive, drive_base_backoff_ms: 0
 # Updating from the admin screen (F-1501): no nightly check, and state kept out of log/
 config :ask_drive,
   auto_update_check: false,
+  auto_acme_renewal: false,
   update_state_dir: Path.join(System.tmp_dir!(), "askdrive_test_update"),
   # the notice after a restart waits for the server to be up: not within a test
   update_notify_ms: 600_000

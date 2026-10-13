@@ -40,6 +40,10 @@ defmodule AskDriveWeb.AdminLive do
       # an update's progress and log (F-1502), on the platform screen
       if socket.assigns.live_action == :platform,
         do: Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.Updates.Server.topic())
+
+      # a Let's Encrypt run's steps (F-1012), on the platform screen
+      if socket.assigns.live_action == :platform,
+        do: Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.ACME.Renewal.topic())
     end
 
     setting = Settings.get_setting!()
@@ -96,6 +100,9 @@ defmodule AskDriveWeb.AdminLive do
      |> assign(:update_latest, nil)
      |> assign(:update_checking, false)
      |> assign(:notify_test, nil)
+     |> assign(:acme_form, acme_form(setting))
+     |> assign(:acme_status, if(scope == :platform, do: AskDrive.ACME.Renewal.status()))
+     |> assign(:acme_dns_test, nil)
      |> load_dashboard_data()}
   end
 
@@ -130,6 +137,16 @@ defmodule AskDriveWeb.AdminLive do
   # --- Updating from the admin screen (F-1501–F-1506), platform scope only ---
 
   @impl true
+  def handle_info({:acme_status, status}, socket) do
+    # a run that just finished has written its result on the setting row
+    socket =
+      if status.running?,
+        do: socket,
+        else: assign(socket, :setting, Settings.get_setting!())
+
+    {:noreply, assign(socket, :acme_status, status)}
+  end
+
   def handle_info({:update_status, status}, socket),
     do: {:noreply, assign(socket, :update_status, status)}
 
@@ -728,6 +745,53 @@ defmodule AskDriveWeb.AdminLive do
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "保存できませんでした。")}
+    end
+  end
+
+  # Let's Encrypt (spec F-1009 – F-1012), platform scope only
+  def handle_event("save_acme", %{"acme" => params}, %{assigns: %{scope: :platform}} = socket) do
+    case Settings.update_acme(socket.assigns.setting, params) do
+      {:ok, updated} ->
+        {:noreply,
+         socket
+         |> assign(:setting, updated)
+         |> assign(:acme_form, acme_form(updated))
+         |> assign(:acme_dns_test, nil)
+         |> put_flash(:info, "Let's Encrypt の設定を保存しました。")}
+
+      {:error, changeset} ->
+        {:noreply,
+         socket
+         |> assign(:acme_form, to_form(changeset, as: :acme))
+         |> put_flash(:error, "保存できませんでした: " <> changeset_messages(changeset))}
+    end
+  end
+
+  def handle_event("test_acme_dns", _params, %{assigns: %{scope: :platform}} = socket) do
+    setting = socket.assigns.setting
+    config = %{api_key: setting.valuedomain_api_key, zone: setting.acme_dns_zone}
+
+    {:noreply,
+     socket
+     |> assign(:acme_dns_test, :running)
+     |> start_async(:acme_dns_test, fn -> AskDrive.ACME.ValueDomain.test(config) end)}
+  end
+
+  def handle_event("run_acme", _params, %{assigns: %{scope: :platform}} = socket) do
+    case AskDrive.ACME.Renewal.run("管理画面から手動") do
+      :ok ->
+        {:noreply,
+         put_flash(
+           socket,
+           :info,
+           "証明書の取得を始めました。DNS の反映待ちに数分かかることがあります。適用時に HTTPS が再起動し、ページが自動で再接続します。"
+         )}
+
+      {:error, :running} ->
+        {:noreply, put_flash(socket, :error, "証明書の取得はすでに実行中です。")}
+
+      {:error, :not_configured} ->
+        {:noreply, put_flash(socket, :error, "先に設定を保存し、自動取得を有効にしてください。")}
     end
   end
 
@@ -5136,9 +5200,19 @@ defmodule AskDriveWeb.AdminLive do
                     <span class="text-zinc-400 block">使用中の証明書</span>
                     <span class="font-medium text-zinc-800 dark:text-zinc-200">
                       {case cert["source"] do
-                        "custom" -> "独自の証明書"
-                        "self_signed" -> "自己署名証明書（ブラウザに警告が出ます）"
-                        _ -> "不明"
+                        "custom" ->
+                          "独自の証明書"
+
+                        "letsencrypt" ->
+                          if cert["acme_staging"],
+                            do: "Let's Encrypt（テスト用 staging。ブラウザに警告が出ます）",
+                            else: "Let's Encrypt（自動更新）"
+
+                        "self_signed" ->
+                          "自己署名証明書（ブラウザに警告が出ます）"
+
+                        _ ->
+                          "不明"
                       end}
                     </span>
                   </div>
@@ -5156,7 +5230,9 @@ defmodule AskDriveWeb.AdminLive do
                   </div>
                   <div>
                     <span class="text-zinc-400 block">HSTS</span>
-                    <span>{if AskDrive.SSL.hsts?(), do: "有効（独自の証明書のため）", else: "無効（自己署名証明書の間は送りません）"}</span>
+                    <span>{if AskDrive.SSL.hsts?(),
+                      do: "有効（信頼された証明書のため）",
+                      else: "無効（自己署名・テスト用の証明書の間は送りません）"}</span>
                   </div>
                 </div>
 
@@ -5267,6 +5343,14 @@ defmodule AskDriveWeb.AdminLive do
                 <% end %>
 
                 <p :if={msg = last_ssl_result()} class="text-xs text-red-600">{msg}</p>
+
+                <%!-- Let's Encrypt by DNS-01 through Value-Domain (spec F-1009 – F-1012) --%>
+                <AskDriveWeb.AcmePanel.acme_section
+                  setting={@setting}
+                  form={@acme_form}
+                  status={@acme_status}
+                  dns_test={@acme_dns_test}
+                />
               <% else %>
                 <p class="text-xs text-zinc-500">
                   HTTPS は無効です（ASK_DRIVE_SSL=false）。HTTP で待ち受けています。
@@ -5704,6 +5788,12 @@ defmodule AskDriveWeb.AdminLive do
   def handle_async(:drive_sync_test, {:exit, reason}, socket),
     do: {:noreply, assign(socket, :drive_sync_test, {:error, "同期テストに失敗しました: #{inspect(reason)}"})}
 
+  def handle_async(:acme_dns_test, {:ok, result}, socket),
+    do: {:noreply, assign(socket, :acme_dns_test, result)}
+
+  def handle_async(:acme_dns_test, {:exit, reason}, socket),
+    do: {:noreply, assign(socket, :acme_dns_test, {:error, "接続テストに失敗しました: #{inspect(reason)}"})}
+
   # Which redirect URIs a 「ウェブ アプリケーション」 client needs (F-349); a 「デスクトップ
   # アプリ」 client needs none for Drive sync
   defp redirect_uri_help(assigns) do
@@ -6127,6 +6217,10 @@ defmodule AskDriveWeb.AdminLive do
       true -> {:ok, emails}
     end
   end
+
+  # the Let's Encrypt form (F-1009); the API key is never echoed back
+  defp acme_form(setting),
+    do: to_form(AskDrive.Settings.Setting.acme_changeset(setting, %{}), as: :acme)
 
   # the LDAP form's fields as the saved settings have them
   defp ldap_form(setting) do

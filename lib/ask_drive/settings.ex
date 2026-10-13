@@ -56,6 +56,23 @@ defmodule AskDrive.Settings do
   end
 
   @doc """
+  Saves the Let's Encrypt settings (spec F-1009) on the platform row. A blank API key keeps
+  the stored one.
+  """
+  def update_acme(%Setting{} = setting, attrs) do
+    setting
+    |> Setting.acme_changeset(drop_blank_secrets(attrs))
+    |> Repo.update()
+  end
+
+  @doc "Records what a Let's Encrypt run found (F-1011), on the platform row."
+  def record_acme_result(attrs) do
+    AskDrive.Apps.platform(fn ->
+      get_setting!() |> Ecto.Changeset.change(attrs) |> Repo.update()
+    end)
+  end
+
+  @doc """
   Saves the LDAP sign-in settings (spec 6.13). `uploads` carries newly uploaded PEM files
   (`:cert`, `:key`, `:ca`); files not uploaded keep what is stored, and so does a blank
   bind password. `"clear_ca" => "true"` removes the CA certificate.

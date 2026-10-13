@@ -139,6 +139,10 @@ defmodule AskDrive.Runtime.Mode do
     if Application.get_env(:ask_drive, :auto_update_check, true),
       do: AskDrive.Updates.maybe_nightly()
 
+    # the Let's Encrypt certificate, once a night when it is due for renewal (F-1011)
+    if Application.get_env(:ask_drive, :auto_acme_renewal, true),
+      do: AskDrive.ACME.Renewal.maybe_nightly()
+
     maybe_start_nightly_batch()
     new_state = follow_clock(state, "Clock tick")
     schedule_clock_tick()

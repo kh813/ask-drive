@@ -70,6 +70,19 @@ defmodule AskDrive.Settings.Setting do
     field :google_chat_webhook_url, Binary
     field :maintenance_message, :string
 
+    # --- Let's Encrypt (spec F-1009 / F-1010, platform row) ---
+    # Saved through Settings.update_acme/2; the last run's result is set by
+    # AskDrive.ACME.Renewal, never cast from forms.
+    field :acme_enabled, :boolean, default: false
+    field :acme_hostname, :string
+    field :acme_dns_zone, :string
+    field :acme_email, :string
+    field :acme_staging, :boolean, default: false
+    field :valuedomain_api_key, Binary
+    field :acme_checked_at, :utc_datetime
+    field :acme_last_ok, :boolean
+    field :acme_last_result, :string
+
     # --- Drive sync authentication (spec 6.1, F-110) ---
     # "service_account" needs no browser OAuth round-trip, so it sidesteps Google's
     # redirect_uri/private-IP/.local restrictions entirely for the sync-only account.
@@ -147,6 +160,7 @@ defmodule AskDrive.Settings.Setting do
       :google_client_secret,
       :drive_oauth_client_secret,
       :google_chat_webhook_url,
+      :valuedomain_api_key,
       :drive_service_account_json | @api_key_fields
     ]
 
@@ -200,6 +214,66 @@ defmodule AskDrive.Settings.Setting do
         :ldap_base_dn,
         "ベース DN を入力するか、組織の Google Workspace ドメインを設定してください"
       )
+    else
+      changeset
+    end
+  end
+
+  @host_name ~r/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/
+
+  @doc """
+  The Let's Encrypt settings form (spec F-1009): turning it on needs the host name, the DNS
+  zone it belongs to and the Value-Domain API key (kept when left blank).
+  """
+  def acme_changeset(setting, attrs) do
+    setting
+    |> cast(attrs, [
+      :acme_enabled,
+      :acme_hostname,
+      :acme_dns_zone,
+      :acme_email,
+      :acme_staging,
+      :valuedomain_api_key
+    ])
+    |> update_change(:acme_hostname, &normalize_host/1)
+    |> update_change(:acme_dns_zone, &normalize_host/1)
+    |> update_change(:acme_email, &String.trim/1)
+    |> validate_format(:acme_hostname, @host_name, message: "はホスト名（例: ask.example.com）で入力してください")
+    |> validate_format(:acme_dns_zone, @host_name, message: "はドメイン名（例: example.com）で入力してください")
+    |> validate_format(:acme_email, ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+      message: "はメールアドレスの形式で入力してください"
+    )
+    |> validate_acme_zone()
+    |> then(fn cs ->
+      if get_field(cs, :acme_enabled) do
+        cs
+        |> validate_required([:acme_hostname, :acme_dns_zone],
+          message: "を入力してください（自動取得を有効にする場合）"
+        )
+        |> check_present(
+          get_field(cs, :valuedomain_api_key),
+          :valuedomain_api_key,
+          "有効にするにはバリュードメインの API キーが必要です"
+        )
+      else
+        cs
+      end
+    end)
+  end
+
+  defp normalize_host(nil), do: nil
+
+  defp normalize_host(host),
+    do: host |> String.trim() |> String.trim_trailing(".") |> String.downcase()
+
+  # the host must be inside the zone whose records the API changes
+  defp validate_acme_zone(changeset) do
+    host = get_field(changeset, :acme_hostname)
+    zone = get_field(changeset, :acme_dns_zone)
+
+    if present?(host) and present?(zone) and host != zone and
+         not String.ends_with?(host, "." <> zone) do
+      add_error(changeset, :acme_hostname, "は DNS のドメイン（#{zone}）のサブドメインにしてください")
     else
       changeset
     end

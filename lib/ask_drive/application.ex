@@ -31,6 +31,9 @@ defmodule AskDrive.Application do
         # Drive sync authorizations waiting for Google's answer (spec F-352)
         AskDrive.Drive.PendingAuth,
         AskDrive.HealthCheck,
+        {Task.Supervisor, name: AskDrive.TaskSupervisor},
+        # Let's Encrypt certificate runs (F-1009); the clock asks it to renew at night
+        AskDrive.ACME.Renewal,
         AskDrive.Runtime.Mode,
         AskDrive.LLM.OllamaModels,
         # Start to serve requests, typically the last entry
