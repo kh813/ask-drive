@@ -12,8 +12,17 @@ defmodule AskDriveWeb.Endpoint do
   ]
 
   socket "/live", Phoenix.LiveView.Socket,
-    websocket: [connect_info: [:peer_data, session: @session_options]],
-    longpoll: [connect_info: [:peer_data, session: @session_options]]
+    websocket: [connect_info: [:peer_data, :x_headers, session: @session_options]],
+    longpoll: [connect_info: [:peer_data, :x_headers, session: @session_options]]
+
+  # Requests that went around the API gateway are refused before anything else, the socket
+  # above included: Phoenix dispatches sockets ahead of the plugs below (spec F-1014).
+  def call(conn, opts) do
+    case AskDriveWeb.Plugs.GatewayGate.call(conn, []) do
+      %Plug.Conn{halted: true} = conn -> conn
+      conn -> super(conn, opts)
+    end
+  end
 
   # Serve at "/" the static files from "priv/static" directory.
   #
@@ -52,6 +61,6 @@ defmodule AskDriveWeb.Endpoint do
 
   plug Plug.MethodOverride
   plug Plug.Head
-  plug Plug.Session, @session_options
+  plug AskDriveWeb.Plugs.Session, @session_options
   plug AskDriveWeb.Router
 end

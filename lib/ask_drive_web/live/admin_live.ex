@@ -64,6 +64,7 @@ defmodule AskDriveWeb.AdminLive do
       |> assign(:ldap_test, nil)
       |> assign(:ac, %{})
       |> assign(:peer_ip, peer_ip(socket))
+      |> assign(:gateway_header, gateway_header(socket))
       |> assign(:peer_cert, peer_cert(socket))
       |> assign(:issued_cert, nil)
       |> assign(:drive_sync_test, nil)
@@ -650,6 +651,31 @@ defmodule AskDriveWeb.AdminLive do
           {:noreply, put_flash(socket, :info, "リバースプロキシの設定を保存しました（すぐに反映されます）。")}
         end
 
+      {:error, errors} ->
+        {:noreply, put_flash(socket, :error, "保存できませんでした: " <> Enum.join(errors, "／"))}
+    end
+  end
+
+  # API gateway (F-1014): turning it on only from a connection that will still get in
+  def handle_event(
+        "save_gateway",
+        %{"gateway" => params},
+        %{assigns: %{scope: :platform}} = socket
+      ) do
+    with {:ok, new} <- AskDrive.Gateway.validate(params),
+         :ok <- still_reachable(new, socket) do
+      :ok = AskDrive.Gateway.save!(new)
+
+      {:noreply,
+       put_flash(
+         socket,
+         :info,
+         if(new.secret,
+           do: "API ゲートウェイの設定を保存しました。ゲートウェイを通らない接続は拒否されます。",
+           else: "API ゲートウェイの確認を無効にしました。"
+         )
+       )}
+    else
       {:error, errors} ->
         {:noreply, put_flash(socket, :error, "保存できませんでした: " <> Enum.join(errors, "／"))}
     end
@@ -5440,6 +5466,12 @@ defmodule AskDriveWeb.AdminLive do
                   {AskDrive.Network.last_result() |> elem(1) |> Enum.join("／")}
                 </p>
               </div>
+
+              <%!-- API gateway in front (spec F-1014) --%>
+              <AskDriveWeb.GatewayPanel.gateway_section
+                peer_ip={@peer_ip}
+                via_gateway={AskDrive.Gateway.valid_secret?(@gateway_header)}
+              />
             </div>
 
             <%!-- Access only from devices with a certificate issued here (spec 6.14) --%>
@@ -6363,6 +6395,36 @@ defmodule AskDriveWeb.AdminLive do
     case get_connect_info(socket, :peer_data) do
       %{ssl_cert: der} when is_binary(der) -> der
       _ -> nil
+    end
+  end
+
+  defp still_reachable(%{secret: nil}, _socket), do: :ok
+
+  defp still_reachable(new, socket) do
+    via_gateway? =
+      is_binary(socket.assigns.gateway_header) and
+        Plug.Crypto.secure_compare(socket.assigns.gateway_header, new.secret)
+
+    if via_gateway? or
+         AskDrive.Gateway.direct_allowed?(parse_ip(socket.assigns.peer_ip), new.direct_ranges),
+       do: :ok,
+       else:
+         {:error,
+          [
+            "この接続（#{socket.assigns.peer_ip || "不明"}）は、保存すると拒否されます。ゲートウェイ経由で開き直すか、サーバー自身（localhost）から操作するか、この IP を「直接アクセスを許可する IP」に入れてください"
+          ]}
+  end
+
+  # the API gateway's secret header on this admin's connection, if any (F-1014)
+  defp gateway_header(socket) do
+    header = AskDrive.Gateway.header()
+
+    case get_connect_info(socket, :x_headers) do
+      headers when is_list(headers) ->
+        Enum.find_value(headers, fn {k, v} -> if String.downcase(k) == header, do: v end)
+
+      _ ->
+        nil
     end
   end
 

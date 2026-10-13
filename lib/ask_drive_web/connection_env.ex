@@ -19,7 +19,13 @@ defmodule AskDriveWeb.ConnectionEnv do
       conn
     else
       id = :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
-      put_resp_cookie(conn, @device_cookie, id, @device_cookie_opts)
+
+      put_resp_cookie(
+        conn,
+        @device_cookie,
+        id,
+        Keyword.put(@device_cookie_opts, :secure, conn.scheme == :https)
+      )
     end
   end
 

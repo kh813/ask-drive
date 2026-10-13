@@ -11,6 +11,10 @@ defmodule AskDriveWeb.Plugs.SSLHeaders do
       trusted proxy (which terminated TLS itself);
     * **HSTS** only when an administrator's own certificate is installed. With the
       self-signed one it would stop browsers from letting users past the warning.
+
+  A request that carried the API gateway's secret (`AskDriveWeb.Plugs.GatewayGate`, F-1014)
+  counts as from a trusted proxy, and its scheme, host and port become the gateway's public
+  URL, whatever host name the gateway forwarded.
   """
   @behaviour Plug
   import Plug.Conn
@@ -23,7 +27,8 @@ defmodule AskDriveWeb.Plugs.SSLHeaders do
 
   @impl true
   def call(conn, _opts) do
-    trusted? = Network.trusted?(conn.remote_ip)
+    gateway? = conn.private[:askdrive_gateway] == true
+    trusted? = gateway? or Network.trusted?(conn.remote_ip)
 
     cond do
       conn.scheme == :http and AskDrive.SSL.enabled?() and not trusted? ->
@@ -31,6 +36,7 @@ defmodule AskDriveWeb.Plugs.SSLHeaders do
 
       true ->
         conn = if trusted?, do: from_proxy(conn), else: conn
+        conn = if gateway?, do: public_url(conn), else: conn
 
         if conn.scheme == :https and AskDrive.SSL.hsts?(),
           do: put_resp_header(conn, "strict-transport-security", @hsts),
@@ -52,5 +58,15 @@ defmodule AskDriveWeb.Plugs.SSLHeaders do
       )
 
     if client, do: %{conn | remote_ip: client}, else: conn
+  end
+
+  defp public_url(conn) do
+    case AskDrive.Gateway.public_uri() do
+      %URI{scheme: scheme, host: host, port: port} ->
+        %{conn | scheme: String.to_existing_atom(scheme), host: host, port: port}
+
+      nil ->
+        conn
+    end
   end
 end

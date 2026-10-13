@@ -432,6 +432,13 @@ v0.0.45 以降、AskDrive の通信はすべて HTTPS で暗号化されます�
   - 利用者がホスト名でアクセスできるよう、社内の DNS（またはバリュードメイン）で、そのホスト名をこのサーバーの IP に向けてください。ポートは既定のままなら `https://ask.example.com:4443/` です。
   - Let's Encrypt の証明書の間も **HSTS** を送ります（テスト用 staging の間は送りません）。アカウント鍵は `ssl/acme/` に保存されます。
 - **リバースプロキシ（Cloudflare Tunnel・nginx 等）で HTTPS を終端する場合**は、「ポートとリバースプロキシ」にそのプロキシの IP（例: 同じマシンなら `127.0.0.1`）を登録し、プロキシから `http://<ホスト>:4000` に中継させてください。登録した IP からの HTTP だけを受け付け、プロキシが付ける `X-Forwarded-Proto/Host/Port`・`X-Forwarded-For`（Cloudflare の `CF-Connecting-IP`）を信頼します（Google ログインのリダイレクト URI を公開 URL で組み立て、ロックや記録には利用者の実際の IP を使います）。それ以外からの HTTP は HTTPS に転送します。HSTS はプロキシ側で付けてください。プロキシから `https://<ホスト>:4443` に中継しても構いません。
+- **API ゲートウェイ（さくらのクラウド等）を前段に置く場合**（v0.1.38〜）: ゲートウェイで Google Workspace のログインを通った人だけが AskDrive（とそのログイン画面）に届くようにできます。設定は **「HTTPS（SSL 証明書）」→「API ゲートウェイ」** です。
+  1. ゲートウェイの接続先（バックエンド）を `https://<origin のホスト名>:4443` にし、すべてのリクエストに秘密のヘッダー `X-Apigw-Secret` を付けるよう設定します。origin のホスト名の証明書は上の「Let's Encrypt」で取得できます。
+  2. AskDrive の「API ゲートウェイ」に、同じ**秘密の値**（16 文字以上）と**公開 URL**（利用者が開く URL。例: `https://app.example.com`）を入れて保存します。保存できるのは、その画面をゲートウェイ経由・サーバー自身（`https://localhost:4443/`）・「直接アクセスを許可する IP」のいずれかから開いているときだけです。
+  3. 以後、ヘッダーのない直接アクセスは 403 になります（サーバー自身と「直接アクセスを許可する IP」を除く）。ゲートウェイ経由のリクエストは、利用者の IP（X-Forwarded-For）でロックや記録を行い、リンクやリダイレクト、Google ログインのリダイレクト URI を公開 URL で組み立てます。Google ログイン（OAuth）を使う場合は、`https://app.example.com/auth/google/callback` を Google Cloud Console に登録してください。
+  - 締め出された場合は、サーバー上で `./app.sh network gateway-off` を実行します（再起動なしで反映）。
+  - 画面は LiveView（WebSocket。使えない場合は long-poll に自動で切り替え）で動きます。ゲートウェイが WebSocket を中継できるかは導入時に確認してください。
+  - ゲートウェイの先で TLS が終端されるため、「端末の電子証明書によるアクセス制限」はゲートウェイ経由では使えません。
 - 以前の `ASK_DRIVE_TRUST_FORWARDED`・`ASK_DRIVE_LEGACY_REDIRECT` は廃止しました。`ASK_DRIVE_TRUST_FORWARDED=true` を使っていた場合は、プロキシの IP を管理画面で登録してください。
 - 設定を誤って入れなくなった場合は、サーバー上で `./app.sh network status`（確認）、`./app.sh network proxy-off`（プロキシの指定を解除）、`./app.sh network ports-reset`（ポートを 4000 / 4443 に戻して再起動）を実行します。
 - HTTPS を使わない従来の HTTP 運用に戻すには `.env.prod` に `ASK_DRIVE_SSL=false` を設定して再起動します。
