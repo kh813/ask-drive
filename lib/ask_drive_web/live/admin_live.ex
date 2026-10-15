@@ -2198,6 +2198,12 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
+  # The health check reports a found program as {:ok, its version line}, a missing one as
+  # {:error, reason} (it used to be compared with :ok, so it always read "not installed")
+  defp tool_ok?({:ok, _}), do: true
+  defp tool_ok?(:ok), do: true
+  defp tool_ok?(_), do: false
+
   defp provider_options(providers) do
     Enum.map(providers, fn provider -> {LLM.label(provider), provider} end)
   end
@@ -3395,8 +3401,12 @@ defmodule AskDriveWeb.AdminLive do
 
                 <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
                   <span class="text-zinc-400 block">{gettext("pdftotext (PDF extraction)")}</span>
-                  <span class="font-semibold mt-1 block">
-                    {if @health.pdftotext == :ok,
+                  <span
+                    id="health-pdftotext"
+                    data-state={if(tool_ok?(@health.pdftotext), do: "installed", else: "missing")}
+                    class="font-semibold mt-1 block"
+                  >
+                    {if tool_ok?(@health.pdftotext),
                       do: gettext("Available"),
                       else: gettext("Not installed (poppler)")}
                   </span>
@@ -3404,15 +3414,19 @@ defmodule AskDriveWeb.AdminLive do
 
                 <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
                   <span class="text-zinc-400 block">{gettext("pandoc (Office extraction)")}</span>
-                  <span class="font-semibold mt-1 block">
-                    {if @health.pandoc == :ok,
+                  <span
+                    id="health-pandoc"
+                    data-state={if(tool_ok?(@health.pandoc), do: "installed", else: "missing")}
+                    class="font-semibold mt-1 block"
+                  >
+                    {if tool_ok?(@health.pandoc),
                       do: gettext("Available"),
                       else: gettext("Not installed (pandoc)")}
                   </span>
                 </div>
               </div>
               <p
-                :if={@health.pdftotext != :ok or @health.pandoc != :ok}
+                :if={not tool_ok?(@health.pdftotext) or not tool_ok?(@health.pandoc)}
                 id="tools-missing-note"
                 class="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed"
               >

@@ -58,7 +58,7 @@ defmodule AskDriveWeb.OllamaPanel do
 
       <dl class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
         <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
-          <dt class="text-zinc-400">{gettext("Installed")}</dt>
+          <dt class="text-zinc-400">{gettext("Installation")}</dt>
           <dd id="ollama-installed" class="mt-1 font-semibold">
             <%= if @status.installed do %>
               <span class="text-emerald-600">{gettext("Installed already")}</span>

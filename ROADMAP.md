@@ -4,7 +4,7 @@ This document outlines planned improvements, future concepts, and the technical 
 
 ---
 
-## Current Version: `0.1.49`
+## Current Version: `0.1.50`
 - **Multi-lingual Support (i18n)**: English (default) & Japanese (`en` / `ja`) with browser `Accept-Language` auto-detection and UI switcher. The admin screens (desk and platform) are fully available in English (v0.1.41, Gettext with English source strings); text recorded by background work (batch, health check, certificate renewal, updater) stays Japanese.
 - **Multi-app Desk Portal**: Departmental multi-desk routing (`/`, `/:app`, `/:app/admin`).
 - **Clear Admin Navigation**: A desk's admin link is named after the desk ("Manage IT-Support"); Platform Admin sits with the admin-mode badge and Release on the right, and each admin screen states whether it applies to one desk or all desks.

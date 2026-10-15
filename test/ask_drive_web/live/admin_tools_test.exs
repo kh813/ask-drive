@@ -51,6 +51,26 @@ defmodule AskDriveWeb.AdminToolsTest do
     refute has_element?(settings, "#ollama-runtime")
   end
 
+  test "both screens say installed exactly when the program is there", %{conn: conn} do
+    state = fn tool -> if System.find_executable(tool), do: "installed", else: "missing" end
+
+    {:ok, tab, _html} = live(conn, ~p"/admin?tab=update")
+
+    # the desk's overview (as the desk's own administrator)
+    desk_admin = user_fixture()
+    desk_conn = build_conn() |> log_in_user(desk_admin) |> log_in_app_admin(desk_admin)
+    {:ok, desk, _html} = live(desk_conn, "/it-support/admin?tab=overview")
+
+    for tool <- ~w(pdftotext pandoc) do
+      assert has_element?(tab, ~s(#tool-#{tool} [data-state="#{state.(tool)}"]))
+      # the desk's overview used to read every found program as missing
+      assert has_element?(desk, ~s(#health-#{tool}[data-state="#{state.(tool)}"]))
+    end
+
+    if System.find_executable("pdftotext"),
+      do: assert(has_element?(tab, "#tool-pdftotext", "インストール済み"))
+  end
+
   test "documents skipped for a missing program go back to the queue once it's installed" do
     {:ok, skipped} =
       %Document{}
