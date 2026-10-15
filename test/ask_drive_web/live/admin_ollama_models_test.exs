@@ -106,7 +106,7 @@ defmodule AskDriveWeb.AdminOllamaModelsTest do
       setting: setting
     } do
       Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.LLM.OllamaModels.topic())
-      {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
+      {:ok, view, _html} = live(conn, ~p"/admin?tab=update")
 
       assert has_element?(
                view,
@@ -137,7 +137,7 @@ defmodule AskDriveWeb.AdminOllamaModelsTest do
     } do
       {:ok, _} = Settings.update_setting(setting, %{embed_model: "gemini-embedding-001"})
       Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.LLM.OllamaModels.topic())
-      {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
+      {:ok, view, _html} = live(conn, ~p"/admin?tab=update")
 
       row = ~s(#ollama-missing-models li[data-missing="gemini-embedding-001"])
       assert has_element?(view, "#{row} a[href='/it-support/admin?tab=settings']")
@@ -158,7 +158,7 @@ defmodule AskDriveWeb.AdminOllamaModelsTest do
     end
 
     test "pulls a model by name, and deletes one no desk uses", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
+      {:ok, view, _html} = live(conn, ~p"/admin?tab=update")
 
       view |> form("#pull-model-form", %{"model" => "llama-extra"}) |> render_submit()
       assert_receive {:stub_pull, "llama-extra"}, 2_000
@@ -175,7 +175,7 @@ defmodule AskDriveWeb.AdminOllamaModelsTest do
     end
 
     test "can't delete a model a desk uses", %{conn: conn, setting: setting} do
-      {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
+      {:ok, view, _html} = live(conn, ~p"/admin?tab=update")
 
       assert has_element?(
                view,

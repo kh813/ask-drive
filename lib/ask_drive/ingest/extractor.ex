@@ -117,7 +117,9 @@ defmodule AskDrive.Ingest.Extractor do
   defp extract_pdf(binary) do
     case System.find_executable("pdftotext") do
       nil ->
-        {:skipped, "Missing external CLI tool: pdftotext (install via `brew install poppler`)"}
+        {:skipped,
+         AskDrive.Documents.missing_tool_reason("pdftotext") <>
+           " (see the platform admin's Install & updates tab)"}
 
       path ->
         with_temp_file(binary, ".pdf", fn temp_path ->
@@ -140,7 +142,9 @@ defmodule AskDrive.Ingest.Extractor do
   defp extract_pandoc(binary, format) do
     case System.find_executable("pandoc") do
       nil ->
-        {:skipped, "Missing external CLI tool: pandoc (install via `brew install pandoc`)"}
+        {:skipped,
+         AskDrive.Documents.missing_tool_reason("pandoc") <>
+           " (see the platform admin's Install & updates tab)"}
 
       path ->
         with_temp_file(binary, ".#{format}", fn temp_path ->

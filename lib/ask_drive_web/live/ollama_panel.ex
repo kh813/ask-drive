@@ -15,7 +15,7 @@ defmodule AskDriveWeb.OllamaPanel do
     required: true,
     doc: "`OllamaModels.required_all/0`: `[{app, role, model}]`"
 
-  attr :install, :map, required: true, doc: "`AskDrive.LLM.OllamaInstaller.status/0`"
+  attr :install, :map, required: true, doc: ~s|`AskDrive.Runtime.ToolInstaller.status("ollama")`|
   attr :starting, :boolean, default: false
 
   attr :overview, :any,

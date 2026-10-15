@@ -45,9 +45,9 @@ defmodule AskDriveWeb.AdminLive do
       if socket.assigns.live_action == :platform,
         do: Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.ACME.Renewal.topic())
 
-      # installing Ollama from the platform screen (F-837)
+      # installing Ollama / pandoc from the platform screen (F-837, F-839)
       if socket.assigns.live_action == :platform,
-        do: Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.LLM.OllamaInstaller.topic())
+        do: Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.Runtime.ToolInstaller.topic())
     end
 
     setting = Settings.get_setting!()
@@ -126,7 +126,9 @@ defmodule AskDriveWeb.AdminLive do
       |> assign(:ollama_needed, AskDrive.LLM.OllamaModels.required_all())
       |> assign(:ollama_overview, AskDrive.LLM.OllamaModels.overview())
       |> assign(:ollama_pulls, AskDrive.LLM.OllamaModels.pulls())
-      |> assign(:ollama_install, AskDrive.LLM.OllamaInstaller.status())
+      |> assign(:ollama_install, AskDrive.Runtime.ToolInstaller.status("ollama"))
+      |> assign(:pandoc_install, AskDrive.Runtime.ToolInstaller.status("pandoc"))
+      |> assign(:external_tools, AskDrive.Runtime.Tools.list())
     else
       socket
     end
@@ -146,7 +148,7 @@ defmodule AskDriveWeb.AdminLive do
       {"audit", gettext("Elevation log")},
       {"metrics", gettext("API usage & logs")},
       {"settings", gettext("Platform settings")},
-      {"update", gettext("Updates")}
+      {"update", gettext("Install & updates")}
     ]
 
   defp tabs(:app),
@@ -177,13 +179,28 @@ defmodule AskDriveWeb.AdminLive do
     do: {:noreply, assign(socket, :update_status, status)}
 
   # an Ollama install's progress (F-837); once done, AskDrive starts it: look again shortly
-  def handle_info({:ollama_install, status}, socket) do
+  def handle_info({:tool_install, "ollama", status}, socket) do
     if status.status == :done and socket.assigns.ollama_install.status == :installing do
       Process.send_after(self(), :refresh_ollama, 3_000)
       Process.send_after(self(), :refresh_ollama, 15_000)
     end
 
     {:noreply, assign(socket, :ollama_install, status)}
+  end
+
+  # pandoc installed: it's on the PATH (.runtime/bin) at once
+  def handle_info({:tool_install, "pandoc", status}, socket) do
+    socket = assign(socket, :pandoc_install, status)
+
+    socket =
+      if status.status == :done do
+        tools = AskDrive.Runtime.Tools.list()
+        socket |> assign(:external_tools, tools) |> requeued_flash(tools)
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_info(:refresh_ollama, socket), do: {:noreply, assign_ollama_runtime(socket)}
@@ -1169,9 +1186,10 @@ defmodule AskDriveWeb.AdminLive do
   def handle_event("install_ollama", _params, %{assigns: %{scope: :platform}} = socket) do
     by = (socket.assigns[:current_user] && socket.assigns.current_user.email) || "admin"
 
-    case AskDrive.LLM.OllamaInstaller.install(by) do
+    case AskDrive.Runtime.ToolInstaller.install("ollama", by) do
       :ok ->
-        {:noreply, assign(socket, :ollama_install, AskDrive.LLM.OllamaInstaller.status())}
+        {:noreply,
+         assign(socket, :ollama_install, AskDrive.Runtime.ToolInstaller.status("ollama"))}
 
       {:error, :busy} ->
         {:noreply, put_flash(socket, :error, gettext("Ollama is already being installed."))}
@@ -1184,6 +1202,32 @@ defmodule AskDriveWeb.AdminLive do
            gettext("Ollama can't be installed from here: AskDrive wasn't started with app.sh.")
          )}
     end
+  end
+
+  def handle_event("install_pandoc", _params, %{assigns: %{scope: :platform}} = socket) do
+    by = (socket.assigns[:current_user] && socket.assigns.current_user.email) || "admin"
+
+    case AskDrive.Runtime.ToolInstaller.install("pandoc", by) do
+      :ok ->
+        {:noreply,
+         assign(socket, :pandoc_install, AskDrive.Runtime.ToolInstaller.status("pandoc"))}
+
+      {:error, :busy} ->
+        {:noreply, put_flash(socket, :error, gettext("pandoc is already being installed."))}
+
+      {:error, :unavailable} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("pandoc can't be installed from here: AskDrive wasn't started with app.sh.")
+         )}
+    end
+  end
+
+  def handle_event("refresh_tools", _params, socket) do
+    tools = AskDrive.Runtime.Tools.list()
+    {:noreply, socket |> assign(:external_tools, tools) |> requeued_flash(tools)}
   end
 
   def handle_event("start_ollama", _params, %{assigns: %{scope: :platform}} = socket) do
@@ -1238,7 +1282,7 @@ defmodule AskDriveWeb.AdminLive do
            socket,
            :error,
            gettext(
-             "Not saved: %{models} isn't one of Ollama's pulled models. Choose a pulled model (a platform administrator pulls them in the platform settings).",
+             "Not saved: %{models} isn't one of Ollama's pulled models. Choose a pulled model (a platform administrator pulls them under Platform admin, Install & updates).",
              models: join_list(models)
            )
          )}
@@ -1844,7 +1888,7 @@ defmodule AskDriveWeb.AdminLive do
             class="mt-1 text-[11px] text-amber-700 dark:text-amber-300 leading-snug"
           >
             {gettext(
-              "No suitable model is pulled yet: ask a platform administrator to pull one (platform settings, Ollama)."
+              "No suitable model is pulled yet: ask a platform administrator to pull one (Platform admin, Install & updates)."
             )}
           </p>
         <% {:error, _} -> %>
@@ -2133,6 +2177,24 @@ defmodule AskDriveWeb.AdminLive do
 
       _ ->
         example
+    end
+  end
+
+  # documents skipped while a program was missing are read again in the next ingestion (F-839)
+  defp requeued_flash(socket, tools) do
+    case AskDrive.Runtime.Tools.requeue_skipped(tools) do
+      0 ->
+        socket
+
+      count ->
+        put_flash(
+          socket,
+          :info,
+          gettext(
+            "%{count} documents skipped for lack of the program will be read in the next ingestion.",
+            count: count
+          )
+        )
     end
   end
 
@@ -3349,6 +3411,15 @@ defmodule AskDriveWeb.AdminLive do
                   </span>
                 </div>
               </div>
+              <p
+                :if={@health.pdftotext != :ok or @health.pandoc != :ok}
+                id="tools-missing-note"
+                class="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed"
+              >
+                {gettext(
+                  "A program that reads documents is missing, so such files are skipped. A platform administrator installs it under Platform admin, Install & updates (some need a command on the server)."
+                )}
+              </p>
             </div>
           </div>
         <% end %>
@@ -4585,15 +4656,31 @@ defmodule AskDriveWeb.AdminLive do
         <% end %>
 
         <%!-- Tab 6: Settings Management --%>
+        <%!-- Install & updates (F-1501, F-837, F-839): AskDrive itself, its Ollama and the
+              external programs it reads documents with --%>
         <%= if @current_tab == "update" and @scope == :platform do %>
-          <AskDriveWeb.UpdatePanel.update_tab
-            status={@update_status}
-            setting={@setting}
-            form={@form}
-            latest={@update_latest}
-            checking={@update_checking}
-            notify_test={@notify_test}
-          />
+          <div class="space-y-6">
+            <AskDriveWeb.UpdatePanel.update_tab
+              status={@update_status}
+              setting={@setting}
+              form={@form}
+              latest={@update_latest}
+              checking={@update_checking}
+              notify_test={@notify_test}
+            />
+            <AskDriveWeb.OllamaPanel.ollama_card
+              status={@ollama_runtime}
+              needed={@ollama_needed}
+              install={@ollama_install}
+              starting={@ollama_starting}
+              overview={@ollama_overview}
+              pulls={@ollama_pulls}
+            />
+            <AskDriveWeb.ToolsPanel.tools_card
+              tools={@external_tools}
+              pandoc_install={@pandoc_install}
+            />
+          </div>
         <% end %>
 
         <%= if @current_tab == "settings" do %>
@@ -6604,16 +6691,6 @@ defmodule AskDriveWeb.AdminLive do
                 </div>
               </.form>
             </div>
-
-            <AskDriveWeb.OllamaPanel.ollama_card
-              :if={@scope == :platform}
-              status={@ollama_runtime}
-              needed={@ollama_needed}
-              install={@ollama_install}
-              starting={@ollama_starting}
-              overview={@ollama_overview}
-              pulls={@ollama_pulls}
-            />
 
             <%!-- HTTPS / SSL certificate (spec 6.10) --%>
             <div

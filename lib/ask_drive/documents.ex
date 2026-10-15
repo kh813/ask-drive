@@ -140,6 +140,29 @@ defmodule AskDrive.Documents do
   end
 
   @doc """
+  The prefix of the reason a document is skipped for when the program that reads it isn't
+  installed (`AskDrive.Ingest.Extractor`): `missing_tool_reason("pdftotext")`.
+  """
+  def missing_tool_reason(tool), do: "Missing external CLI tool: #{tool}"
+
+  @doc """
+  Documents skipped because `tool` wasn't installed go back to "pending", so the next
+  ingestion reads them now that it is (F-839). Unchanged files are otherwise never read
+  again. Returns how many, in the current app's database.
+  """
+  def requeue_missing_tool(tool) do
+    prefix = missing_tool_reason(tool)
+
+    {count, _} =
+      Repo.update_all(
+        from(d in Document, where: d.status == "skipped" and like(d.error, ^"#{prefix}%")),
+        set: [status: "pending", error: nil]
+      )
+
+    count
+  end
+
+  @doc """
   Marks a document as indexed with content hash.
   """
   def mark_indexed(%Document{} = doc, content_hash) do

@@ -36,8 +36,8 @@ defmodule AskDrive.Application do
         AskDrive.ACME.Renewal,
         AskDrive.Runtime.Mode,
         AskDrive.LLM.OllamaModels,
-        # installing Ollama from the platform admin screen (F-837)
-        AskDrive.LLM.OllamaInstaller,
+        # installing Ollama and pandoc from the platform admin screen (F-837, F-839)
+        AskDrive.Runtime.ToolInstaller,
         # Start to serve requests, typically the last entry
         AskDriveWeb.Endpoint
       ]

@@ -50,7 +50,8 @@ AskDrive 管理スクリプト
   deploy             最新コードを取得し、マイグレーションと再ビルド・再起動を実行
   update [options]   Git/Release から自己アップデート (--yes, --ver <version>, --build-only: ビルドのみ・再起動なし)
   repair-ollama      .runtime に Ollama をインストール / 再インストール (あとで Ollama に切り替えるとき・llama-server 欠落の修復)
-  install-ollama     .runtime に Ollama をインストールするだけ (デプロイしない。管理画面の「Ollama」から実行される)
+  install-ollama     .runtime に Ollama をインストールするだけ (デプロイしない。管理画面の「インストールとアップデート」から実行される)
+  install-pandoc     .runtime に pandoc（Office 文書の本文抽出）をインストールする (同上)
   admin grant <mail> 指定メールアドレスを全体管理者にする (ロックアウト時の復旧)
   auth status        ログイン認証・LDAP・管理者アカウントの状態
   auth disable       ログイン認証を無効に戻す (ゲスト・POC。締め出されたときの復旧)
@@ -366,6 +367,17 @@ cmd_install_ollama() {
   fi
   pkill -f "^(${RUNTIME_BIN}/)?ollama serve" 2>/dev/null || true
   echo "Ollama を ${RUNTIME_DIR} にインストールしました。"
+}
+
+# 管理画面の「インストールとアップデート」から実行する（F-839）。pandoc の公式の
+# スタンドアロン版を .runtime/bin に置く（初回セットアップと同じ手順。sudo 不要）。
+cmd_install_pandoc() {
+  echo "pandoc をダウンロードしています..."
+  if ! install_pandoc; then
+    echo "pandoc のインストールに失敗しました。" >&2
+    exit 1
+  fi
+  echo "pandoc を ${RUNTIME_BIN}/pandoc にインストールしました（$("${RUNTIME_BIN}/pandoc" --version | head -n 1)）。"
 }
 
 cmd_admin() {
@@ -846,6 +858,9 @@ case "${COMMAND}" in
     ;;
   install-ollama)
     cmd_install_ollama "$@"
+    ;;
+  install-pandoc)
+    cmd_install_pandoc "$@"
     ;;
   admin)
     cmd_admin "$@"
