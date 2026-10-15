@@ -16,6 +16,7 @@ defmodule AskDrive.Accounts.LoginThrottle do
   any lock (`unlock/1`).
   """
 
+  use Gettext, backend: AskDriveWeb.Gettext
   import Ecto.Query
   alias AskDrive.Accounts.{LoginFailure, LoginLock}
   alias AskDrive.Repo
@@ -148,7 +149,7 @@ defmodule AskDrive.Accounts.LoginThrottle do
   end
 
   @doc "\"Chrome 131 / Windows\" from a User-Agent, for the admin screen."
-  def describe_user_agent(nil), do: "不明"
+  def describe_user_agent(nil), do: gettext("Unknown")
 
   def describe_user_agent(ua) do
     browser =

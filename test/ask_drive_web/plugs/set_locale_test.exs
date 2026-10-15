@@ -1,6 +1,9 @@
 defmodule AskDriveWeb.Plugs.SetLocaleTest do
   use AskDriveWeb.ConnCase, async: true
 
+  # these tests set the language preference themselves
+  @moduletag locale: :none
+
   alias AskDriveWeb.Plugs.SetLocale
 
   test "defaults to en when no preference, session, or accept-language is present", %{conn: conn} do

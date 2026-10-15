@@ -2,6 +2,9 @@ defmodule AskDriveWeb.HeaderNavTest do
   @moduledoc "Where a desk's admin screen and Platform Admin are reached from (spec F-1117)."
   use AskDriveWeb.ConnCase, async: false
 
+  # asserts the English texts
+  @moduletag locale: "en"
+
   alias AskDrive.Accounts
 
   # the header's right-hand side, in order, as element ids

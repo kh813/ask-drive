@@ -11,6 +11,7 @@ defmodule AskDrive.ChatSummary do
   """
   require Logger
 
+  use Gettext, backend: AskDriveWeb.Gettext
   alias AskDrive.{LLM, Settings, Snippet}
 
   @max_excerpt_chars 1_200
@@ -29,8 +30,11 @@ defmodule AskDrive.ChatSummary do
   # when they don't answer the question (F-416): those rules are in every prompt.
   @styles %{
     "concise" => %{
-      label: "簡潔（一般論・前置きなし）",
-      description: "250字以内で要点だけを答えます（3点以内の箇条書き）。小さなローカルモデル向け。",
+      label: gettext_noop("Concise (no generalities or preamble)"),
+      description:
+        gettext_noop(
+          "Answers with the key points only, in up to 250 characters (at most 3 bullet points). Suited to small local models."
+        ),
       ja_chars: 250,
       en_words: 150,
       max_tokens: 450,
@@ -48,8 +52,11 @@ defmodule AskDrive.ChatSummary do
       """
     },
     "conversational" => %{
-      label: "対話調（同僚に丁寧に説明）",
-      description: "同僚に話すような丁寧で自然な口調で、結論 → 要点の箇条書き → 一言の補足の順に答えます（500字以内）。",
+      label: gettext_noop("Conversational (explained politely, as to a colleague)"),
+      description:
+        gettext_noop(
+          "Answers in a polite, natural tone, as if talking to a colleague: the conclusion, then the key points as bullets, then a one-line note (up to 500 characters)."
+        ),
       ja_chars: 500,
       en_words: 300,
       max_tokens: 900,
@@ -71,8 +78,11 @@ defmodule AskDrive.ChatSummary do
       """
     },
     "detailed" => %{
-      label: "詳しく（条件・手順・例外まで）",
-      description: "結論のあと、抜粋にある手順・条件・例外・期限を番号付きリストや箇条書きで整理して答えます（800字以内）。",
+      label: gettext_noop("Detailed (conditions, steps and exceptions)"),
+      description:
+        gettext_noop(
+          "After the conclusion, sets out the steps, conditions, exceptions and deadlines in the excerpts as numbered lists or bullets (up to 800 characters)."
+        ),
       ja_chars: 800,
       en_words: 450,
       max_tokens: 1_400,
@@ -94,8 +104,11 @@ defmodule AskDrive.ChatSummary do
       """
     },
     "plain" => %{
-      label: "やさしく（新しいメンバー向け）",
-      description: "専門用語や略語をかみ砕き、配属されたばかりの人にも分かる言葉で答えます（500字以内）。",
+      label: gettext_noop("Plain (for new members)"),
+      description:
+        gettext_noop(
+          "Explains jargon and abbreviations in words that someone who has just joined can follow (up to 500 characters)."
+        ),
       ja_chars: 500,
       en_words: 300,
       max_tokens: 900,
@@ -121,10 +134,12 @@ defmodule AskDrive.ChatSummary do
   @default_style "concise"
 
   @doc "The answer styles as `{label, value}` pairs for a select, in display order (F-432)."
-  def style_options, do: Enum.map(@style_order, &{@styles[&1].label, &1})
+  def style_options,
+    do: Enum.map(@style_order, &{Gettext.gettext(AskDriveWeb.Gettext, @styles[&1].label), &1})
 
   @doc "A one-line explanation of an answer style, for the admin settings."
-  def style_description(style), do: style_config(style).description
+  def style_description(style),
+    do: Gettext.gettext(AskDriveWeb.Gettext, style_config(style).description)
 
   @doc "The answer style the settings pick; an unknown or missing one falls back to concise."
   def style(setting) do

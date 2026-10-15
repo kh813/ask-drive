@@ -26,14 +26,32 @@ defmodule AskDriveWeb.ConnCase do
 
       # Import conveniences for testing with connections
       import Plug.Conn
-      import Phoenix.ConnTest
+      import Phoenix.ConnTest, except: [build_conn: 0]
       import AskDriveWeb.ConnCase
     end
   end
 
   setup tags do
     AskDrive.DataCase.setup_sandbox(tags)
-    {:ok, conn: Phoenix.ConnTest.build_conn()}
+
+    # The suite asserts the Japanese UI the screens were written in; a test that checks the
+    # English one tags itself `@tag locale: "en"`, and `locale: :none` sends no preference.
+    Process.put({__MODULE__, :locale}, Map.get(tags, :locale, "ja"))
+    {:ok, conn: build_conn()}
+  end
+
+  @doc """
+  `Phoenix.ConnTest.build_conn/0` with the test's language preference (Accept-Language: the
+  `:locale` tag, Japanese by default).
+  """
+  def build_conn do
+    case Process.get({__MODULE__, :locale}, "ja") do
+      :none ->
+        Phoenix.ConnTest.build_conn()
+
+      locale ->
+        Phoenix.ConnTest.build_conn() |> Plug.Conn.put_req_header("accept-language", locale)
+    end
   end
 
   alias AskDrive.Accounts.User

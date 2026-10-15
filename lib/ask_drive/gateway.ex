@@ -23,6 +23,8 @@ defmodule AskDrive.Gateway do
   it off when the admin screen can't be reached. Re-read when the file changes.
   """
 
+  use Gettext, backend: AskDriveWeb.Gettext
+
   alias AskDrive.Network
 
   @header "x-apigw-secret"
@@ -78,8 +80,8 @@ defmodule AskDrive.Gateway do
   @doc "What is missing before the check can be switched on (`[]` when nothing)."
   def enable_problems(settings \\ settings()) do
     [
-      is_nil(settings.secret) && "秘密のヘッダーの値を保存してください",
-      is_nil(settings.public_url) && "公開 URL を保存してください"
+      is_nil(settings.secret) && gettext("Save the secret header value"),
+      is_nil(settings.public_url) && gettext("Save the public URL")
     ]
     |> Enum.filter(&is_binary/1)
   end
@@ -140,13 +142,17 @@ defmodule AskDrive.Gateway do
     errors =
       [
         secret && String.length(secret) < @min_secret &&
-          "秘密の値は #{@min_secret} 文字以上にしてください",
-        secret && Regex.match?(~r/[\s"\\]/, secret) && "秘密の値に空白・引用符・バックスラッシュは使えません",
+          gettext("The secret value must be at least %{count} characters", count: @min_secret),
+        secret && Regex.match?(~r/[\s"\\]/, secret) &&
+          gettext("The secret value can't contain spaces, quotes or backslashes"),
         public_url && not valid_public_url?(public_url) &&
-          "公開 URL は https://app.example.com の形（パスなし）で入力してください",
-        current.enabled && is_nil(public_url) && "有効の間は公開 URL を空にできません（先に無効にしてください）",
+          gettext("Enter the public URL as https://app.example.com (no path)"),
+        current.enabled && is_nil(public_url) &&
+          gettext("The public URL can't be emptied while the check is on (turn it off first)"),
         match?({:error, _}, ranges) &&
-          "直接アクセスを許可する IP として読み取れません: #{elem(ranges, 1) |> List.wrap() |> Enum.join("、")}"
+          gettext("Can't read these as IPs allowed direct access: %{values}",
+            values: elem(ranges, 1) |> List.wrap() |> Enum.join(gettext(", "))
+          )
       ]
       |> Enum.filter(&is_binary/1)
 

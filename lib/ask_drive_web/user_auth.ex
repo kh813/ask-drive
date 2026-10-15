@@ -28,6 +28,7 @@ defmodule AskDriveWeb.UserAuth do
   import Phoenix.Controller
   import Plug.Conn
 
+  use Gettext, backend: AskDriveWeb.Gettext
   alias AskDrive.Accounts
   alias AskDrive.Accounts.{AdminAccess, User}
   alias Phoenix.LiveView
@@ -39,13 +40,16 @@ defmodule AskDriveWeb.UserAuth do
 
   # Not a persisted row (id 0 never occurs in SQLite's autoincrement), so it can never be
   # confused with — or accidentally modified as if it were — a real user.
-  @guest_admin %User{
-    id: 0,
-    email: "poc@localhost",
-    name: "ゲスト（認証無効・POC モード）",
-    admin_eligible: true,
-    status: "active"
-  }
+  # (a function, not an attribute, so its name follows the viewer's language)
+  defp guest_admin do
+    %User{
+      id: 0,
+      email: "poc@localhost",
+      name: gettext("Guest (authentication off, POC mode)"),
+      admin_eligible: true,
+      status: "active"
+    }
+  end
 
   @doc """
   Whether login and elevation are bypassed: `ASK_DRIVE_DISABLE_AUTH` when it holds a
@@ -165,7 +169,7 @@ defmodule AskDriveWeb.UserAuth do
   def fetch_current_user(conn, _opts) do
     if auth_disabled?() do
       conn
-      |> assign(:current_user, @guest_admin)
+      |> assign(:current_user, guest_admin())
       |> assign(:admin_elevated?, true)
       |> assign(:admin_elevation_expires_at, nil)
     else
@@ -474,7 +478,7 @@ defmodule AskDriveWeb.UserAuth do
   defp assign_current_user(socket, session) do
     if auth_disabled?() do
       socket
-      |> Phoenix.Component.assign(:current_user, @guest_admin)
+      |> Phoenix.Component.assign(:current_user, guest_admin())
       |> Phoenix.Component.assign(:admin_elevated?, true)
       |> Phoenix.Component.assign(:admin_elevation_expires_at, nil)
     else

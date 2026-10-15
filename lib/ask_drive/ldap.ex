@@ -20,6 +20,7 @@ defmodule AskDrive.Ldap do
   verified password is remembered for 24 hours (`AskDrive.Ldap.Cache`).
   """
 
+  use Gettext, backend: AskDriveWeb.Gettext
   require Logger
   alias AskDrive.Ldap.Cache
   alias AskDrive.Settings.Setting
@@ -65,7 +66,7 @@ defmodule AskDrive.Ldap do
 
     cond do
       not enabled?(setting) ->
-        {:error, {:unavailable, "LDAP ログインが設定されていません"}}
+        {:error, {:unavailable, gettext("LDAP sign-in is not set up")}}
 
       not usable? ->
         {:error, :invalid_credentials}
@@ -162,9 +163,14 @@ defmodule AskDrive.Ldap do
   defp service_bind(client, handle, setting) do
     if present?(setting.ldap_bind_dn) and present?(setting.ldap_bind_password) do
       case client.bind(handle, setting.ldap_bind_dn, setting.ldap_bind_password) do
-        :ok -> :ok
-        {:error, :ldap_closed} -> closed()
-        {:error, reason} -> unavailable("アクセス認証情報でのバインドに失敗しました", reason)
+        :ok ->
+          :ok
+
+        {:error, :ldap_closed} ->
+          closed()
+
+        {:error, reason} ->
+          unavailable(gettext("Binding with the access credentials failed"), reason)
       end
     else
       :ok
@@ -180,16 +186,19 @@ defmodule AskDrive.Ldap do
         {:error, :invalid_credentials}
 
       {:ok, [_ | _]} ->
-        unavailable("同じメールアドレスのユーザーが複数見つかりました", email)
+        unavailable(gettext("More than one user has this email address"), email)
 
       {:error, :insufficientAccessRights} ->
-        unavailable("ユーザー情報を読み取る権限がありません", :insufficientAccessRights)
+        unavailable(
+          gettext("No permission to read user information"),
+          :insufficientAccessRights
+        )
 
       {:error, :ldap_closed} ->
         closed()
 
       {:error, reason} ->
-        unavailable("ユーザーを検索できません", reason)
+        unavailable(gettext("Can't search for the user"), reason)
     end
   end
 
@@ -262,9 +271,19 @@ defmodule AskDrive.Ldap do
       with_connection(setting, fn client, handle ->
         with :ok <- service_bind(client, handle, setting) do
           case client.search(handle, base_dn(setting), :base) do
-            {:ok, _} -> :ok
-            {:error, :ldap_closed} -> closed()
-            {:error, reason} -> unavailable("ベース DN（#{base_dn(setting)}）を読み取れません", reason)
+            {:ok, _} ->
+              :ok
+
+            {:error, :ldap_closed} ->
+              closed()
+
+            {:error, reason} ->
+              unavailable(
+                gettext("Can't read the base DN (%{base_dn})",
+                  base_dn: to_string(base_dn(setting))
+                ),
+                reason
+              )
           end
         end
       end)
@@ -273,7 +292,8 @@ defmodule AskDrive.Ldap do
         {:error, {:unavailable, message}} -> {:error, message}
       end
     else
-      {:error, "クライアント証明書・秘密鍵・ベース DN（またはドメイン）を設定してください"}
+      {:error,
+       gettext("Set the client certificate, the private key and the base DN (or the domain)")}
     end
   end
 
@@ -292,7 +312,13 @@ defmodule AskDrive.Ldap do
             end
 
           {:error, reason} ->
-            unavailable("#{host}:#{port(setting)} に接続できません（証明書・サービスの状態を確認してください）", reason)
+            unavailable(
+              gettext(
+                "Can't connect to %{address} (check the certificate and the service status)",
+                address: "#{host}:#{port(setting)}"
+              ),
+              reason
+            )
         end
 
       {:error, message} ->
@@ -328,10 +354,10 @@ defmodule AskDrive.Ldap do
   defp first_der(pem, type) do
     case :public_key.pem_decode(pem || "") do
       [{^type, der, _} | _] -> {:ok, der}
-      _ -> {:error, "クライアント証明書を読み取れません"}
+      _ -> {:error, gettext("Can't read the client certificate")}
     end
   rescue
-    _ -> {:error, "クライアント証明書を読み取れません"}
+    _ -> {:error, gettext("Can't read the client certificate")}
   end
 
   defp key_der(pem) do
@@ -341,31 +367,37 @@ defmodule AskDrive.Ldap do
         {:ok, {type, der}}
 
       _ ->
-        {:error, "クライアントの秘密鍵を読み取れません"}
+        {:error, gettext("Can't read the client private key")}
     end
   rescue
-    _ -> {:error, "クライアントの秘密鍵を読み取れません"}
+    _ -> {:error, gettext("Can't read the client private key")}
   end
 
   # the system's trusted CAs (ldap.google.com has a public certificate), or the one given
   defp cacerts(pem) do
     if present?(pem) do
       case for({:Certificate, der, _} <- :public_key.pem_decode(pem), do: der) do
-        [] -> {:error, "CA 証明書を読み取れません"}
+        [] -> {:error, gettext("Can't read the CA certificate")}
         ders -> {:ok, ders}
       end
     else
       {:ok, :public_key.cacerts_get()}
     end
   rescue
-    _ -> {:error, "CA 証明書を読み取れません"}
+    _ -> {:error, gettext("Can't read the CA certificate")}
   end
 
   # With TLS 1.3 the server checks the client certificate after the handshake has completed
   # on our side, so a refused certificate shows up as the connection closing on the first
   # request rather than as a failed connect.
   defp closed,
-    do: unavailable("LDAP サーバーが接続を切断しました（クライアント証明書が拒否された可能性があります）", :ldap_closed)
+    do:
+      unavailable(
+        gettext(
+          "The LDAP server closed the connection (the client certificate may have been refused)"
+        ),
+        :ldap_closed
+      )
 
   defp unavailable(message, reason) do
     Logger.warning("LDAP: #{message}: #{inspect(reason)}")

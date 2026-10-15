@@ -13,8 +13,12 @@ config :ask_drive,
   # POC (spec 6.9.6): login and admin elevation are off unless ASK_DRIVE_DISABLE_AUTH=false.
   auth_disabled_by_default: true
 
+# The default locale is only for text built outside a request — background work such as
+# the health check, batch errors and logs, shared by every viewer — which has always been
+# Japanese. Each request and LiveView sets its own (AskDriveWeb.Plugs.SetLocale: the
+# viewer's choice, else the browser's, else English).
 config :ask_drive, AskDriveWeb.Gettext,
-  default_locale: "en",
+  default_locale: "ja",
   locales: ~w(en ja)
 
 # Oban configuration for SQLite3

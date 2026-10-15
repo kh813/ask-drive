@@ -13,9 +13,11 @@ defmodule AskDrive.ClientCerts.Group do
     group
     |> cast(attrs, [:name])
     |> update_change(:name, &String.trim/1)
-    |> validate_required([:name], message: "グループ名を入力してください")
+    |> validate_required([:name], message: "Enter a group name")
     |> validate_length(:name, max: 60)
-    |> validate_format(:name, ~r{^[^/\\\\=,+"<>;#]+$}, message: "に使えない文字が含まれています")
-    |> unique_constraint(:name, message: "は既にあります")
+    |> validate_format(:name, ~r{^[^/\\\\=,+"<>;#]+$},
+      message: "contains characters that can't be used"
+    )
+    |> unique_constraint(:name, message: "already exists")
   end
 end

@@ -27,10 +27,12 @@ defmodule AskDriveWeb.UpdatePanel do
           <div>
             <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
               <.icon name="hero-arrow-path-rounded-square" class="w-5 h-5 text-indigo-600" />
-              AskDrive のアップデート
+              {gettext("AskDrive updates")}
             </h2>
             <p class="text-xs text-zinc-500 mt-1 leading-relaxed max-w-2xl">
-              新しいバージョンは、サーバーとバッチを動かしたまま裏でビルドし、終わったら短い再起動（30 秒ほど）で切り替えます。再起動のあいだ、開いている画面には「アップデート中」と表示され、終わると自動で再読み込みします。
+              {gettext(
+                "A new version is built in the background while the server and batches keep running, then switched to with a short restart (about 30 seconds). During the restart, open screens show “Updating” and reload automatically when it is done."
+              )}
             </p>
           </div>
           <button
@@ -41,13 +43,13 @@ defmodule AskDriveWeb.UpdatePanel do
             class="px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium flex items-center gap-1.5 transition disabled:opacity-50"
           >
             <.icon name="hero-arrow-path" class={["w-4 h-4", @checking && "animate-spin"]} />
-            {if @checking, do: "確認しています…", else: "今すぐ確認"}
+            {if @checking, do: gettext("Checking…"), else: gettext("Check now")}
           </button>
         </div>
 
         <dl class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
-            <dt class="text-zinc-500">稼働中</dt>
+            <dt class="text-zinc-500">{gettext("Running version")}</dt>
             <dd
               id="update-current"
               class="mt-1 font-mono text-base font-semibold text-zinc-900 dark:text-zinc-100"
@@ -62,7 +64,7 @@ defmodule AskDriveWeb.UpdatePanel do
               else: "bg-zinc-50 dark:bg-zinc-950 border-zinc-200/60 dark:border-zinc-800"
             )
           ]}>
-            <dt class="text-zinc-500">最新</dt>
+            <dt class="text-zinc-500">{gettext("Latest")}</dt>
             <dd
               id="update-latest"
               class="mt-1 font-mono text-base font-semibold text-zinc-900 dark:text-zinc-100"
@@ -72,22 +74,22 @@ defmodule AskDriveWeb.UpdatePanel do
                 :if={@available}
                 class="ml-1 align-middle text-[10px] font-sans font-semibold px-1.5 py-0.5 rounded-full bg-indigo-600 text-white"
               >
-                新しいバージョンがあります
+                {gettext("New version available")}
               </span>
               <span
                 :if={@setting.update_latest_version && !@available}
                 class="ml-1 align-middle text-[10px] font-sans text-emerald-600 dark:text-emerald-400"
               >
-                最新です
+                {gettext("Up to date")}
               </span>
             </dd>
           </div>
           <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
-            <dt class="text-zinc-500">最後の確認</dt>
+            <dt class="text-zinc-500">{gettext("Last checked")}</dt>
             <dd class="mt-1 text-zinc-700 dark:text-zinc-300">
               {if @setting.update_checked_at,
                 do: AskDrive.Clock.format(@setting.update_checked_at, "%Y-%m-%d %H:%M"),
-                else: "まだ確認していません"}
+                else: gettext("Not checked yet")}
             </dd>
           </div>
         </dl>
@@ -103,14 +105,14 @@ defmodule AskDriveWeb.UpdatePanel do
               open={@available != nil}
             >
               <summary class="cursor-pointer text-zinc-600 dark:text-zinc-400 select-none">
-                v{latest.version} のリリースノート
+                {gettext("Release notes for v%{version}", version: latest.version)}
                 <a
                   :if={latest.url}
                   href={latest.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   class="ml-1 underline text-indigo-600"
-                >GitHub で見る</a>
+                >{gettext("View on GitHub")}</a>
               </summary>
               <pre class="mt-2 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 text-[11px] text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap max-h-60 overflow-y-auto">{latest.notes}</pre>
             </details>
@@ -123,7 +125,7 @@ defmodule AskDriveWeb.UpdatePanel do
           class="text-xs text-zinc-600 dark:text-zinc-400 flex items-center gap-1.5"
         >
           <.icon name="hero-clock" class="w-3.5 h-3.5 text-zinc-400" />
-          前回のアップデート: {@setting.update_last_result}
+          {gettext("Last update: %{result}", result: @setting.update_last_result)}
         </p>
 
         <%!-- Start --%>
@@ -135,17 +137,23 @@ defmodule AskDriveWeb.UpdatePanel do
         >
           <fieldset class="space-y-1.5 text-xs text-zinc-700 dark:text-zinc-300">
             <legend class="font-medium text-zinc-800 dark:text-zinc-200 mb-1">
-              バッチの実行中にビルドが終わったら
+              {gettext("If the build finishes while a batch is running")}
             </legend>
             <label class="flex items-start gap-2 cursor-pointer">
               <input type="radio" name="wait" value="boundary" checked class="mt-0.5" />
               <span>
-                <strong>区切りで一時停止して再起動し、再起動後に続きから再開する</strong>（推奨。止まるのは処理中のファイル／チャンクが終わった時点）
+                <strong>{gettext("Pause at a break point, restart, and resume where it left off after the restart")}</strong>{gettext(
+                  " (recommended; it stops once the file / chunk being processed is finished)"
+                )}
               </span>
             </label>
             <label class="flex items-start gap-2 cursor-pointer">
               <input type="radio" name="wait" value="batch_end" class="mt-0.5" />
-              <span>バッチが終わるまで待ってから再起動する（夜間バッチ中だと朝までかかることがあります）</span>
+              <span>
+                {gettext(
+                  "Wait until the batch finishes, then restart (during the nightly batch this can take until morning)"
+                )}
+              </span>
             </label>
           </fieldset>
           <div class="flex flex-wrap items-center gap-3">
@@ -154,15 +162,20 @@ defmodule AskDriveWeb.UpdatePanel do
               type="submit"
               id="start-update-btn"
               disabled={!@available}
-              data-confirm={"AskDrive を v#{@available} にアップデートしますか？ビルドが終わると、30 秒ほど再起動します。"}
+              data-confirm={
+                gettext(
+                  "Update AskDrive to v%{version}? Once the build is done, it restarts for about 30 seconds.",
+                  version: to_string(@available)
+                )
+              }
               class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm flex items-center gap-1.5 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo-600"
             >
-              <.icon name="hero-arrow-down-tray" class="w-4 h-4" /> 今すぐアップデート
+              <.icon name="hero-arrow-down-tray" class="w-4 h-4" /> {gettext("Update now")}
             </button>
             <span :if={!@available} id="start-update-hint" class="text-xs text-zinc-500">
               {if @setting.update_latest_version,
-                do: "最新版で稼働しています。",
-                else: "「今すぐ確認」で最新版を確認すると、アップデートできるようになります。"}
+                do: gettext("Running the latest version."),
+                else: gettext("Check for the latest version with “Check now” to be able to update.")}
             </span>
           </div>
         </form>
@@ -183,10 +196,10 @@ defmodule AskDriveWeb.UpdatePanel do
               {phase_label(@status.phase)}
             </span>
             <span class="text-xs text-zinc-500">
-              v{@status.from} → {if @status.to, do: "v#{@status.to}", else: "最新版"}
+              v{@status.from} → {if @status.to, do: "v#{@status.to}", else: gettext("latest version")}
               <span :if={@status.by}>・{@status.by}</span>
               <span :if={@status.started_at}>
-                ・{AskDrive.Clock.format(@status.started_at, "%H:%M")} 開始
+                ・{gettext("started %{time}", time: AskDrive.Clock.format(@status.started_at, "%H:%M"))}
               </span>
             </span>
           </div>
@@ -196,20 +209,24 @@ defmodule AskDriveWeb.UpdatePanel do
               type="button"
               id="cancel-update-btn"
               phx-click="cancel_update"
-              data-confirm="ビルドを中止しますか？（稼働中のサーバーは変わりません）"
+              data-confirm={gettext("Cancel the build? (The running server is not affected.)")}
               class="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs transition"
             >
-              中止
+              {gettext("Abort")}
             </button>
             <button
               :if={@status.phase == :waiting_batch}
               type="button"
               id="restart-now-btn"
               phx-click="restart_now"
-              data-confirm="バッチを待たずに今すぐ再起動しますか？処理中のファイル（またはチャンク）はやり直しになります。"
+              data-confirm={
+                gettext(
+                  "Restart now without waiting for the batch? The file (or chunk) being processed will be redone."
+                )
+              }
               class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium transition"
             >
-              今すぐ再起動
+              {gettext("Restart now")}
             </button>
           </div>
         </div>
@@ -237,26 +254,38 @@ defmodule AskDriveWeb.UpdatePanel do
       <%!-- Settings --%>
       <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
         <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-          <.icon name="hero-moon" class="w-5 h-5 text-indigo-600" /> 夜間のアップデート
+          <.icon name="hero-moon" class="w-5 h-5 text-indigo-600" /> {gettext("Nightly updates")}
         </h2>
         <div id="update-settings" class="space-y-2">
           <AskDriveWeb.FeatureToggle.toggle
             id="toggle-update-check"
             feature="update_check"
             on={@setting.update_check_enabled == true}
-            label="毎晩、新しいバージョンを確認する"
-            hint="夜間枠の開始時。見つかるとこの画面と管理画面の見出しに表示"
+            label={gettext("Check for a new version every night")}
+            hint={
+              gettext(
+                "At the start of the night window. When one is found, it is shown on this screen and in the admin screen header."
+              )
+            }
           />
           <AskDriveWeb.FeatureToggle.toggle
             id="toggle-update-auto-apply"
             feature="update_auto_apply"
             on={@setting.update_auto_apply == true}
-            label="新しいバージョンが見つかったら自動でアップデートする"
-            hint="夜間バッチより先に行い、バッチは再起動後に始まります"
-            confirm_on="新しいバージョンが見つかった夜に、自動でアップデートして再起動するようにします。続行しますか？"
+            label={gettext("Update automatically when a new version is found")}
+            hint={gettext("Runs before the nightly batch; the batch starts after the restart.")}
+            confirm_on={
+              gettext(
+                "On a night when a new version is found, AskDrive will update and restart automatically. Continue?"
+              )
+            }
           />
           <p class="text-[11px] text-zinc-500 leading-relaxed">
-            自動アップデートでも、ビルドに失敗した場合は稼働中のバージョンのまま動き続けます。再起動による自動の切り替えには、AskDrive が常駐サービス（<code class="font-mono">./app.sh service install</code>）として登録されている必要があります。
+            {gettext(
+              "Even with automatic updates, if the build fails the running version keeps running. Switching over automatically by restarting requires AskDrive to be a resident service ("
+            )}<code class="font-mono">./app.sh service install</code>{gettext(
+              ") registered on the server."
+            )}
           </p>
         </div>
       </div>
@@ -268,16 +297,24 @@ defmodule AskDriveWeb.UpdatePanel do
       >
         <div>
           <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-            <.icon name="hero-bell-alert" class="w-5 h-5 text-indigo-600" /> 通知（Google Chat）
+            <.icon name="hero-bell-alert" class="w-5 h-5 text-indigo-600" /> {gettext(
+              "Notifications (Google Chat)"
+            )}
           </h2>
           <p class="text-xs text-zinc-500 mt-1 leading-relaxed max-w-2xl">
-            アップデートの開始時と、新しいバージョンが起動して正常に稼働したときに、Google Chat のスペースへ通知します（自動・手動とも）。開始の通知だけが届いて完了の通知が来なければ、再起動後に起動できていない可能性があります。ビルドの失敗や、古いバージョンのまま起動した場合も通知します。
+            {gettext(
+              "Posts to a Google Chat space when an update starts and when the new version has started and is running normally (automatic and manual alike). If only the start notice arrives and no completion notice follows, AskDrive may have failed to start after the restart. A failed build, or starting on the old version, is also notified."
+            )}
           </p>
         </div>
         <ol class="list-decimal pl-5 text-[11px] text-zinc-600 dark:text-zinc-400 space-y-0.5">
-          <li>Google Chat で通知先のスペースを開き、スペース名 →「アプリと統合」→「Webhook を追加」</li>
-          <li>名前（例: AskDrive）を入れて保存し、表示された URL をコピー</li>
-          <li>下に貼り付けて保存し、「テスト送信」で届くか確認</li>
+          <li>
+            {gettext(
+              "In Google Chat, open the space to notify, then space name → “Apps & integrations” → “Add webhooks”"
+            )}
+          </li>
+          <li>{gettext("Enter a name (e.g. AskDrive), save, and copy the URL shown")}</li>
+          <li>{gettext("Paste it below, save, and check that “Send test” arrives")}</li>
         </ol>
         <.form
           for={@form}
@@ -290,7 +327,11 @@ defmodule AskDriveWeb.UpdatePanel do
             type="password"
             value=""
             autocomplete="off"
-            label={"Webhook URL（#{if AskDrive.Notify.GoogleChat.configured?(@setting), do: "設定済み。変更するときだけ入力", else: "未設定"}）"}
+            label={
+              if AskDrive.Notify.GoogleChat.configured?(@setting),
+                do: gettext("Webhook URL (set; enter only to change it)"),
+                else: gettext("Webhook URL (not set)")
+            }
             placeholder="https://chat.googleapis.com/v1/spaces/.../messages?key=...&token=..."
           />
           <div class="flex flex-wrap items-center justify-end gap-2">
@@ -299,34 +340,36 @@ defmodule AskDriveWeb.UpdatePanel do
               type="button"
               id="clear-google-chat-btn"
               phx-click="clear_google_chat"
-              data-confirm="Google Chat の Webhook URL を削除しますか？（通知が届かなくなります）"
+              data-confirm={
+                gettext("Delete the Google Chat webhook URL? (Notifications will stop arriving.)")
+              }
               class="px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40 text-xs transition"
             >
-              削除
+              {gettext("Delete")}
             </button>
             <button
               :if={AskDrive.Notify.GoogleChat.configured?(@setting)}
               type="button"
               id="test-google-chat-btn"
               phx-click="test_google_chat"
-              phx-disable-with="送信しています…"
+              phx-disable-with={gettext("Sending…")}
               class="px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium transition"
             >
-              テスト送信
+              {gettext("Send test")}
             </button>
             <button
               type="submit"
               id="save-notify-settings-btn"
               class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
             >
-              保存
+              {gettext("Save")}
             </button>
           </div>
         </.form>
         <%= case @notify_test do %>
           <% :ok -> %>
             <p id="google-chat-test-result" class="text-xs text-emerald-600 dark:text-emerald-400">
-              テスト通知を送信しました。Google Chat のスペースに届いているか確認してください。
+              {gettext("Test notice sent. Check that it arrived in the Google Chat space.")}
             </p>
           <% {:error, message} -> %>
             <p id="google-chat-test-result" class="text-xs text-red-600 dark:text-red-400">
@@ -339,11 +382,11 @@ defmodule AskDriveWeb.UpdatePanel do
     """
   end
 
-  defp phase_label(:building), do: "ビルド中"
-  defp phase_label(:waiting_batch), do: "再起動待ち"
-  defp phase_label(:restarting), do: "再起動中"
-  defp phase_label(:built), do: "ビルド完了（手動で再起動）"
-  defp phase_label(:failed), do: "失敗・中止"
+  defp phase_label(:building), do: gettext("Building")
+  defp phase_label(:waiting_batch), do: gettext("Waiting to restart")
+  defp phase_label(:restarting), do: gettext("Restarting")
+  defp phase_label(:built), do: gettext("Build done (restart manually)")
+  defp phase_label(:failed), do: gettext("Failed / cancelled")
   defp phase_label(_), do: ""
 
   defp phase_class(:failed), do: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"

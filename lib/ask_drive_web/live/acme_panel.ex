@@ -27,16 +27,18 @@ defmodule AskDriveWeb.AcmePanel do
       <div>
         <h3 class="font-semibold text-sm text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
           <.icon name="hero-shield-check" class="w-4 h-4 text-emerald-600" />
-          Let's Encrypt（証明書の自動取得・自動更新）
+          {gettext("Let's Encrypt (automatic certificate issuance and renewal)")}
         </h3>
         <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-          ブラウザや API ゲートウェイが信頼する証明書を Let's Encrypt から無料で取得し、期限が近づくと自動で更新します。所有の確認は DNS の TXT レコードで行う（DNS-01）ため、このサーバーは LAN 内のままで構いません。TXT レコードはバリュードメインの DNS API で追加し、確認が済んだらすぐ削除します。更新は、残りの有効期間が 3 分の 1（90 日の証明書なら 30 日）を切った夜に、夜間バッチの時間帯に 1 回試し、失敗しても翌晩以降に再び試します。結果は Google Chat に通知します（アップデートの通知先を設定している場合）。
+          {gettext(
+            "Gets a certificate trusted by browsers and the API gateway from Let's Encrypt for free, and renews it automatically as it nears expiry. Ownership is proven with a DNS TXT record (DNS-01), so this server can stay inside the LAN. The TXT record is added through the Value-Domain DNS API and deleted as soon as the check is done. Renewal is tried once, during the nightly batch window, on the first night when less than a third of the validity period is left (30 days for a 90-day certificate); if it fails, it is tried again on the following nights. The result is posted to Google Chat (if an update notification destination is set)."
+          )}
         </p>
       </div>
 
       <div id="acme-state" class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
         <div>
-          <span class="text-zinc-400 block">状態</span>
+          <span class="text-zinc-400 block">{gettext("Status")}</span>
           <span class={[
             "font-medium",
             cond do
@@ -46,23 +48,26 @@ defmodule AskDriveWeb.AcmePanel do
             end
           ]}>
             {cond do
-              @running? -> "取得中…"
-              @configured? -> "有効"
-              @setting.acme_enabled -> "設定が足りません"
-              true -> "自動更新は無効"
+              @running? -> gettext("Obtaining…")
+              @configured? -> gettext("On")
+              @setting.acme_enabled -> gettext("Settings incomplete")
+              true -> gettext("Automatic renewal is off")
             end}
           </span>
         </div>
         <div>
-          <span class="text-zinc-400 block">前回の実行</span>
+          <span class="text-zinc-400 block">{gettext("Last run")}</span>
           <span class="font-mono">{AskDrive.Clock.format(@setting.acme_checked_at, "%Y-%m-%d %H:%M")}</span>
         </div>
         <div>
-          <span class="text-zinc-400 block">次の更新</span>
+          <span class="text-zinc-400 block">{gettext("Next renewal")}</span>
           <span class="font-mono">
             {if @renew_after,
-              do: AskDrive.Clock.format(@renew_after, "%Y-%m-%d") <> " 以降の夜",
-              else: "—（Let's Encrypt の証明書の取得後に表示）"}
+              do:
+                gettext("The night of %{date} or later",
+                  date: AskDrive.Clock.format(@renew_after, "%Y-%m-%d")
+                ),
+              else: gettext("— (shown once a Let's Encrypt certificate is obtained)")}
           </span>
         </div>
       </div>
@@ -80,7 +85,9 @@ defmodule AskDriveWeb.AcmePanel do
           )
         ]}
       >
-        {if @setting.acme_last_ok, do: "成功: ", else: "失敗: "}{@setting.acme_last_result}
+        {if @setting.acme_last_ok,
+          do: gettext("Succeeded: %{result}", result: @setting.acme_last_result),
+          else: gettext("Failed: %{result}", result: @setting.acme_last_result)}
       </p>
 
       <div
@@ -95,8 +102,12 @@ defmodule AskDriveWeb.AcmePanel do
         id="toggle-acme"
         feature="acme"
         on={@setting.acme_enabled == true}
-        label="夜間の自動更新"
-        hint="ホスト名・ドメイン・API キーを保存してから有効にできます。「今すぐ取得」は無効のままでも使えます（先に staging で試せます）"
+        label={gettext("Nightly automatic renewal")}
+        hint={
+          gettext(
+            "Can be turned on once the host name, domain and API key are saved. “Obtain now” works even while this is off (try it with staging first)."
+          )
+        }
       />
 
       <.form for={@form} id="acme-form" phx-submit="save_acme" class="space-y-3">
@@ -104,38 +115,50 @@ defmodule AskDriveWeb.AcmePanel do
           <.input
             field={@form[:acme_hostname]}
             type="text"
-            label="証明書のホスト名"
-            placeholder="例: ask.example.com"
+            label={gettext("Certificate host name")}
+            placeholder={gettext("e.g. ask.example.com")}
           />
           <.input
             field={@form[:acme_dns_zone]}
             type="text"
-            label="バリュードメインで管理しているドメイン"
-            placeholder="例: example.com"
+            label={gettext("Domain managed at Value-Domain")}
+            placeholder={gettext("e.g. example.com")}
           />
           <.input
             field={@form[:valuedomain_api_key]}
             type="password"
             value=""
             autocomplete="off"
-            label={"バリュードメインの API キー（#{if present?(@setting.valuedomain_api_key), do: "設定済み。変更するときだけ入力", else: "未設定"}）"}
+            label={
+              if present?(@setting.valuedomain_api_key),
+                do: gettext("Value-Domain API key (set; enter only to change it)"),
+                else: gettext("Value-Domain API key (not set)")
+            }
           />
           <.input
             field={@form[:acme_email]}
             type="email"
-            label="連絡先メールアドレス（任意）"
-            placeholder="期限切れの警告などが Let's Encrypt から届きます"
+            label={gettext("Contact email (optional)")}
+            placeholder={gettext("Let's Encrypt sends expiry warnings and the like here")}
           />
         </div>
         <.input
           field={@form[:acme_staging]}
           type="checkbox"
-          label="テスト用（staging）の証明書を取得する（ブラウザでは警告が出ます。設定の確認用）"
+          label={
+            gettext(
+              "Get a test (staging) certificate (browsers will show a warning; for checking the settings)"
+            )
+          }
         />
         <p class="text-[11px] text-zinc-500 leading-relaxed">
-          「保存」は値を保存するだけで、自動更新の有効・無効は上のスイッチで切り替えます。API キーはバリュードメインの「API」設定で発行し、暗号化して保存します。バリュードメインの DNS API はドメインのレコードをまとめて書き換える方式のため、変更の前に毎回レコード全体をサーバーの
+          {gettext(
+            "“Save” only saves the values; automatic renewal is turned on and off with the switch above. Issue the API key in Value-Domain's “API” settings; it is stored encrypted. Value-Domain's DNS API rewrites all of a domain's records at once, so before every change the whole record set is saved on the server in"
+          )}
           <code class="font-mono">ssl/acme/dns_backup/</code>
-          に保存し、変更後に読み直して TXT レコード以外が変わっていないことを確かめます。初めて使うときは「テスト用」で取得できることを確かめてから、本番の証明書に切り替えてください（本番には失敗回数の制限があります）。
+          {gettext(
+            "and after the change it is read back to confirm that nothing but the TXT record changed. The first time, make sure a “test” certificate can be obtained before switching to a production one (production has a limit on failed attempts)."
+          )}
         </p>
         <div class="flex flex-wrap items-center gap-2">
           <button
@@ -143,7 +166,7 @@ defmodule AskDriveWeb.AcmePanel do
             id="save-acme-btn"
             class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition"
           >
-            保存
+            {gettext("Save")}
           </button>
           <button
             type="button"
@@ -154,27 +177,36 @@ defmodule AskDriveWeb.AcmePanel do
             }
             class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            DNS 接続テスト（変更しません）
+            {gettext("Test DNS connection (changes nothing)")}
           </button>
           <button
             type="button"
             id="run-acme-btn"
             phx-click="run_acme"
             disabled={not @ready? or @running?}
-            data-confirm="Let's Encrypt から証明書を取得し、HTTPS を再起動して適用します。DNS に一時的な TXT レコードを追加し、確認後に削除します。続行しますか？"
+            data-confirm={
+              gettext(
+                "Get a certificate from Let's Encrypt and restart HTTPS to apply it. A temporary TXT record is added to DNS and deleted after the check. Continue?"
+              )
+            }
             class="px-4 py-2 rounded-lg border border-emerald-300 text-emerald-800 dark:text-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {if @running?, do: "取得中…", else: "今すぐ取得"}
+            {if @running?, do: gettext("Obtaining…"), else: gettext("Obtain now")}
           </button>
         </div>
       </.form>
 
       <%= case @dns_test do %>
         <% :running -> %>
-          <p id="acme-dns-test" class="text-xs text-zinc-500">バリュードメインに接続しています…</p>
+          <p id="acme-dns-test" class="text-xs text-zinc-500">
+            {gettext("Connecting to Value-Domain…")}
+          </p>
         <% {:ok, count} -> %>
           <p id="acme-dns-test" class="text-xs text-emerald-700 dark:text-emerald-300">
-            接続できました（{@setting.acme_dns_zone} のレコード {count} 件を確認。何も変更していません）。
+            {gettext("Connected (found %{count} records for %{zone}; nothing was changed).",
+              count: count,
+              zone: @setting.acme_dns_zone
+            )}
           </p>
         <% {:error, message} -> %>
           <p id="acme-dns-test" class="text-xs text-red-600">{message}</p>

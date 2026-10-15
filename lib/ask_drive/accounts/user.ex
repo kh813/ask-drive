@@ -50,7 +50,7 @@ defmodule AskDrive.Accounts.User do
     ])
     |> update_change(:email, &normalize_email/1)
     |> validate_required([:email, :status])
-    |> validate_format(:email, ~r/^[^\s@]+@[^\s@]+$/, message: "の形式が正しくありません")
+    |> validate_format(:email, ~r/^[^\s@]+@[^\s@]+$/, message: "is not a valid email address")
     |> validate_inclusion(:status, @statuses)
     |> unique_constraint(:email)
   end

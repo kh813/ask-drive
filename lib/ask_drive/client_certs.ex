@@ -21,6 +21,7 @@ defmodule AskDrive.ClientCerts do
   hasn't expired. Requests from the server itself (localhost) always pass, as a way back in;
   `./app.sh mtls off` switches it off from the command line.
   """
+  use Gettext, backend: AskDriveWeb.Gettext
   import Ecto.Query
   require Logger
   alias AskDrive.ClientCerts.{Cert, Group}
@@ -209,7 +210,7 @@ defmodule AskDrive.ClientCerts do
   defp parse_expiry(text, _today) when is_binary(text) do
     case Date.from_iso8601(String.trim(text)) do
       {:ok, date} -> {:ok, date}
-      _ -> {:error, "有効期限の日付が正しくありません。"}
+      _ -> {:error, gettext("The expiry date is not valid.")}
     end
   end
 
@@ -220,7 +221,9 @@ defmodule AskDrive.ClientCerts do
   defp check_password(password) do
     if String.length(password) in 8..64 and password =~ ~r/\A[\x21-\x7e]+\z/,
       do: :ok,
-      else: {:error, "パスワードは 8〜64 文字の半角英数字・記号（空白なし）で入力してください。"}
+      else:
+        {:error,
+         gettext("Enter a password of 8 to 64 ASCII letters, digits and symbols (no spaces).")}
   end
 
   defp check_expiry(expires_on, today) do
@@ -228,10 +231,14 @@ defmodule AskDrive.ClientCerts do
 
     cond do
       Date.compare(expires_on, today) != :gt ->
-        {:error, "有効期限は明日以降の日付を指定してください。"}
+        {:error, gettext("The expiry date must be tomorrow or later.")}
 
       latest && Date.compare(expires_on, latest) == :gt ->
-        {:error, "有効期限は #{latest}（AskDrive の認証局の期限）までの日付を指定してください。"}
+        {:error,
+         gettext(
+           "The expiry date must be on or before %{date} (when the AskDrive certificate authority expires).",
+           date: to_string(latest)
+         )}
 
       true ->
         :ok
@@ -239,7 +246,9 @@ defmodule AskDrive.ClientCerts do
   end
 
   defp check_label(label) do
-    if String.length(label) <= 40, do: :ok, else: {:error, "メモは 40 文字以内で入力してください。"}
+    if String.length(label) <= 40,
+      do: :ok,
+      else: {:error, gettext("Keep the note to 40 characters or fewer.")}
   end
 
   @doc "The last day a certificate can be valid: the CA's own expiry (nil before the CA exists)."

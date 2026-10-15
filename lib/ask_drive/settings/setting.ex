@@ -207,12 +207,16 @@ defmodule AskDrive.Settings.Setting do
 
     if get_field(changeset, :ldap_enabled) do
       changeset
-      |> check_present(cert, :ldap_client_cert, "有効にするにはクライアント証明書が必要です")
-      |> check_present(key, :ldap_client_key, "有効にするには秘密鍵が必要です")
+      |> check_present(
+        cert,
+        :ldap_client_cert,
+        "A client certificate is required to turn this on"
+      )
+      |> check_present(key, :ldap_client_key, "A private key is required to turn this on")
       |> check_present(
         AskDrive.Ldap.base_dn(apply_changes(changeset)),
         :ldap_base_dn,
-        "ベース DN を入力するか、組織の Google Workspace ドメインを設定してください"
+        "Enter a base DN or set the organization's Google Workspace domain"
       )
     else
       changeset
@@ -238,10 +242,14 @@ defmodule AskDrive.Settings.Setting do
     |> update_change(:acme_hostname, &normalize_host/1)
     |> update_change(:acme_dns_zone, &normalize_host/1)
     |> update_change(:acme_email, &String.trim/1)
-    |> validate_format(:acme_hostname, @host_name, message: "はホスト名（例: ask.example.com）で入力してください")
-    |> validate_format(:acme_dns_zone, @host_name, message: "はドメイン名（例: example.com）で入力してください")
+    |> validate_format(:acme_hostname, @host_name,
+      message: "must be a host name (e.g. ask.example.com)"
+    )
+    |> validate_format(:acme_dns_zone, @host_name,
+      message: "must be a domain name (e.g. example.com)"
+    )
     |> validate_format(:acme_email, ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-      message: "はメールアドレスの形式で入力してください"
+      message: "must be an email address"
     )
     |> validate_acme_zone()
     |> validate_acme_complete()
@@ -260,12 +268,12 @@ defmodule AskDrive.Settings.Setting do
       if get_field(cs, :acme_enabled) do
         cs
         |> validate_required([:acme_hostname, :acme_dns_zone],
-          message: "を保存してください（自動更新を有効にする場合）"
+          message: "must be saved (to turn on automatic renewal)"
         )
         |> check_present(
           get_field(cs, :valuedomain_api_key),
           :valuedomain_api_key,
-          "有効にするにはバリュードメインの API キーが必要です"
+          "A Value-Domain API key is required to turn this on"
         )
       else
         cs
@@ -285,7 +293,9 @@ defmodule AskDrive.Settings.Setting do
 
     if present?(host) and present?(zone) and host != zone and
          not String.ends_with?(host, "." <> zone) do
-      add_error(changeset, :acme_hostname, "は DNS のドメイン（#{zone}）のサブドメインにしてください")
+      add_error(changeset, :acme_hostname, "must be a subdomain of the DNS domain (%{zone})",
+        zone: zone
+      )
     else
       changeset
     end
@@ -372,9 +382,11 @@ defmodule AskDrive.Settings.Setting do
       less_than_or_equal_to: 1.0
     )
     |> validate_number(:batch_num_ctx, greater_than: 512)
-    |> validate_inclusion(:llm_provider, @generation_providers, message: "は対応していないプロバイダです")
+    |> validate_inclusion(:llm_provider, @generation_providers,
+      message: "is not a supported provider"
+    )
     |> validate_inclusion(:embed_provider, @embedding_providers,
-      message: "は埋め込みに対応していません（Claude API には埋め込みエンドポイントがありません）"
+      message: "does not support embeddings (the Claude API has no embedding endpoint)"
     )
     |> validate_number(:embedding_dim, greater_than_or_equal_to: 64, less_than_or_equal_to: 4096)
     |> validate_number(:llm_max_tokens, greater_than: 0, less_than_or_equal_to: 200_000)
@@ -386,25 +398,29 @@ defmodule AskDrive.Settings.Setting do
       greater_than_or_equal_to: 1,
       less_than_or_equal_to: 480
     )
-    |> validate_inclusion(:drive_auth_mode, @drive_auth_modes, message: "は対応していない認証方式です")
+    |> validate_inclusion(:drive_auth_mode, @drive_auth_modes,
+      message: "is not a supported authentication method"
+    )
     |> validate_base_urls()
     |> validate_chat_summary_provider()
-    |> validate_inclusion(:chat_answer_style, @chat_answer_styles, message: "は対応していない回答スタイルです")
+    |> validate_inclusion(:chat_answer_style, @chat_answer_styles,
+      message: "is not a supported answer style"
+    )
     |> update_change(:allowed_domain, &normalize_domain/1)
     |> validate_format(
       :allowed_domain,
       ~r/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/,
-      message: "はドメイン名（例: company.com）で入力してください"
+      message: "must be a domain name (e.g. company.com)"
     )
     |> update_change(:google_chat_webhook_url, &(&1 && String.trim(&1)))
     |> validate_format(:google_chat_webhook_url, ~r{^https://chat\.googleapis\.com/\S+$},
-      message: "は Google Chat の Webhook URL（https://chat.googleapis.com/...）を入力してください"
+      message: "must be a Google Chat webhook URL (https://chat.googleapis.com/...)"
     )
     |> validate_batch_llm_mode()
     |> validate_drive_service_account()
     |> update_change(:drive_impersonate_email, &(&1 && String.trim(&1)))
     |> validate_format(:drive_impersonate_email, ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-      message: "はメールアドレスの形式で入力してください"
+      message: "must be an email address"
     )
   end
 
@@ -421,7 +437,7 @@ defmodule AskDrive.Settings.Setting do
           if String.starts_with?(url, ["http://", "https://"]) do
             acc
           else
-            add_error(acc, field, "は http:// または https:// で始まる URL を指定してください")
+            add_error(acc, field, "must be a URL starting with http:// or https://")
           end
       end
     end)
@@ -448,7 +464,7 @@ defmodule AskDrive.Settings.Setting do
         add_error(
           changeset,
           :drive_service_account_json,
-          "Drive 認証方式にサービスアカウントを選んだため、JSON キーが必要です"
+          "A JSON key is required because a service account is selected as the Drive authentication method"
         )
 
       blank?(json) ->
@@ -472,10 +488,12 @@ defmodule AskDrive.Settings.Setting do
 
     if get_field(changeset, :batch_llm_mode) == "cloud" do
       changeset
-      |> validate_inclusion(:cloud_llm_provider, @cloud_providers, message: "はクラウドのプロバイダを選んでください")
+      |> validate_inclusion(:cloud_llm_provider, @cloud_providers,
+        message: "must be a cloud provider"
+      )
       |> then(fn cs ->
         if blank?(get_field(cs, :cloud_llm_model)),
-          do: add_error(cs, :cloud_llm_model, "クラウドで実行する場合はモデル名を指定してください"),
+          do: add_error(cs, :cloud_llm_model, "Specify a model name to run in the cloud"),
           else: cs
       end)
     else
@@ -501,7 +519,7 @@ defmodule AskDrive.Settings.Setting do
     else
       changeset
       |> validate_inclusion(:chat_summary_provider, @generation_providers,
-        message: "は対応していないプロバイダです"
+        message: "is not a supported provider"
       )
       |> then(fn cs ->
         # the batch's provider in effect: the cloud one in cloud mode (F-821)
@@ -511,7 +529,11 @@ defmodule AskDrive.Settings.Setting do
             else: get_field(cs, :llm_provider)
 
         if provider != batch_provider and blank?(get_field(cs, :chat_summary_model)) do
-          add_error(cs, :chat_summary_model, "チャット要約のプロバイダを夜間バッチと別にする場合は、モデル名を指定してください")
+          add_error(
+            cs,
+            :chat_summary_model,
+            "Specify a model name when the chat summary uses a different provider from the nightly batch"
+          )
         else
           cs
         end

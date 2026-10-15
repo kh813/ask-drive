@@ -19,7 +19,7 @@ defmodule AskDriveWeb.GatewayPanel do
       <div class="flex flex-wrap items-center gap-2">
         <h3 class="font-semibold text-sm text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
           <.icon name="hero-building-office-2" class="w-4 h-4 text-indigo-600" />
-          API ゲートウェイ（Google ログインの入口）
+          {gettext("API gateway (entry point for Google sign-in)")}
         </h3>
         <span
           id="gateway-state"
@@ -31,18 +31,22 @@ defmodule AskDriveWeb.GatewayPanel do
             )
           ]}
         >
-          {if @on?, do: "有効（ゲートウェイ経由のみ）", else: "無効"}
+          {if @on?, do: gettext("On (via the gateway only)"), else: gettext("Off")}
         </span>
       </div>
       <p class="text-xs text-zinc-500 leading-relaxed">
-        さくらのクラウドの API ゲートウェイなどで Google Workspace のログインを通った人だけが AskDrive に届くようにします。ゲートウェイは転送するすべてのリクエストに秘密のヘッダー（<code class="font-mono">X-Apigw-Secret</code>）を付けます。ここに同じ値を設定すると、ヘッダーのない直接アクセスは 403 で拒否します（ログイン画面も画面の更新用の接続も含みます）。ゲートウェイからのリクエストは、利用者の IP（X-Forwarded-For）を信頼し、リンク・リダイレクト・Google ログインのリダイレクト URI を下の「公開 URL」で組み立てます。
+        {gettext(
+          "Lets only people who have passed Google Workspace sign-in at an API gateway (such as Sakura Cloud's) reach AskDrive. The gateway adds a secret header ("
+        )}<code class="font-mono">X-Apigw-Secret</code>{gettext(
+          ") to every request it forwards. Once the same value is set here, direct access without the header is refused with 403 (including the sign-in screen and the connection that updates the screen). For requests from the gateway, the user's IP (X-Forwarded-For) is trusted, and links, redirects and the Google sign-in redirect URI are built from the “Public URL” below."
+        )}
       </p>
       <p class="text-xs text-zinc-600 dark:text-zinc-400">
-        この画面の接続:
+        {gettext("This screen's connection:")}
         <span id="gateway-this-connection" class="font-medium">
           {if @via_gateway,
-            do: "ゲートウェイ経由（秘密のヘッダーあり）",
-            else: "直接（#{@peer_ip || "不明"}）"}
+            do: gettext("Via the gateway (secret header present)"),
+            else: gettext("Direct (%{ip})", ip: @peer_ip || gettext("unknown"))}
         </span>
       </p>
 
@@ -50,16 +54,26 @@ defmodule AskDriveWeb.GatewayPanel do
         id="toggle-gateway"
         feature="gateway"
         on={@on?}
-        label="API ゲートウェイの確認"
-        hint="秘密のヘッダーの値と公開 URL を保存してから有効にできます。有効にした時点から、ヘッダーのない直接アクセスを拒否します"
-        confirm_on="API ゲートウェイの確認を有効にします。ゲートウェイを通らない接続（サーバー自身と許可した IP を除く）は、すぐに拒否されます。続行しますか？"
+        label={gettext("API gateway check")}
+        hint={
+          gettext(
+            "Can be turned on once the secret header value and public URL are saved. From then on, direct access without the header is refused."
+          )
+        }
+        confirm_on={
+          gettext(
+            "Turn on the API gateway check. Connections that don't go through the gateway (except from the server itself and allowed IPs) will be refused immediately. Continue?"
+          )
+        }
       />
 
       <form id="gateway-form" phx-submit="save_gateway" class="space-y-3">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           <label class="space-y-1">
             <span class="block font-medium">
-              秘密のヘッダーの値（{if @gw.secret, do: "設定済み。変更するときだけ入力", else: "未設定"}・16 文字以上）
+              {if @gw.secret,
+                do: gettext("Secret header value (set; enter only to change it; 16+ characters)"),
+                else: gettext("Secret header value (not set; 16+ characters)")}
             </span>
             <input
               type="password"
@@ -70,32 +84,42 @@ defmodule AskDriveWeb.GatewayPanel do
             />
           </label>
           <label class="space-y-1">
-            <span class="block font-medium">公開 URL（利用者が開く URL）</span>
+            <span class="block font-medium">{gettext("Public URL (the URL users open)")}</span>
             <input
               type="url"
               name="gateway[public_url]"
               value={@gw.public_url}
-              placeholder="例: https://app.example.com"
+              placeholder={gettext("e.g. https://app.example.com")}
               class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 font-mono"
             />
           </label>
           <label class="space-y-1 sm:col-span-2">
             <span class="block font-medium">
-              ゲートウェイを通さずに直接アクセスを許可する IP（任意・カンマ区切り、範囲は 192.168.0.0/16 の形。空欄なら許可しない）
+              {gettext(
+                "IPs allowed to connect directly, bypassing the gateway (optional; comma-separated, ranges like 192.168.0.0/16; leave empty to allow none)"
+              )}
             </span>
             <input
               type="text"
               name="gateway[direct_ranges]"
               value={Enum.join(@gw.direct_ranges, ", ")}
-              placeholder="例: 192.168.0.0/16（移行期間中に社内 LAN から直接使う場合）"
+              placeholder={
+                gettext(
+                  "e.g. 192.168.0.0/16 (to use it directly from the office LAN during migration)"
+                )
+              }
               class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 font-mono"
             />
           </label>
         </div>
         <p class="text-[11px] text-zinc-400 leading-relaxed">
-          「保存」は値を保存するだけで、確認の有効・無効は上のスイッチで切り替えます。有効にできるのは、この画面がゲートウェイ経由（同じ秘密の値）・サーバー自身（localhost）・直接アクセスを許可する IP のいずれかから開かれているときだけです（自分を締め出さないため）。サーバー自身からは常に直接アクセスできます。締め出された場合はサーバー上で
+          {gettext(
+            "“Save” only saves the values; the check is turned on and off with the switch above. It can be turned on only while this screen is opened via the gateway (with the same secret value), from the server itself (localhost) or from an IP allowed direct access (so you don't lock yourself out). The server itself can always connect directly. If you are locked out, run"
+          )}
           <code class="font-mono">./app.sh network gateway-off</code>
-          を実行してください（再起動なしで反映）。秘密の値はメールに書かず、安全な方法で受け取ってください。
+          {gettext(
+            "on the server (takes effect without a restart). Don't send the secret value by email; receive it in a secure way."
+          )}
         </p>
         <div class="flex justify-end">
           <button
@@ -103,7 +127,7 @@ defmodule AskDriveWeb.GatewayPanel do
             id="save-gateway-btn"
             class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
           >
-            保存
+            {gettext("Save")}
           </button>
         </div>
       </form>

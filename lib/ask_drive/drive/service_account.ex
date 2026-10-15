@@ -23,6 +23,7 @@ defmodule AskDrive.Drive.ServiceAccount do
   with this project's preference for the stdlib over small wrapper libraries (spec 3.4).
   """
   use GenServer
+  use Gettext, backend: AskDriveWeb.Gettext
   require Logger
 
   alias AskDrive.LLM.HTTP
@@ -57,7 +58,7 @@ defmodule AskDrive.Drive.ServiceAccount do
     end
   end
 
-  def parse(_), do: {:error, "サービスアカウントの JSON キーを入力してください。"}
+  def parse(_), do: {:error, gettext("Enter the service account JSON key.")}
 
   @doc """
   Returns a valid, unexpired access token for `json` (the raw service account key content),
@@ -160,10 +161,11 @@ defmodule AskDrive.Drive.ServiceAccount do
   defp decode_private_key(pem) do
     case :public_key.pem_decode(pem) do
       [entry | _] -> {:ok, :public_key.pem_entry_decode(entry)}
-      [] -> {:error, "private_key を PEM 形式として解釈できませんでした。"}
+      [] -> {:error, gettext("Could not read private_key as PEM.")}
     end
   rescue
-    e -> {:error, "private_key の読み込みに失敗しました: #{Exception.message(e)}"}
+    e ->
+      {:error, gettext("Failed to load private_key: %{error}", error: Exception.message(e))}
   end
 
   defp b64(map), do: map |> Jason.encode!() |> Base.url_encode64(padding: false)
@@ -182,7 +184,7 @@ defmodule AskDrive.Drive.ServiceAccount do
 
       {:error, reason} ->
         Logger.error("Service account token exchange network failure: #{inspect(reason)}")
-        {:error, "接続できませんでした: #{inspect(reason)}"}
+        {:error, gettext("Could not connect: %{reason}", reason: inspect(reason))}
     end
   end
 
@@ -192,15 +194,20 @@ defmodule AskDrive.Drive.ServiceAccount do
   # console step that fixes it. Spell that step out, with the exact values to register.
   def describe_exchange_error(_status, %{"error" => "unauthorized_client"}, account, subject)
       when is_binary(subject) do
-    "ドメイン全体の委任が許可されていません。Google 管理コンソール →「セキュリティ」→「API の制御」→" <>
-      "「ドメイン全体の委任」で、クライアント ID #{account[:client_id] || "(JSON キーの client_id)"} に" <>
-      "スコープ #{@scope} を追加してください（反映まで数分〜最大24時間かかることがあります）。"
+    gettext(
+      "Domain-wide delegation is not allowed. In the Google Admin console, go to \"Security\" → \"API controls\" → \"Domain-wide delegation\" and add the scope %{scope} to client ID %{client_id} (it can take from a few minutes up to 24 hours to take effect).",
+      client_id: account[:client_id] || gettext("(client_id in the JSON key)"),
+      scope: @scope
+    )
   end
 
   def describe_exchange_error(_status, %{"error" => "invalid_grant"} = body, _account, subject)
       when is_binary(subject) do
-    "アクセスユーザー #{subject} でトークンを取得できませんでした。Workspace 内に実在する有効な" <>
-      "ユーザーのメールアドレスか確認してください（#{body["error_description"] || "invalid_grant"}）。"
+    gettext(
+      "Could not get a token for the access user %{subject}. Check that it is the email address of an existing, active user in your Workspace (%{detail}).",
+      subject: subject,
+      detail: body["error_description"] || "invalid_grant"
+    )
   end
 
   def describe_exchange_error(status, body, _account, _subject) do
@@ -209,15 +216,18 @@ defmodule AskDrive.Drive.ServiceAccount do
 
   defp decode_json(json) do
     case Jason.decode(json) do
-      {:ok, decoded} -> {:ok, decoded}
-      {:error, error} -> {:error, "JSON として解析できません: #{Exception.message(error)}"}
+      {:ok, decoded} ->
+        {:ok, decoded}
+
+      {:error, error} ->
+        {:error, gettext("Can't parse as JSON: %{error}", error: Exception.message(error))}
     end
   end
 
   defp fetch_string(map, key) do
     case Map.get(map, key) do
       value when is_binary(value) and value != "" -> {:ok, value}
-      _ -> {:error, "サービスアカウントの JSON キーに #{key} がありません。"}
+      _ -> {:error, gettext("The service account JSON key has no %{key}.", key: key)}
     end
   end
 

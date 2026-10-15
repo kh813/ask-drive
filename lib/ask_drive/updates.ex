@@ -17,6 +17,7 @@ defmodule AskDrive.Updates do
   if switched on, and with automatic updating the update then runs before the batch starts.
   The work is done by `AskDrive.Updates.Server`; this module is its API and the checks.
   """
+  use Gettext, backend: AskDriveWeb.Gettext
   require Logger
 
   alias AskDrive.{Clock, Settings}
@@ -54,10 +55,14 @@ defmodule AskDrive.Updates do
          }}
 
       {:ok, %{status: status}} ->
-        {:error, "GitHub から最新リリースを取得できませんでした（HTTP #{status}）"}
+        {:error,
+         gettext("Could not get the latest release from GitHub (HTTP %{status})",
+           status: to_string(status)
+         )}
 
       {:error, error} ->
-        {:error, "GitHub に接続できませんでした（#{Exception.message(error)}）"}
+        {:error,
+         gettext("Could not connect to GitHub (%{error})", error: Exception.message(error))}
     end
   end
 

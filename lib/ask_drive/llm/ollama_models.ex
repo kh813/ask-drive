@@ -17,6 +17,7 @@ defmodule AskDrive.LLM.OllamaModels do
   """
   use GenServer
   require Logger
+  use Gettext, backend: AskDriveWeb.Gettext
 
   alias AskDrive.{LLM, Settings}
   alias AskDrive.LLM.OllamaServer
@@ -104,9 +105,10 @@ defmodule AskDrive.LLM.OllamaModels do
     chat = AskDrive.ChatSummary.provider_and_model(setting)
 
     [
-      {"埋め込み", LLM.embedding_provider(setting), LLM.embedding_model(setting)},
-      {"夜間バッチ（QA 生成）", LLM.generation_provider(setting), LLM.generation_model(setting)},
-      {"チャット要約", elem(chat, 0), elem(chat, 1)}
+      {gettext("Embedding"), LLM.embedding_provider(setting), LLM.embedding_model(setting)},
+      {gettext("Nightly batch (QA generation)"), LLM.generation_provider(setting),
+       LLM.generation_model(setting)},
+      {gettext("Chat summary"), elem(chat, 0), elem(chat, 1)}
     ]
     |> Enum.filter(fn {_role, provider, model} ->
       provider == "ollama" and is_binary(model) and model != ""

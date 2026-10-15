@@ -27,10 +27,11 @@ defmodule AskDrive.Apps.App do
     |> update_change(:slug, &(&1 |> String.trim() |> String.downcase()))
     |> validate_required([:slug, :name])
     |> validate_format(:slug, ~r/^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$|^[a-z0-9]$/,
-      message: "は英小文字・数字・ハイフンで入力してください（先頭と末尾は英数字、32 文字まで）"
+      message:
+        "must use lowercase letters, digits and hyphens (starting and ending with a letter or digit, up to 32 characters)"
     )
-    |> validate_exclusion(:slug, @reserved, message: "はシステムで使用するため利用できません")
+    |> validate_exclusion(:slug, @reserved, message: "is reserved for the system")
     |> validate_length(:name, max: 80)
-    |> unique_constraint(:slug, message: "は既に使われています")
+    |> unique_constraint(:slug, message: "is already in use")
   end
 end

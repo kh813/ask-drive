@@ -167,7 +167,8 @@ defmodule AskDrive.Apps do
     if get_by_slug(slug),
       do:
         {:error,
-         App.changeset(%App{}, %{slug: slug}) |> Ecto.Changeset.add_error(:slug, "は既に使われています")},
+         App.changeset(%App{}, %{slug: slug})
+         |> Ecto.Changeset.add_error(:slug, "is already in use")},
       else: :ok
   end
 

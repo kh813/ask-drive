@@ -7,6 +7,7 @@ defmodule AskDrive.Accounts.AdminElevationLog do
   stays answerable afterwards.
   """
   use Ecto.Schema
+  use Gettext, backend: AskDriveWeb.Gettext
   import Ecto.Changeset
 
   alias AskDrive.Accounts.User
@@ -33,17 +34,17 @@ defmodule AskDrive.Accounts.AdminElevationLog do
   @doc "Recognised audit events."
   def events, do: @events
 
-  @doc "Japanese label for the admin dashboard."
-  def label("granted"), do: "昇格"
-  def label("denied"), do: "失敗（パスワード不一致など）"
-  def label("locked_out"), do: "ロックアウト"
-  def label("released"), do: "解除"
-  def label("expired"), do: "期限切れ"
-  def label("password_set"), do: "パスワード初回設定"
-  def label("password_changed"), do: "パスワード変更"
-  def label("password_reset"), do: "パスワードのリセット（全体管理者）"
-  def label("app_admin_added"), do: "窓口管理者を追加"
-  def label("app_admin_removed"), do: "窓口管理者から削除"
+  @doc "Label for the admin dashboard, in the current locale."
+  def label("granted"), do: gettext("Elevated")
+  def label("denied"), do: gettext("Failed (wrong password, etc.)")
+  def label("locked_out"), do: gettext("Locked out")
+  def label("released"), do: gettext("Released")
+  def label("expired"), do: gettext("Expired")
+  def label("password_set"), do: gettext("Password set for the first time")
+  def label("password_changed"), do: gettext("Password changed")
+  def label("password_reset"), do: gettext("Password reset (platform admin)")
+  def label("app_admin_added"), do: gettext("Desk admin added")
+  def label("app_admin_removed"), do: gettext("Desk admin removed")
   def label(other), do: other
 
   @doc false

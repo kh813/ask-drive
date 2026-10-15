@@ -6,6 +6,7 @@ defmodule AskDrive.HealthCheck do
   - External CLI tools (pdftotext, pandoc)
   """
   use GenServer
+  use Gettext, backend: AskDriveWeb.Gettext
   require Logger
 
   alias AskDrive.LLM
@@ -21,17 +22,24 @@ defmodule AskDrive.HealthCheck do
   def check do
     # Two provider probes with their own socket timeouts can outlast the default 5s call
     # timeout; a slow health check must not crash the LiveView that asked for it.
-    # The checks run in this server's process, so tell it which app's providers to probe
-    GenServer.call(__MODULE__, {:check, AskDrive.Apps.current()}, 30_000)
+    # The checks run in this server's process, so tell it which app's providers to probe,
+    # and in which language the caller (the admin screen) wants the messages
+    GenServer.call(
+      __MODULE__,
+      {:check, AskDrive.Apps.current(), Gettext.get_locale(AskDriveWeb.Gettext)},
+      30_000
+    )
   catch
     :exit, _reason -> unavailable_results()
   end
 
   defp unavailable_results do
+    timeout = gettext("The health check timed out")
+
     %{
-      sqlite_vec: {:error, "ヘルスチェックがタイムアウトしました"},
-      llm_generation: {:error, "ヘルスチェックがタイムアウトしました"},
-      llm_embedding: {:error, "ヘルスチェックがタイムアウトしました"},
+      sqlite_vec: {:error, timeout},
+      llm_generation: {:error, timeout},
+      llm_embedding: {:error, timeout},
       generation_provider: "ollama",
       embedding_provider: "ollama",
       pdftotext: {:error, "unknown"},
@@ -57,8 +65,12 @@ defmodule AskDrive.HealthCheck do
   end
 
   @impl true
-  def handle_call({:check, app}, _from, state) do
-    results = if app, do: AskDrive.Apps.with_app(app, &perform_checks/0), else: perform_checks()
+  def handle_call({:check, app, locale}, _from, state) do
+    results =
+      Gettext.with_locale(AskDriveWeb.Gettext, locale, fn ->
+        if app, do: AskDrive.Apps.with_app(app, &perform_checks/0), else: perform_checks()
+      end)
+
     {:reply, results, %{state | results: results}}
   end
 
@@ -102,7 +114,8 @@ defmodule AskDrive.HealthCheck do
 
   defp check_provider(role, setting) do
     if missing_key?(role, setting) do
-      {:error, "API キーが未設定です（窓口の管理画面の「設定」で登録してください）"}
+      {:error,
+       gettext("API key not set (register it in the desk's admin screen, under Settings)")}
     else
       check_provider_health(role, setting)
     end

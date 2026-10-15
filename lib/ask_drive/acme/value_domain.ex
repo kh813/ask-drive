@@ -16,6 +16,8 @@ defmodule AskDrive.ACME.ValueDomain do
   `config` is `%{api_key: token, zone: "example.com", backup_dir: path}`.
   """
 
+  use Gettext, backend: AskDriveWeb.Gettext
+
   @base_url "https://api.value-domain.com/v1"
   @keep_backups 20
 
@@ -166,7 +168,7 @@ defmodule AskDrive.ACME.ValueDomain do
          }}
 
       {:ok, resp} ->
-        {:error, http_error("DNS のレコードを取得できませんでした", resp)}
+        {:error, http_error(gettext("Could not get the DNS records"), resp)}
 
       {:error, _} = error ->
         error
@@ -176,7 +178,7 @@ defmodule AskDrive.ACME.ValueDomain do
   defp put_zone(config, payload) do
     case request(config, :put, json: payload) do
       {:ok, %{status: status}} when status in 200..299 -> :ok
-      {:ok, resp} -> {:error, http_error("DNS のレコードを更新できませんでした", resp)}
+      {:ok, resp} -> {:error, http_error(gettext("Could not update the DNS records"), resp)}
       {:error, _} = error -> error
     end
   end
@@ -197,16 +199,33 @@ defmodule AskDrive.ACME.ValueDomain do
       ] ++ opts ++ Application.get_env(:ask_drive, :valuedomain_req_options, [])
 
     case Req.request(opts) do
-      {:ok, resp} -> {:ok, resp}
-      {:error, e} -> {:error, "バリュードメインの API に接続できませんでした: #{Exception.message(e)}"}
+      {:ok, resp} ->
+        {:ok, resp}
+
+      {:error, e} ->
+        {:error,
+         gettext("Could not connect to the Value-Domain API: %{error}",
+           error: Exception.message(e)
+         )}
     end
   end
 
-  defp http_error(what, %{status: 401}), do: "#{what}（HTTP 401: API キーが正しくありません）"
+  defp http_error(what, %{status: 401}),
+    do: gettext("%{what} (HTTP 401: the API key is incorrect)", what: what)
 
   defp http_error(what, %{status: status}) when status in [403, 404],
-    do: "#{what}（HTTP #{status}: このアカウントで管理しているドメインか確認してください）"
+    do:
+      gettext(
+        "%{what} (HTTP %{status}: check that the domain is managed by this account)",
+        what: what,
+        status: to_string(status)
+      )
 
   defp http_error(what, %{status: status, body: body}),
-    do: "#{what}（HTTP #{status}: #{body |> inspect() |> String.slice(0, 200)}）"
+    do:
+      gettext("%{what} (HTTP %{status}: %{body})",
+        what: what,
+        status: to_string(status),
+        body: body |> inspect() |> String.slice(0, 200)
+      )
 end

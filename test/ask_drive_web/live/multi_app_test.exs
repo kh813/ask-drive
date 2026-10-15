@@ -123,7 +123,7 @@ defmodule AskDriveWeb.MultiAppTest do
     {:ok, legal_view, html} = live(conn, "/legal/admin?tab=settings")
     assert html =~ "Legal の管理"
     assert has_element?(legal_view, "#admin-scope-label", "この窓口だけに適用")
-    assert has_element?(legal_view, "#admin-nav-link[aria-current='page']", "Manage Legal")
+    assert has_element?(legal_view, "#admin-nav-link[aria-current='page']", "Legal の管理")
     refute has_element?(legal_view, "#platform-admin-nav-link[aria-current]")
     assert html =~ "Google Drive"
     assert html =~ "窓口管理者"

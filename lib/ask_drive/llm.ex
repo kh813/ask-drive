@@ -11,6 +11,7 @@ defmodule AskDrive.LLM do
   local `bge-m3`, generation moves to a cloud API" setup needs no re-indexing.
   """
   require Logger
+  use Gettext, backend: AskDriveWeb.Gettext
 
   alias AskDrive.LLM.HTTP
   alias AskDrive.LLM.Providers.{Anthropic, Gemini, LMStudio, Ollama, OpenAI}
@@ -25,8 +26,8 @@ defmodule AskDrive.LLM do
   }
 
   @labels %{
-    "ollama" => "Ollama (ローカル)",
-    "lmstudio" => "LM Studio (ローカル)",
+    "ollama" => "Ollama",
+    "lmstudio" => "LM Studio",
     "gemini" => "Google Gemini API",
     "anthropic" => "Anthropic Claude API",
     "openai" => "OpenAI API"
@@ -47,7 +48,13 @@ defmodule AskDrive.LLM do
   def embedding_providers, do: Enum.filter(order(), &module(&1).supports_embedding?())
 
   @doc "Human readable name for a provider identifier."
-  def label(provider), do: Map.get(@labels, normalize(provider), provider)
+  def label(provider) do
+    name = Map.get(@labels, normalize(provider), provider)
+
+    if normalize(provider) in ~w(ollama lmstudio),
+      do: gettext("%{name} (local)", name: name),
+      else: name
+  end
 
   @doc "Adapter module for a provider identifier."
   def module(provider), do: Map.get(@providers, normalize(provider), Ollama)
@@ -118,10 +125,10 @@ defmodule AskDrive.LLM do
 
     cond do
       role == :embedding and not module(provider).supports_embedding?() ->
-        {:error, "#{label(provider)} は埋め込みに対応していません。"}
+        {:error, gettext("%{provider} does not support embeddings.", provider: label(provider))}
 
       requires_api_key?(provider) and api_key(provider, setting) in [nil, ""] ->
-        {:error, "#{label(provider)} の API キーが未設定です。"}
+        {:error, gettext("The %{provider} API key is not set.", provider: label(provider))}
 
       true ->
         :ok
@@ -400,8 +407,15 @@ defmodule AskDrive.LLM do
         model = generation_model(setting)
 
         case generate(model, "ping", setting: setting, max_tokens: 16, timeout: 30_000) do
-          {:ok, _text} -> {:ok, "#{label(provider)} / #{model} に接続できました。"}
-          {:error, reason} -> {:error, HTTP.describe(reason)}
+          {:ok, _text} ->
+            {:ok,
+             gettext("Connected to %{provider} / %{model}.",
+               provider: label(provider),
+               model: to_string(model)
+             )}
+
+          {:error, reason} ->
+            {:error, HTTP.describe(reason)}
         end
 
       :embedding ->
@@ -410,10 +424,15 @@ defmodule AskDrive.LLM do
 
         case embed(model, ["ping"], setting: setting, timeout: 30_000) do
           {:ok, [vector | _]} ->
-            {:ok, "#{label(provider)} / #{model} に接続できました (#{length(vector)} 次元)。"}
+            {:ok,
+             gettext("Connected to %{provider} / %{model} (%{dim} dimensions).",
+               provider: label(provider),
+               model: to_string(model),
+               dim: length(vector)
+             )}
 
           {:ok, []} ->
-            {:error, "ベクトルが返りませんでした。"}
+            {:error, gettext("No vector was returned.")}
 
           {:error, reason} ->
             {:error, HTTP.describe(reason)}
@@ -496,13 +515,13 @@ defmodule AskDrive.LLM do
   def masked_api_key(provider, setting \\ nil) do
     case api_key(provider, setting) do
       key when is_binary(key) and byte_size(key) >= 4 ->
-        "設定済み（末尾4文字: ..." <> String.slice(key, -4, 4) <> "）"
+        gettext("Set (last 4 characters: ...%{last4})", last4: String.slice(key, -4, 4))
 
       key when is_binary(key) and key != "" ->
-        "設定済み"
+        gettext("Set")
 
       _ ->
-        "未設定"
+        gettext("Not set")
     end
   end
 
@@ -569,7 +588,8 @@ defmodule AskDrive.LLM do
 
   defp check_api_key(provider, setting) do
     if requires_api_key?(provider) and api_key(provider, setting) in [nil, ""] do
-      {:error, {:unauthorized, "#{label(provider)} の API キーが未設定です。"}}
+      {:error,
+       {:unauthorized, gettext("The %{provider} API key is not set.", provider: label(provider))}}
     else
       :ok
     end

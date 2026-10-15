@@ -14,6 +14,7 @@ defmodule AskDrive.Network do
   previous settings are restored. The proxy list applies at once (re-read when the file
   changes, so `./app.sh network proxy-off` takes effect without a restart).
   """
+  use Gettext, backend: AskDriveWeb.Gettext
   import Bitwise
   require Logger
 
@@ -232,11 +233,13 @@ defmodule AskDrive.Network do
 
     errors =
       [
-        match?(:error, http) && "HTTP のポートは 1〜65535 の数字にしてください",
-        match?(:error, https) && "HTTPS のポートは 1〜65535 の数字にしてください",
-        http == https && "HTTP と HTTPS に同じポートは使えません",
+        match?(:error, http) && gettext("The HTTP port must be a number from 1 to 65535"),
+        match?(:error, https) && gettext("The HTTPS port must be a number from 1 to 65535"),
+        http == https && gettext("HTTP and HTTPS can't use the same port"),
         match?({:error, _}, proxies) &&
-          "プロキシの IP として読み取れません: #{elem(proxies, 1) |> List.wrap() |> Enum.join("、")}"
+          gettext("Can't read these as proxy IPs: %{values}",
+            values: elem(proxies, 1) |> List.wrap() |> Enum.join(gettext(", "))
+          )
       ]
       |> Enum.filter(&is_binary/1)
 
@@ -245,7 +248,12 @@ defmodule AskDrive.Network do
         [{http, current.http_port, "HTTP"}, {https, current.https_port, "HTTPS"}]
         |> Enum.flat_map(fn {{:ok, port}, old, label} ->
           if port != old and not port_free?(port),
-            do: ["#{label} のポート #{port} は、ほかのプログラムが使用中です"],
+            do: [
+              gettext("%{protocol} port %{port} is in use by another program",
+                protocol: label,
+                port: port
+              )
+            ],
             else: []
         end)
       else

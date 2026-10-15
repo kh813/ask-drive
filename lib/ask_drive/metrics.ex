@@ -3,6 +3,7 @@ defmodule AskDrive.Metrics do
   Context for logging and analyzing LLM and API usage metrics (tokens, payload size, latency, errors)
   without logging confidential user prompts or search terms (spec 14.5, N-606).
   """
+  use Gettext, backend: AskDriveWeb.Gettext
   import Ecto.Query, warn: false
   require Logger
 
@@ -159,46 +160,63 @@ defmodule AskDrive.Metrics do
   alias AskDrive.Documents.{Chunk, Document}
 
   @doc """
-  Determines human-friendly format category from document name and mime_type.
+  Determines the format of a document from its name and mime_type, as a language-neutral key.
   """
-  def format_category(doc) do
+  def format_key(doc) do
     name = (doc.name || "") |> String.downcase()
     mime = (doc.mime_type || "") |> String.downcase()
 
     cond do
       String.ends_with?(name, ".md") or String.ends_with?(name, ".markdown") ->
-        "Markdown (構造化テキスト)"
+        :markdown
 
       String.ends_with?(name, ".txt") or mime == "text/plain" ->
-        "Plain Text (平文)"
+        :plain_text
 
       String.ends_with?(name, ".csv") or String.ends_with?(name, ".tsv") or
           mime in ["text/csv", "text/tab-separated-values"] ->
-        "CSV / TSV (表形式)"
+        :csv
 
       String.contains?(mime, "google-apps.document") or String.ends_with?(name, ".docx") or
           String.ends_with?(name, ".doc") ->
-        "Docs / Word (文書)"
+        :docs
 
       String.contains?(mime, "google-apps.spreadsheet") or String.ends_with?(name, ".xlsx") or
           String.ends_with?(name, ".xls") ->
-        "Sheets / Excel (表計算)"
+        :sheets
 
       String.contains?(mime, "google-apps.presentation") or String.ends_with?(name, ".pptx") or
           String.ends_with?(name, ".ppt") ->
-        "Slides / PowerPoint (スライド)"
+        :slides
 
       String.ends_with?(name, ".pdf") or mime == "application/pdf" ->
-        "PDF 文書"
+        :pdf
 
       String.ends_with?(name, ".png") or String.ends_with?(name, ".jpg") or
         String.ends_with?(name, ".jpeg") or String.starts_with?(mime, "image/") ->
-        "画像 / OCR対象"
+        :image
 
       true ->
-        "その他"
+        :other
     end
   end
+
+  @doc """
+  Determines human-friendly format category from document name and mime_type, in the current
+  locale. Every label starts with the format name the admin screen keys its colours on
+  ("Markdown", "Plain", "CSV", "Docs", "Sheets", "PDF").
+  """
+  def format_category(doc), do: format_label(format_key(doc))
+
+  defp format_label(:markdown), do: gettext("Markdown (structured text)")
+  defp format_label(:plain_text), do: gettext("Plain Text (plain)")
+  defp format_label(:csv), do: gettext("CSV / TSV (tabular)")
+  defp format_label(:docs), do: gettext("Docs / Word (document)")
+  defp format_label(:sheets), do: gettext("Sheets / Excel (spreadsheet)")
+  defp format_label(:slides), do: gettext("Slides / PowerPoint (slides)")
+  defp format_label(:pdf), do: gettext("PDF document")
+  defp format_label(:image), do: gettext("Image / OCR target")
+  defp format_label(:other), do: gettext("Other")
 
   @doc """
   Calculates token efficiency details for a given document with its preloaded or queried chunks.
@@ -211,7 +229,8 @@ defmodule AskDrive.Metrics do
     extracted_bytes = Enum.reduce(chunks, 0, fn c, acc -> acc + byte_size(c.content || "") end)
     chunks_count = length(chunks)
 
-    category = format_category(doc)
+    format = format_key(doc)
+    category = format_label(format)
 
     # Calculate token density (Tokens per 1 KB of source file)
     # Higher is generally cleaner for text; for image/PDF, a huge raw file with tiny tokens yields low density.
@@ -233,8 +252,8 @@ defmodule AskDrive.Metrics do
         100.0
       end
 
-    {score_rating, advice} =
-      evaluate_efficiency(category, tokens_per_kb, effective_text_ratio, chunks_count)
+    {score_level, score_rating, advice} =
+      evaluate_efficiency(format, tokens_per_kb, effective_text_ratio, chunks_count)
 
     %{
       document: doc,
@@ -245,41 +264,60 @@ defmodule AskDrive.Metrics do
       chunks_count: chunks_count,
       tokens_per_kb: tokens_per_kb,
       effective_text_ratio: effective_text_ratio,
+      score_level: score_level,
       score_rating: score_rating,
       advice: advice
     }
   end
 
-  defp evaluate_efficiency(category, tokens_per_kb, effective_text_ratio, chunks_count) do
+  # {score_level, score_rating, advice}: score_level is the language-neutral grade the admin
+  # screen picks the badge colour from; score_rating and advice are display text.
+  defp evaluate_efficiency(format, tokens_per_kb, effective_text_ratio, chunks_count) do
     cond do
       chunks_count == 0 ->
-        {"—", "インデックス化されたチャンクがありません"}
+        {:none, "—", gettext("No indexed chunks")}
 
-      String.starts_with?(category, "Markdown") or String.starts_with?(category, "Plain Text") ->
-        {"優良 (S)", "構造化されたテキスト形式で、トークン化および検索効率が最も高い理想的なデータです。"}
+      format in [:markdown, :plain_text] ->
+        {:excellent, gettext("Excellent (S)"),
+         gettext(
+           "Structured text: ideal data with the highest tokenisation and search efficiency."
+         )}
 
-      String.starts_with?(category, "CSV") or String.starts_with?(category, "Sheets") ->
+      format in [:csv, :sheets] ->
         if tokens_per_kb > 50.0 do
-          {"良好 (A)", "表形式データとして効率よくインデックス化されています。"}
+          {:good, gettext("Good (A)"), gettext("Indexed efficiently as tabular data.")}
         else
-          {"普通 (B)", "不要な空欄や巨大なヘッダー行を整理するとトークン効率が向上します。"}
+          {:fair, gettext("Fair (B)"),
+           gettext(
+             "Removing unneeded blank cells and oversized header rows improves token efficiency."
+           )}
         end
 
-      String.starts_with?(category, "Docs") ->
-        {"良好 (A)", "文書構造が整っており、安定したトークン効率です。"}
+      format == :docs ->
+        {:good, gettext("Good (A)"),
+         gettext("Well-structured document with stable token efficiency.")}
 
-      String.starts_with?(category, "PDF") ->
+      format == :pdf ->
         if effective_text_ratio < 10.0 and tokens_per_kb < 10.0 do
-          {"要改善 (C)", "ファイルサイズに対して抽出文字数が少なめです。スキャン画像が多い場合はテキスト原本やMarkdownへの変換を推奨します。"}
+          {:poor, gettext("Needs improvement (C)"),
+           gettext(
+             "Little text was extracted for the file size. If it is mostly scanned images, converting it to the original text or Markdown is recommended."
+           )}
         else
-          {"普通 (B)", "PDFからテキスト抽出されています。見出し構成が明確なMarkdownやDocsにするとさらに精度が上がります。"}
+          {:fair, gettext("Fair (B)"),
+           gettext(
+             "Text is extracted from the PDF. Converting it to Markdown or Docs with clear headings improves accuracy further."
+           )}
         end
 
-      String.starts_with?(category, "画像") ->
-        {"注意 (D)", "画像主体のデータです。テキスト書き起こし（Markdown化）を行うことで大幅な検索精度向上とトークン節約が期待できます。"}
+      format == :image ->
+        {:warning, gettext("Caution (D)"),
+         gettext(
+           "Mostly image data. Transcribing it to text (Markdown) can greatly improve search accuracy and save tokens."
+         )}
 
       true ->
-        {"普通 (B)", "標準的なファイル形式です。"}
+        {:fair, gettext("Fair (B)"), gettext("Standard file format.")}
     end
   end
 

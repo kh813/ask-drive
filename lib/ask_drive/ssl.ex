@@ -16,6 +16,7 @@ defmodule AskDrive.SSL do
   and the endpoint is restarted; if the endpoint won't start with it, the previous
   certificate is restored.
   """
+  use Gettext, backend: AskDriveWeb.Gettext
   require Logger
 
   @self_signed_days 825
@@ -240,7 +241,12 @@ defmodule AskDrive.SSL do
 
       errors =
         []
-        |> check(key_matches?(key, cert), "秘密鍵が証明書と対になっていません（別の証明書の鍵です）")
+        |> check(
+          key_matches?(key, cert),
+          gettext(
+            "The private key does not match the certificate (it is the key of another certificate)"
+          )
+        )
         |> check_validity(cert)
         |> check_chain(cert_der, chain)
         |> check_hostname(info, hostname)
@@ -248,8 +254,11 @@ defmodule AskDrive.SSL do
       errors =
         if errors == [] do
           case handshake_test(cert_pem, key_pem, chain_pem) do
-            :ok -> []
-            {:error, reason} -> ["TLS 接続テストに失敗しました: #{reason}"]
+            :ok ->
+              []
+
+            {:error, reason} ->
+              [gettext("TLS connection test failed: %{reason}", reason: to_string(reason))]
           end
         else
           errors
@@ -271,7 +280,12 @@ defmodule AskDrive.SSL do
          {:ok, key} <- decode_key(key_pem) do
       errors =
         []
-        |> check(key_matches?(key, cert), "秘密鍵が証明書と対になっていません（別の証明書の鍵です）")
+        |> check(
+          key_matches?(key, cert),
+          gettext(
+            "The private key does not match the certificate (it is the key of another certificate)"
+          )
+        )
         |> check_validity(cert)
 
       if errors == [], do: {:ok, cert_info(cert)}, else: {:error, Enum.reverse(errors)}
@@ -285,11 +299,17 @@ defmodule AskDrive.SSL do
 
   defp decode_cert(pem) do
     case :public_key.pem_decode(pem || "") do
-      [{:Certificate, der, _} | _] -> {:ok, der, :public_key.pkix_decode_cert(der, :otp)}
-      _ -> {:error, "証明書を PEM 形式として読み取れません（-----BEGIN CERTIFICATE----- で始まるファイルを指定してください）"}
+      [{:Certificate, der, _} | _] ->
+        {:ok, der, :public_key.pkix_decode_cert(der, :otp)}
+
+      _ ->
+        {:error,
+         gettext(
+           "Can't read the certificate as PEM (choose a file starting with -----BEGIN CERTIFICATE-----)"
+         )}
     end
   rescue
-    _ -> {:error, "証明書を読み取れません"}
+    _ -> {:error, gettext("Can't read the certificate")}
   end
 
   defp decode_key(pem) do
@@ -299,13 +319,19 @@ defmodule AskDrive.SSL do
         {:ok, :public_key.pem_entry_decode(entry)}
 
       [{_type, _der, {_cipher, _}} | _] ->
-        {:error, "パスフレーズ付きの秘密鍵には対応していません。パスフレーズを外した鍵を指定してください"}
+        {:error,
+         gettext(
+           "Private keys with a passphrase are not supported. Choose the key with the passphrase removed"
+         )}
 
       _ ->
-        {:error, "秘密鍵を PEM 形式として読み取れません（-----BEGIN PRIVATE KEY----- 等で始まるファイルを指定してください）"}
+        {:error,
+         gettext(
+           "Can't read the private key as PEM (choose a file starting with -----BEGIN PRIVATE KEY----- or similar)"
+         )}
     end
   rescue
-    _ -> {:error, "秘密鍵を読み取れません"}
+    _ -> {:error, gettext("Can't read the private key")}
   end
 
   defp decode_chain(pem) do
@@ -315,7 +341,7 @@ defmodule AskDrive.SSL do
 
     {:ok, certs}
   rescue
-    _ -> {:error, "中間証明書を読み取れません"}
+    _ -> {:error, gettext("Can't read the intermediate certificates")}
   end
 
   # The key matches when something signed with it verifies against the certificate's key.
@@ -343,10 +369,18 @@ defmodule AskDrive.SSL do
 
     cond do
       DateTime.compare(now, not_before) == :lt ->
-        ["証明書の有効期間がまだ始まっていません（#{not_before} から）" | errors]
+        [
+          gettext("The certificate is not valid yet (valid from %{date})",
+            date: to_string(not_before)
+          )
+          | errors
+        ]
 
       DateTime.compare(now, not_after) == :gt ->
-        ["証明書の有効期限が切れています（#{not_after} まで）" | errors]
+        [
+          gettext("The certificate has expired (valid until %{date})", date: to_string(not_after))
+          | errors
+        ]
 
       true ->
         errors
@@ -370,10 +404,16 @@ defmodule AskDrive.SSL do
       end)
 
     if broken,
-      do: ["中間証明書のつながりが正しくありません（#{broken + 1} 番目の証明書の発行者が次の証明書と一致しません。順序を確認してください）" | errors],
+      do: [
+        gettext(
+          "The intermediate certificate chain is broken (the issuer of certificate %{position} does not match the next certificate; check the order)",
+          position: to_string(broken + 1)
+        )
+        | errors
+      ],
       else: errors
   rescue
-    _ -> ["中間証明書の検証中にエラーが発生しました" | errors]
+    _ -> [gettext("An error occurred while checking the intermediate certificates") | errors]
   end
 
   defp check_hostname(errors, _info, host) when host in [nil, ""], do: errors
@@ -383,7 +423,13 @@ defmodule AskDrive.SSL do
 
     if Enum.any?(info["names"], &name_matches?(&1, host)),
       do: errors,
-      else: ["証明書のホスト名（#{Enum.join(info["names"], ", ")}）に #{host} が含まれていません" | errors]
+      else: [
+        gettext("The certificate's host names (%{names}) do not include %{host}",
+          names: Enum.join(info["names"], ", "),
+          host: host
+        )
+        | errors
+      ]
   end
 
   defp name_matches?("*." <> base, host) do

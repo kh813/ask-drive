@@ -7,6 +7,7 @@ defmodule AskDriveWeb.FeatureToggle do
   missing is shown in the flash.
   """
   use Phoenix.Component
+  use Gettext, backend: AskDriveWeb.Gettext
 
   attr :id, :string, required: true
   attr :feature, :string, required: true
@@ -29,7 +30,7 @@ defmodule AskDriveWeb.FeatureToggle do
           "text-[11px] font-medium",
           if(@on, do: "text-emerald-700 dark:text-emerald-300", else: "text-zinc-500")
         ]}>
-          {if @on, do: "有効", else: "無効"}
+          {if @on, do: gettext("On"), else: gettext("Off")}
         </span>
         <button
           type="button"

@@ -1,5 +1,8 @@
 defmodule AskDriveWeb.ChatThreadsTest do
   use AskDriveWeb.ConnCase, async: false
+
+  # asserts the English texts
+  @moduletag locale: "en"
   import Phoenix.LiveViewTest
 
   alias AskDrive.ChatHistory

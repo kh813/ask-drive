@@ -16,6 +16,7 @@ defmodule AskDrive.Batch.Progress do
   by the next batch.
   """
 
+  use Gettext, backend: AskDriveWeb.Gettext
   import Ecto.Query, warn: false
   alias AskDrive.Batch.{BatchPhaseStat, BatchRun}
   alias AskDrive.Repo
@@ -36,15 +37,20 @@ defmodule AskDrive.Batch.Progress do
   @ingest_only [{"sync", 20}, {"invalidate", 2}, {"embed_chunks", 76}, {"verify", 2}]
 
   @labels %{
-    "sync" => "Drive の一覧を同期",
-    "invalidate" => "変更の反映",
-    "embed_chunks" => "取り込み（本文抽出・分割・埋め込み）",
-    "generate" => "想定QAの生成",
-    "embed_questions" => "想定質問の埋め込み",
-    "verify" => "仕上げ（未回答の解消）"
+    "sync" => gettext_noop("Sync the Drive file list"),
+    "invalidate" => gettext_noop("Apply changes"),
+    "embed_chunks" => gettext_noop("Ingestion (text extraction, chunking, embedding)"),
+    "generate" => gettext_noop("Generate QA pairs"),
+    "embed_questions" => gettext_noop("Embed QA questions"),
+    "verify" => gettext_noop("Finish (resolve unanswered questions)")
   }
 
-  def label(phase), do: Map.get(@labels, phase, phase)
+  def label(phase) do
+    case Map.fetch(@labels, phase) do
+      {:ok, label} -> Gettext.gettext(AskDriveWeb.Gettext, label)
+      :error -> phase
+    end
+  end
 
   def bind(run_id), do: Process.put(@key, run_id)
   def unbind, do: Process.delete(@key)

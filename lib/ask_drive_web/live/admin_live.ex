@@ -118,21 +118,21 @@ defmodule AskDriveWeb.AdminLive do
 
   defp tabs(:platform),
     do: [
-      {"apps", "窓口（アプリ）"},
-      {"users", "ユーザー管理"},
-      {"audit", "昇格ログ"},
-      {"metrics", "API利用量・ログ"},
-      {"settings", "全体設定"},
-      {"update", "アップデート"}
+      {"apps", gettext("Desks (apps)")},
+      {"users", gettext("Users")},
+      {"audit", gettext("Elevation log")},
+      {"metrics", gettext("API usage & logs")},
+      {"settings", gettext("Platform settings")},
+      {"update", gettext("Updates")}
     ]
 
   defp tabs(:app),
     do: [
-      {"overview", "概要・バッチ状況"},
-      {"questions", "未回答・解消質問"},
-      {"documents", "ドキュメント一覧"},
-      {"metrics", "API利用量・ログ"},
-      {"settings", "設定"}
+      {"overview", gettext("Overview & batch status")},
+      {"questions", gettext("Unanswered & resolved questions")},
+      {"documents", gettext("Documents")},
+      {"metrics", gettext("API usage & logs")},
+      {"settings", gettext("Settings")}
     ]
 
   defp default_tab(scope), do: scope |> tabs() |> hd() |> elem(0)
@@ -187,8 +187,14 @@ defmodule AskDriveWeb.AdminLive do
      socket
      |> assign(:drive_auth_code, "")
      |> assign(:drive_auth, nil)
-     |> assign(:drive_auth_result, {:ok, "#{email} と連携しました。"})
-     |> put_flash(:info, "Google Drive 同期アカウント（#{email}）と連携しました。「同期テスト」で確認してください。")
+     |> assign(:drive_auth_result, {:ok, gettext("Connected %{email}.", email: email)})
+     |> put_flash(
+       :info,
+       gettext(
+         "Connected the Google Drive sync account (%{email}). Check it with \"Test sync\".",
+         email: email
+       )
+     )
      |> load_dashboard_data()}
   end
 
@@ -217,7 +223,7 @@ defmodule AskDriveWeb.AdminLive do
         slug = Ecto.Changeset.get_field(cs, :slug)
 
         if slug && AskDrive.Apps.get_by_slug(slug),
-          do: Ecto.Changeset.add_error(cs, :slug, "は既に使われています"),
+          do: Ecto.Changeset.add_error(cs, :slug, "is already taken"),
           else: cs
       end)
       |> Map.put(:action, :validate)
@@ -242,7 +248,7 @@ defmodule AskDriveWeb.AdminLive do
            :app_form,
            to_form(AskDrive.Apps.App.changeset(%AskDrive.Apps.App{}, params), as: :app)
          )
-         |> put_flash(:error, "担当者: " <> message)}
+         |> put_flash(:error, gettext("Administrators: %{message}", message: message))}
 
       other ->
         create_app_result(socket, other)
@@ -261,11 +267,11 @@ defmodule AskDriveWeb.AdminLive do
         {:noreply,
          socket
          |> assign(:apps, AskDrive.Apps.list())
-         |> put_flash(:info, "窓口を更新しました。")
+         |> put_flash(:info, gettext("Desk updated."))
          |> load_dashboard_data()}
 
       {:error, _} ->
-        {:noreply, put_flash(socket, :error, "窓口名を入力してください。")}
+        {:noreply, put_flash(socket, :error, gettext("Enter a desk name."))}
     end
   end
 
@@ -277,14 +283,24 @@ defmodule AskDriveWeb.AdminLive do
         {:noreply,
          socket
          |> assign(:apps, AskDrive.Apps.list())
-         |> put_flash(:info, "窓口「#{app.name}」を削除しました（データベースファイルは名前を変えて残しています）。")
+         |> put_flash(
+           :info,
+           gettext("Desk \"%{name}\" deleted (its database file is kept under another name).",
+             name: app.name
+           )
+         )
          |> load_dashboard_data()}
 
       {:error, :primary} ->
-        {:noreply, put_flash(socket, :error, "最初の窓口は削除できません。")}
+        {:noreply, put_flash(socket, :error, gettext("The first desk can't be deleted."))}
 
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "削除できませんでした: #{inspect(reason)}")}
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Could not delete: %{reason}", reason: inspect(reason))
+         )}
     end
   end
 
@@ -330,10 +346,15 @@ defmodule AskDriveWeb.AdminLive do
            |> assign_settings_form(updated)
            |> assign(:ldap_form, ldap_form(updated))
            |> assign(:ldap_pending, %{})
-           |> put_flash(:info, "LDAP ログインの設定を保存しました。")}
+           |> put_flash(:info, gettext("LDAP sign-in settings saved."))}
 
         {:error, changeset} ->
-          {:noreply, put_flash(socket, :error, "保存できませんでした: " <> changeset_messages(changeset))}
+          {:noreply,
+           put_flash(
+             socket,
+             :error,
+             gettext("Could not save: %{errors}", errors: changeset_messages(changeset))
+           )}
       end
     end
   end
@@ -352,10 +373,14 @@ defmodule AskDriveWeb.AdminLive do
     problem =
       cond do
         elem(AskDriveWeb.UserAuth.auth_mode(), 1) == :env ->
-          "環境変数 ASK_DRIVE_DISABLE_AUTH で固定されています。.env.prod からこの行を削除して再起動してください。"
+          gettext(
+            "It is fixed by the environment variable ASK_DRIVE_DISABLE_AUTH. Remove that line from .env.prod and restart."
+          )
 
         not (AskDrive.Ldap.enabled?(setting) or AskDrive.Drive.OAuth.login_enabled?()) ->
-          "ログインの方法がありません。先に「Google Secure LDAP でのログイン」または Google ログイン（OAuth）を設定してください。"
+          gettext(
+            "There is no way to sign in. First set up \"Sign in with Google Secure LDAP\" or Google login (OAuth)."
+          )
 
         match?({:error, _}, parsed) ->
           elem(parsed, 1)
@@ -380,7 +405,10 @@ defmodule AskDriveWeb.AdminLive do
        socket
        |> put_flash(
          :info,
-         "ログイン認証を有効にしました。#{Enum.join(emails, "、")} のいずれかでログインし、「全体管理」から本人確認して入ってください。"
+         gettext(
+           "Login turned on. Sign in as %{emails} and verify your identity from \"Platform Admin\" to enter.",
+           emails: join_list(emails)
+         )
        )
        |> redirect(to: ~p"/login")}
     end
@@ -401,7 +429,10 @@ defmodule AskDriveWeb.AdminLive do
         {:noreply,
          socket
          |> clear_ac("grant-admin-emails")
-         |> put_flash(:info, "#{Enum.join(emails, "、")} を昇格可にしました。")
+         |> put_flash(
+           :info,
+           gettext("%{emails} can now elevate to admin.", emails: join_list(emails))
+         )
          |> load_dashboard_data()}
 
       {:error, message} ->
@@ -415,7 +446,9 @@ defmodule AskDriveWeb.AdminLive do
        put_flash(
          socket,
          :error,
-         "環境変数 ASK_DRIVE_DISABLE_AUTH で固定されています。.env.prod からこの行を削除して再起動してください。"
+         gettext(
+           "It is fixed by the environment variable ASK_DRIVE_DISABLE_AUTH. Remove that line from .env.prod and restart."
+         )
        )}
     else
       {:ok, _} = Settings.set_auth_required(false)
@@ -423,7 +456,10 @@ defmodule AskDriveWeb.AdminLive do
 
       {:noreply,
        socket
-       |> put_flash(:info, "ログイン認証を無効にしました（誰でもゲストとして管理者操作ができます）。")
+       |> put_flash(
+         :info,
+         gettext("Login turned off (anyone can use the admin screens as a guest).")
+       )
        |> load_dashboard_data()}
     end
   end
@@ -433,10 +469,10 @@ defmodule AskDriveWeb.AdminLive do
       case AskDrive.Accounts.LoginThrottle.unlock(String.to_integer(id)) do
         {:ok, lock} ->
           Logger.info("AdminLive: login lock lifted (#{lock.scope} #{lock.email || lock.ip})")
-          put_flash(socket, :info, "ロックを解除しました。")
+          put_flash(socket, :info, gettext("Lock lifted."))
 
         {:error, :not_found} ->
-          put_flash(socket, :error, "このロックはすでに解除されています。")
+          put_flash(socket, :error, gettext("This lock has already been lifted."))
       end
 
     {:noreply, load_dashboard_data(socket)}
@@ -456,7 +492,7 @@ defmodule AskDriveWeb.AdminLive do
     check =
       cond do
         is_nil(pem.cert) or is_nil(pem.key) ->
-          {:error, ["証明書と秘密鍵の両方を選択してください"]}
+          {:error, [gettext("Choose both the certificate and the private key")]}
 
         true ->
           case AskDrive.SSL.validate(pem, hostname) do
@@ -482,10 +518,16 @@ defmodule AskDriveWeb.AdminLive do
         {:noreply,
          socket
          |> assign(:ssl_check, nil)
-         |> put_flash(:info, "証明書を適用しています。数秒後にページが自動で再接続します（再接続しない場合は再読み込みしてください）。")}
+         |> put_flash(
+           :info,
+           gettext(
+             "Applying the certificate. The page reconnects by itself in a few seconds (reload it if it doesn't)."
+           )
+         )}
 
       _ ->
-        {:noreply, put_flash(socket, :error, "先に「検証する」で証明書を検証してください。")}
+        {:noreply,
+         put_flash(socket, :error, gettext("Validate the certificate first with \"Validate\"."))}
     end
   end
 
@@ -505,7 +547,9 @@ defmodule AskDriveWeb.AdminLive do
          put_flash(
            socket,
            :error,
-           "この接続には有効な証明書がなく、社内 LAN からの接続でもありません。先にこの端末に証明書をインストールし、監視のまま「この接続の証明書: 有効」と表示されることを確認するか、社内 LAN から操作してください。"
+           gettext(
+             "This connection has no valid certificate and doesn't come from the office LAN. First install a certificate on this device and check, while still monitoring, that \"Certificate of this connection: valid\" is shown, or do this from the office LAN."
+           )
          )}
 
       true ->
@@ -525,8 +569,10 @@ defmodule AskDriveWeb.AdminLive do
            :info,
            if(restart?,
              do:
-               "設定しました。HTTPS の待ち受けを再起動しています（数秒後に自動で再接続します。証明書の選択を求められたら AskDrive の証明書を選んでください）。",
-             else: "設定しました。"
+               gettext(
+                 "Done. Restarting the HTTPS listener (the page reconnects by itself in a few seconds; if asked to choose a certificate, choose the AskDrive one)."
+               ),
+             else: gettext("Done.")
            )
          )
          |> load_dashboard_data()}
@@ -538,10 +584,19 @@ defmodule AskDriveWeb.AdminLive do
     case AskDrive.ClientCerts.set_lan_ranges(text) do
       :ok ->
         {:noreply,
-         socket |> put_flash(:info, "社内 LAN の設定を保存しました（すぐに反映されます）。") |> load_dashboard_data()}
+         socket
+         |> put_flash(:info, gettext("Office LAN settings saved (effective immediately)."))
+         |> load_dashboard_data()}
 
       {:error, bad} ->
-        {:noreply, put_flash(socket, :error, "IP アドレス・範囲として読み取れません: #{Enum.join(bad, "、")}")}
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Can't read these as IP addresses or ranges: %{values}",
+             values: join_list(bad)
+           )
+         )}
     end
   end
 
@@ -549,10 +604,17 @@ defmodule AskDriveWeb.AdminLive do
     case AskDrive.ClientCerts.create_group(name) do
       {:ok, group} ->
         {:noreply,
-         socket |> put_flash(:info, "グループ「#{group.name}」を追加しました。") |> load_dashboard_data()}
+         socket
+         |> put_flash(:info, gettext("Group \"%{name}\" added.", name: group.name))
+         |> load_dashboard_data()}
 
       {:error, cs} ->
-        {:noreply, put_flash(socket, :error, "グループ名" <> changeset_messages(cs))}
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Group name %{errors}", errors: changeset_messages(cs))
+         )}
     end
   end
 
@@ -595,8 +657,9 @@ defmodule AskDriveWeb.AdminLive do
      |> put_flash(
        :info,
        if(on?,
-         do: "夜間の自動実行をオンにしました。次の夜間枠から自動で実行します。",
-         else: "夜間の自動実行をオフにしました（手動実行はできます）。"
+         do:
+           gettext("Nightly batch turned on. It runs automatically from the next nightly window."),
+         else: gettext("Nightly batch turned off (manual runs still work).")
        )
      )
      |> load_dashboard_data()}
@@ -615,10 +678,19 @@ defmodule AskDriveWeb.AdminLive do
       {:error, reason} ->
         message =
           case reason do
-            :not_kept -> "この証明書は再ダウンロードに対応する前に発行したため、ダウンロードできません。新しく発行してください。"
-            :revoked -> "失効した証明書はダウンロードできません。"
-            :expired -> "有効期限が切れた証明書はダウンロードできません。"
-            :not_found -> "証明書が見つかりません。"
+            :not_kept ->
+              gettext(
+                "This certificate was issued before re-downloads were supported, so it can't be downloaded. Issue a new one."
+              )
+
+            :revoked ->
+              gettext("A revoked certificate can't be downloaded.")
+
+            :expired ->
+              gettext("An expired certificate can't be downloaded.")
+
+            :not_found ->
+              gettext("Certificate not found.")
           end
 
         {:noreply, put_flash(socket, :error, message)}
@@ -629,12 +701,13 @@ defmodule AskDriveWeb.AdminLive do
     {:ok, _} =
       AskDrive.ClientCerts.revoke(String.to_integer(id), socket.assigns.current_user.email)
 
-    {:noreply, socket |> put_flash(:info, "証明書を失効させました。") |> load_dashboard_data()}
+    {:noreply,
+     socket |> put_flash(:info, gettext("Certificate revoked.")) |> load_dashboard_data()}
   end
 
   def handle_event("delete_client_cert_group", %{"group_id" => id}, socket) do
     :ok = AskDrive.ClientCerts.delete_group(String.to_integer(id))
-    {:noreply, socket |> put_flash(:info, "グループを削除しました。") |> load_dashboard_data()}
+    {:noreply, socket |> put_flash(:info, gettext("Group deleted.")) |> load_dashboard_data()}
   end
 
   # Ports and trusted proxies (spec F-1013). A port change restarts the endpoint, which drops
@@ -652,15 +725,29 @@ defmodule AskDriveWeb.AdminLive do
            put_flash(
              socket,
              :info,
-             "ポートを変更して再起動しています。数秒後に https://<ホスト>:#{new.https_port}/admin?tab=settings を開き直してください（起動できなければ元の設定に戻ります）。"
+             gettext(
+               "Changing the ports and restarting. In a few seconds, reopen https://<host>:%{port}/admin?tab=settings (if it can't start, the previous settings come back).",
+               port: to_string(new.https_port)
+             )
            )}
         else
           {:ok, _, :applied} = AskDrive.Network.apply_settings(new)
-          {:noreply, put_flash(socket, :info, "リバースプロキシの設定を保存しました（すぐに反映されます）。")}
+
+          {:noreply,
+           put_flash(
+             socket,
+             :info,
+             gettext("Reverse proxy settings saved (effective immediately).")
+           )}
         end
 
       {:error, errors} ->
-        {:noreply, put_flash(socket, :error, "保存できませんでした: " <> Enum.join(errors, "／"))}
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Could not save: %{errors}", errors: Enum.join(errors, "／"))
+         )}
     end
   end
 
@@ -681,13 +768,21 @@ defmodule AskDriveWeb.AdminLive do
        |> put_flash(
          :info,
          if(new.enabled,
-           do: "API ゲートウェイの設定を保存しました（確認は有効のままです）。",
-           else: "API ゲートウェイの設定を保存しました。確認は「API ゲートウェイの確認」のスイッチで有効にします。"
+           do: gettext("API gateway settings saved (the check stays on)."),
+           else:
+             gettext(
+               "API gateway settings saved. Turn the check on with the \"API gateway check\" switch."
+             )
          )
        )}
     else
       {:error, errors} ->
-        {:noreply, put_flash(socket, :error, "保存できませんでした: " <> Enum.join(errors, "／"))}
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Could not save: %{errors}", errors: Enum.join(errors, "／"))
+         )}
     end
   end
 
@@ -697,7 +792,14 @@ defmodule AskDriveWeb.AdminLive do
       record_ssl_result(AskDrive.SSL.reset_to_self_signed())
     end)
 
-    {:noreply, put_flash(socket, :info, "自己署名証明書を作り直して適用しています。数秒後にページが自動で再接続します。")}
+    {:noreply,
+     put_flash(
+       socket,
+       :info,
+       gettext(
+         "Recreating and applying the self-signed certificate. The page reconnects by itself in a few seconds."
+       )
+     )}
   end
 
   def handle_event("cancel_ssl_upload", %{"ref" => ref, "upload" => upload}, socket) do
@@ -712,7 +814,13 @@ defmodule AskDriveWeb.AdminLive do
 
       name ->
         AskDrive.LLM.OllamaModels.pull_async(name)
-        {:noreply, put_flash(socket, :info, "#{name} の取得を開始しました（数分かかることがあります）。")}
+
+        {:noreply,
+         put_flash(
+           socket,
+           :info,
+           gettext("Started downloading %{name} (this can take a few minutes).", name: name)
+         )}
     end
   end
 
@@ -724,7 +832,13 @@ defmodule AskDriveWeb.AdminLive do
   @impl true
   def handle_event("check_updates", _params, %{assigns: %{scope: :platform}} = socket) do
     lv = self()
-    Task.start(fn -> send(lv, {:update_checked, AskDrive.Updates.check()}) end)
+    locale = Gettext.get_locale(AskDriveWeb.Gettext)
+
+    Task.start(fn ->
+      Gettext.put_locale(AskDriveWeb.Gettext, locale)
+      send(lv, {:update_checked, AskDrive.Updates.check()})
+    end)
+
     {:noreply, assign(socket, :update_checking, true)}
   end
 
@@ -744,13 +858,17 @@ defmodule AskDriveWeb.AdminLive do
         {:noreply,
          socket
          |> assign(:update_status, AskDrive.Updates.status())
-         |> put_flash(:info, "アップデートを開始しました。ビルドが終わると再起動します。")}
+         |> put_flash(
+           :info,
+           gettext("Update started. AskDrive restarts when the build finishes.")
+         )}
 
       {:error, :busy} ->
-        {:noreply, put_flash(socket, :error, "アップデートはすでに進行中です。")}
+        {:noreply, put_flash(socket, :error, gettext("An update is already in progress."))}
 
       {:error, :up_to_date} ->
-        {:noreply, put_flash(socket, :info, "最新版で稼働しています。アップデートはありません。")}
+        {:noreply,
+         put_flash(socket, :info, gettext("Running the latest version. No update available."))}
     end
   end
 
@@ -773,24 +891,31 @@ defmodule AskDriveWeb.AdminLive do
          |> assign(:setting, updated)
          |> assign(:acme_form, acme_form(updated))
          |> assign(:acme_dns_test, nil)
-         |> put_flash(:info, "Let's Encrypt の設定を保存しました。")}
+         |> put_flash(:info, gettext("Let's Encrypt settings saved."))}
 
       {:error, changeset} ->
         {:noreply,
          socket
          |> assign(:acme_form, to_form(changeset, as: :acme))
-         |> put_flash(:error, "保存できませんでした: " <> changeset_messages(changeset))}
+         |> put_flash(
+           :error,
+           gettext("Could not save: %{errors}", errors: changeset_messages(changeset))
+         )}
     end
   end
 
   def handle_event("test_acme_dns", _params, %{assigns: %{scope: :platform}} = socket) do
     setting = socket.assigns.setting
     config = %{api_key: setting.valuedomain_api_key, zone: setting.acme_dns_zone}
+    locale = Gettext.get_locale(AskDriveWeb.Gettext)
 
     {:noreply,
      socket
      |> assign(:acme_dns_test, :running)
-     |> start_async(:acme_dns_test, fn -> AskDrive.ACME.ValueDomain.test(config) end)}
+     |> start_async(:acme_dns_test, fn ->
+       Gettext.put_locale(AskDriveWeb.Gettext, locale)
+       AskDrive.ACME.ValueDomain.test(config)
+     end)}
   end
 
   def handle_event("run_acme", _params, %{assigns: %{scope: :platform}} = socket) do
@@ -800,14 +925,18 @@ defmodule AskDriveWeb.AdminLive do
          put_flash(
            socket,
            :info,
-           "証明書の取得を始めました。DNS の反映待ちに数分かかることがあります。適用時に HTTPS が再起動し、ページが自動で再接続します。"
+           gettext(
+             "Started getting the certificate. Waiting for DNS to propagate can take a few minutes. HTTPS restarts when it is applied, and the page reconnects by itself."
+           )
          )}
 
       {:error, :running} ->
-        {:noreply, put_flash(socket, :error, "証明書の取得はすでに実行中です。")}
+        {:noreply,
+         put_flash(socket, :error, gettext("Getting the certificate is already in progress."))}
 
       {:error, :not_configured} ->
-        {:noreply, put_flash(socket, :error, "先にホスト名・ドメイン・API キーを保存してください。")}
+        {:noreply,
+         put_flash(socket, :error, gettext("Save the host name, domain and API key first."))}
     end
   end
 
@@ -828,13 +957,19 @@ defmodule AskDriveWeb.AdminLive do
          |> assign(:setting, updated)
          |> assign_settings_form(updated)
          |> assign(:notify_test, nil)
-         |> put_flash(:info, "Google Chat の通知先を保存しました。「テスト送信」で確認できます。")}
+         |> put_flash(
+           :info,
+           gettext("Google Chat notification destination saved. Check it with \"Send test\".")
+         )}
 
       {:error, changeset} ->
         {:noreply,
          socket
          |> assign(:form, to_form(changeset))
-         |> put_flash(:error, "保存できませんでした: " <> changeset_messages(changeset))}
+         |> put_flash(
+           :error,
+           gettext("Could not save: %{errors}", errors: changeset_messages(changeset))
+         )}
     end
   end
 
@@ -844,7 +979,7 @@ defmodule AskDriveWeb.AdminLive do
 
     result =
       case AskDrive.Notify.GoogleChat.send_message(text, socket.assigns.setting) do
-        :not_configured -> {:error, "Webhook URL が設定されていません。"}
+        :not_configured -> {:error, gettext("No webhook URL is set.")}
         other -> other
       end
 
@@ -862,7 +997,7 @@ defmodule AskDriveWeb.AdminLive do
      |> assign(:setting, updated)
      |> assign_settings_form(updated)
      |> assign(:notify_test, nil)
-     |> put_flash(:info, "Google Chat の通知先を削除しました。")}
+     |> put_flash(:info, gettext("Google Chat notification destination removed."))}
   end
 
   def handle_event("select_tab", %{"tab" => tab}, socket) do
@@ -875,7 +1010,13 @@ defmodule AskDriveWeb.AdminLive do
 
     {:noreply,
      socket
-     |> put_flash(:info, "#{count} 件のチャンクを QA 生成の対象に戻しました。次のバッチで再び生成します。")
+     |> put_flash(
+       :info,
+       gettext(
+         "%{count} chunks are back in line for QA generation. The next batch generates them again.",
+         count: count
+       )
+     )
      |> load_dashboard_data()}
   end
 
@@ -884,10 +1025,15 @@ defmodule AskDriveWeb.AdminLive do
       case Scheduler.request_stop() do
         :ok ->
           Logger.info("AdminLive: stop requested for the running batch")
-          put_flash(socket, :info, "バッチの停止を要求しました。処理中の項目が終わり次第止まります。")
+
+          put_flash(
+            socket,
+            :info,
+            gettext("Stop requested. The batch stops once the current item finishes.")
+          )
 
         {:error, :not_running} ->
-          put_flash(socket, :error, "実行中のバッチはありません。")
+          put_flash(socket, :error, gettext("No batch is running."))
       end
 
     {:noreply, load_dashboard_data(socket)}
@@ -897,7 +1043,8 @@ defmodule AskDriveWeb.AdminLive do
     ingest_only? = params["kind"] == "ingest_only"
 
     if Scheduler.running?() do
-      {:noreply, put_flash(socket, :error, "バッチが実行中です。終了してから実行してください。")}
+      {:noreply,
+       put_flash(socket, :error, gettext("A batch is running. Run it again after it finishes."))}
     else
       Logger.info("AdminLive: Triggering manual batch run (ingest_only: #{ingest_only?})...")
       # bind: run the batch against this app's database (spec 6.11)
@@ -905,8 +1052,8 @@ defmodule AskDriveWeb.AdminLive do
 
       message =
         if ingest_only?,
-          do: "取り込みのみのバッチを開始しました（QA 生成は行いません）。",
-          else: "バッチ（QA 生成あり）の実行を開始しました。"
+          do: gettext("Started an ingestion-only batch (no QA generation)."),
+          else: gettext("Started a batch (with QA generation).")
 
       {:noreply,
        socket
@@ -939,14 +1086,16 @@ defmodule AskDriveWeb.AdminLive do
           if reindex? do
             case Vector.rebuild_index(updated.embedding_dim) do
               {:ok, _dim} ->
-                "設定を保存し、ベクトルインデックスを再構築しました。次回の夜間バッチで全チャンクを再ベクトル化します。"
+                gettext(
+                  "Settings saved and the vector index rebuilt. The next nightly batch re-embeds all chunks."
+                )
 
               {:error, reason} ->
                 Logger.error("Vector index rebuild failed: #{inspect(reason)}")
-                "設定は保存しましたが、ベクトルインデックスの再構築に失敗しました。ログを確認してください。"
+                gettext("Settings saved, but rebuilding the vector index failed. Check the logs.")
             end
           else
-            "設定を保存しました。"
+            gettext("Settings saved.")
           end
 
         {:noreply,
@@ -961,7 +1110,7 @@ defmodule AskDriveWeb.AdminLive do
          socket
          |> assign(:form, to_form(changeset))
          |> assign(:llm_view, llm_view_from_params(setting_params, socket.assigns.llm_view))
-         |> put_flash(:error, "設定の保存に失敗しました。入力内容を確認してください。")}
+         |> put_flash(:error, gettext("Could not save the settings. Check your input."))}
     end
   end
 
@@ -986,7 +1135,8 @@ defmodule AskDriveWeb.AdminLive do
          |> assign_drive_mode()}
 
       {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Drive 認証方式を切り替えられませんでした。")}
+        {:noreply,
+         put_flash(socket, :error, gettext("Could not switch the Drive authentication method."))}
     end
   end
 
@@ -1020,7 +1170,7 @@ defmodule AskDriveWeb.AdminLive do
 
     result =
       case OAuth.test_client(client) do
-        :ok -> {:ok, "クライアント ID / シークレットは有効です（Google が認識しています）。"}
+        :ok -> {:ok, gettext("The client ID / secret is valid (Google recognizes it).")}
         {:error, message} -> {:error, message}
       end
 
@@ -1035,7 +1185,9 @@ defmodule AskDriveWeb.AdminLive do
      |> assign(:drive_client_open, true)
      |> put_flash(
        :error,
-       "接続するには OAuth クライアントが必要です。全体設定の「Google OAuth（ログイン / Drive 同期）」に登録するか、下の「OAuth クライアント（初回のみ）」に入力して保存してください。"
+       gettext(
+         "Connecting needs an OAuth client. Register one in the platform settings under \"Google OAuth (login / Drive sync)\", or enter one below under \"OAuth client (first time only)\" and save."
+       )
      )}
   end
 
@@ -1084,7 +1236,7 @@ defmodule AskDriveWeb.AdminLive do
           end
 
         _ ->
-          {:error, "先に JSON キーを保存してください。"}
+          {:error, gettext("Save the JSON key first.")}
       end
 
     {:noreply, assign(socket, :service_account_test, result)}
@@ -1102,22 +1254,33 @@ defmodule AskDriveWeb.AdminLive do
          assign(
            socket,
            :drive_sync_test,
-           {:error, "先に認証（サービスアカウントの JSON キー、または OAuth の認可）を設定してください。"}
+           {:error,
+            gettext(
+              "Set up authentication first (a service account JSON key, or OAuth authorization)."
+            )}
          )}
 
       setting.drive_folder_id in [nil, ""] ->
         {:noreply,
-         assign(socket, :drive_sync_test, {:error, "同期するフォルダの ID / URL を入力して保存してください。"})}
+         assign(
+           socket,
+           :drive_sync_test,
+           {:error, gettext("Enter and save the ID / URL of the folder to sync.")}
+         )}
 
       true ->
         folder_id = setting.drive_folder_id
+        locale = Gettext.get_locale(AskDriveWeb.Gettext)
 
         {:noreply,
          socket
          |> assign(:drive_sync_test, :running)
          |> start_async(
            :drive_sync_test,
-           AskDrive.Apps.bind(fn -> drive_sync_dry_run(folder_id, setting) end)
+           AskDrive.Apps.bind(fn ->
+             Gettext.put_locale(AskDriveWeb.Gettext, locale)
+             drive_sync_dry_run(folder_id, setting)
+           end)
          )}
     end
   end
@@ -1130,7 +1293,7 @@ defmodule AskDriveWeb.AdminLive do
      socket
      |> assign(:setting, Settings.get_setting!())
      |> assign(:service_account_test, nil)
-     |> put_flash(:info, "サービスアカウントの認証情報を削除しました。")
+     |> put_flash(:info, gettext("Service account credentials removed."))
      |> load_dashboard_data()}
   end
 
@@ -1144,7 +1307,10 @@ defmodule AskDriveWeb.AdminLive do
       {:ok, %{id: id}} when id == actor.id ->
         {:noreply,
          socket
-         |> put_flash(:info, "あなたの全体管理者の権限を外しました。一般ユーザーになりました。")
+         |> put_flash(
+           :info,
+           gettext("Your platform administrator role was removed. You are now a regular user.")
+         )
          |> redirect(to: ~p"/")}
 
       result ->
@@ -1171,18 +1337,28 @@ defmodule AskDriveWeb.AdminLive do
         :ok ->
           {:noreply,
            socket
-           |> put_flash(:info, "#{user.email} の窓口管理者権限を更新しました。")
+           |> put_flash(
+             :info,
+             gettext("Updated the desk administrator roles of %{email}.", email: user.email)
+           )
            |> load_dashboard_data()}
 
         {:error, :last_admin} ->
           {:noreply,
-           put_flash(socket, :error, "窓口「#{app.name}」の担当者を 0 人にはできません。先にほかの担当者を追加してください。")}
+           put_flash(
+             socket,
+             :error,
+             gettext(
+               "Desk \"%{name}\" can't have zero administrators. Add another administrator first.",
+               name: app.name
+             )
+           )}
 
         {:error, _} ->
-          {:noreply, put_flash(socket, :error, "更新できませんでした。")}
+          {:noreply, put_flash(socket, :error, gettext("Could not update."))}
       end
     else
-      {:noreply, put_flash(socket, :error, "ユーザーが見つかりません。")}
+      {:noreply, put_flash(socket, :error, gettext("User not found."))}
     end
   end
 
@@ -1224,11 +1400,21 @@ defmodule AskDriveWeb.AdminLive do
       {:noreply,
        socket
        |> clear_ac("add-app-admins-emails")
-       |> put_flash(:info, "#{Enum.join(emails, "、")} を窓口「#{app.name}」の担当者にしました。")
+       |> put_flash(
+         :info,
+         gettext("%{emails} are now administrators of desk \"%{name}\".",
+           emails: join_list(emails),
+           name: app.name
+         )
+       )
        |> load_dashboard_data()}
     else
-      {:error, :not_authorized} -> {:noreply, put_flash(socket, :error, "担当者を変更する権限がありません。")}
-      {:error, message} -> {:noreply, put_flash(socket, :error, message)}
+      {:error, :not_authorized} ->
+        {:noreply,
+         put_flash(socket, :error, gettext("You are not allowed to change the administrators."))}
+
+      {:error, message} ->
+        {:noreply, put_flash(socket, :error, message)}
     end
   end
 
@@ -1243,20 +1429,35 @@ defmodule AskDriveWeb.AdminLive do
       :ok when user.id == actor.id and socket.assigns.scope == :app ->
         {:noreply,
          socket
-         |> put_flash(:info, "窓口「#{app.name}」の担当者から外れました。")
+         |> put_flash(
+           :info,
+           gettext("You are no longer an administrator of desk \"%{name}\".", name: app.name)
+         )
          |> redirect(to: "/" <> app.slug)}
 
       :ok ->
         {:noreply,
          socket
-         |> put_flash(:info, "#{user.email} を窓口「#{app.name}」の担当者から外しました。")
+         |> put_flash(
+           :info,
+           gettext("Removed %{email} from the administrators of desk \"%{name}\".",
+             email: user.email,
+             name: app.name
+           )
+         )
          |> load_dashboard_data()}
 
       {:error, :last_admin} ->
-        {:noreply, put_flash(socket, :error, "担当者を 0 人にはできません。先にほかの担当者を追加してください。")}
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("A desk can't have zero administrators. Add another administrator first.")
+         )}
 
       {:error, :not_authorized} ->
-        {:noreply, put_flash(socket, :error, "担当者を変更する権限がありません。")}
+        {:noreply,
+         put_flash(socket, :error, gettext("You are not allowed to change the administrators."))}
     end
   end
 
@@ -1279,8 +1480,11 @@ defmodule AskDriveWeb.AdminLive do
          |> put_flash(
            :info,
            if(updated.access_password_enabled,
-             do: "窓口アクセスパスワードを変更しました。",
-             else: "窓口アクセスパスワードを保存しました。利用制限は「パスワードによる利用制限」のスイッチで有効にします。"
+             do: gettext("Desk access password changed."),
+             else:
+               gettext(
+                 "Desk access password saved. Turn the restriction on with the \"Restrict access by password\" switch."
+               )
            )
          )
          |> load_dashboard_data()}
@@ -1293,13 +1497,13 @@ defmodule AskDriveWeb.AdminLive do
   # --- On/off switches (F-206): apply at once, separately from saving the values ---
 
   @setting_toggles %{
-    "auto_batch" => {:auto_batch_enabled, "夜間の自動実行"},
-    "maintenance_mode" => {:maintenance_mode, "メンテナンスモード"},
-    "serve_stale_qa" => {:serve_stale_qa, "Stale な QA の配信"},
-    "daytime_llm" => {:daytime_llm_enabled, "営業時間中の LLM 生成"},
-    "chat_summary" => {:chat_summary_enabled, "チャットの AI 要約"},
-    "update_check" => {:update_check_enabled, "毎晩の新しいバージョンの確認"},
-    "update_auto_apply" => {:update_auto_apply, "自動アップデート"}
+    "auto_batch" => {:auto_batch_enabled, gettext_noop("Nightly batch")},
+    "maintenance_mode" => {:maintenance_mode, gettext_noop("Maintenance mode")},
+    "serve_stale_qa" => {:serve_stale_qa, gettext_noop("Serving stale QA pairs")},
+    "daytime_llm" => {:daytime_llm_enabled, gettext_noop("LLM generation during business hours")},
+    "chat_summary" => {:chat_summary_enabled, gettext_noop("AI summary in chat")},
+    "update_check" => {:update_check_enabled, gettext_noop("Nightly check for new versions")},
+    "update_auto_apply" => {:update_auto_apply, gettext_noop("Automatic updates")}
   }
   @platform_toggles ~w(update_check update_auto_apply oauth_login ldap gateway acme)
 
@@ -1308,19 +1512,38 @@ defmodule AskDriveWeb.AdminLive do
 
     result =
       if feature in @platform_toggles and socket.assigns.scope != :platform,
-        do: {:error, "この画面では切り替えられません", "この機能"},
+        do: {:error, gettext("It can't be switched on this screen"), gettext("This feature")},
         else: set_feature(feature, on?, socket)
 
     case result do
       {:ok, socket, label} ->
-        {:noreply, put_flash(socket, :info, "#{label}を#{if on?, do: "有効", else: "無効"}にしました。")}
+        {:noreply,
+         put_flash(
+           socket,
+           :info,
+           if(on?,
+             do: gettext("%{feature} turned on.", feature: label),
+             else: gettext("%{feature} turned off.", feature: label)
+           )
+         )}
 
       {:error, message, label} ->
         {:noreply,
          put_flash(
            socket,
            :error,
-           "#{label}を#{if on?, do: "有効", else: "無効"}にできませんでした: #{message}"
+           if(on?,
+             do:
+               gettext("%{feature} could not be turned on: %{message}",
+                 feature: label,
+                 message: message
+               ),
+             else:
+               gettext("%{feature} could not be turned off: %{message}",
+                 feature: label,
+                 message: message
+               )
+           )
          )}
     end
   end
@@ -1343,19 +1566,24 @@ defmodule AskDriveWeb.AdminLive do
 
   defp event_class(_), do: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
 
-  defp password_error_message(:mismatch), do: "新しいパスワードが一致しません。"
+  defp password_error_message(:mismatch), do: gettext("The new passwords don't match.")
 
   defp password_error_message(:too_short),
-    do: "パスワードは #{AdminAccess.min_password_length()} 文字以上にしてください。"
+    do:
+      gettext("The password must be at least %{count} characters.",
+        count: AdminAccess.min_password_length()
+      )
 
-  defp password_error_message(:surrounding_whitespace), do: "パスワードの前後に空白を含めないでください。"
-  defp password_error_message(:not_authorized), do: "この操作を行う権限がありません。"
-  defp password_error_message(_), do: "パスワードの変更・設定に失敗しました。"
+  defp password_error_message(:surrounding_whitespace),
+    do: gettext("The password must not start or end with spaces.")
+
+  defp password_error_message(:not_authorized), do: gettext("You are not allowed to do this.")
+  defp password_error_message(_), do: gettext("Could not set or change the password.")
 
   defp handle_user_change({:ok, user}, socket) do
     {:noreply,
      socket
-     |> put_flash(:info, "#{user.email} を更新しました。")
+     |> put_flash(:info, gettext("Updated %{email}.", email: user.email))
      |> load_dashboard_data()}
   end
 
@@ -1364,12 +1592,14 @@ defmodule AskDriveWeb.AdminLive do
      put_flash(
        socket,
        :error,
-       "このアドレスは .env.prod の ASK_DRIVE_ADMIN_EMAILS で全体管理者に固定されています（次のログインで元に戻ります）。サーバーの .env.prod からこのアドレスを削除して ./app.sh restart したあと、もう一度操作してください。"
+       gettext(
+         "This address is fixed as a platform administrator by ASK_DRIVE_ADMIN_EMAILS in .env.prod (it is restored at the next sign-in). Remove it from .env.prod on the server, run ./app.sh restart, then try again."
+       )
      )}
   end
 
   defp handle_user_change({:error, :cannot_modify_self}, socket) do
-    {:noreply, put_flash(socket, :error, "自分自身の権限や状態は変更できません。")}
+    {:noreply, put_flash(socket, :error, gettext("You can't change your own role or status."))}
   end
 
   defp handle_user_change({:error, :last_admin}, socket) do
@@ -1377,20 +1607,22 @@ defmodule AskDriveWeb.AdminLive do
      put_flash(
        socket,
        :error,
-       "昇格可能なアカウントを 0 件にはできません。先に別のアカウントに昇格を許可してください。"
+       gettext(
+         "At least one account must be eligible for admin elevation. Allow another account to elevate first."
+       )
      )}
   end
 
   defp handle_user_change({:error, _changeset}, socket) do
-    {:noreply, put_flash(socket, :error, "ユーザーの更新に失敗しました。")}
+    {:noreply, put_flash(socket, :error, gettext("Could not update the user."))}
   end
 
   # `<.input type="select">` wants {label, value} pairs; the identifiers themselves are too
   # terse to show to an operator.
   # Secrets are never echoed back into the form; the admin only needs to know whether one
   # is stored (N-610).
-  defp secret_state(value) when is_binary(value) and value != "", do: "設定済み"
-  defp secret_state(_), do: "未設定"
+  defp secret_state(value) when is_binary(value) and value != "", do: gettext("Set")
+  defp secret_state(_), do: gettext("Not set")
 
   defp provider_options(providers) do
     Enum.map(providers, fn provider -> {LLM.label(provider), provider} end)
@@ -1638,18 +1870,24 @@ defmodule AskDriveWeb.AdminLive do
               ]}
             >
               <%= if @scope == :platform do %>
-                <.icon name="hero-shield-check" class="w-3.5 h-3.5" /> すべての窓口に適用
+                <.icon name="hero-shield-check" class="w-3.5 h-3.5" /> {gettext(
+                  "Applies to all desks"
+                )}
               <% else %>
-                <.icon name="hero-chat-bubble-left-right" class="w-3.5 h-3.5" /> この窓口だけに適用
+                <.icon name="hero-chat-bubble-left-right" class="w-3.5 h-3.5" /> {gettext(
+                  "Applies to this desk only"
+                )}
               <% end %>
             </p>
             <div class="flex items-center gap-2">
               <h1 class="font-bold text-2xl text-zinc-900 dark:text-zinc-100">
-                {if @scope == :app, do: "#{@app.name} の管理", else: "全体管理"}
+                {if @scope == :app,
+                  do: gettext("Manage %{name}", name: @app.name),
+                  else: gettext("Platform admin")}
               </h1>
               <span
                 id="app-version"
-                title="稼働中の AskDrive のバージョン"
+                title={gettext("Running AskDrive version")}
                 class="text-[11px] font-mono px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
               >
                 v{AskDrive.version()}
@@ -1661,13 +1899,19 @@ defmodule AskDriveWeb.AdminLive do
                 patch="/admin?tab=update"
                 class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white transition"
               >
-                v{available} があります
+                {gettext("v%{version} available", version: available)}
               </.link>
             </div>
             <p class="text-xs text-zinc-500 mt-1">
               {if @scope == :app,
-                do: "この窓口の夜間バッチ、ドキュメント、未回答質問、Google Drive と AI の設定を管理します。",
-                else: "窓口（アプリ）の追加・管理、ユーザー、HTTPS、ローカルモデル、夜間バッチの時間帯など、AskDrive 全体の設定を管理します。"}
+                do:
+                  gettext(
+                    "Manage this desk's nightly batch, documents, unanswered questions, and Google Drive and AI settings."
+                  ),
+                else:
+                  gettext(
+                    "Manage settings for all of AskDrive: adding and managing desks (apps), users, HTTPS, local models, the nightly batch window, and more."
+                  )}
             </p>
           </div>
 
@@ -1678,16 +1922,22 @@ defmodule AskDriveWeb.AdminLive do
                 id="stop-requested"
                 class="text-xs px-3.5 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-200 flex items-center gap-1.5"
               >
-                <.icon name="hero-clock" class="w-4 h-4" /> 停止を要求しました。処理中の項目が終わり次第止まります
+                <.icon name="hero-clock" class="w-4 h-4" /> {gettext(
+                  "Stop requested. It will stop once the current item finishes."
+                )}
               </span>
             <% else %>
               <button
                 id="stop-batch-btn"
                 phx-click="stop_batch"
-                data-confirm="実行中のバッチを停止しますか？処理中のファイル（またはチャンク）が終わった時点で止まります。ここまでの取り込み・生成結果は残り、残りは次回のバッチで続きから処理します。"
+                data-confirm={
+                  gettext(
+                    "Stop the running batch? It stops once the current file (or chunk) finishes. What has been ingested and generated so far is kept, and the rest is picked up by the next batch."
+                  )
+                }
                 class="text-xs px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium shadow-sm flex items-center gap-1.5 transition"
               >
-                <.icon name="hero-stop" class="w-4 h-4" /> バッチを停止
+                <.icon name="hero-stop" class="w-4 h-4" /> {gettext("Stop batch")}
               </button>
             <% end %>
           </div>
@@ -1702,14 +1952,24 @@ defmodule AskDriveWeb.AdminLive do
               phx-value-kind="full"
               data-confirm={
                 if(@current_mode == :daytime,
-                  do: "現在は営業時間相です。QA 生成ありのバッチは生成モデルを長時間占有し、その間チャットは原文検索のみ（キーワード中心）になります。続きから再実行しますか？",
-                  else: "続きから再実行しますか？"
+                  do:
+                    gettext(
+                      "It is currently business hours. A batch with QA generation occupies the generation model for a long time, and chat falls back to source search only (mostly keywords) meanwhile. Resume from where it stopped?"
+                    ),
+                  else: gettext("Resume from where it stopped?")
                 )
               }
-              title="前回のバッチが最後まで終わっていません。残りだけを処理します（済んだ部分はやり直しません）。"
+              title={
+                gettext(
+                  "The previous batch did not finish. Only the rest is processed (finished parts are not redone)."
+                )
+              }
               class="text-xs px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium shadow-sm flex items-center gap-1.5 transition"
             >
-              <.icon name="hero-arrow-path" class="w-4 h-4" /> 続きから再実行（残り {@remaining.chunks} チャンク）
+              <.icon name="hero-arrow-path" class="w-4 h-4" /> {gettext(
+                "Resume (%{count} chunks left)",
+                count: @remaining.chunks
+              )}
             </button>
             <%!-- Ingest only (spec 6.3.8 F-331): sync + indexing, no QA generation, so the
                   local model stays free for chat. The safe default for daytime runs. --%>
@@ -1717,10 +1977,14 @@ defmodule AskDriveWeb.AdminLive do
               id="trigger-ingest-btn"
               phx-click="trigger_batch"
               phx-value-kind="ingest_only"
-              title="Drive の同期と取り込み（本文抽出・埋め込み）だけを行います。QA 生成は行わないため、実行中もチャットは通常どおり使えます。"
+              title={
+                gettext(
+                  "Only syncs Drive and runs ingestion (text extraction and embedding). No QA generation, so chat works as usual while it runs."
+                )
+              }
               class="text-xs px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm flex items-center gap-1.5 transition"
             >
-              <.icon name="hero-arrow-down-tray" class="w-4 h-4" /> 取り込みのみ実行
+              <.icon name="hero-arrow-down-tray" class="w-4 h-4" /> {gettext("Run ingestion only")}
             </button>
             <button
               id="trigger-batch-btn"
@@ -1729,13 +1993,15 @@ defmodule AskDriveWeb.AdminLive do
               data-confirm={
                 if(@current_mode == :daytime,
                   do:
-                    "現在は営業時間相です。QA 生成ありのバッチは生成モデルを長時間占有し、その間チャットは原文検索のみ（キーワード中心）になります。通常は「取り込みのみ実行」で十分です。実行しますか？",
-                  else: "バッチ（QA 生成あり）を手動実行しますか？"
+                    gettext(
+                      "It is currently business hours. A batch with QA generation occupies the generation model for a long time, and chat falls back to source search only (mostly keywords) meanwhile. \"Run ingestion only\" is usually enough. Run it anyway?"
+                    ),
+                  else: gettext("Run the batch (with QA generation) manually?")
                 )
               }
               class="text-xs px-3.5 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium flex items-center gap-1.5 transition"
             >
-              <.icon name="hero-play" class="w-4 h-4" /> フル実行（QA 生成あり）
+              <.icon name="hero-play" class="w-4 h-4" /> {gettext("Full run (with QA generation)")}
             </button>
           </div>
         </div>
@@ -1749,16 +2015,25 @@ defmodule AskDriveWeb.AdminLive do
           class="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-xs text-amber-900 dark:text-amber-100 space-y-1"
         >
           <p class="font-semibold flex items-center gap-1.5">
-            <.icon name="hero-key" class="w-4 h-4" /> API キーが未登録です
+            <.icon name="hero-key" class="w-4 h-4" /> {gettext("API key not registered")}
           </p>
           <p :if={missing_embed}>
-            埋め込み（{missing_embed}）の API キーがないため、夜間バッチ（文書の取り込み）を実行しません。チャットは原文のキーワード検索だけになります。
+            {gettext(
+              "There is no API key for embedding (%{provider}), so the nightly batch (document ingestion) does not run. Chat is limited to keyword search over the source text.",
+              provider: missing_embed
+            )}
           </p>
           <p :if={!missing_embed && missing_gen}>
-            回答生成（{missing_gen}）の API キーがないため、夜間バッチは文書の取り込みだけを行い、想定QA を生成しません。
+            {gettext(
+              "There is no API key for answer generation (%{provider}), so the nightly batch only ingests documents and does not generate QA pairs.",
+              provider: missing_gen
+            )}
           </p>
           <p>
-            キーが発行されたら、<.link patch={"/#{@app.slug}/admin?tab=settings"} class="underline font-medium">「設定」タブ</.link>で登録してください。
+            {gettext("When the key is issued, open the ")}<.link
+              patch={"/#{@app.slug}/admin?tab=settings"}
+              class="underline font-medium"
+            >{gettext("Settings tab")}</.link>{gettext(" and register it there.")}
           </p>
         </div>
 
@@ -1787,28 +2062,30 @@ defmodule AskDriveWeb.AdminLive do
             <%!-- KPI Cards --%>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
-                <p class="text-xs font-medium text-zinc-500">同期ドキュメント数</p>
+                <p class="text-xs font-medium text-zinc-500">{gettext("Synced documents")}</p>
                 <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
                   {@total_docs}
                 </p>
               </div>
 
               <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
-                <p class="text-xs font-medium text-zinc-500">総チャンク数</p>
+                <p class="text-xs font-medium text-zinc-500">{gettext("Total chunks")}</p>
                 <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
                   {@total_chunks}
                 </p>
               </div>
 
               <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
-                <p class="text-xs font-medium text-zinc-500">有効な想定QA数 (Tier 1)</p>
+                <p class="text-xs font-medium text-zinc-500">{gettext("Active QA pairs (Tier 1)")}</p>
                 <p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
                   {@active_qas}
                 </p>
               </div>
 
               <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
-                <p class="text-xs font-medium text-zinc-500">Stale QA数 (再生成待ち)</p>
+                <p class="text-xs font-medium text-zinc-500">
+                  {gettext("Stale QA pairs (awaiting regeneration)")}
+                </p>
                 <p class="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
                   {@stale_qas}
                 </p>
@@ -1819,12 +2096,17 @@ defmodule AskDriveWeb.AdminLive do
             <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-clock" class="w-5 h-5 text-indigo-600" /> 夜間バッチの自動実行と履歴
+                  <.icon name="hero-clock" class="w-5 h-5 text-indigo-600" /> {gettext(
+                    "Nightly batch schedule and history"
+                  )}
                 </h2>
                 <span class="text-xs text-zinc-500">
-                  夜間枠: 毎日 {pad2(elem(@auto_status.window, 0))}:00〜翌 {pad2(
-                    elem(@auto_status.window, 1)
-                  )}:00・打ち切り {pad2(@auto_status.deadline_hour)}:00（この PC のローカル時刻）
+                  {gettext(
+                    "Nightly window: daily %{start}:00 to %{finish}:00 the next day · cutoff %{deadline}:00 (local time of this PC)",
+                    start: pad2(elem(@auto_status.window, 0)),
+                    finish: pad2(elem(@auto_status.window, 1)),
+                    deadline: pad2(@auto_status.deadline_hour)
+                  )}
                 </span>
               </div>
 
@@ -1854,9 +2136,13 @@ defmodule AskDriveWeb.AdminLive do
                   <% :off -> %>
                     <div class="flex flex-wrap items-center justify-between gap-2">
                       <span>
-                        この窓口の夜間の自動実行は<strong>オフ</strong>です（設定中）。「今すぐ実行」「取り込みのみ」は手動で実行できます。
+                        {gettext("Automatic nightly runs for this desk are ")}<strong>{gettext("off")}</strong>{gettext(
+                          " (still being set up). \"Run now\" and \"Ingest only\" can be run manually."
+                        )}
                         <span :if={@setup_looks_done?} id="auto-batch-ready-hint">
-                          Google Drive と AI の設定は済んでいます。準備ができたら自動実行をオンにしてください。
+                          {gettext(
+                            "Google Drive and AI are set up. Turn on automatic runs when you are ready."
+                          )}
                         </span>
                       </span>
                       <button
@@ -1865,29 +2151,42 @@ defmodule AskDriveWeb.AdminLive do
                         phx-value-on="true"
                         class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium"
                       >
-                        自動実行をオンにする
+                        {gettext("Turn on automatic runs")}
                       </button>
                     </div>
                   <% :running -> %>
-                    バッチを実行中です。<span :if={@running_progress}>
-                      全体の目安 {@running_progress.overall}%{if @running_progress.remaining_seconds,
-                        do: "（残り #{eta_label(@running_progress.remaining_seconds)}）"} ・ ステップ {@running_progress.step}/{@running_progress.steps}「{@running_progress.label}」{if @running_progress.total >
-                                                                                                                                                                                0,
-                                                                                                                                                                              do:
-                                                                                                                                                                                " #{@running_progress.done} / #{@running_progress.total}"}
+                    {gettext("Batch is running.")}
+                    <span :if={@running_progress}>
+                      {gettext("Overall estimate %{percent}%", percent: @running_progress.overall)}{if @running_progress.remaining_seconds,
+                        do:
+                          gettext("(%{eta} left)",
+                            eta: eta_label(@running_progress.remaining_seconds)
+                          )} ・ {gettext("Step %{step}/%{steps} \"%{label}\"",
+                        step: @running_progress.step,
+                        steps: @running_progress.steps,
+                        label: @running_progress.label
+                      )}{if @running_progress.total > 0,
+                        do: " #{@running_progress.done} / #{@running_progress.total}"}
                     </span>
                   <% :done -> %>
-                    {Calendar.strftime(@auto_status.window_start, "%-m/%-d")} の夜間枠は実行済みです（#{@auto_status.run.id}・{trigger_label(
-                      @auto_status.run.trigger
-                    )}・{AskDrive.Clock.format(@auto_status.run.started_at, "%H:%M")} 開始・{status_label(
-                      @auto_status.run.status
-                    )}）。次回の自動実行: {Calendar.strftime(@auto_status.next_start, "%-m/%-d %H:%M")}
+                    {gettext(
+                      "The nightly window of %{date} has already run (#%{id} · %{trigger} · started %{time} · %{status}). Next automatic run: %{next}",
+                      date: Calendar.strftime(@auto_status.window_start, "%-m/%-d"),
+                      id: @auto_status.run.id,
+                      trigger: trigger_label(@auto_status.run.trigger),
+                      time: AskDrive.Clock.format(@auto_status.run.started_at, "%H:%M"),
+                      status: status_label(@auto_status.run.status),
+                      next: Calendar.strftime(@auto_status.next_start, "%-m/%-d %H:%M")
+                    )}
                   <% :due -> %>
-                    夜間枠内で、この枠の自動実行はまだありません。1 分以内に自動で開始します。
+                    {gettext(
+                      "Within the nightly window, and this window has not run yet. It will start automatically within a minute."
+                    )}
                   <% :missed -> %>
-                    {Calendar.strftime(@auto_status.window_start, "%-m/%-d")} の夜間枠では、自動実行の記録がありません（再起動で中断されたものは除く。手動実行は自動実行の代わりになりません）。次回の自動実行: {Calendar.strftime(
-                      @auto_status.next_start,
-                      "%-m/%-d %H:%M"
+                    {gettext(
+                      "No automatic run was recorded in the nightly window of %{date} (runs cut short by a restart are not counted, and manual runs do not replace automatic ones). Next automatic run: %{next}",
+                      date: Calendar.strftime(@auto_status.window_start, "%-m/%-d"),
+                      next: Calendar.strftime(@auto_status.next_start, "%-m/%-d %H:%M")
                     )}
                 <% end %>
               </div>
@@ -1896,20 +2195,24 @@ defmodule AskDriveWeb.AdminLive do
                 :if={@scope == :app and @auto_status.state != :off and @setting.auto_batch_enabled}
                 class="text-[11px] text-zinc-500"
               >
-                夜間の自動実行: オン ·
+                {gettext("Automatic nightly runs: on ·")}
                 <button
                   id="auto-batch-off-btn"
                   phx-click="set_auto_batch"
                   phx-value-on="false"
-                  data-confirm="この窓口の夜間の自動実行をオフにしますか？（手動実行はできます）"
+                  data-confirm={
+                    gettext(
+                      "Turn off automatic nightly runs for this desk? (Manual runs remain available.)"
+                    )
+                  }
                   class="underline hover:text-zinc-800 dark:hover:text-zinc-200"
                 >
-                  オフにする
+                  {gettext("Turn off")}
                 </button>
               </p>
 
               <%= if @runs == [] do %>
-                <p class="text-xs text-zinc-500">バッチの実行履歴はまだありません。</p>
+                <p class="text-xs text-zinc-500">{gettext("No batch runs yet.")}</p>
               <% else %>
                 <div class="overflow-x-auto">
                   <table
@@ -1919,14 +2222,16 @@ defmodule AskDriveWeb.AdminLive do
                     <thead class="text-[11px] text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                       <tr>
                         <th class="py-2 px-2">#</th>
-                        <th class="py-2 px-2">開始</th>
-                        <th class="py-2 px-2 text-right">所要時間</th>
-                        <th class="py-2 px-2">起動</th>
-                        <th class="py-2 px-2">種別</th>
-                        <th class="py-2 px-2">状態</th>
-                        <th class="py-2 px-2 text-right">取り込み（文書 / チャンク）</th>
-                        <th class="py-2 px-2 text-right">失敗</th>
-                        <th class="py-2 px-2 text-right">生成QA</th>
+                        <th class="py-2 px-2">{gettext("Started")}</th>
+                        <th class="py-2 px-2 text-right">{gettext("Duration")}</th>
+                        <th class="py-2 px-2">{gettext("Trigger")}</th>
+                        <th class="py-2 px-2">{gettext("Type")}</th>
+                        <th class="py-2 px-2">{gettext("Status")}</th>
+                        <th class="py-2 px-2 text-right">
+                          {gettext("Ingested (documents / chunks)")}
+                        </th>
+                        <th class="py-2 px-2 text-right">{gettext("Failed")}</th>
+                        <th class="py-2 px-2 text-right">{gettext("QA generated")}</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
@@ -1950,7 +2255,9 @@ defmodule AskDriveWeb.AdminLive do
                         </td>
                         <td class="py-2 px-2 whitespace-nowrap">{trigger_label(run.trigger)}</td>
                         <td class="py-2 px-2 whitespace-nowrap">
-                          {if run.kind == "ingest_only", do: "取り込みのみ", else: "フル"}
+                          {if run.kind == "ingest_only",
+                            do: gettext("Ingest only"),
+                            else: gettext("Full")}
                         </td>
                         <td class="py-2 px-2 whitespace-nowrap">
                           <span class={[
@@ -1987,7 +2294,9 @@ defmodule AskDriveWeb.AdminLive do
                   </table>
                 </div>
                 <p class="text-[11px] text-zinc-400">
-                  行をクリックすると、下の「バッチ実行状況」にそのバッチの詳細（フェーズ別内訳・ファイル別ログ）を表示します。
+                  {gettext(
+                    "Click a row to show that batch's details (phase breakdown and per-file log) in \"Batch run status\" below."
+                  )}
                 </p>
               <% end %>
             </div>
@@ -1996,7 +2305,9 @@ defmodule AskDriveWeb.AdminLive do
             <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
               <div class="flex items-center justify-between">
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-cpu-chip" class="w-5 h-5 text-indigo-600" /> バッチ実行状況
+                  <.icon name="hero-cpu-chip" class="w-5 h-5 text-indigo-600" /> {gettext(
+                    "Batch run status"
+                  )}
                   <span :if={@latest_run} class="text-xs font-normal text-zinc-400">
                     #{@latest_run.id}
                   </span>
@@ -2033,7 +2344,7 @@ defmodule AskDriveWeb.AdminLive do
                     :if={@latest_run.kind == "ingest_only"}
                     class="text-xs px-2.5 py-1 rounded-full font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
                   >
-                    取り込みのみ
+                    {gettext("Ingest only")}
                   </span>
                 </div>
               </div>
@@ -2041,41 +2352,54 @@ defmodule AskDriveWeb.AdminLive do
               <%= if @latest_run do %>
                 <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 text-xs text-zinc-600 dark:text-zinc-400">
                   <div>
-                    <span class="text-zinc-400 block">開始日時</span>
+                    <span class="text-zinc-400 block">{gettext("Started at")}</span>
                     <span class="font-mono text-zinc-800 dark:text-zinc-200">
                       {AskDrive.Clock.format(@latest_run.started_at, "%Y-%m-%d %H:%M:%S")}
                     </span>
                   </div>
                   <div>
-                    <span class="text-zinc-400 block">終了日時</span>
+                    <span class="text-zinc-400 block">{gettext("Finished at")}</span>
                     <span class="font-mono text-zinc-800 dark:text-zinc-200">
                       {if @latest_run.finished_at,
                         do: AskDrive.Clock.format(@latest_run.finished_at, "%Y-%m-%d %H:%M:%S"),
-                        else: "実行中..."}
+                        else: gettext("Running...")}
                     </span>
                   </div>
                   <div>
-                    <span class="text-zinc-400 block">取り込み（成功文書 / チャンク）</span>
+                    <span class="text-zinc-400 block">{gettext(
+                      "Ingested (successful documents / chunks)"
+                    )}</span>
                     <span class="font-mono text-zinc-800 dark:text-zinc-200">
-                      {count_logs(@item_logs, "embed_chunks", "indexed")} 件 / {sum_chunks(@item_logs)} 件
+                      {gettext("%{documents} documents / %{chunks} chunks",
+                        documents: count_logs(@item_logs, "embed_chunks", "indexed"),
+                        chunks: sum_chunks(@item_logs)
+                      )}
                       <span
                         :if={count_logs(@item_logs, "failed") > 0}
                         class="text-red-600 dark:text-red-400"
                       >
-                        （失敗 {count_logs(@item_logs, "failed")} 件）
+                        {gettext("(%{count} failed)", count: count_logs(@item_logs, "failed"))}
                       </span>
                     </span>
                   </div>
                   <div>
-                    <span class="text-zinc-400 block">QA 生成（対象チャンク / 生成QA）</span>
+                    <span class="text-zinc-400 block">{gettext(
+                      "QA generation (chunks processed / QA generated)"
+                    )}</span>
                     <span class="font-mono text-zinc-800 dark:text-zinc-200">
-                      {@latest_run.chunks_processed} 件 / {@latest_run.qa_generated} 件
+                      {gettext("%{chunks} chunks / %{qas} QA",
+                        chunks: @latest_run.chunks_processed,
+                        qas: @latest_run.qa_generated
+                      )}
                     </span>
                   </div>
                   <div>
-                    <span class="text-zinc-400 block">未回答解消 / 残キュー</span>
+                    <span class="text-zinc-400 block">{gettext("Unanswered resolved / queue left")}</span>
                     <span class="font-mono text-zinc-800 dark:text-zinc-200">
-                      {@latest_run.questions_resolved} 件 / {@latest_run.queue_remaining} 件
+                      {gettext("%{resolved} resolved / %{queued} queued",
+                        resolved: @latest_run.questions_resolved,
+                        queued: @latest_run.queue_remaining
+                      )}
                     </span>
                   </div>
                 </div>
@@ -2087,7 +2411,7 @@ defmodule AskDriveWeb.AdminLive do
                   class="p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 space-y-1"
                 >
                   <p class="text-xs font-semibold text-red-800 dark:text-red-200">
-                    失敗の原因（エラー内容）
+                    {gettext("Cause of failure (error)")}
                   </p>
                   <pre class="text-[11px] leading-relaxed text-red-900 dark:text-red-100 whitespace-pre-wrap break-all max-h-60 overflow-y-auto">{@latest_run.error}</pre>
                 </div>
@@ -2112,15 +2436,26 @@ defmodule AskDriveWeb.AdminLive do
                   id="batch-resume"
                   class="p-3 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200/70 dark:border-indigo-900 space-y-2 text-xs"
                 >
-                  <p class="font-semibold text-indigo-900 dark:text-indigo-200">続きから再実行</p>
+                  <p class="font-semibold text-indigo-900 dark:text-indigo-200">
+                    {gettext("Resume")}
+                  </p>
                   <p class="text-zinc-700 dark:text-zinc-300">
-                    残り: 取り込み待ち {@remaining.documents} 文書・QA 未生成 {@remaining.chunks} チャンク・質問の埋め込み待ち {@remaining.questions} 件
+                    {gettext(
+                      "Left: %{documents} documents to ingest · %{chunks} chunks without QA · %{questions} questions to embed",
+                      documents: @remaining.documents,
+                      chunks: @remaining.chunks,
+                      questions: @remaining.questions
+                    )}
                     <span :if={@remaining.given_up > 0} class="text-amber-700 dark:text-amber-300">
-                      （3 回失敗して除外中 {@remaining.given_up} チャンク）
+                      {gettext("(%{count} chunks excluded after 3 failures)",
+                        count: @remaining.given_up
+                      )}
                     </span>
                   </p>
                   <p class="text-zinc-500">
-                    取り込み済みの文書と、QA を生成済みのチャンクは再実行しません。前回失敗したチャンクは後回しにします。
+                    {gettext(
+                      "Documents already ingested and chunks that already have QA are not redone. Chunks that failed last time go last."
+                    )}
                   </p>
                   <button
                     id="resume-batch-btn"
@@ -2129,13 +2464,15 @@ defmodule AskDriveWeb.AdminLive do
                     data-confirm={
                       if(@current_mode == :daytime,
                         do:
-                          "現在は営業時間相です。QA 生成ありのバッチは生成モデルを長時間占有し、その間チャットは原文検索のみ（キーワード中心）になります。続きから再実行しますか？",
-                        else: "続きから再実行しますか？"
+                          gettext(
+                            "It is currently business hours. A batch with QA generation occupies the generation model for a long time, and chat falls back to source search only (mostly keywords) meanwhile. Resume from where it stopped?"
+                          ),
+                        else: gettext("Resume from where it stopped?")
                       )
                     }
                     class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm inline-flex items-center gap-1.5 transition"
                   >
-                    <.icon name="hero-arrow-path" class="w-4 h-4" /> 続きから再実行
+                    <.icon name="hero-arrow-path" class="w-4 h-4" /> {gettext("Resume")}
                   </button>
                 </div>
 
@@ -2150,21 +2487,34 @@ defmodule AskDriveWeb.AdminLive do
                 >
                   <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                     {case @latest_run.status do
-                      "running" -> "進捗"
-                      "waiting" -> "進捗（ほかの窓口の取り込みが終わったら想定QAを生成します）"
-                      _ -> "停止した位置"
+                      "running" ->
+                        gettext("Progress")
+
+                      "waiting" ->
+                        gettext(
+                          "Progress (QA pairs are generated once the other desks finish ingestion)"
+                        )
+
+                      _ ->
+                        gettext("Where it stopped")
                     end}
                   </h3>
                   <div>
                     <div class="flex items-baseline justify-between text-xs text-zinc-600 dark:text-zinc-400">
                       <span>
-                        全体の目安<span
+                        {gettext("Overall estimate")}<span
                           :if={@latest_run.status == "running"}
                           id="batch-progress-basis"
                           class="text-zinc-500"
                         >{if @selected_progress.basis == :time,
-                          do: "（想定される処理時間から。最近のバッチの各ステップの所要時間と、このステップのペースで推定）",
-                          else: "（ステップごとの固定の比率から。所要時間の記録がたまると処理時間ベースになります）"}</span>
+                          do:
+                            gettext(
+                              "(based on expected processing time, estimated from recent batches' step durations and this step's pace)"
+                            ),
+                          else:
+                            gettext(
+                              "(based on fixed per-step ratios; switches to processing time once enough durations are recorded)"
+                            )}</span>
                       </span>
                       <span class="font-mono text-base font-semibold text-zinc-900 dark:text-zinc-100">
                         {@selected_progress.overall}%
@@ -2175,7 +2525,9 @@ defmodule AskDriveWeb.AdminLive do
                       id="batch-progress-remaining"
                       class="mt-0.5 text-right text-[11px] text-zinc-500"
                     >
-                      全体の残り {eta_label(@selected_progress.remaining_seconds)}
+                      {gettext("%{eta} left overall",
+                        eta: eta_label(@selected_progress.remaining_seconds)
+                      )}
                     </p>
                     <div class="mt-1 h-2.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
                       <div
@@ -2188,13 +2540,21 @@ defmodule AskDriveWeb.AdminLive do
                   <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800/80 space-y-1.5 text-xs">
                     <div class="flex flex-wrap items-baseline justify-between gap-2">
                       <span class="font-medium text-zinc-800 dark:text-zinc-200">
-                        ステップ {@selected_progress.step}/{@selected_progress.steps}: {@selected_progress.label}
+                        {gettext("Step %{step}/%{steps}: %{label}",
+                          step: @selected_progress.step,
+                          steps: @selected_progress.steps,
+                          label: @selected_progress.label
+                        )}
                       </span>
                       <span
                         :if={@selected_progress.total > 0}
                         class="font-mono text-zinc-600 dark:text-zinc-400"
                       >
-                        {@selected_progress.done} / {@selected_progress.total} 件（{@selected_progress.percent}%）
+                        {gettext("%{done} / %{total} (%{percent}%)",
+                          done: @selected_progress.done,
+                          total: @selected_progress.total,
+                          percent: @selected_progress.percent
+                        )}
                       </span>
                     </div>
                     <div
@@ -2211,7 +2571,9 @@ defmodule AskDriveWeb.AdminLive do
                       :if={@selected_progress.item}
                       class="text-zinc-600 dark:text-zinc-400 break-all"
                     >
-                      {if @latest_run.status == "running", do: "処理中", else: "最後に処理していたもの"}: {@selected_progress.item}
+                      {if @latest_run.status == "running",
+                        do: gettext("Processing"),
+                        else: gettext("Last item processed")}: {@selected_progress.item}
                       <span :if={@selected_progress.detail} class="text-zinc-500">
                         — {@selected_progress.detail}
                       </span>
@@ -2223,26 +2585,34 @@ defmodule AskDriveWeb.AdminLive do
                       {@selected_progress.detail}
                     </p>
                     <p :if={@latest_run.status == "running"} class="text-zinc-500">
-                      このステップの経過 {format_seconds(@selected_progress.elapsed_seconds)}<span :if={
-                        @selected_progress.eta_seconds
-                      }>・残り {eta_label(@selected_progress.eta_seconds)}（ここまでのペースから推定）</span>
+                      {gettext("Elapsed in this step: %{time}",
+                        time: format_seconds(@selected_progress.elapsed_seconds)
+                      )}<span :if={@selected_progress.eta_seconds}>{gettext(
+                        " · %{eta} left (estimated from the pace so far)",
+                        eta: eta_label(@selected_progress.eta_seconds)
+                      )}</span>
                     </p>
                     <p
                       :if={@selected_progress[:past_deadline]}
                       class="text-amber-700 dark:text-amber-300"
                     >
-                      このペースでは打ち切り時刻（{@selected_progress.past_deadline}）までに全件は終わらない見込みです。残りは次回のバッチで続きから生成します。
+                      {gettext(
+                        "At this pace, not everything will finish by the cutoff (%{deadline}). The rest will be generated by the next batch.",
+                        deadline: @selected_progress.past_deadline
+                      )}
                     </p>
                   </div>
                   <p class="text-[11px] text-zinc-400">
-                    全体の % はステップごとの重み（取り込みと想定QAの生成が大半）による目安です。この画面は 5 秒ごとに更新されます。
+                    {gettext(
+                      "The overall % is an estimate weighted by step (ingestion and QA generation make up most of it). This screen refreshes every 5 seconds."
+                    )}
                   </p>
                 </div>
 
                 <%!-- Phase Breakdown List --%>
                 <div class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-2">
                   <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                    フェーズ別内訳
+                    {gettext("Phase breakdown")}
                   </h3>
                   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
                     <%= for stat <- @latest_run.phase_stats do %>
@@ -2251,8 +2621,10 @@ defmodule AskDriveWeb.AdminLive do
                           {Progress.label(stat.phase_name)}
                         </span>
                         <div class="text-right text-zinc-500">
-                          <span>{stat.duration_seconds}秒</span>
-                          <span class="text-[10px] ml-1 text-zinc-400">({stat.items_count}件)</span>
+                          <span>{gettext("%{count}s", count: stat.duration_seconds)}</span>
+                          <span class="text-[10px] ml-1 text-zinc-400">{gettext("(%{count} items)",
+                            count: stat.items_count
+                          )}</span>
                         </div>
                       </div>
                     <% end %>
@@ -2267,26 +2639,34 @@ defmodule AskDriveWeb.AdminLive do
                 >
                   <div class="flex flex-wrap items-center justify-between gap-2">
                     <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                      QA を生成できなかったチャンク（3 回失敗・{@remaining.given_up} 件）
+                      {gettext("Chunks QA could not be generated for (failed 3 times · %{count})",
+                        count: @remaining.given_up
+                      )}
                     </h3>
                     <button
                       id="retry-given-up-btn"
                       phx-click="retry_given_up"
                       class="text-xs px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium inline-flex items-center gap-1.5 transition"
                     >
-                      <.icon name="hero-arrow-uturn-left" class="w-4 h-4" /> 生成の対象に戻す
+                      <.icon name="hero-arrow-uturn-left" class="w-4 h-4" /> {gettext(
+                        "Return to generation"
+                      )}
                     </button>
                   </div>
                   <p class="text-[11px] text-zinc-400">
-                    バッチはこれらを飛ばします（毎晩同じチャンクで時間を使わないため）。モデルを変えたときや、原因を直したあとに対象へ戻してください。文書を更新すると、変わったチャンクは自動で対象に戻ります。
+                    {gettext(
+                      "The batch skips these (so it does not spend time on the same chunks every night). Return them after changing the model or fixing the cause. When a document is updated, its changed chunks return automatically."
+                    )}
                   </p>
                   <div class="overflow-x-auto max-h-60 overflow-y-auto">
                     <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
                       <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
                         <tr :for={chunk <- @given_up_chunks}>
                           <td class="py-1.5 px-2 break-all">
-                            {(chunk.document && (chunk.document.path || chunk.document.name)) || "—"}（チャンク {chunk.position +
-                              1}）
+                            {(chunk.document && (chunk.document.path || chunk.document.name)) || "—"}{gettext(
+                              " (chunk %{number})",
+                              number: chunk.position + 1
+                            )}
                           </td>
                           <td class="py-1.5 px-2 text-red-700 dark:text-red-300 break-all">
                             {chunk.qa_error}
@@ -2304,11 +2684,13 @@ defmodule AskDriveWeb.AdminLive do
                 <%!-- Per-file log (spec 6.3.5): what happened to each Drive file, and why --%>
                 <div class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-2">
                   <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                    ファイル別ログ（{length(@item_logs)} 件・失敗を先頭に表示）
+                    {gettext("Per-file log (%{count} · failures first)", count: length(@item_logs))}
                   </h3>
                   <%= if @item_logs == [] do %>
                     <p class="text-xs text-zinc-500">
-                      このバッチのファイル別ログはありません（v0.0.27 より前に実行したバッチには記録されていません）。
+                      {gettext(
+                        "No per-file log for this batch (batches run before v0.0.27 did not record one)."
+                      )}
                     </p>
                   <% else %>
                     <div class="overflow-x-auto max-h-[28rem] overflow-y-auto">
@@ -2318,12 +2700,12 @@ defmodule AskDriveWeb.AdminLive do
                       >
                         <thead class="text-[11px] text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 bg-white dark:bg-zinc-900">
                           <tr>
-                            <th class="py-2 px-2">フェーズ</th>
-                            <th class="py-2 px-2">結果</th>
-                            <th class="py-2 px-2">ファイル</th>
-                            <th class="py-2 px-2 text-right">チャンク</th>
-                            <th class="py-2 px-2 text-right">時間</th>
-                            <th class="py-2 px-2">詳細</th>
+                            <th class="py-2 px-2">{gettext("Phase")}</th>
+                            <th class="py-2 px-2">{gettext("Result")}</th>
+                            <th class="py-2 px-2">{gettext("File")}</th>
+                            <th class="py-2 px-2 text-right">{gettext("Chunks")}</th>
+                            <th class="py-2 px-2 text-right">{gettext("Time")}</th>
+                            <th class="py-2 px-2">{gettext("Details")}</th>
                           </tr>
                         </thead>
                         <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
@@ -2363,14 +2745,16 @@ defmodule AskDriveWeb.AdminLive do
                   <% end %>
                 </div>
               <% else %>
-                <p class="text-xs text-zinc-500">夜間バッチの実行履歴はまだありません。</p>
+                <p class="text-xs text-zinc-500">{gettext("No nightly batch runs yet.")}</p>
               <% end %>
             </div>
 
             <%!-- System & Model Health --%>
             <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
               <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                <.icon name="hero-server" class="w-5 h-5 text-indigo-600" /> システム・推論基盤ステータス
+                <.icon name="hero-server" class="w-5 h-5 text-indigo-600" /> {gettext(
+                  "System and inference status"
+                )}
               </h2>
               <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-xs">
                 <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
@@ -2378,63 +2762,67 @@ defmodule AskDriveWeb.AdminLive do
                   <span class="font-semibold text-emerald-600 mt-1 block">
                     <%= case @health.sqlite_vec do %>
                       <% {:ok, v} -> %>
-                        有効 (v{v})
+                        {gettext("Enabled (v%{version})", version: v)}
                       <% {:error, err} -> %>
-                        <span class="text-red-600">無効: {err}</span>
+                        <span class="text-red-600">{gettext("Disabled: %{error}", error: err)}</span>
                     <% end %>
                   </span>
                 </div>
 
                 <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
                   <span class="text-zinc-400 block">
-                    回答生成 ({LLM.label(@generation_provider)})
+                    {gettext("Answer generation (%{provider})",
+                      provider: LLM.label(@generation_provider)
+                    )}
                   </span>
                   <span class="font-semibold text-emerald-600 mt-1 block">
                     <%= case @health.llm_generation do %>
                       <% {:ok, info} -> %>
-                        接続中 ({info})
+                        {gettext("Connected (%{info})", info: info)}
                       <% {:error, err} -> %>
-                        <span class="text-red-600">未接続: {err}</span>
+                        <span class="text-red-600">{gettext("Not connected: %{error}", error: err)}</span>
                     <% end %>
                   </span>
                   <span class="text-[10px] text-zinc-400 mt-0.5 block">
                     {LLM.generation_model(@setting)}{if LLM.cloud_mode?(@setting),
-                      do: "（クラウド）"}
+                      do: gettext("(cloud)")}
                   </span>
                 </div>
 
                 <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
                   <span class="text-zinc-400 block">
-                    埋め込み ({LLM.label(@embedding_provider)})
+                    {gettext("Embedding (%{provider})", provider: LLM.label(@embedding_provider))}
                   </span>
                   <span class="font-semibold text-emerald-600 mt-1 block">
                     <%= case @health.llm_embedding do %>
                       <% {:ok, info} -> %>
-                        接続中 ({info})
+                        {gettext("Connected (%{info})", info: info)}
                       <% {:error, err} -> %>
-                        <span class="text-red-600">未接続: {err}</span>
+                        <span class="text-red-600">{gettext("Not connected: %{error}", error: err)}</span>
                     <% end %>
                   </span>
                   <span class="text-[10px] text-zinc-400 mt-0.5 block">
-                    {@setting.embed_model} / {@setting.embedding_dim} 次元
+                    {@setting.embed_model} / {gettext("%{count} dimensions",
+                      count: @setting.embedding_dim
+                    )}
                   </span>
                 </div>
 
                 <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
-                  <span class="text-zinc-400 block">pdftotext (PDF抽出)</span>
+                  <span class="text-zinc-400 block">{gettext("pdftotext (PDF extraction)")}</span>
                   <span class="font-semibold mt-1 block">
                     {if @health.pdftotext == :ok,
-                      do: "利用可能",
-                      else: "未インストール (poppler)"}
+                      do: gettext("Available"),
+                      else: gettext("Not installed (poppler)")}
                   </span>
                 </div>
 
                 <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
-                  <span class="text-zinc-400 block">pandoc (Office抽出)</span>
+                  <span class="text-zinc-400 block">{gettext("pandoc (Office extraction)")}</span>
                   <span class="font-semibold mt-1 block">
                     {if @health.pandoc == :ok,
-                      do: "利用可能",
-                      else: "未インストール (pandoc)"}
+                      do: gettext("Available"),
+                      else: gettext("Not installed (pandoc)")}
                   </span>
                 </div>
               </div>
@@ -2449,15 +2837,17 @@ defmodule AskDriveWeb.AdminLive do
               <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
                 <span class="flex items-center gap-2">
                   <.icon name="hero-question-mark-circle" class="w-5 h-5 text-amber-600" />
-                  未回答質問（次回夜間バッチで最優先生成）
+                  {gettext("Unanswered questions (top priority in the next nightly batch)")}
                 </span>
                 <span class="text-xs font-normal text-zinc-500">
-                  {length(@unresolved_questions)} 件
+                  {gettext("%{count} items", count: length(@unresolved_questions))}
                 </span>
               </h2>
 
               <%= if @unresolved_questions == [] do %>
-                <p class="text-xs text-zinc-500 py-4 text-center">現在、未解決の質問はありません。</p>
+                <p class="text-xs text-zinc-500 py-4 text-center">
+                  {gettext("No unresolved questions right now.")}
+                </p>
               <% else %>
                 <div class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
                   <%= for q <- @unresolved_questions do %>
@@ -2465,14 +2855,14 @@ defmodule AskDriveWeb.AdminLive do
                       <div>
                         <p class="font-medium text-zinc-900 dark:text-zinc-100">{q.question}</p>
                         <p class="text-[11px] text-zinc-400 mt-0.5">
-                          到達: Tier {q.tier_reached} ・ 質問日時: {AskDrive.Clock.format(
-                            q.asked_at,
-                            "%Y-%m-%d %H:%M"
+                          {gettext("Reached: Tier %{tier} · Asked: %{time}",
+                            tier: q.tier_reached,
+                            time: AskDrive.Clock.format(q.asked_at, "%Y-%m-%d %H:%M")
                           )}
                         </p>
                       </div>
                       <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/50">
-                        優先度1
+                        {gettext("Priority 1")}
                       </span>
                     </div>
                   <% end %>
@@ -2483,11 +2873,13 @@ defmodule AskDriveWeb.AdminLive do
             <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
               <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <.icon name="hero-check-badge" class="w-5 h-5 text-emerald-600" />
-                最近解消された質問 (前夜バッチによる成果)
+                {gettext("Recently resolved questions (from last night's batch)")}
               </h2>
 
               <%= if @resolved_questions == [] do %>
-                <p class="text-xs text-zinc-500 py-4 text-center">解消済みの質問ログはありません。</p>
+                <p class="text-xs text-zinc-500 py-4 text-center">
+                  {gettext("No resolved questions yet.")}
+                </p>
               <% else %>
                 <div class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
                   <%= for q <- @resolved_questions do %>
@@ -2495,12 +2887,14 @@ defmodule AskDriveWeb.AdminLive do
                       <div class="flex items-center justify-between">
                         <p class="font-medium text-zinc-900 dark:text-zinc-100">{q.question}</p>
                         <span class="text-[10px] text-zinc-400">
-                          解消: {AskDrive.Clock.format(q.resolved_at, "%Y-%m-%d %H:%M")}
+                          {gettext("Resolved: %{time}",
+                            time: AskDrive.Clock.format(q.resolved_at, "%Y-%m-%d %H:%M")
+                          )}
                         </span>
                       </div>
                       <%= if q.resolved_qa do %>
                         <div class="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400 text-[11px]">
-                          <span class="font-semibold text-emerald-600">生成された回答:</span>
+                          <span class="font-semibold text-emerald-600">{gettext("Generated answer:")}</span>
                           {q.resolved_qa.answer}
                         </div>
                       <% end %>
@@ -2516,26 +2910,26 @@ defmodule AskDriveWeb.AdminLive do
         <%= if @current_tab == "documents" do %>
           <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
             <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
-              <span>取り込み対象ドキュメント一覧</span>
+              <span>{gettext("Documents for ingestion")}</span>
               <span class="text-xs font-normal text-zinc-500">
-                合計 {length(@documents)} 件
+                {gettext("%{count} in total", count: length(@documents))}
               </span>
             </h2>
 
             <%= if @documents == [] do %>
               <p class="text-xs text-zinc-500 py-8 text-center">
-                同期されたドキュメントはまだありません。Google 連携および Drive 同期を行ってください。
+                {gettext("No synced documents yet. Connect Google and sync Drive.")}
               </p>
             <% else %>
               <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
                   <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                     <tr>
-                      <th class="py-3 px-2">ドキュメント名</th>
-                      <th class="py-3 px-2">状態</th>
-                      <th class="py-3 px-2">ファイル形式</th>
-                      <th class="py-3 px-2 text-right">トークン効率</th>
-                      <th class="py-3 px-2">最終同期</th>
+                      <th class="py-3 px-2">{gettext("Document name")}</th>
+                      <th class="py-3 px-2">{gettext("Status")}</th>
+                      <th class="py-3 px-2">{gettext("File type")}</th>
+                      <th class="py-3 px-2 text-right">{gettext("Token efficiency")}</th>
+                      <th class="py-3 px-2">{gettext("Last synced")}</th>
                       <th class="py-3 px-2 text-right">Drive</th>
                     </tr>
                   </thead>
@@ -2591,16 +2985,16 @@ defmodule AskDriveWeb.AdminLive do
                             <span class={[
                               "px-2 py-0.5 rounded-full text-[10px] font-medium inline-block",
                               cond do
-                                String.starts_with?(eff.score_rating, "優良") ->
+                                eff.score_level == :excellent ->
                                   "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
 
-                                String.starts_with?(eff.score_rating, "良好") ->
+                                eff.score_level == :good ->
                                   "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
 
-                                String.starts_with?(eff.score_rating, "普通") ->
+                                eff.score_level == :fair ->
                                   "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
 
-                                String.starts_with?(eff.score_rating, "要改善") ->
+                                eff.score_level == :poor ->
                                   "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
 
                                 true ->
@@ -2628,7 +3022,8 @@ defmodule AskDriveWeb.AdminLive do
                               target="_blank"
                               class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 inline-flex items-center gap-0.5"
                             >
-                              開く <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
+                              {gettext("Open")}
+                              <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
                             </.link>
                           <% end %>
                         </td>
@@ -2648,10 +3043,14 @@ defmodule AskDriveWeb.AdminLive do
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0 flex-1">
                   <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                    <.icon name="hero-squares-2x2" class="w-5 h-5 text-indigo-600" /> 窓口（アプリ）
+                    <.icon name="hero-squares-2x2" class="w-5 h-5 text-indigo-600" /> {gettext(
+                      "Desks (apps)"
+                    )}
                   </h2>
                   <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    窓口ごとに Google Drive のフォルダ、Gemini などの API キー（費用負担を分けられます）、検索インデックス、QA、質問ログ、夜間バッチの履歴が分かれます。データは窓口ごとに別のデータベースに保存され、混ざりません。
+                    {gettext(
+                      "Each desk has its own Google Drive folder, API keys such as Gemini (so costs can be split), search index, QA pairs, question log and nightly batch history. Each desk's data is stored in a separate database and never mixed."
+                    )}
                   </p>
                 </div>
                 <button
@@ -2661,7 +3060,7 @@ defmodule AskDriveWeb.AdminLive do
                   phx-click="toggle_new_app"
                   class="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium shadow-sm transition"
                 >
-                  <.icon name="hero-plus" class="w-4 h-4" /> 窓口を追加
+                  <.icon name="hero-plus" class="w-4 h-4" /> {gettext("Add desk")}
                 </button>
               </div>
 
@@ -2672,7 +3071,9 @@ defmodule AskDriveWeb.AdminLive do
                 id="new-app-panel"
                 class="p-4 rounded-xl border-2 border-indigo-200 dark:border-indigo-900 bg-indigo-50/40 dark:bg-indigo-950/20 space-y-3"
               >
-                <h3 class="font-semibold text-sm text-zinc-900 dark:text-zinc-100">新しい窓口</h3>
+                <h3 class="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
+                  {gettext("New desk")}
+                </h3>
                 <.form
                   for={@app_form}
                   id="new-app-form"
@@ -2683,25 +3084,27 @@ defmodule AskDriveWeb.AdminLive do
                   <.input
                     field={@app_form[:name]}
                     type="text"
-                    label="窓口名（例: HR）"
+                    label={gettext("Desk name (e.g. HR)")}
                     phx-debounce="300"
                   />
                   <.input
                     field={@app_form[:slug]}
                     type="text"
-                    label="URL 名（英小文字・数字・ハイフン）"
+                    label={gettext("URL name (lowercase letters, digits, hyphens)")}
                     placeholder="hr"
                     phx-debounce="300"
                   />
                   <.input
                     field={@app_form[:description]}
                     type="text"
-                    label="説明（任意・窓口の一覧に表示）"
+                    label={gettext("Description (optional, shown in the desk list)")}
                   />
                   <%!-- required (F-1114): an app always has an administrator --%>
                   <label class="sm:col-span-3 text-xs space-y-1">
                     <span class="block font-medium text-zinc-700 dark:text-zinc-300">
-                      担当者（窓口管理者）のメールアドレス（必須・複数可・カンマ区切り）
+                      {gettext(
+                        "Email addresses of the desk administrators (required; separate multiple with commas)"
+                      )}
                     </span>
                     <.email_input
                       id="new-app-admin-emails"
@@ -2714,15 +3117,18 @@ defmodule AskDriveWeb.AdminLive do
                       }
                     />
                     <span class="block text-zinc-500">
-                      窓口の設定（Drive・API キー等）は担当者が行います。全体管理者は窓口の管理画面に入れません。
+                      {gettext(
+                        "Desk administrators configure the desk (Drive, API keys, etc.). Platform administrators cannot open a desk's admin screen."
+                      )}
                     </span>
                   </label>
                   <p class="sm:col-span-3 text-xs text-zinc-600 dark:text-zinc-400">
-                    チャットの URL:
+                    {gettext("Chat URL:")}
                     <span id="new-app-url" class="font-mono text-indigo-700 dark:text-indigo-300">
                       /{slug_preview(@app_form)}
                     </span>
-                    ・管理画面: <span class="font-mono">/{slug_preview(@app_form)}/admin</span>
+                    {gettext("· Admin screen:")}
+                    <span class="font-mono">/{slug_preview(@app_form)}/admin</span>
                   </p>
                   <div class="sm:col-span-3 flex flex-wrap items-center gap-2">
                     <button
@@ -2730,17 +3136,19 @@ defmodule AskDriveWeb.AdminLive do
                       id="create-app-btn"
                       class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium"
                     >
-                      窓口を作成
+                      {gettext("Create desk")}
                     </button>
                     <button
                       type="button"
                       phx-click="toggle_new_app"
                       class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs"
                     >
-                      キャンセル
+                      {gettext("Cancel")}
                     </button>
                     <span class="text-[11px] text-zinc-500">
-                      AI の設定は最初の窓口から引き継ぎます。Google Drive と API キーは作成後に設定します。
+                      {gettext(
+                        "AI settings are copied from the first desk. Set up Google Drive and API keys after creating it."
+                      )}
                     </span>
                   </div>
                 </.form>
@@ -2752,14 +3160,18 @@ defmodule AskDriveWeb.AdminLive do
                 class="text-xs rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 dark:border-emerald-900 px-3 py-2 flex flex-wrap items-center gap-2"
               >
                 <span class="text-emerald-800 dark:text-emerald-200">
-                  窓口「{@last_created_app.name}」（/{@last_created_app.slug}）を作成しました。次に Google Drive のフォルダと認証、必要なら API キーを設定してください。
+                  {gettext(
+                    "Created desk \"%{name}\" (/%{slug}). Next, set up the Google Drive folder and authentication, and API keys if needed.",
+                    name: @last_created_app.name,
+                    slug: @last_created_app.slug
+                  )}
                 </span>
                 <a
                   href={"/" <> @last_created_app.slug <> "/admin?tab=settings"}
                   id="open-new-app-settings"
                   class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
                 >
-                  窓口の設定を開く →
+                  {gettext("Open desk settings →")}
                 </a>
               </div>
 
@@ -2770,11 +3182,11 @@ defmodule AskDriveWeb.AdminLive do
                 >
                   <thead class="text-[11px] text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                     <tr>
-                      <th class="py-2 px-2">窓口名 / 説明</th>
+                      <th class="py-2 px-2">{gettext("Desk name / description")}</th>
                       <th class="py-2 px-2">URL</th>
-                      <th class="py-2 px-2 text-right">文書 / チャンク</th>
+                      <th class="py-2 px-2 text-right">{gettext("Documents / chunks")}</th>
                       <th class="py-2 px-2">Drive</th>
-                      <th class="py-2 px-2">直近のバッチ</th>
+                      <th class="py-2 px-2">{gettext("Last batch")}</th>
                       <th class="py-2 px-2"></th>
                     </tr>
                   </thead>
@@ -2794,16 +3206,20 @@ defmodule AskDriveWeb.AdminLive do
                               type="text"
                               name="description"
                               value={app.description}
-                              placeholder="説明（ポータルに表示）"
+                              placeholder={gettext("Description (shown on the portal)")}
                               class="w-full px-2 py-1 rounded border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[11px]"
                             />
-                            <button type="submit" class="text-[11px] underline text-indigo-600">保存</button>
+                            <button type="submit" class="text-[11px] underline text-indigo-600">
+                              {gettext("Save")}
+                            </button>
                           </form>
                           <span :if={is_nil(app.id)} class="font-medium">{app.name}</span>
                         </td>
                         <td class="py-2 px-2 font-mono whitespace-nowrap">
                           <a href={"/" <> app.slug} class="text-indigo-600 underline">/{app.slug}</a>
-                          <a href={"/" <> app.slug <> "/admin"} class="ml-2 text-zinc-500 underline">管理</a>
+                          <a href={"/" <> app.slug <> "/admin"} class="ml-2 text-zinc-500 underline">
+                            {gettext("Admin")}
+                          </a>
                         </td>
                         <% sum = Map.get(@app_summaries, app.slug, %{}) %>
                         <td class="py-2 px-2 text-right font-mono">
@@ -2811,13 +3227,13 @@ defmodule AskDriveWeb.AdminLive do
                         </td>
                         <td class="py-2 px-2 whitespace-nowrap">
                           <%= if sum[:drive?] do %>
-                            設定済み
+                            {gettext("Set")}
                           <% else %>
                             <a
                               href={"/" <> app.slug <> "/admin?tab=settings"}
                               class="text-amber-700 dark:text-amber-300 underline"
                             >
-                              未設定（設定する）
+                              {gettext("Not set (set up)")}
                             </a>
                           <% end %>
                         </td>
@@ -2834,7 +3250,7 @@ defmodule AskDriveWeb.AdminLive do
                             id={"app-auto-off-#{app.slug}"}
                             class="ml-1 px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[10px]"
                           >
-                            自動実行: オフ（設定中）
+                            {gettext("Auto-run: off (being set up)")}
                           </span>
                         </td>
                         <td class="py-2 px-2 text-right whitespace-nowrap space-x-2">
@@ -2850,8 +3266,13 @@ defmodule AskDriveWeb.AdminLive do
                             ]}
                           >
                             {case @app_admins[app.slug] || [] do
-                              [] -> "担当者未設定（ユーザー管理で割り当ててください）"
-                              admins -> "担当者: " <> Enum.map_join(admins, "、", & &1.email)
+                              [] ->
+                                gettext("No administrator (assign one in User management)")
+
+                              admins ->
+                                gettext("Administrators: %{emails}",
+                                  emails: Enum.map_join(admins, gettext(", "), & &1.email)
+                                )
                             end}
                           </span>
                           <button
@@ -2859,10 +3280,15 @@ defmodule AskDriveWeb.AdminLive do
                             type="button"
                             phx-click="delete_app"
                             phx-value-id={app.id}
-                            data-confirm={"窓口「#{app.name}」を削除します。チャット・管理画面が使えなくなります（データベースファイルは名前を変えて残します）。続行しますか？"}
+                            data-confirm={
+                              gettext(
+                                "Delete desk \"%{name}\"? Its chat and admin screen will stop working (the database file is kept under a new name). Continue?",
+                                name: app.name
+                              )
+                            }
                             class="text-[11px] text-red-600 underline"
                           >
-                            削除
+                            {gettext("Delete")}
                           </button>
                         </td>
                       </tr>
@@ -2881,13 +3307,23 @@ defmodule AskDriveWeb.AdminLive do
               <div class="flex items-start justify-between gap-4">
                 <div>
                   <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                    <.icon name="hero-users" class="w-5 h-5 text-indigo-600" /> 登録ユーザー
+                    <.icon name="hero-users" class="w-5 h-5 text-indigo-600" /> {gettext(
+                      "Registered users"
+                    )}
                   </h2>
                   <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    利用者は初回ログイン時に自動登録され、全員が一般ユーザーとして開始します。<strong>「昇格可」</strong>に指定されたアカウント（全体管理者）だけが、本人確認をして一時的に全体管理に入れます。
+                    {gettext(
+                      "Users are registered automatically on first sign-in and all start as regular users. Only accounts marked"
+                    )}
+                    <strong>{gettext("\"Can elevate\"")}</strong>
+                    {gettext(
+                      "(platform administrators) can verify their identity and temporarily enter platform administration."
+                    )}
                   </p>
                 </div>
-                <span class="text-xs text-zinc-500 shrink-0">合計 {length(@users)} 名</span>
+                <span class="text-xs text-zinc-500 shrink-0">{gettext("%{count} users in total",
+                  count: length(@users)
+                )}</span>
               </div>
 
               <%!-- Administrators by e-mail, before their first sign-in too (F-1309) --%>
@@ -2898,7 +3334,9 @@ defmodule AskDriveWeb.AdminLive do
               >
                 <label class="flex-1 text-xs space-y-1">
                   <span class="block font-medium text-zinc-700 dark:text-zinc-300">
-                    メールアドレスで管理者（昇格可）を追加（複数可・カンマ区切り。まだログインしたことのない人も追加できます）
+                    {gettext(
+                      "Add administrators (can elevate) by email (separate multiple with commas; people who have never signed in can be added too)"
+                    )}
                   </span>
                   <.email_input
                     id="grant-admin-emails"
@@ -2916,20 +3354,22 @@ defmodule AskDriveWeb.AdminLive do
                   id="grant-admin-btn"
                   class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                 >
-                  昇格可にする
+                  {gettext("Allow elevation")}
                 </button>
               </form>
 
               <%= if Accounts.configured_admin_emails() != [] do %>
                 <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800 text-xs text-zinc-600 dark:text-zinc-400">
                   <span class="font-medium text-zinc-700 dark:text-zinc-300">
-                    環境変数で昇格可に固定されているアドレス:
+                    {gettext("Addresses fixed as able to elevate by environment variable:")}
                   </span>
                   <span class="font-mono text-[11px] ml-1">
                     {Enum.join(Accounts.configured_admin_emails(), ", ")}
                   </span>
                   <p class="text-[11px] text-zinc-400 mt-1">
-                    これらはログインのたびに昇格可フラグが再付与されます。画面から外しても元に戻ります。
+                    {gettext(
+                      "These get the elevation flag back on every sign-in. Removing it here is undone."
+                    )}
                   </p>
                 </div>
               <% end %>
@@ -2938,12 +3378,12 @@ defmodule AskDriveWeb.AdminLive do
                 <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
                   <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                     <tr>
-                      <th class="py-3 px-2">ユーザー</th>
-                      <th class="py-3 px-2">全体管理者への昇格</th>
-                      <th class="py-3 px-2">担当窓口（アプリ管理者）</th>
-                      <th class="py-3 px-2">状態</th>
-                      <th class="py-3 px-2">最終ログイン / 最終昇格</th>
-                      <th class="py-3 px-2 text-right">操作</th>
+                      <th class="py-3 px-2">{gettext("User account")}</th>
+                      <th class="py-3 px-2">{gettext("Elevation to platform admin")}</th>
+                      <th class="py-3 px-2">{gettext("Desks administered (app admin)")}</th>
+                      <th class="py-3 px-2">{gettext("Status")}</th>
+                      <th class="py-3 px-2">{gettext("Last sign-in / last elevation")}</th>
+                      <th class="py-3 px-2 text-right">{gettext("Actions")}</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
@@ -2960,7 +3400,7 @@ defmodule AskDriveWeb.AdminLive do
                               :if={user.id == @current_user.id}
                               class="text-[10px] text-indigo-600 dark:text-indigo-400 ml-1"
                             >
-                              (自分)
+                              {gettext("(you)")}
                             </span>
                           </div>
                           <div class="text-[11px] text-zinc-400 font-mono">{user.email}</div>
@@ -2974,12 +3414,16 @@ defmodule AskDriveWeb.AdminLive do
                               else: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
                             )
                           ]}>
-                            {if user.admin_eligible, do: "全体昇格可", else: "不可"}
+                            {if user.admin_eligible,
+                              do: gettext("Platform elevation allowed"),
+                              else: gettext("Not allowed")}
                           </span>
                         </td>
                         <td class="py-3 px-2">
                           <%= if user.admin_eligible do %>
-                            <span class="text-[11px] text-zinc-400">（全窓口の管理が可能）</span>
+                            <span class="text-[11px] text-zinc-400">{gettext(
+                              "(can administer all desks)"
+                            )}</span>
                           <% else %>
                             <div class="flex flex-wrap items-center gap-1.5">
                               <%= for app <- @apps do %>
@@ -2992,8 +3436,14 @@ defmodule AskDriveWeb.AdminLive do
                                   phx-value-app_slug={app.slug}
                                   title={
                                     if(is_app_admin,
-                                      do: "クリックして #{app.name} の管理者権限を解除",
-                                      else: "クリックして #{app.name} の管理者権限を付与"
+                                      do:
+                                        gettext("Click to revoke admin rights for %{app}",
+                                          app: app.name
+                                        ),
+                                      else:
+                                        gettext("Click to grant admin rights for %{app}",
+                                          app: app.name
+                                        )
                                     )
                                   }
                                   class={[
@@ -3021,7 +3471,9 @@ defmodule AskDriveWeb.AdminLive do
                               else: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
                             )
                           ]}>
-                            {if user.status == "active", do: "有効", else: "無効"}
+                            {if user.status == "active",
+                              do: gettext("Active"),
+                              else: gettext("Disabled")}
                           </span>
                         </td>
                         <td class="py-3 px-2 text-zinc-400">
@@ -3031,7 +3483,7 @@ defmodule AskDriveWeb.AdminLive do
                               else: "—"}
                           </div>
                           <div class="text-[10px]">
-                            昇格: {if user.last_elevated_at,
+                            {gettext("Elevated:")} {if user.last_elevated_at,
                               do: AskDrive.Clock.format(user.last_elevated_at, "%Y-%m-%d %H:%M"),
                               else: "—"}
                           </div>
@@ -3054,17 +3506,23 @@ defmodule AskDriveWeb.AdminLive do
                               phx-click="set_admin_eligible"
                               phx-value-id={user.id}
                               phx-value-eligible="false"
-                              data-confirm="あなたの全体管理者の権限を外して、一般ユーザーに戻りますか？以後は全体管理の画面に入れなくなります（元に戻すには、ほかの全体管理者に依頼してください）。"
+                              data-confirm={
+                                gettext(
+                                  "Remove your own platform administrator rights and go back to being a regular user? You will no longer be able to enter platform administration (to undo this, ask another platform administrator)."
+                                )
+                              }
                               class="px-2.5 py-1 rounded-lg border border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/40 text-[11px] font-medium transition"
                             >
-                              自分の全体管理者権限を外す
+                              {gettext("Remove my platform admin rights")}
                             </button>
                           </div>
                           <p
                             :if={user.admin_eligible and Accounts.admin_fixed_by_env?(user)}
                             class="text-[11px] text-zinc-500 text-right"
                           >
-                            .env.prod の ASK_DRIVE_ADMIN_EMAILS で固定（画面からは外せません）
+                            {gettext(
+                              "Fixed by ASK_DRIVE_ADMIN_EMAILS in .env.prod (cannot be removed here)"
+                            )}
                           </p>
                           <div
                             :if={user.id != @current_user.id}
@@ -3077,13 +3535,22 @@ defmodule AskDriveWeb.AdminLive do
                               phx-value-eligible={to_string(not user.admin_eligible)}
                               data-confirm={
                                 if(user.admin_eligible,
-                                  do: "#{user.email} から管理者への昇格資格を外しますか？",
-                                  else: "#{user.email} を全体管理者にしますか？本人確認をすれば、全体の設定を変更できるようになります。"
+                                  do:
+                                    gettext("Remove admin elevation rights from %{email}?",
+                                      email: user.email
+                                    ),
+                                  else:
+                                    gettext(
+                                      "Make %{email} a platform administrator? After verifying their identity, they will be able to change platform settings.",
+                                      email: user.email
+                                    )
                                 )
                               }
                               class="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[11px] font-medium transition"
                             >
-                              {if user.admin_eligible, do: "昇格を禁止", else: "昇格を許可"}
+                              {if user.admin_eligible,
+                                do: gettext("Disallow elevation"),
+                                else: gettext("Permit elevation")}
                             </button>
                             <button
                               id={"toggle-status-#{user.id}"}
@@ -3094,8 +3561,12 @@ defmodule AskDriveWeb.AdminLive do
                               }
                               data-confirm={
                                 if(user.status == "active",
-                                  do: "#{user.email} を無効化しますか？ログインできなくなります。",
-                                  else: "#{user.email} を再度有効化しますか？"
+                                  do:
+                                    gettext(
+                                      "Disable %{email}? They will no longer be able to sign in.",
+                                      email: user.email
+                                    ),
+                                  else: gettext("Re-enable %{email}?", email: user.email)
                                 )
                               }
                               class={[
@@ -3108,7 +3579,9 @@ defmodule AskDriveWeb.AdminLive do
                                 )
                               ]}
                             >
-                              {if user.status == "active", do: "無効化", else: "有効化"}
+                              {if user.status == "active",
+                                do: gettext("Disable"),
+                                else: gettext("Enable")}
                             </button>
                           </div>
                         </td>
@@ -3127,24 +3600,28 @@ defmodule AskDriveWeb.AdminLive do
             <div>
               <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <.icon name="hero-clipboard-document-list" class="w-5 h-5 text-indigo-600" />
-                管理者権限の昇格履歴
+                {gettext("Admin elevation history")}
               </h2>
               <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                どのアカウントから、いつ管理者権限へ昇格したかの記録です（直近 100 件）。失敗・解除・期限切れも残ります。この記録は削除も編集もできません。
+                {gettext(
+                  "A record of which account elevated to admin rights and when (latest 100). Failures, revocations and expiries are recorded too. This record cannot be deleted or edited."
+                )}
               </p>
             </div>
 
             <%= if @elevation_logs == [] do %>
-              <p class="text-xs text-zinc-500 py-8 text-center">昇格の記録はまだありません。</p>
+              <p class="text-xs text-zinc-500 py-8 text-center">
+                {gettext("No elevations recorded yet.")}
+              </p>
             <% else %>
               <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
                   <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                     <tr>
-                      <th class="py-3 px-2">日時</th>
-                      <th class="py-3 px-2">アカウント</th>
-                      <th class="py-3 px-2">イベント</th>
-                      <th class="py-3 px-2">送信元 IP</th>
+                      <th class="py-3 px-2">{gettext("Date and time")}</th>
+                      <th class="py-3 px-2">{gettext("Account")}</th>
+                      <th class="py-3 px-2">{gettext("Event")}</th>
+                      <th class="py-3 px-2">{gettext("Source IP")}</th>
                       <th class="py-3 px-2">User-Agent</th>
                     </tr>
                   </thead>
@@ -3187,26 +3664,33 @@ defmodule AskDriveWeb.AdminLive do
             <%!-- KPI Cards --%>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
-                <p class="text-xs font-medium text-zinc-500">総リクエスト数 (過去30日)</p>
+                <p class="text-xs font-medium text-zinc-500">
+                  {gettext("Total requests (last 30 days)")}
+                </p>
                 <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
                   {@metrics_summary.total_requests}
-                  <span class="text-xs font-normal text-zinc-500">回</span>
+                  <span class="text-xs font-normal text-zinc-500">{gettext("times")}</span>
                 </p>
-                <p class="text-[11px] text-zinc-400 mt-1">成功率: {@metrics_summary.success_rate}%</p>
+                <p class="text-[11px] text-zinc-400 mt-1">
+                  {gettext("Success rate: %{rate}%", rate: @metrics_summary.success_rate)}
+                </p>
               </div>
 
               <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
-                <p class="text-xs font-medium text-zinc-500">総消費トークン数</p>
+                <p class="text-xs font-medium text-zinc-500">{gettext("Total tokens used")}</p>
                 <p class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
                   {@metrics_summary.total_tokens}
                 </p>
                 <p class="text-[11px] text-zinc-400 mt-1">
-                  入力 {@metrics_summary.prompt_tokens} / 出力 {@metrics_summary.completion_tokens}
+                  {gettext("Input %{prompt} / output %{completion}",
+                    prompt: @metrics_summary.prompt_tokens,
+                    completion: @metrics_summary.completion_tokens
+                  )}
                 </p>
               </div>
 
               <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
-                <p class="text-xs font-medium text-zinc-500">送信データ量</p>
+                <p class="text-xs font-medium text-zinc-500">{gettext("Data sent")}</p>
                 <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
                   {div(@metrics_summary.total_bytes, 1024)}
                   <span class="text-xs font-normal text-zinc-500">KB</span>
@@ -3215,18 +3699,20 @@ defmodule AskDriveWeb.AdminLive do
               </div>
 
               <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
-                <p class="text-xs font-medium text-zinc-500">平均応答時間 (レイテンシ)</p>
+                <p class="text-xs font-medium text-zinc-500">
+                  {gettext("Average response time (latency)")}
+                </p>
                 <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
                   {@metrics_summary.avg_latency_ms}
                   <span class="text-xs font-normal text-zinc-500">ms</span>
                 </p>
                 <p class="text-[11px] text-zinc-400 mt-1">
-                  エラー: {@metrics_summary.error_requests} 件
+                  {gettext("Errors: %{count}", count: @metrics_summary.error_requests)}
                   <span
                     :if={Map.get(@metrics_summary, :rate_limit_errors, 0) > 0}
                     class="text-amber-600 dark:text-amber-400 ml-1 font-medium"
                   >
-                    (429制限: {@metrics_summary.rate_limit_errors} 件)
+                    {gettext("(429 rate limit: %{count})", count: @metrics_summary.rate_limit_errors)}
                   </span>
                 </p>
               </div>
@@ -3236,20 +3722,24 @@ defmodule AskDriveWeb.AdminLive do
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
                 <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-cpu-chip" class="w-5 h-5 text-indigo-600" /> プロバイダ・モデル別利用内訳
+                  <.icon name="hero-cpu-chip" class="w-5 h-5 text-indigo-600" /> {gettext(
+                    "Usage by provider and model"
+                  )}
                 </h3>
                 <%= if @metrics_summary.provider_breakdown == [] do %>
-                  <p class="text-xs text-zinc-500 py-4 text-center">API呼び出しの記録はまだありません。</p>
+                  <p class="text-xs text-zinc-500 py-4 text-center">
+                    {gettext("No API calls recorded yet.")}
+                  </p>
                 <% else %>
                   <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
                       <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                         <tr>
-                          <th class="py-2.5 px-2">プロバイダ</th>
-                          <th class="py-2.5 px-2">モデル</th>
-                          <th class="py-2.5 px-2 text-right">リクエスト</th>
-                          <th class="py-2.5 px-2 text-right">総トークン</th>
-                          <th class="py-2.5 px-2 text-right">エラー</th>
+                          <th class="py-2.5 px-2">{gettext("Provider")}</th>
+                          <th class="py-2.5 px-2">{gettext("Model")}</th>
+                          <th class="py-2.5 px-2 text-right">{gettext("Requests")}</th>
+                          <th class="py-2.5 px-2 text-right">{gettext("Total tokens")}</th>
+                          <th class="py-2.5 px-2 text-right">{gettext("Errors")}</th>
                         </tr>
                       </thead>
                       <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
@@ -3280,18 +3770,22 @@ defmodule AskDriveWeb.AdminLive do
 
               <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
                 <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-tag" class="w-5 h-5 text-indigo-600" /> 機能・用途別内訳
+                  <.icon name="hero-tag" class="w-5 h-5 text-indigo-600" /> {gettext(
+                    "Usage by feature and purpose"
+                  )}
                 </h3>
                 <%= if @metrics_summary.purpose_breakdown == [] do %>
-                  <p class="text-xs text-zinc-500 py-4 text-center">API呼び出しの記録はまだありません。</p>
+                  <p class="text-xs text-zinc-500 py-4 text-center">
+                    {gettext("No API calls recorded yet.")}
+                  </p>
                 <% else %>
                   <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
                       <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                         <tr>
-                          <th class="py-2.5 px-2">用途</th>
-                          <th class="py-2.5 px-2 text-right">リクエスト数</th>
-                          <th class="py-2.5 px-2 text-right">総トークン数</th>
+                          <th class="py-2.5 px-2">{gettext("Purpose")}</th>
+                          <th class="py-2.5 px-2 text-right">{gettext("Number of requests")}</th>
+                          <th class="py-2.5 px-2 text-right">{gettext("Total token count")}</th>
                         </tr>
                       </thead>
                       <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
@@ -3299,10 +3793,10 @@ defmodule AskDriveWeb.AdminLive do
                           <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
                             <td class="py-2.5 px-2 font-medium text-zinc-900 dark:text-zinc-100">
                               {case row.purpose do
-                                "batch_generation" -> "夜間バッチ QA生成"
-                                "chat_summary" -> "チャット AI要約"
-                                "embedding" -> "埋め込みベクトル生成"
-                                "generation" -> "テキスト生成"
+                                "batch_generation" -> gettext("Nightly batch QA generation")
+                                "chat_summary" -> gettext("Chat AI summary")
+                                "embedding" -> gettext("Embedding vector generation")
+                                "generation" -> gettext("Text generation")
                                 other -> other
                               end}
                             </td>
@@ -3325,10 +3819,14 @@ defmodule AskDriveWeb.AdminLive do
                 <div>
                   <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                     <.icon name="hero-exclamation-triangle" class="w-5 h-5 text-red-500" />
-                    直近の API 通信エラーログ（プライバシー配慮: 質問本文や文書内容は保存・表示しません）
+                    {gettext(
+                      "Recent API communication errors (for privacy, question text and document content are neither stored nor shown)"
+                    )}
                   </h3>
                   <p class="text-xs text-zinc-500 mt-1">
-                    直近発生した API 通信エラーの履歴です。API キーの失効やレート制限（429）、タイムアウトなどを確認できます。
+                    {gettext(
+                      "History of recent API communication errors. Use it to check for revoked API keys, rate limits (429), timeouts and so on."
+                    )}
                   </p>
                 </div>
               </div>
@@ -3339,19 +3837,19 @@ defmodule AskDriveWeb.AdminLive do
                     name="hero-check-circle"
                     class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0"
                   />
-                  <span>直近のエラーは発生していません。正常に稼働しています。</span>
+                  <span>{gettext("No recent errors. Everything is running normally.")}</span>
                 </div>
               <% else %>
                 <div class="overflow-x-auto">
                   <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
                     <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                       <tr>
-                        <th class="py-2.5 px-2">日時</th>
-                        <th class="py-2.5 px-2">プロバイダ</th>
-                        <th class="py-2.5 px-2">モデル</th>
-                        <th class="py-2.5 px-2">用途</th>
-                        <th class="py-2.5 px-2">エラー内容</th>
-                        <th class="py-2.5 px-2 text-right">遅延</th>
+                        <th class="py-2.5 px-2">{gettext("Date and time")}</th>
+                        <th class="py-2.5 px-2">{gettext("Provider")}</th>
+                        <th class="py-2.5 px-2">{gettext("Model")}</th>
+                        <th class="py-2.5 px-2">{gettext("Purpose")}</th>
+                        <th class="py-2.5 px-2">{gettext("Error details")}</th>
+                        <th class="py-2.5 px-2 text-right">{gettext("Latency")}</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
@@ -3384,18 +3882,20 @@ defmodule AskDriveWeb.AdminLive do
                 <div>
                   <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                     <.icon name="hero-document-chart-bar" class="w-5 h-5 text-indigo-600" />
-                    インデックス対象データのトークン効率・構造化分析
+                    {gettext("Token efficiency and structure analysis of indexed data")}
                   </h3>
                   <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    取り込み文書がどれだけ効率よくトークン化（テキスト抽出・構造化）されているかを分析します。Markdown等の構造化テキストはトークン密度と検索精度が高く、スキャン画像や複雑なPDFはトークン効率が低下する傾向があります。
+                    {gettext(
+                      "Analyzes how efficiently ingested documents are tokenized (text extraction and structuring). Structured text such as Markdown has high token density and search accuracy, while scanned images and complex PDFs tend to have lower token efficiency."
+                    )}
                   </p>
                 </div>
                 <div class="text-right shrink-0">
                   <span class="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
-                    対象文書: {@data_efficiency.total_indexed_docs} 件
+                    {gettext("Documents: %{count}", count: @data_efficiency.total_indexed_docs)}
                   </span>
                   <span class="text-[11px] text-zinc-400 block">
-                    総インデックス: {@data_efficiency.total_tokens} トークン
+                    {gettext("Total indexed: %{count} tokens", count: @data_efficiency.total_tokens)}
                   </span>
                 </div>
               </div>
@@ -3403,22 +3903,26 @@ defmodule AskDriveWeb.AdminLive do
               <%!-- Format Comparison Cards / Table --%>
               <div class="space-y-3">
                 <h4 class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  ファイル形式別のトークン効率比較
+                  {gettext("Token efficiency by file format")}
                 </h4>
                 <%= if @data_efficiency.format_breakdown == [] do %>
-                  <p class="text-xs text-zinc-400 py-3 text-center">インデックス済みの文書がありません。</p>
+                  <p class="text-xs text-zinc-400 py-3 text-center">
+                    {gettext("No indexed documents.")}
+                  </p>
                 <% else %>
                   <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
                       <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                         <tr>
-                          <th class="py-2.5 px-2">形式・種別</th>
-                          <th class="py-2.5 px-2 text-right">文書数</th>
-                          <th class="py-2.5 px-2 text-right">総トークン数</th>
-                          <th class="py-2.5 px-2 text-right">元データ合計</th>
-                          <th class="py-2.5 px-2 text-right">トークン密度 (Tokens/KB)</th>
-                          <th class="py-2.5 px-2 text-right">有効テキスト比率</th>
-                          <th class="py-2.5 px-2">効率評価</th>
+                          <th class="py-2.5 px-2">{gettext("Format / type")}</th>
+                          <th class="py-2.5 px-2 text-right">{gettext("Document count")}</th>
+                          <th class="py-2.5 px-2 text-right">{gettext("Total token count")}</th>
+                          <th class="py-2.5 px-2 text-right">{gettext("Original data total")}</th>
+                          <th class="py-2.5 px-2 text-right">
+                            {gettext("Token density (tokens/KB)")}
+                          </th>
+                          <th class="py-2.5 px-2 text-right">{gettext("Usable text ratio")}</th>
+                          <th class="py-2.5 px-2">{gettext("Efficiency rating")}</th>
                         </tr>
                       </thead>
                       <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
@@ -3459,18 +3963,18 @@ defmodule AskDriveWeb.AdminLive do
                                 {cond do
                                   String.starts_with?(fmt.category, "Markdown") or
                                       String.starts_with?(fmt.category, "Plain") ->
-                                    "最高 (S)"
+                                    gettext("Best (S)")
 
                                   String.starts_with?(fmt.category, "CSV") or
                                     String.starts_with?(fmt.category, "Docs") or
                                       String.starts_with?(fmt.category, "Sheets") ->
-                                    "良好 (A)"
+                                    gettext("Good (A)")
 
                                   String.starts_with?(fmt.category, "PDF") ->
-                                    "標準 (B)"
+                                    gettext("Standard (B)")
 
                                   true ->
-                                    "要確認 (C)"
+                                    gettext("Needs review (C)")
                                 end}
                               </span>
                             </td>
@@ -3485,21 +3989,23 @@ defmodule AskDriveWeb.AdminLive do
               <%!-- Document Details & Advice List --%>
               <div class="space-y-3 pt-3 border-t border-zinc-200/60 dark:border-zinc-800">
                 <h4 class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  文書ごとのトークン効率と改善アドバイス
+                  {gettext("Token efficiency and improvement advice per document")}
                 </h4>
                 <%= if @data_efficiency.doc_stats == [] do %>
-                  <p class="text-xs text-zinc-400 py-3 text-center">インデックス済みの文書がありません。</p>
+                  <p class="text-xs text-zinc-400 py-3 text-center">
+                    {gettext("No indexed documents.")}
+                  </p>
                 <% else %>
                   <div class="overflow-x-auto max-h-80 overflow-y-auto">
                     <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
                       <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 bg-white dark:bg-zinc-900">
                         <tr>
-                          <th class="py-2.5 px-2">ドキュメント</th>
-                          <th class="py-2.5 px-2">種別</th>
-                          <th class="py-2.5 px-2 text-right">推定トークン</th>
-                          <th class="py-2.5 px-2 text-right">元サイズ</th>
-                          <th class="py-2.5 px-2">効率スコア</th>
-                          <th class="py-2.5 px-2">データ作成者向けアドバイス</th>
+                          <th class="py-2.5 px-2">{gettext("Document")}</th>
+                          <th class="py-2.5 px-2">{gettext("Type")}</th>
+                          <th class="py-2.5 px-2 text-right">{gettext("Estimated tokens")}</th>
+                          <th class="py-2.5 px-2 text-right">{gettext("Original size")}</th>
+                          <th class="py-2.5 px-2">{gettext("Efficiency score")}</th>
+                          <th class="py-2.5 px-2">{gettext("Advice for content authors")}</th>
                         </tr>
                       </thead>
                       <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
@@ -3522,16 +4028,16 @@ defmodule AskDriveWeb.AdminLive do
                               <span class={[
                                 "px-2 py-0.5 rounded-full text-[10px] font-medium",
                                 cond do
-                                  String.starts_with?(stat.score_rating, "優良") ->
+                                  stat.score_level == :excellent ->
                                     "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
 
-                                  String.starts_with?(stat.score_rating, "良好") ->
+                                  stat.score_level == :good ->
                                     "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
 
-                                  String.starts_with?(stat.score_rating, "普通") ->
+                                  stat.score_level == :fair ->
                                     "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
 
-                                  String.starts_with?(stat.score_rating, "要改善") ->
+                                  stat.score_level == :poor ->
                                     "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
 
                                   true ->
@@ -3578,19 +4084,23 @@ defmodule AskDriveWeb.AdminLive do
               <div>
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                   <.icon name="hero-building-office-2" class="w-5 h-5 text-indigo-600" />
-                  組織・アカウント（Google Workspace / ドメイン制限）
+                  {gettext("Organization and accounts (Google Workspace / domain restriction)")}
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  会社・組織で特定ドメイン（例: <code class="font-mono">company.com</code>）のみにアクセスを制限する場合はドメインを入力してください。個人利用（<code class="font-mono">@gmail.com</code>
-                  等）やドメイン制限を行わない場合は、<strong>空欄</strong>のまま保存してください（どの Google アカウントでもログイン・Drive 連携が可能になります）。
+                  {gettext("For a company or organization, enter a domain (e.g.")} <code class="font-mono">company.com</code>{gettext(
+                    ") to allow access only from that domain. For personal use ("
+                  )}<code class="font-mono">@gmail.com</code>
+                  {gettext("etc.) or no domain restriction, leave it ")}<strong>{gettext("blank")}</strong>{gettext(
+                    " and save (any Google account can then sign in and connect Drive)."
+                  )}
                 </p>
               </div>
               <.form for={@form} id="org-form" phx-submit="save_settings" class="space-y-4">
                 <.input
                   field={@form[:allowed_domain]}
                   type="text"
-                  label="許可ドメイン（例: company.com / 空欄で制限なし）"
-                  placeholder="company.com (空欄で制限なし)"
+                  label={gettext("Allowed domain (e.g. company.com; leave blank for no restriction)")}
+                  placeholder={gettext("company.com (blank for no restriction)")}
                 />
                 <div class="flex justify-end">
                   <button
@@ -3598,14 +4108,14 @@ defmodule AskDriveWeb.AdminLive do
                     id="save-org-btn"
                     class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                   >
-                    保存
+                    {gettext("Save")}
                   </button>
                 </div>
               </.form>
 
               <%!-- Sign-in methods (spec 6.13 / F-1310): each on or off on its own --%>
               <h3 class="pt-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                ログインの方法
+                {gettext("Sign-in methods")}
               </h3>
 
               <div
@@ -3618,7 +4128,7 @@ defmodule AskDriveWeb.AdminLive do
                     <div class="flex items-center justify-between">
                       <h3 class="font-semibold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                         <.icon name="hero-cloud-arrow-up" class="w-4 h-4 text-indigo-600" />
-                        Google Drive 同期用 OAuth クライアント（全体共通）
+                        {gettext("OAuth client for Google Drive sync (shared by all desks)")}
                       </h3>
                       <span class={[
                         "text-[11px] font-medium px-2.5 py-0.5 rounded-full",
@@ -3630,28 +4140,34 @@ defmodule AskDriveWeb.AdminLive do
                         )
                       ]}>
                         {if AskDrive.Drive.OAuth.client_configured?(),
-                          do: "OAuth クライアント: 設定済み",
-                          else: "OAuth クライアント: 未設定"}
+                          do: gettext("OAuth client: Set"),
+                          else: gettext("OAuth client: Not set")}
                       </span>
                     </div>
 
                     <p class="text-xs text-zinc-500 leading-relaxed">
-                      すべての窓口で Google Drive を同期するために必要な Google Cloud の OAuth 認証情報です。ここで登録しておくと、各窓口で個別にクライアント ID を設定する必要がなくなります（※ Google ログインを使わない場合でも、Drive 同期のために設定が必要です）。
+                      {gettext(
+                        "The Google Cloud OAuth credentials needed to sync Google Drive on every desk. Once registered here, you don't need to set a client ID on each desk. (Required for Drive sync even if you don't use Google sign-in.)"
+                      )}
                     </p>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                       <.input
                         field={@form[:google_client_id]}
                         type="text"
-                        label="OAuth クライアント ID"
-                        placeholder="例: xxxxxxxx.apps.googleusercontent.com"
+                        label={gettext("OAuth client ID")}
+                        placeholder={gettext("e.g. xxxxxxxx.apps.googleusercontent.com")}
                       />
                       <.input
                         field={@form[:google_client_secret]}
                         type="password"
                         value=""
-                        label={"OAuth クライアント シークレット（#{secret_state(@setting.google_client_secret)}）"}
-                        placeholder="例: GOCSPX-xxxxxxxxxxxx"
+                        label={
+                          gettext("OAuth client secret (%{state})",
+                            state: secret_state(@setting.google_client_secret)
+                          )
+                        }
+                        placeholder={gettext("e.g. GOCSPX-xxxxxxxxxxxx")}
                       />
                     </div>
 
@@ -3664,7 +4180,7 @@ defmodule AskDriveWeb.AdminLive do
                           phx-value-scope="platform"
                           class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium transition"
                         >
-                          接続テスト
+                          {gettext("Test connection")}
                         </button>
                         <.client_test_result result={@oauth_client_test[:platform]} />
                       </div>
@@ -3673,7 +4189,7 @@ defmodule AskDriveWeb.AdminLive do
                         id="save-oauth-btn"
                         class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                       >
-                        保存
+                        {gettext("Save")}
                       </button>
                     </div>
                   </div>
@@ -3683,7 +4199,7 @@ defmodule AskDriveWeb.AdminLive do
                     <div class="flex items-center justify-between">
                       <h3 class="font-semibold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                         <.icon name="hero-arrow-left-on-rectangle" class="w-4 h-4 text-indigo-600" />
-                        Google アカウントでのログイン (SSO)
+                        {gettext("Sign-in with a Google account (SSO)")}
                       </h3>
                       <span class={[
                         "text-[11px] font-medium px-2.5 py-0.5 rounded-full",
@@ -3694,23 +4210,31 @@ defmodule AskDriveWeb.AdminLive do
                         )
                       ]}>
                         {case oauth_status(@setting) do
-                          :unset -> "未設定"
-                          :login -> "ログイン: 有効"
-                          :drive_only -> "ログイン: 無効（Drive 同期のみ）"
+                          :unset -> gettext("Not set")
+                          :login -> gettext("Sign-in: On")
+                          :drive_only -> gettext("Sign-in: Off (Drive sync only)")
                         end}
                       </span>
                     </div>
 
                     <p class="text-xs text-zinc-500 leading-relaxed">
-                      利用者がログイン画面から Google アカウントでサインインできるようにします（上記の OAuth クライアントを使用します）。<strong>Google ログインを無効にしていても、上記の Drive 同期は問題なく利用できます。</strong>
+                      {gettext(
+                        "Lets users sign in with their Google account on the sign-in screen (uses the OAuth client above). "
+                      )}<strong>{gettext(
+                        "Drive sync above keeps working even with Google sign-in turned off."
+                      )}</strong>
                     </p>
 
                     <AskDriveWeb.FeatureToggle.toggle
                       id="toggle-oauth-login"
                       feature="oauth_login"
                       on={@setting.oauth_login_enabled != false}
-                      label="Google ログイン"
-                      hint="ログイン画面に「Google でログイン」を表示する（上の OAuth クライアントを保存してから有効にできます）"
+                      label={gettext("Google sign-in")}
+                      hint={
+                        gettext(
+                          "Show \"Sign in with Google\" on the sign-in screen (can be turned on after saving the OAuth client above)"
+                        )
+                      }
                     />
 
                     <.redirect_uri_help />
@@ -3726,7 +4250,7 @@ defmodule AskDriveWeb.AdminLive do
                 <div>
                   <h2 class="font-semibold text-sm text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
                     <.icon name="hero-lock-closed" class="w-4 h-4 text-indigo-500" />
-                    Google Secure LDAP でのログイン
+                    {gettext("Sign-in with Google Secure LDAP")}
                     <span class={[
                       "text-[11px] font-medium px-2 py-0.5 rounded-full",
                       if(AskDrive.Ldap.enabled?(@setting),
@@ -3735,14 +4259,18 @@ defmodule AskDriveWeb.AdminLive do
                         else: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
                       )
                     ]}>
-                      {if AskDrive.Ldap.enabled?(@setting), do: "有効", else: "無効"}
+                      {if AskDrive.Ldap.enabled?(@setting), do: gettext("On"), else: gettext("Off")}
                     </span>
                   </h2>
                   <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    ログイン画面に「メールアドレスとパスワード」の欄を出し、Google Workspace のパスワードを Secure LDAP で確認します（パスワードは AskDrive に保存しません）。外部公開の URL がなくても使えます。Google 管理コンソールで LDAP クライアントを追加し、「ユーザー認証情報の確認」と「ユーザー情報の読み取り」を許可して、発行された証明書（.crt）と秘密鍵（.key）をここに登録してください。
+                    {gettext(
+                      "Shows email and password fields on the sign-in screen and checks the Google Workspace password with Secure LDAP (AskDrive does not store passwords). Works without a public URL. In the Google Admin console, add an LDAP client, allow \"Verify user credentials\" and \"Read user information\", and register the issued certificate (.crt) and private key (.key) here."
+                    )}
                   </p>
                   <p class="text-xs text-amber-700 dark:text-amber-300 mt-1 leading-relaxed">
-                    LDAP でのパスワード確認には Google の 2 段階認証がかかりません。同じアカウントで 5 分間に 5 回失敗すると 15 分、同じ接続環境（ブラウザ）から 24 時間に 10 回失敗すると 24 時間ロックします。
+                    {gettext(
+                      "Password checks over LDAP skip Google's 2-step verification. 5 failures for the same account within 5 minutes lock it for 15 minutes; 10 failures from the same device (browser) within 24 hours lock it for 24 hours."
+                    )}
                   </p>
                 </div>
 
@@ -3752,19 +4280,26 @@ defmodule AskDriveWeb.AdminLive do
                   <%= case ldap_cert do %>
                     <% {:ok, info} -> %>
                       <p id="ldap-cert-info">
-                        登録済みの証明書: <span class="font-mono">{info["subject"]}</span>・有効期限 {String.slice(
+                        {gettext("Registered certificate:")} <span class="font-mono">{info["subject"]}</span>{gettext(
+                          " · Expires"
+                        )} {String.slice(
                           info["not_after"],
                           0,
                           10
                         )}
                       </p>
                     <% _ -> %>
-                      <p>クライアント証明書: 未登録</p>
+                      <p>{gettext("Client certificate: Not registered")}</p>
                   <% end %>
                   <p>
-                    秘密鍵: {secret_state(@setting.ldap_client_key)}・CA 証明書: {if @setting.ldap_ca_cert,
-                      do: "登録済み",
-                      else: "なし（公的な CA で検証）"}
+                    {gettext("Private key: %{key} · CA certificate: %{ca}",
+                      key: secret_state(@setting.ldap_client_key),
+                      ca:
+                        if(@setting.ldap_ca_cert,
+                          do: gettext("Registered"),
+                          else: gettext("None (verified with a public CA)")
+                        )
+                    )}
                   </p>
                 </div>
 
@@ -3772,14 +4307,22 @@ defmodule AskDriveWeb.AdminLive do
                   id="toggle-ldap"
                   feature="ldap"
                   on={@setting.ldap_enabled == true}
-                  label="LDAP でのログイン"
-                  hint="下の設定（クライアント証明書と秘密鍵を含む）を保存してから有効にできます。有効の間に保存すると、設定が足りない場合は保存できません"
-                  confirm_off="LDAP でのログインを無効にします。LDAP でしかログインできない利用者は入れなくなります。続行しますか？"
+                  label={gettext("LDAP sign-in")}
+                  hint={
+                    gettext(
+                      "Can be turned on after saving the settings below (including the client certificate and private key). While it is on, saving fails if settings are missing"
+                    )
+                  }
+                  confirm_off={
+                    gettext(
+                      "This turns off LDAP sign-in. Users who can only sign in with LDAP will be locked out. Continue?"
+                    )
+                  }
                 />
                 <form id="ldap-form" phx-submit="save_ldap" phx-change="ldap_change" class="space-y-4">
                   <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                     <label class="space-y-1 sm:col-span-2">
-                      <span class="block font-medium">LDAP サーバー</span>
+                      <span class="block font-medium">{gettext("LDAP server")}</span>
                       <input
                         type="text"
                         name="ldap[ldap_host]"
@@ -3789,7 +4332,7 @@ defmodule AskDriveWeb.AdminLive do
                       />
                     </label>
                     <label class="space-y-1">
-                      <span class="block font-medium">ポート（LDAPS）</span>
+                      <span class="block font-medium">{gettext("Port (LDAPS)")}</span>
                       <input
                         type="number"
                         name="ldap[ldap_port]"
@@ -3799,9 +4342,12 @@ defmodule AskDriveWeb.AdminLive do
                       />
                     </label>
                     <label class="space-y-1 sm:col-span-3">
-                      <span class="block font-medium">ベース DN（空欄ならドメインから自動: {AskDrive.Ldap.domain_base_dn(
-                        @setting.allowed_domain
-                      ) || "ドメイン未設定"}）</span>
+                      <span class="block font-medium">{gettext(
+                        "Base DN (blank = derived from the domain: %{dn})",
+                        dn:
+                          AskDrive.Ldap.domain_base_dn(@setting.allowed_domain) ||
+                            gettext("domain not set")
+                      )}</span>
                       <input
                         type="text"
                         name="ldap[ldap_base_dn]"
@@ -3813,15 +4359,17 @@ defmodule AskDriveWeb.AdminLive do
                       />
                     </label>
                     <label class="space-y-1">
-                      <span class="block font-medium">クライアント証明書（.crt）</span>
+                      <span class="block font-medium">{gettext("Client certificate (.crt)")}</span>
                       <.live_file_input upload={@uploads.ldap_cert} class={ssl_file_input_class()} />
                     </label>
                     <label class="space-y-1">
-                      <span class="block font-medium">秘密鍵（.key）</span>
+                      <span class="block font-medium">{gettext("Private key (.key)")}</span>
                       <.live_file_input upload={@uploads.ldap_key} class={ssl_file_input_class()} />
                     </label>
                     <label class="space-y-1">
-                      <span class="block font-medium">CA 証明書（任意・Google では不要）</span>
+                      <span class="block font-medium">{gettext(
+                        "CA certificate (optional; not needed for Google)"
+                      )}</span>
                       <.live_file_input upload={@uploads.ldap_ca} class={ssl_file_input_class()} />
                     </label>
                   </div>
@@ -3834,13 +4382,15 @@ defmodule AskDriveWeb.AdminLive do
                       name="ldap[clear_ca]"
                       value="true"
                       class="rounded border-zinc-300"
-                    /> 登録済みの CA 証明書を削除する
+                    /> {gettext("Delete the registered CA certificate")}
                   </label>
                   <details class="text-xs">
-                    <summary class="cursor-pointer text-zinc-500">アクセス認証情報（任意）</summary>
+                    <summary class="cursor-pointer text-zinc-500">
+                      {gettext("Access credentials (optional)")}
+                    </summary>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
                       <label class="space-y-1">
-                        <span class="block font-medium">ユーザー名（バインド DN）</span>
+                        <span class="block font-medium">{gettext("Username (bind DN)")}</span>
                         <input
                           type="text"
                           name="ldap[ldap_bind_dn]"
@@ -3849,9 +4399,9 @@ defmodule AskDriveWeb.AdminLive do
                         />
                       </label>
                       <label class="space-y-1">
-                        <span class="block font-medium">パスワード（{secret_state(
-                          @setting.ldap_bind_password
-                        )}）</span>
+                        <span class="block font-medium">{gettext("Password (%{state})",
+                          state: secret_state(@setting.ldap_bind_password)
+                        )}</span>
                         <input
                           type="password"
                           name="ldap[ldap_bind_password]"
@@ -3862,7 +4412,9 @@ defmodule AskDriveWeb.AdminLive do
                       </label>
                     </div>
                     <p class="text-zinc-400 mt-1">
-                      Google では証明書だけで接続できるため通常は不要です。管理コンソールで「アクセス認証情報」を生成した場合に入力します。
+                      {gettext(
+                        "Usually not needed, since Google connects with the certificate alone. Enter these only if you generated \"Access credentials\" in the Admin console."
+                      )}
                     </p>
                   </details>
                   <p
@@ -3870,9 +4422,12 @@ defmodule AskDriveWeb.AdminLive do
                     id="ldap-pending"
                     class="text-xs text-amber-700 dark:text-amber-300"
                   >
-                    選択済み・未保存: {@ldap_pending
-                    |> Enum.map(fn {_kind, {name, _pem}} -> name end)
-                    |> Enum.join("、")}（「保存」で登録されます）
+                    {gettext("Selected, not saved yet: %{files} (registered when you press \"Save\")",
+                      files:
+                        @ldap_pending
+                        |> Enum.map(fn {_kind, {name, _pem}} -> name end)
+                        |> Enum.join(gettext(", "))
+                    )}
                   </p>
                   <div class="flex flex-wrap justify-end gap-2">
                     <button
@@ -3882,7 +4437,7 @@ defmodule AskDriveWeb.AdminLive do
                       id="test-ldap-btn"
                       class="px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium text-xs transition"
                     >
-                      接続テスト（入力中の内容で）
+                      {gettext("Test connection (with the values entered)")}
                     </button>
                     <button
                       type="submit"
@@ -3891,7 +4446,7 @@ defmodule AskDriveWeb.AdminLive do
                       id="save-ldap-btn"
                       class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                     >
-                      保存
+                      {gettext("Save")}
                     </button>
                   </div>
                 </form>
@@ -3902,18 +4457,20 @@ defmodule AskDriveWeb.AdminLive do
                   class="pt-3 border-t border-zinc-200/60 dark:border-zinc-800 space-y-2"
                 >
                   <h3 class="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
-                    ロック中のログイン（{length(@login_locks)} 件）
+                    {gettext("Locked sign-ins (%{count})", count: length(@login_locks))}
                   </h3>
-                  <p :if={@login_locks == []} class="text-xs text-zinc-400">ロック中のアカウント・接続環境はありません。</p>
+                  <p :if={@login_locks == []} class="text-xs text-zinc-400">
+                    {gettext("No accounts or devices are locked.")}
+                  </p>
                   <table
                     :if={@login_locks != []}
                     class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400"
                   >
                     <thead class="text-[11px] text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                       <tr>
-                        <th class="py-1.5 px-2">対象</th>
-                        <th class="py-1.5 px-2">接続環境</th>
-                        <th class="py-1.5 px-2">解除予定</th>
+                        <th class="py-1.5 px-2">{gettext("Target")}</th>
+                        <th class="py-1.5 px-2">{gettext("Device")}</th>
+                        <th class="py-1.5 px-2">{gettext("Unlocks at")}</th>
                         <th class="py-1.5 px-2"></th>
                       </tr>
                     </thead>
@@ -3922,13 +4479,21 @@ defmodule AskDriveWeb.AdminLive do
                         <td class="py-1.5 px-2">
                           {cond do
                             lock.scope == "account" and String.starts_with?(lock.key, "access:") ->
-                              "窓口「#{lock.key |> String.trim_leading("access:") |> String.split("|") |> hd()}」の合言葉（5 分間に 5 回失敗）"
+                              gettext("Passphrase for desk \"%{desk}\" (5 failures in 5 minutes)",
+                                desk:
+                                  lock.key
+                                  |> String.trim_leading("access:")
+                                  |> String.split("|")
+                                  |> hd()
+                              )
 
                             lock.scope == "account" ->
-                              "アカウント: #{lock.email}（5 分間に 5 回失敗）"
+                              gettext("Account: %{email} (5 failures in 5 minutes)",
+                                email: to_string(lock.email)
+                              )
 
                             true ->
-                              "接続環境（24 時間に 10 回失敗）"
+                              gettext("Device (10 failures in 24 hours)")
                           end}
                         </td>
                         <td class="py-1.5 px-2">
@@ -3942,10 +4507,10 @@ defmodule AskDriveWeb.AdminLive do
                             id={"unlock-#{lock.id}"}
                             phx-click="unlock_login"
                             phx-value-id={lock.id}
-                            data-confirm="このロックを解除しますか？"
+                            data-confirm={gettext("Lift this lock?")}
                             class="px-2.5 py-1 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium"
                           >
-                            解除
+                            {gettext("Unlock")}
                           </button>
                         </td>
                       </tr>
@@ -3967,8 +4532,13 @@ defmodule AskDriveWeb.AdminLive do
                   ]}
                 >
                   {case @ldap_test do
-                    :ok -> "接続できました（証明書・ベース DN とも OK）。ログイン画面でパスワードを試してください。"
-                    {:error, message} -> "接続できません: " <> message
+                    :ok ->
+                      gettext(
+                        "Connected (certificate and base DN are OK). Try a password on the sign-in screen."
+                      )
+
+                    {:error, message} ->
+                      gettext("Cannot connect: %{message}", message: message)
                   end}
                 </p>
               </div>
@@ -3983,7 +4553,9 @@ defmodule AskDriveWeb.AdminLive do
             >
               <div>
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-user-circle" class="w-5 h-5 text-indigo-600" /> ログイン認証
+                  <.icon name="hero-user-circle" class="w-5 h-5 text-indigo-600" /> {gettext(
+                    "Required sign-in"
+                  )}
                   <span class={[
                     "text-[11px] font-medium px-2 py-0.5 rounded-full",
                     if(auth_state == :enabled,
@@ -3992,13 +4564,15 @@ defmodule AskDriveWeb.AdminLive do
                       else: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
                     )
                   ]}>
-                    {if auth_state == :enabled, do: "有効", else: "無効（ゲスト・POC）"}
+                    {if auth_state == :enabled, do: gettext("On"), else: gettext("Off (guest / POC)")}
                   </span>
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  有効にすると、窓口一覧・チャットを含むすべての画面でログインが必要になり、管理画面はさらに本人確認が必要になります（Secure LDAP なら本人のパスワード、それ以外は 10 分以内のログイン）。無効の間は、誰でもログインなしでチャットと管理画面を使えます。締め出された場合は、サーバー上で
+                  {gettext(
+                    "When on, every screen including the desk list and chat requires sign-in, and the admin screen also requires identity confirmation (your password with Secure LDAP, otherwise a sign-in within the last 10 minutes). While off, anyone can use the chat and the admin screen without signing in. If you get locked out, run"
+                  )}
                   <code class="font-mono">./app.sh auth disable</code>
-                  を実行すると無効に戻せます。
+                  {gettext("on the server to turn it off again.")}
                 </p>
               </div>
 
@@ -4007,7 +4581,9 @@ defmodule AskDriveWeb.AdminLive do
                 id="auth-env-fixed"
                 class="text-xs px-3 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
               >
-                環境変数 <code class="font-mono">ASK_DRIVE_DISABLE_AUTH</code>（.env.prod）で固定されています。この画面や ./app.sh auth で切り替えるには、.env.prod からその行を削除して再起動してください。
+                {gettext("Fixed by the environment variable")} <code class="font-mono">ASK_DRIVE_DISABLE_AUTH</code>{gettext(
+                  " (.env.prod). To switch it from this screen or with ./app.sh auth, remove that line from .env.prod and restart."
+                )}
               </p>
 
               <form
@@ -4018,7 +4594,9 @@ defmodule AskDriveWeb.AdminLive do
               >
                 <label class="block text-xs space-y-1">
                   <span class="block font-medium text-zinc-700 dark:text-zinc-300">
-                    管理者のメールアドレス（複数可・カンマ区切り。有効にした後、このいずれかでログインして昇格します）
+                    {gettext(
+                      "Administrator email addresses (comma-separated for several; after turning it on, sign in with one of them and elevate)"
+                    )}
                   </span>
                   <div class="sm:w-96">
                     <.email_input
@@ -4034,15 +4612,21 @@ defmodule AskDriveWeb.AdminLive do
                   </div>
                 </label>
                 <p class="text-xs text-zinc-500">
-                  必要なもの: ログインの方法（Google Secure LDAP または Google ログイン）が設定済みであること。有効にすると、このブラウザもログイン画面に移ります。
+                  {gettext(
+                    "Requirement: a sign-in method (Google Secure LDAP or Google sign-in) is set up. Turning it on also takes this browser to the sign-in screen."
+                  )}
                 </p>
                 <button
                   type="submit"
                   id="enable-auth-btn"
-                  data-confirm="ログイン認証を有効にしますか？有効にした後は、ログインと本人確認をしないと管理画面に入れません。"
+                  data-confirm={
+                    gettext(
+                      "Turn on required sign-in? Afterwards you cannot enter the admin screen without signing in and confirming your identity."
+                    )
+                  }
                   class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                 >
-                  ログイン認証を有効にする
+                  {gettext("Turn on required sign-in")}
                 </button>
               </form>
 
@@ -4050,10 +4634,14 @@ defmodule AskDriveWeb.AdminLive do
                 <button
                   id="disable-auth-btn"
                   phx-click="disable_auth"
-                  data-confirm="ログイン認証を無効にしますか？誰でもログインなしでチャットと管理画面を使えるようになります。"
+                  data-confirm={
+                    gettext(
+                      "Turn off required sign-in? Anyone will be able to use the chat and the admin screen without signing in."
+                    )
+                  }
                   class="px-4 py-2.5 rounded-xl border border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/40 font-medium text-xs transition"
                 >
-                  ログイン認証を無効にする（ゲスト・POC に戻す）
+                  {gettext("Turn off required sign-in (back to guest / POC)")}
                 </button>
               </div>
             </div>
@@ -4066,15 +4654,24 @@ defmodule AskDriveWeb.AdminLive do
             >
               <div>
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-shield-check" class="w-5 h-5 text-indigo-600" /> 全体管理への入り方
+                  <.icon name="hero-shield-check" class="w-5 h-5 text-indigo-600" /> {gettext(
+                    "How platform administrators get in"
+                  )}
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  全体管理者（ユーザー管理で「昇格可」のアカウント）は、ヘッダーの「全体管理」から、各自のアカウントで本人確認して入ります。共有のパスワードはありません。 {if AdminAccess.confirmation_method() ==
-                                                                                                     :ldap_password,
-                                                                                                   do:
-                                                                                                     "現在は Google Secure LDAP が有効なので、本人の Google Workspace のパスワードで確認します（入力ミスは LDAP ログインと同じロックの対象です）。",
-                                                                                                   else:
-                                                                                                     "現在は Google Secure LDAP が無効なので、#{AskDrive.Accounts.AppAdminAccess.fresh_login_minutes()} 分以内にログインしていればそのまま入れます（古い場合はログインし直します）。"}
+                  {gettext(
+                    "Platform administrators (accounts marked \"can elevate\" in user management) get in from \"Platform admin\" in the header by confirming their identity with their own account. There is no shared password."
+                  )}
+                  {if AdminAccess.confirmation_method() == :ldap_password,
+                    do:
+                      gettext(
+                        "Google Secure LDAP is on, so you confirm with your own Google Workspace password (typos count toward the same lock as LDAP sign-in)."
+                      ),
+                    else:
+                      gettext(
+                        "Google Secure LDAP is off, so you get straight in if you signed in within the last %{minutes} minutes (otherwise you sign in again).",
+                        minutes: AskDrive.Accounts.AppAdminAccess.fresh_login_minutes()
+                      )}
                 </p>
               </div>
 
@@ -4082,14 +4679,16 @@ defmodule AskDriveWeb.AdminLive do
                 <.input
                   field={@form[:admin_session_minutes]}
                   type="number"
-                  label="昇格の有効時間 (分)"
+                  label={gettext("Admin elevation duration (minutes)")}
                   min="1"
                   max="480"
                   form="settings-form"
                 />
               </div>
               <p class="text-[11px] text-zinc-400">
-                昇格の有効時間は下の「設定を保存」で反映されます（窓口の管理画面にも同じ時間が適用されます）。
+                {gettext(
+                  "The elevation duration takes effect with \"Save settings\" below (the same duration applies to desk admin screens)."
+                )}
               </p>
             </div>
 
@@ -4101,10 +4700,14 @@ defmodule AskDriveWeb.AdminLive do
             >
               <div>
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-user-group" class="w-5 h-5 text-indigo-600" /> 窓口管理者
+                  <.icon name="hero-user-group" class="w-5 h-5 text-indigo-600" /> {gettext(
+                    "Desk administrators"
+                  )}
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  この窓口の管理画面（Drive の設定・API キーを含む）に入れるのは、ここに載っている担当者だけです（全体管理者は入れません）。担当者は各自のアカウントで本人確認して入ります。担当者を追加し、自分を外して引き継ぐこともできます（最後の 1 人は外せません）。
+                  {gettext(
+                    "Only the administrators listed here can enter this desk's admin screen (including Drive settings and API keys); platform administrators cannot. Each administrator gets in by confirming their identity with their own account. You can add administrators, and remove yourself to hand over (the last one cannot be removed)."
+                  )}
                 </p>
               </div>
 
@@ -4116,8 +4719,12 @@ defmodule AskDriveWeb.AdminLive do
                 >
                   <span class="text-zinc-800 dark:text-zinc-200">
                     {admin.email}
-                    <span :if={admin.id == @current_user.id} class="text-zinc-400">（あなた）</span>
-                    <span :if={is_nil(admin.last_login_at)} class="text-zinc-400">（未ログイン）</span>
+                    <span :if={admin.id == @current_user.id} class="text-zinc-400">{gettext(
+                      "(this is you)"
+                    )}</span>
+                    <span :if={is_nil(admin.last_login_at)} class="text-zinc-400">{gettext(
+                      "(never signed in)"
+                    )}</span>
                   </span>
                   <button
                     :if={length(@app_admins[@app.slug] || []) > 1}
@@ -4127,13 +4734,21 @@ defmodule AskDriveWeb.AdminLive do
                     phx-value-user_id={admin.id}
                     data-confirm={
                       if(admin.id == @current_user.id,
-                        do: "あなたをこの窓口の担当者から外しますか？以後、この窓口の管理画面には入れなくなります。",
-                        else: "#{admin.email} をこの窓口の担当者から外しますか？"
+                        do:
+                          gettext(
+                            "Remove yourself from this desk's administrators? You will no longer be able to enter this desk's admin screen."
+                          ),
+                        else:
+                          gettext("Remove %{email} from this desk's administrators?",
+                            email: admin.email
+                          )
                       )
                     }
                     class="px-2.5 py-1 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[11px] font-medium"
                   >
-                    {if admin.id == @current_user.id, do: "自分を外す", else: "外す"}
+                    {if admin.id == @current_user.id,
+                      do: gettext("Remove myself"),
+                      else: gettext("Remove")}
                   </button>
                 </li>
               </ul>
@@ -4146,7 +4761,9 @@ defmodule AskDriveWeb.AdminLive do
                 <input type="hidden" name="app_slug" value={@app.slug} />
                 <label class="flex-1 text-xs space-y-1">
                   <span class="block font-medium text-zinc-700 dark:text-zinc-300">
-                    担当者を追加（メールアドレス、複数可・カンマ区切り。まだログインしたことのない人も追加できます）
+                    {gettext(
+                      "Add administrators (email addresses, comma-separated for several; people who have never signed in can be added too)"
+                    )}
                   </span>
                   <.email_input id="add-app-admins-emails" name="emails" ac={@ac} />
                 </label>
@@ -4155,7 +4772,7 @@ defmodule AskDriveWeb.AdminLive do
                   id="add-app-admins-btn"
                   class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                 >
-                  追加
+                  {gettext("Add")}
                 </button>
               </form>
 
@@ -4164,18 +4781,29 @@ defmodule AskDriveWeb.AdminLive do
                 id="app-admin-changes"
                 class="text-[11px] text-zinc-500 space-y-0.5"
               >
-                <p class="font-medium text-zinc-600 dark:text-zinc-400">担当者の変更履歴</p>
+                <p class="font-medium text-zinc-600 dark:text-zinc-400">
+                  {gettext("Administrator change history")}
+                </p>
                 <p
                   :for={c <- @app_admin_changes}
                   class={c.by_platform? && "text-amber-700 dark:text-amber-300"}
                 >
                   {AskDrive.Clock.format(c.at, "%m/%d %H:%M") <>
                     " " <>
-                    c.actor <>
-                    if(c.by_platform?, do: "（全体管理者）", else: "") <>
-                    " が " <>
-                    (c.target || "") <>
-                    if(c.event == "app_admin_added", do: " を追加", else: " を削除")}
+                    if(c.event == "app_admin_added",
+                      do:
+                        gettext("%{actor}%{by} added %{target}",
+                          actor: c.actor,
+                          by: if(c.by_platform?, do: gettext(" (platform admin)"), else: ""),
+                          target: c.target || ""
+                        ),
+                      else:
+                        gettext("%{actor}%{by} removed %{target}",
+                          actor: c.actor,
+                          by: if(c.by_platform?, do: gettext(" (platform admin)"), else: ""),
+                          target: c.target || ""
+                        )
+                    )}
                 </p>
               </div>
             </div>
@@ -4188,10 +4816,14 @@ defmodule AskDriveWeb.AdminLive do
               <div class="flex items-start justify-between gap-4">
                 <div>
                   <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                    <.icon name="hero-lock-closed" class="w-5 h-5 text-indigo-600" /> 窓口アクセスパスワード
+                    <.icon name="hero-lock-closed" class="w-5 h-5 text-indigo-600" /> {gettext(
+                      "Desk access password"
+                    )}
                   </h2>
                   <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    この窓口のチャット利用を限定するためのパスワードです。有効にすると、正しいパスワードを入力したユーザーのみがチャットを利用できるようになります。
+                    {gettext(
+                      "A password that limits who can use this desk's chat. When on, only users who enter the correct password can use the chat."
+                    )}
                   </p>
                 </div>
               </div>
@@ -4200,13 +4832,18 @@ defmodule AskDriveWeb.AdminLive do
                 id="toggle-access-password"
                 feature="access_password"
                 on={@setting.access_password_enabled == true}
-                label="パスワードによる利用制限"
+                label={gettext("Restrict access with a password")}
                 hint={
                   if @setting.access_password_hash,
-                    do: "有効にすると、パスワードを入力した人だけがこの窓口のチャットを使えます",
-                    else: "先に下でパスワードを保存してください"
+                    do:
+                      gettext("When on, only people who enter the password can use this desk's chat"),
+                    else: gettext("Save a password below first")
                 }
-                confirm_on="パスワードによる利用制限を有効にします。パスワードを知らない利用者はこの窓口を使えなくなります。続行しますか？"
+                confirm_on={
+                  gettext(
+                    "This turns on password restriction. Users who don't know the password will no longer be able to use this desk. Continue?"
+                  )
+                }
               />
 
               <.form
@@ -4219,7 +4856,17 @@ defmodule AskDriveWeb.AdminLive do
                   field={@access_password_form[:password]}
                   type="password"
                   value=""
-                  label={"#{if @setting.access_password_hash, do: "新しいパスワード", else: "窓口アクセスパスワード"}（#{AdminAccess.min_password_length()} 文字以上）"}
+                  label={
+                    if @setting.access_password_hash,
+                      do:
+                        gettext("New password (at least %{count} characters)",
+                          count: AdminAccess.min_password_length()
+                        ),
+                      else:
+                        gettext("Desk access password (at least %{count} characters)",
+                          count: AdminAccess.min_password_length()
+                        )
+                  }
                   autocomplete="new-password"
                   required
                 />
@@ -4229,7 +4876,7 @@ defmodule AskDriveWeb.AdminLive do
                       field={@access_password_form[:confirmation]}
                       type="password"
                       value=""
-                      label="確認"
+                      label={gettext("Confirm password")}
                       autocomplete="new-password"
                       required
                     />
@@ -4239,7 +4886,9 @@ defmodule AskDriveWeb.AdminLive do
                     id="save-access-password-btn"
                     class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition whitespace-nowrap"
                   >
-                    {if @setting.access_password_hash, do: "パスワードを変更", else: "パスワードを保存"}
+                    {if @setting.access_password_hash,
+                      do: gettext("Change password"),
+                      else: gettext("Save password")}
                   </button>
                 </div>
               </.form>
@@ -4253,15 +4902,15 @@ defmodule AskDriveWeb.AdminLive do
               <div class="flex items-center justify-between">
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                   <.icon name="hero-cloud-arrow-down" class="w-5 h-5 text-indigo-600" />
-                  Google Drive 同期設定
+                  {gettext("Google Drive sync settings")}
                 </h2>
                 <%= if Accounts.drive_connected?() do %>
                   <span class="text-xs px-2.5 py-1 rounded-full font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200/50">
-                    連携中: {Accounts.drive_identity()}
+                    {gettext("Connected: %{identity}", identity: to_string(Accounts.drive_identity()))}
                   </span>
                 <% else %>
                   <span class="text-xs px-2.5 py-1 rounded-full font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/50">
-                    未連携
+                    {gettext("Not connected")}
                   </span>
                 <% end %>
               </div>
@@ -4282,7 +4931,7 @@ defmodule AskDriveWeb.AdminLive do
                     )
                   ]}
                 >
-                  Google アカウント認証
+                  {gettext("Google account authorization")}
                 </button>
                 <button
                   type="button"
@@ -4297,7 +4946,7 @@ defmodule AskDriveWeb.AdminLive do
                     )
                   ]}
                 >
-                  サービスアカウント
+                  {gettext("Service account")}
                 </button>
               </div>
 
@@ -4312,12 +4961,14 @@ defmodule AskDriveWeb.AdminLive do
               >
                 <%= if @drive_mode == "service_account" do %>
                   <p class="text-xs text-zinc-500 leading-relaxed">
-                    ブラウザでの認可が不要なため、Google の redirect_uri 制限（生の IP アドレスや
+                    {gettext(
+                      "No browser authorization is needed, so this avoids Google's redirect_uri restrictions (rejection of raw IP addresses and"
+                    )}
                     <code
                       class="font-mono text-[11px]"
                       phx-no-curly-interpolation
                     >.local</code>
-                    ホスト名の拒否）を回避できます。
+                    {gettext("host names). Open")}
                     <a
                       href="https://console.cloud.google.com/iam-admin/serviceaccounts"
                       target="_blank"
@@ -4325,11 +4976,13 @@ defmodule AskDriveWeb.AdminLive do
                     >
                       Google Cloud Console
                     </a>
-                    でサービスアカウントを作成し、JSON キーをダウンロードして貼り付けてください。作成後、同期対象の Drive フォルダをそのサービスアカウントのメールアドレス（<code
+                    {gettext(
+                      "to create a service account, then download its JSON key and paste it below. After that, share the Drive folder to sync with the service account's email address ("
+                    )}<code
                       class="font-mono text-[11px]"
                       phx-no-curly-interpolation
                     >...@...iam.gserviceaccount.com</code>
-                    ）と共有するのを忘れないでください。
+                    {gettext("). Don't forget this step.")}
                   </p>
 
                   <div id="service-account-fields" class="space-y-3">
@@ -4338,30 +4991,36 @@ defmodule AskDriveWeb.AdminLive do
                       type="textarea"
                       value=""
                       rows="6"
-                      label={"サービスアカウントの JSON キー（#{secret_state(@setting.drive_service_account_json)}）"}
+                      label={
+                        gettext("Service account JSON key (%{state})",
+                          state: secret_state(@setting.drive_service_account_json)
+                        )
+                      }
                       placeholder={
                         ~s({"type": "service_account", "client_email": "...", "private_key": "...", ...})
                       }
                       class="font-mono text-[11px]"
                     />
                     <p class="text-[11px] text-zinc-500 -mt-1">
-                      保存済みの場合は空欄のままで構いません（既存のキーを維持します）。
+                      {gettext(
+                        "If already saved, you can leave this blank (the existing key is kept)."
+                      )}
                     </p>
                     <.input
                       field={@form[:drive_impersonate_email]}
                       type="email"
-                      label="アクセスユーザー（ドメイン全体の委任・任意）"
+                      label={gettext("User to act as (domain-wide delegation, optional)")}
                       placeholder="sync@example.com"
                     />
                     <p class="text-[11px] text-zinc-500 leading-relaxed -mt-1">
-                      同期対象が「組織内のユーザーのみアクセス可」の共有ドライブにある場合、サービスアカウント（組織外扱い）は共有に追加できません。
-                      その場合はフォルダを閲覧できる社内ユーザーのメールアドレスを入力し、Google 管理コンソール →「セキュリティ」→「API の制御」→「ドメイン全体の委任」で
-                      クライアント ID
+                      {gettext(
+                        "If the folder to sync is in a shared drive that only users in your organization can access, the service account (treated as outside the organization) cannot be added to it. In that case, enter the email address of an internal user who can view the folder, and in the Google Admin console → \"Security\" → \"API controls\" → \"Domain-wide delegation\", authorize the client ID"
+                      )}
                       <code class="font-mono">{service_account_client_id(@setting) ||
-                        "（JSON キーの client_id）"}</code>
-                      にスコープ
+                        gettext("(client_id from the JSON key)")}</code>
+                      {gettext("for the scope")}
                       <code class="font-mono" phx-no-curly-interpolation>https://www.googleapis.com/auth/drive.readonly</code>
-                      を許可してください。空欄ならサービスアカウント自身としてアクセスします。
+                      {gettext("— or leave it blank to access Drive as the service account itself.")}
                     </p>
                     <div class="flex flex-wrap items-center gap-3">
                       <button
@@ -4370,17 +5029,17 @@ defmodule AskDriveWeb.AdminLive do
                         phx-click="test_service_account"
                         class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium transition"
                       >
-                        接続テスト
+                        {gettext("Test connection")}
                       </button>
                       <button
                         :if={Accounts.drive_connected?()}
                         type="button"
                         id="disconnect-service-account-btn"
                         phx-click="disconnect_service_account"
-                        data-confirm="保存済みのサービスアカウント認証情報を削除しますか？"
+                        data-confirm={gettext("Delete the saved service account credentials?")}
                         class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 font-medium text-xs transition"
                       >
-                        <.icon name="hero-x-circle" class="w-4 h-4" /> 削除
+                        <.icon name="hero-x-circle" class="w-4 h-4" /> {gettext("Delete")}
                       </button>
                     </div>
                     <%= case @service_account_test do %>
@@ -4408,11 +5067,13 @@ defmodule AskDriveWeb.AdminLive do
                           </div>
                           <div>
                             <p class="text-xs font-semibold text-emerald-900 dark:text-emerald-200">
-                              Google Drive 接続済み
+                              {gettext("Google Drive connected")}
                             </p>
                             <p class="text-xs font-mono text-emerald-700 dark:text-emerald-300">
                               {@account.email}
-                              <span class="text-[11px] font-sans text-emerald-600 dark:text-emerald-400">（このアカウントの権限で同期）</span>
+                              <span class="text-[11px] font-sans text-emerald-600 dark:text-emerald-400">{gettext(
+                                "(syncs with this account's permissions)"
+                              )}</span>
                             </p>
                           </div>
                         </div>
@@ -4423,7 +5084,7 @@ defmodule AskDriveWeb.AdminLive do
                             }
                             class="px-3 py-1.5 rounded-lg border border-red-200 hover:border-red-300 bg-white dark:bg-zinc-900 hover:bg-red-50 dark:hover:bg-red-950/40 text-red-700 dark:text-red-300 font-medium text-xs transition shadow-xs"
                           >
-                            連携解除
+                            {gettext("Disconnect")}
                           </.link>
                         </div>
                       </div>
@@ -4435,10 +5096,10 @@ defmodule AskDriveWeb.AdminLive do
                             <.icon
                               name="hero-arrow-path-rounded-square"
                               class="w-4 h-4 text-indigo-600"
-                            /> Google Drive 連携手順（3 ステップ）
+                            /> {gettext("Connect Google Drive (3 steps)")}
                           </h4>
                           <span class="text-[11px] text-amber-700 dark:text-amber-400 font-medium bg-amber-50 dark:bg-amber-950/40 px-2.5 py-0.5 rounded-full border border-amber-200/60 dark:border-amber-900/60">
-                            未接続
+                            {gettext("Not connected yet")}
                           </span>
                         </div>
 
@@ -4449,17 +5110,19 @@ defmodule AskDriveWeb.AdminLive do
                           </span>
                           <div class="flex-1 space-y-1.5">
                             <label class="block text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-                              同期する Google アカウントを入力
+                              {gettext("Enter the Google account to sync")}
                             </label>
                             <p class="text-[11px] text-zinc-500">
-                              同期対象の Drive フォルダを閲覧できるアカウント（Gmail または Workspace アカウント）を入力します。
+                              {gettext(
+                                "Enter an account (Gmail or Workspace) that can view the Drive folder to sync."
+                              )}
                             </p>
                             <input
                               type="email"
                               name="drive_login_hint"
                               id="drive-login-hint"
                               value={@drive_login_hint}
-                              placeholder="例: sync-drive@gmail.com または sync@company.com"
+                              placeholder={gettext("e.g. sync-drive@gmail.com or sync@company.com")}
                               class="w-full sm:w-80 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs shadow-xs"
                             />
                           </div>
@@ -4472,10 +5135,12 @@ defmodule AskDriveWeb.AdminLive do
                           </span>
                           <div class="flex-1 space-y-2">
                             <label class="block text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-                              Google の認可ページを開いて「許可」
+                              {gettext("Open Google's authorization page and click \"Allow\"")}
                             </label>
                             <p class="text-[11px] text-zinc-500">
-                              ボタンを押すと別ウィンドウで Google ログイン画面が開きます。ログインして Drive へのアクセスを「許可」してください。
+                              {gettext(
+                                "The button opens the Google sign-in page in a new window. Sign in and \"Allow\" access to Drive."
+                              )}
                             </p>
                             <div class="pt-0.5">
                               <%= cond do %>
@@ -4486,7 +5151,9 @@ defmodule AskDriveWeb.AdminLive do
                                     phx-click="drive_connect_needs_client"
                                     class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                                   >
-                                    <.icon name="hero-key" class="w-4 h-4" /> OAuth クライアントを設定して接続
+                                    <.icon name="hero-key" class="w-4 h-4" /> {gettext(
+                                      "Set up the OAuth client to connect"
+                                    )}
                                   </button>
                                 <% true -> %>
                                   <a
@@ -4497,7 +5164,7 @@ defmodule AskDriveWeb.AdminLive do
                                     class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                                   >
                                     <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
-                                    Google の認可画面を開く（別ウィンドウ）
+                                    {gettext("Open Google's authorization page (new window)")}
                                   </a>
                               <% end %>
                             </div>
@@ -4507,9 +5174,9 @@ defmodule AskDriveWeb.AdminLive do
                               id="drive-connect-target"
                               class="text-[11px] text-zinc-500 pt-1"
                             >
-                              使用クライアント ID:
+                              {gettext("Client ID in use:")}
                               <code class="font-mono select-all">{@drive_client_id}</code>
-                              ／ リダイレクト URI:
+                              {gettext("/ Redirect URI:")}
                               <code class="font-mono select-all">{@drive_redirect_uri}</code>
                             </p>
 
@@ -4518,9 +5185,13 @@ defmodule AskDriveWeb.AdminLive do
                               id="drive-redirect-mismatch-help"
                               class="text-[11px] text-amber-700 dark:text-amber-300"
                             >
-                              ※ Google に「エラー 400: redirect_uri_mismatch」と表示された場合は、OAuth クライアントの種類が「ウェブ アプリケーション」です。Google Cloud Console で承認済みのリダイレクト URI に
+                              {gettext(
+                                "Note: If Google shows \"Error 400: redirect_uri_mismatch\", the OAuth client type is \"Web application\". In Google Cloud Console, add"
+                              )}
                               <code class="font-mono select-all">{@drive_redirect_uri}</code>
-                              を追加するか、種類「デスクトップ アプリ」のクライアントを作成してください（デスクトップ アプリなら登録不要）。
+                              {gettext(
+                                "to the authorized redirect URIs, or create a client of type \"Desktop app\" (no registration needed for desktop apps)."
+                              )}
                             </p>
                           </div>
                         </div>
@@ -4532,7 +5203,7 @@ defmodule AskDriveWeb.AdminLive do
                           </span>
                           <div class="flex-1 space-y-2">
                             <label class="block text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-                              認可後のブラウザのアドレス（URL）を貼り付け
+                              {gettext("Paste the browser address (URL) after authorizing")}
                             </label>
 
                             <div class="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-900/50 space-y-1 text-[11px]">
@@ -4540,13 +5211,18 @@ defmodule AskDriveWeb.AdminLive do
                                 <.icon
                                   name="hero-information-circle"
                                   class="w-4 h-4 text-amber-600 shrink-0"
-                                /> 「このサイトにアクセスできません」と表示された場合（正常動作）
+                                /> {gettext(
+                                  "If you see \"This site can't be reached\" (this is expected)"
+                                )}
                               </p>
                               <p class="text-amber-800 dark:text-amber-300 leading-relaxed">
-                                Google で「許可」を押したあと、別ウィンドウのアドレスバーが
+                                {gettext(
+                                  "After you click \"Allow\" on Google, the address bar of the other window goes to"
+                                )}
                                 <code class="font-mono bg-white/80 dark:bg-black/30 px-1 py-0.5 rounded">http://localhost:4000/...</code>
-                                に遷移してエラー表示になるのは正常です。
-                                その<strong>ブラウザのアドレスバーの URL をすべてコピー</strong>して、下の枠に貼り付け、「保存して認証完了」を押してください（枠で Enter を押しても同じです）。
+                                {gettext("and shows an error. This is normal. ")}<strong>{gettext("Copy the whole URL from that browser's address bar")}</strong>{gettext(
+                                  ", paste it into the box below, and click \"Save and finish\" (pressing Enter in the box does the same)."
+                                )}
                               </p>
                             </div>
 
@@ -4568,11 +5244,13 @@ defmodule AskDriveWeb.AdminLive do
                                 type="button"
                                 id="drive-auth-finish-btn"
                                 phx-click="drive_auth_finish"
-                                phx-disable-with="認証しています…"
+                                phx-disable-with={gettext("Authorizing…")}
                                 disabled={String.trim(@drive_auth_code) == ""}
                                 class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed"
                               >
-                                <.icon name="hero-check-circle" class="w-4 h-4" /> 保存して認証完了
+                                <.icon name="hero-check-circle" class="w-4 h-4" /> {gettext(
+                                  "Save and finish"
+                                )}
                               </button>
                               <%= case @drive_auth_result do %>
                                 <% {:ok, message} -> %>
@@ -4594,7 +5272,11 @@ defmodule AskDriveWeb.AdminLive do
                             </div>
 
                             <p :if={@drive_on_server?} class="text-[11px] text-zinc-500">
-                              ※ AskDrive サーバー上のブラウザ（<code class="font-mono">https://localhost:4443/</code>）で操作している場合は、貼り付け不要で自動的に完了します。
+                              {gettext(
+                                "Note: If you are using a browser on the AskDrive server itself ("
+                              )}<code class="font-mono">https://localhost:4443/</code>{gettext(
+                                "), this completes automatically without pasting."
+                              )}
                             </p>
                           </div>
                         </div>
@@ -4609,10 +5291,17 @@ defmodule AskDriveWeb.AdminLive do
                       class="rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
                     >
                       <summary class="cursor-pointer px-3 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                        OAuth クライアント設定（全体設定を使う場合は不要 / 個別指定）{cond do
-                          AskDrive.Drive.OAuth.desk_drive_client?() -> "：この窓口の設定を使用中"
-                          @drive_oauth_ready? -> "：全体設定の設定を使用中"
-                          true -> "：未設定"
+                        {gettext(
+                          "OAuth client settings (not needed when using the platform settings / per-desk override)"
+                        )}{cond do
+                          AskDrive.Drive.OAuth.desk_drive_client?() ->
+                            gettext(": using this desk's settings")
+
+                          @drive_oauth_ready? ->
+                            gettext(": using the platform settings")
+
+                          true ->
+                            gettext(": not set")
                         end}
                       </summary>
                       <div id="drive-oauth-client-fields" class="px-3 pb-3 space-y-3">
@@ -4621,7 +5310,9 @@ defmodule AskDriveWeb.AdminLive do
                           id="drive-oauth-client-missing"
                           class="text-[11px] text-amber-700 dark:text-amber-300"
                         >
-                          「接続」するには、Google の OAuth クライアント（ID とシークレット）が必要です。全体設定の「Google Drive 同期用 OAuth クライアント」に登録すればすべての窓口で使えます。この窓口だけで個別設定する場合は、下に入力してください。
+                          {gettext(
+                            "To connect, you need a Google OAuth client (ID and secret). Register it under \"OAuth client for Google Drive sync\" in the platform settings to use it on every desk, or enter it below to set it for this desk only."
+                          )}
                         </p>
                         <ol class="list-decimal pl-5 text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1.5">
                           <li>
@@ -4630,7 +5321,7 @@ defmodule AskDriveWeb.AdminLive do
                               target="_blank"
                               rel="noopener noreferrer"
                               class="underline text-indigo-600"
-                            >Google Drive API を有効にする</a>
+                            >{gettext("Enable the Google Drive API")}</a>
                           </li>
                           <li>
                             <a
@@ -4638,14 +5329,20 @@ defmodule AskDriveWeb.AdminLive do
                               target="_blank"
                               rel="noopener noreferrer"
                               class="underline text-indigo-600"
-                            >OAuth 同意画面</a>
-                            を作成する:
+                            >{gettext("OAuth consent screen")}</a>
+                            {gettext("— create it:")}
                             <ul class="list-disc pl-4 mt-0.5 space-y-0.5 text-zinc-500">
                               <li>
-                                <strong>Google Workspace（組織）</strong>: ユーザーの種類を「<strong>内部</strong>」にする
+                                <strong>{gettext("Google Workspace (organization)")}</strong>{gettext(
+                                  ": set User type to “"
+                                )}<strong>{gettext("Internal")}</strong>{gettext("”")}
                               </li>
                               <li>
-                                <strong>個人 Gmail（@gmail.com 等）</strong>: ユーザーの種類を「<strong>外部</strong>」にし、「テストユーザー」に同期する Gmail アドレスを追加する
+                                <strong>{gettext("Personal Gmail (@gmail.com etc.)")}</strong>{gettext(
+                                  ": set User type to “"
+                                )}<strong>{gettext("External")}</strong>{gettext(
+                                  "” and add the Gmail address to sync under “Test users”"
+                                )}
                               </li>
                             </ul>
                           </li>
@@ -4655,23 +5352,33 @@ defmodule AskDriveWeb.AdminLive do
                               target="_blank"
                               rel="noopener noreferrer"
                               class="underline text-indigo-600"
-                            >OAuth クライアント ID</a>
-                            を作る（種類は「デスクトップ アプリ」。リダイレクト URI の登録は不要）
+                            >{gettext("OAuth client ID")}</a>
+                            {gettext(
+                              "— create one (type \"Desktop app\"; no redirect URI registration needed)"
+                            )}
                           </li>
-                          <li>表示されたクライアント ID とシークレットを下に入力し、カードの一番下の「保存」を押す</li>
+                          <li>
+                            {gettext(
+                              "Enter the client ID and secret shown below, then click \"Save\" at the bottom of the card"
+                            )}
+                          </li>
                         </ol>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <.input
                             field={@form[:drive_oauth_client_id]}
                             type="text"
-                            label="OAuth クライアント ID"
+                            label={gettext("OAuth client ID")}
                             placeholder="xxxxxxxx.apps.googleusercontent.com"
                           />
                           <.input
                             field={@form[:drive_oauth_client_secret]}
                             type="password"
                             value=""
-                            label={"OAuth クライアント シークレット（#{secret_state(@setting.drive_oauth_client_secret)}）"}
+                            label={
+                              gettext("OAuth client secret (%{state})",
+                                state: secret_state(@setting.drive_oauth_client_secret)
+                              )
+                            }
                           />
                         </div>
                         <.redirect_uri_help />
@@ -4683,7 +5390,7 @@ defmodule AskDriveWeb.AdminLive do
                             phx-value-scope="desk"
                             class="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium"
                           >
-                            接続テスト（使用中のクライアント）
+                            {gettext("Test connection (client in use)")}
                           </button>
                           <.client_test_result result={@oauth_client_test[:desk]} />
                         </div>
@@ -4695,20 +5402,22 @@ defmodule AskDriveWeb.AdminLive do
                 <%!-- Which folder to sync (moved here from the general settings form) --%>
                 <div class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3">
                   <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                    <.icon name="hero-folder" class="w-4 h-4 text-indigo-500" /> 同期するフォルダ
+                    <.icon name="hero-folder" class="w-4 h-4 text-indigo-500" /> {gettext(
+                      "Folder to sync"
+                    )}
                   </h3>
                   <div class="space-y-3">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <.input
                         field={@form[:drive_folder_id]}
                         type="text"
-                        label="Google Drive フォルダ ID / URL"
+                        label={gettext("Google Drive folder ID / URL")}
                         placeholder="https://drive.google.com/drive/folders/..."
                       />
                       <.input
                         field={@form[:drive_folder_name]}
                         type="text"
-                        label="フォルダの表示名（任意）"
+                        label={gettext("Folder display name (optional)")}
                       />
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
@@ -4717,7 +5426,7 @@ defmodule AskDriveWeb.AdminLive do
                         id="save-drive-settings-btn"
                         class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                       >
-                        <.icon name="hero-arrow-up-tray" class="w-4 h-4" /> 保存
+                        <.icon name="hero-arrow-up-tray" class="w-4 h-4" /> {gettext("Save")}
                       </button>
                       <button
                         type="button"
@@ -4726,10 +5435,14 @@ defmodule AskDriveWeb.AdminLive do
                         disabled={@drive_sync_test == :running}
                         class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium transition disabled:opacity-50"
                       >
-                        {if @drive_sync_test == :running, do: "テスト中…", else: "同期テスト"}
+                        {if @drive_sync_test == :running,
+                          do: gettext("Testing…"),
+                          else: gettext("Test sync")}
                       </button>
                       <span class="text-[11px] text-zinc-500">
-                        認証とフォルダの読み取りを確認し、同期の対象になるファイルを一覧します（取り込みはしません）。
+                        {gettext(
+                          "Checks authentication and folder access, and lists the files that would be synced (nothing is ingested)."
+                        )}
                       </span>
                     </div>
                   </div>
@@ -4738,7 +5451,12 @@ defmodule AskDriveWeb.AdminLive do
                       <% {:ok, %{folder: folder, count: count, sample: sample}} -> %>
                         <div class="text-[11px] text-emerald-700 dark:text-emerald-400 space-y-1">
                           <p>
-                            同期できます（{Accounts.drive_identity()}）。フォルダ「{folder}」の対象ファイル: {count} 件
+                            {gettext(
+                              "Sync works (%{identity}). Files to sync in folder \"%{folder}\": %{count}",
+                              identity: to_string(Accounts.drive_identity()),
+                              folder: to_string(folder),
+                              count: count
+                            )}
                           </p>
                           <ul
                             :if={sample != []}
@@ -4746,7 +5464,7 @@ defmodule AskDriveWeb.AdminLive do
                           >
                             <li :for={path <- sample}>{path}</li>
                             <li :if={count > length(sample)} class="list-none">
-                              … ほか {count - length(sample)} 件
+                              {gettext("… and %{count} more", count: count - length(sample))}
                             </li>
                           </ul>
                         </div>
@@ -4766,17 +5484,21 @@ defmodule AskDriveWeb.AdminLive do
             >
               <div>
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-cpu-chip" class="w-5 h-5 text-indigo-600" /> LLM プロバイダ
+                  <.icon name="hero-cpu-chip" class="w-5 h-5 text-indigo-600" /> {gettext(
+                    "LLM providers"
+                  )}
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  回答生成と埋め込みで別々のプロバイダを選べます。埋め込みをローカルのまま据え置くと再インデックスが不要なため、まず生成だけを切り替える構成をおすすめします。
+                  {gettext(
+                    "Answer generation and embedding can use different providers. Keeping embedding local avoids re-indexing, so we recommend switching only generation first."
+                  )}
                 </p>
               </div>
 
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <%= for {role, label, provider, model} <- [
-                      {:generation, "回答生成", @generation_provider, LLM.generation_model(@setting)},
-                      {:embedding, "埋め込み", @embedding_provider, @setting.embed_model}
+                      {:generation, gettext("Answer generation"), @generation_provider, LLM.generation_model(@setting)},
+                      {:embedding, gettext("Embedding"), @embedding_provider, @setting.embed_model}
                     ] do %>
                   <div class="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800 space-y-2">
                     <div class="flex items-center justify-between">
@@ -4789,7 +5511,7 @@ defmodule AskDriveWeb.AdminLive do
                           else: "bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
                         )
                       ]}>
-                        {if LLM.local?(provider), do: "ローカル", else: "外部 API"}
+                        {if LLM.local?(provider), do: gettext("Local"), else: gettext("External API")}
                       </span>
                     </div>
                     <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
@@ -4800,7 +5522,7 @@ defmodule AskDriveWeb.AdminLive do
                       {LLM.base_url(provider, @setting)}
                     </div>
                     <div :if={LLM.requires_api_key?(provider)} class="text-[11px] text-zinc-500">
-                      API キー: {LLM.masked_api_key(provider, @setting)}
+                      {gettext("API key: %{key}", key: LLM.masked_api_key(provider, @setting))}
                     </div>
 
                     <div class="pt-1 flex items-center gap-2">
@@ -4811,7 +5533,7 @@ defmodule AskDriveWeb.AdminLive do
                         phx-value-role={role}
                         class="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[11px] font-medium transition"
                       >
-                        接続テスト
+                        {gettext("Test connection")}
                       </button>
                     </div>
 
@@ -4832,13 +5554,15 @@ defmodule AskDriveWeb.AdminLive do
               >
                 <.icon name="hero-exclamation-triangle" class="w-4 h-4 shrink-0 mt-0.5" />
                 <span>
-                  外部 API が有効です。<strong>文書本文と質問がプロバイダに送信されます。</strong>
-                  機密文書を扱う場合は Ollama または LM Studio に戻してください。
+                  {gettext("An external API is in use.")}<strong>{gettext(
+                    "Document text and questions are sent to the provider."
+                  )}</strong>
+                  {gettext("For confidential documents, switch back to Ollama or LM Studio.")}
                 </span>
               </div>
 
               <p class="text-[11px] text-zinc-400">
-                値の変更は下の「システム・OAuth・バッチ設定」フォームから行います。
+                {gettext("Change these values in the System, OAuth and batch settings form below.")}
               </p>
             </div>
 
@@ -4846,7 +5570,9 @@ defmodule AskDriveWeb.AdminLive do
             <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-6">
               <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-indigo-600" />
-                {if @scope == :platform, do: "夜間バッチの時間帯", else: "AI・Drive・チャットの設定"}
+                {if @scope == :platform,
+                  do: gettext("Nightly batch hours"),
+                  else: gettext("AI, Drive and chat settings")}
               </h2>
 
               <.form
@@ -4866,7 +5592,9 @@ defmodule AskDriveWeb.AdminLive do
                   class="space-y-4 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
                 >
                   <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                    <.icon name="hero-cpu-chip" class="w-4 h-4 text-indigo-500" /> LLM プロバイダとモデル
+                    <.icon name="hero-cpu-chip" class="w-4 h-4 text-indigo-500" /> {gettext(
+                      "LLM providers and models"
+                    )}
                   </h3>
 
                   <%!-- Nightly batch (QA generation) --%>
@@ -4875,13 +5603,19 @@ defmodule AskDriveWeb.AdminLive do
                       <.input
                         field={@form[:batch_llm_mode]}
                         type="select"
-                        label="夜間バッチ（QA 生成）の実行方法"
-                        options={[{"ローカル LLM", "local"}, {"クラウド API", "cloud"}]}
+                        label={gettext("Run the nightly batch (QA generation) on")}
+                        options={[{gettext("Local LLM"), "local"}, {gettext("Cloud API"), "cloud"}]}
                       />
                       <p class="sm:col-span-2 text-[11px] text-zinc-500 leading-relaxed sm:pt-6">
                         {if @llm_view.batch == "cloud",
-                          do: "クラウド API は高精度・高速ですが、夜間に全チャンクの本文が API 提供元に送信され、従量課金になります。",
-                          else: "このサーバー上の Ollama または LM Studio で生成します。文書は社外に送信されません。"}
+                          do:
+                            gettext(
+                              "A cloud API is more accurate and faster, but at night the text of every chunk is sent to the API provider and billed by usage."
+                            ),
+                          else:
+                            gettext(
+                              "Generates with Ollama or LM Studio on this server. Documents are not sent outside your organization."
+                            )}
                       </p>
                     </div>
 
@@ -4895,13 +5629,13 @@ defmodule AskDriveWeb.AdminLive do
                       <.input
                         field={@form[:llm_provider]}
                         type="select"
-                        label="ローカル LLM プロバイダ"
+                        label={gettext("Local LLM provider")}
                         options={provider_options(llm_providers_for("local"))}
                       />
                       <.input
                         field={@form[:batch_model]}
                         type="text"
-                        label="ローカル LLM のモデル名"
+                        label={gettext("Local LLM model name")}
                       />
                     </div>
 
@@ -4915,19 +5649,19 @@ defmodule AskDriveWeb.AdminLive do
                       <.input
                         field={@form[:cloud_llm_provider]}
                         type="select"
-                        label="クラウド API プロバイダ"
+                        label={gettext("Cloud API provider")}
                         options={provider_options(llm_providers_for("cloud"))}
                       />
                       <.input
                         field={@form[:cloud_llm_model]}
                         type="text"
-                        label="クラウド API のモデル名"
-                        placeholder="例: Gemini のモデル名"
+                        label={gettext("Cloud API model name")}
+                        placeholder={gettext("e.g. a Gemini model name")}
                       />
                       <.input
                         field={@form[:llm_max_tokens]}
                         type="number"
-                        label="生成トークン上限"
+                        label={gettext("Max generation tokens")}
                         min="1"
                       />
                     </div>
@@ -4945,11 +5679,11 @@ defmodule AskDriveWeb.AdminLive do
                         id="chat-summary-mode"
                         name="setting[chat_summary_mode]"
                         value={@llm_view.chat}
-                        label="チャット要約の実行方法"
+                        label={gettext("Run the chat summary on")}
                         options={[
-                          {"夜間バッチと同じ", "same"},
-                          {"ローカル LLM", "local"},
-                          {"クラウド API", "cloud"}
+                          {gettext("Same as the nightly batch"), "same"},
+                          {gettext("Local LLM"), "local"},
+                          {gettext("Cloud API"), "cloud"}
                         ]}
                       />
                       <.input
@@ -4958,8 +5692,8 @@ defmodule AskDriveWeb.AdminLive do
                         type="select"
                         label={
                           if(@llm_view.chat == "cloud",
-                            do: "チャット要約のクラウド API プロバイダ",
-                            else: "チャット要約のローカル LLM プロバイダ"
+                            do: gettext("Chat summary cloud API provider"),
+                            else: gettext("Chat summary local LLM provider")
                           )
                         }
                         options={provider_options(llm_providers_for(@llm_view.chat))}
@@ -4967,16 +5701,25 @@ defmodule AskDriveWeb.AdminLive do
                       <.input
                         field={@form[:chat_summary_model]}
                         type="text"
-                        label="チャット要約モデル名"
-                        placeholder="空欄なら夜間バッチのモデル名"
+                        label={gettext("Chat summary model name")}
+                        placeholder={gettext("Blank: the nightly batch model")}
                       />
                     </div>
                     <p class="text-[11px] text-zinc-500 leading-relaxed">
                       {if @llm_view.chat_side == "cloud",
-                        do: "クラウド API で要約します。質問と検索された抜粋が API 提供元に送信されます。",
-                        else: "ローカル LLM で要約します。質問と抜粋は社外に送信されません。"}
+                        do:
+                          gettext(
+                            "Summarizes with a cloud API. Questions and the retrieved excerpts are sent to the API provider."
+                          ),
+                        else:
+                          gettext(
+                            "Summarizes with a local LLM. Questions and excerpts are not sent outside your organization."
+                          )}
                       {if @llm_view.chat != "same",
-                        do: "夜間バッチと別のプロバイダにする場合は、モデル名を指定してください。"}
+                        do:
+                          gettext(
+                            "When using a different provider from the nightly batch, enter a model name."
+                          )}
                     </p>
                   </div>
 
@@ -4986,7 +5729,7 @@ defmodule AskDriveWeb.AdminLive do
                     <.input
                       field={@form[:chat_answer_style]}
                       type="select"
-                      label="チャット要約の回答スタイル"
+                      label={gettext("Chat summary answer style")}
                       options={ChatSummary.style_options()}
                     />
                     <div class="sm:col-span-2 sm:pt-6 space-y-1">
@@ -5005,7 +5748,9 @@ defmodule AskDriveWeb.AdminLive do
                         </li>
                       </ul>
                       <p class="text-[11px] text-zinc-500 leading-relaxed">
-                        どのスタイルでも、抜粋だけを根拠にし、引用元の番号 [1] を付け、抜粋から答えられないときは「資料からは確認できませんでした。」と答えます。小さなローカルモデルでは「簡潔」以外の指示（口調・字数）が守られにくいため、クラウド API（Gemini 等）での利用をおすすめします。
+                        {gettext(
+                          "Every style answers only from the excerpts, adds source numbers such as [1], and says it could not confirm the answer in the documents when the excerpts do not answer the question. Small local models often ignore instructions other than Concise (tone, length), so a cloud API (Gemini etc.) is recommended."
+                        )}
                       </p>
                     </div>
                   </div>
@@ -5014,14 +5759,18 @@ defmodule AskDriveWeb.AdminLive do
                     <.input
                       field={@form[:embed_provider]}
                       type="select"
-                      label="埋め込みプロバイダ"
+                      label={gettext("Embedding provider")}
                       options={provider_options(LLM.embedding_providers())}
                     />
-                    <.input field={@form[:embed_model]} type="text" label="埋め込みモデル名" />
+                    <.input
+                      field={@form[:embed_model]}
+                      type="text"
+                      label={gettext("Embedding model name")}
+                    />
                     <.input
                       field={@form[:embedding_dim]}
                       type="number"
-                      label="埋め込み次元"
+                      label={gettext("Embedding dimensions")}
                       min="64"
                       max="4096"
                     />
@@ -5034,13 +5783,15 @@ defmodule AskDriveWeb.AdminLive do
                       step="0.1"
                       min="0.0"
                       max="2.0"
-                      label="temperature (空欄でプロバイダ既定値)"
+                      label={gettext("Temperature (blank: provider default)")}
                     />
                   </div>
 
                   <p class="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
                     <.icon name="hero-exclamation-triangle" class="w-3.5 h-3.5 inline" />
-                    埋め込みモデルまたは次元を変更すると、ベクトル仮想テーブルを再作成し、既存のベクトルをすべて破棄します。次回の夜間バッチで全チャンクを再ベクトル化するまで Tier 1 / Tier 2 は機能しません。
+                    {gettext(
+                      "Changing the embedding model or dimensions recreates the vector table and discards all existing vectors. Tier 1 / Tier 2 do not work until the next nightly batch re-embeds every chunk."
+                    )}
                   </p>
                 </div>
 
@@ -5052,10 +5803,14 @@ defmodule AskDriveWeb.AdminLive do
                   class="space-y-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
                 >
                   <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                    <.icon name="hero-key" class="w-4 h-4 text-indigo-500" /> プロバイダ接続情報
+                    <.icon name="hero-key" class="w-4 h-4 text-indigo-500" /> {gettext(
+                      "Provider connections"
+                    )}
                   </h3>
                   <p class="text-[11px] text-zinc-500">
-                    上で選んだプロバイダ（夜間バッチ・チャット要約・埋め込み）の接続情報だけを表示しています。API キーは暗号化して保存されます。空欄のまま保存すると既存の値を維持します。
+                    {gettext(
+                      "Only the providers chosen above (nightly batch, chat summary, embedding) are shown. API keys are stored encrypted. Leaving a field blank keeps the current value."
+                    )}
                   </p>
 
                   <div
@@ -5068,13 +5823,13 @@ defmodule AskDriveWeb.AdminLive do
                     <.input
                       field={@form[:ollama_host]}
                       type="text"
-                      label="Ollama エンドポイント"
+                      label={gettext("Ollama endpoint")}
                       placeholder={LLM.default_base_url("ollama")}
                     />
                     <.input
                       field={@form[:batch_num_ctx]}
                       type="number"
-                      label="Ollama のコンテキスト長 (num_ctx)"
+                      label={gettext("Ollama context length (num_ctx)")}
                     />
                   </div>
 
@@ -5088,7 +5843,7 @@ defmodule AskDriveWeb.AdminLive do
                     <.input
                       field={@form[:lmstudio_base_url]}
                       type="text"
-                      label="LM Studio エンドポイント"
+                      label={gettext("LM Studio endpoint")}
                       placeholder={LLM.default_base_url("lmstudio")}
                     />
                   </div>
@@ -5104,13 +5859,17 @@ defmodule AskDriveWeb.AdminLive do
                       field={@form[:anthropic_api_key]}
                       type="password"
                       value=""
-                      label={"Anthropic Claude API キー（#{LLM.masked_api_key("anthropic", @setting)}）"}
+                      label={
+                        gettext("Anthropic Claude API key (%{key})",
+                          key: LLM.masked_api_key("anthropic", @setting)
+                        )
+                      }
                       placeholder="sk-ant-..."
                     />
                     <.input
                       field={@form[:anthropic_base_url]}
                       type="text"
-                      label="Anthropic ベース URL"
+                      label={gettext("Anthropic base URL")}
                       placeholder={LLM.default_base_url("anthropic")}
                     />
                   </div>
@@ -5126,13 +5885,17 @@ defmodule AskDriveWeb.AdminLive do
                       field={@form[:gemini_api_key]}
                       type="password"
                       value=""
-                      label={"Google Gemini API キー（#{LLM.masked_api_key("gemini", @setting)}）"}
+                      label={
+                        gettext("Google Gemini API key (%{key})",
+                          key: LLM.masked_api_key("gemini", @setting)
+                        )
+                      }
                       placeholder="AIza..."
                     />
                     <.input
                       field={@form[:gemini_base_url]}
                       type="text"
-                      label="Gemini ベース URL"
+                      label={gettext("Gemini base URL")}
                       placeholder={LLM.default_base_url("gemini")}
                     />
                   </div>
@@ -5148,13 +5911,17 @@ defmodule AskDriveWeb.AdminLive do
                       field={@form[:openai_api_key]}
                       type="password"
                       value=""
-                      label={"OpenAI API キー（#{LLM.masked_api_key("openai", @setting)}）"}
+                      label={
+                        gettext("OpenAI API key (%{key})",
+                          key: LLM.masked_api_key("openai", @setting)
+                        )
+                      }
                       placeholder="sk-..."
                     />
                     <.input
                       field={@form[:openai_base_url]}
                       type="text"
-                      label="OpenAI ベース URL"
+                      label={gettext("OpenAI base URL")}
                       placeholder={LLM.default_base_url("openai")}
                     />
                   </div>
@@ -5168,7 +5935,11 @@ defmodule AskDriveWeb.AdminLive do
                     step="0.01"
                     min="0.5"
                     max="1.0"
-                    label="QA 即答（Tier 1）の類似度しきい値（既定 0.90。下げるほど生成済み QA で即答しやすく、上げるほど要約・抜粋に回る）"
+                    label={
+                      gettext(
+                        "Similarity threshold for instant QA answers (Tier 1) (default 0.90; lower answers more often from generated QA pairs, higher sends more to summary and excerpts)"
+                      )
+                    }
                   />
                 </div>
 
@@ -5176,21 +5947,25 @@ defmodule AskDriveWeb.AdminLive do
                   <.input
                     field={@form[:batch_start_hour]}
                     type="number"
-                    label="自動実行の開始時刻 (時: 0〜23。既定 0)"
+                    label={gettext("Automatic run start hour (0–23, default 0)")}
                     min="0"
                     max="23"
                   />
                   <.input
                     field={@form[:batch_end_hour]}
                     type="number"
-                    label="自動実行を開始できる最終時刻 (時: 0〜23。既定 7)"
+                    label={gettext("Latest hour an automatic run can start (0–23, default 7)")}
                     min="0"
                     max="23"
                   />
                   <.input
                     field={@form[:batch_deadline_hour]}
                     type="number"
-                    label="バッチの打ち切り時刻 (時: 0〜23。既定 8。実行中のバッチはこの時刻で QA 生成を止める)"
+                    label={
+                      gettext(
+                        "Batch cut-off hour (0–23, default 8; a running batch stops QA generation at this hour)"
+                      )
+                    }
                     min="0"
                     max="23"
                   />
@@ -5198,7 +5973,9 @@ defmodule AskDriveWeb.AdminLive do
                     id="night-order-help"
                     class="sm:col-span-2 text-[11px] text-zinc-500 leading-relaxed"
                   >
-                    窓口が複数あるときの夜間の自動実行は、1 つずつ順に 2 段階で行います。(1) すべての窓口の取り込み（同期・本文抽出・埋め込み）を、取り込み済みの割合が低い窓口から。(2) 想定QAの生成を、生成が済んでいる割合が低い窓口から。打ち切り時刻までの残り時間は、生成が残っているチャンク数に応じて窓口ごとに分け、早く終わった窓口の余りは次の窓口に回します。
+                    {gettext(
+                      "With several desks, the nightly run goes one desk at a time in two stages. (1) Ingestion (sync, text extraction, embedding) for every desk, starting with the desk with the lowest share ingested. (2) QA pair generation, starting with the desk with the lowest share generated. The time left before the cut-off is split between desks by the number of chunks still to generate, and time left over by a desk that finishes early goes to the next one."
+                    )}
                   </p>
                 </div>
 
@@ -5206,7 +5983,7 @@ defmodule AskDriveWeb.AdminLive do
                   :if={@scope == :app}
                   field={@form[:maintenance_message]}
                   type="text"
-                  label="メンテナンス告知メッセージ"
+                  label={gettext("Maintenance notice message")}
                 />
 
                 <div
@@ -5218,36 +5995,48 @@ defmodule AskDriveWeb.AdminLive do
                     id="toggle-auto-batch"
                     feature="auto_batch"
                     on={@setting.auto_batch_enabled}
-                    label="夜間の自動実行"
-                    hint="Google Drive の同期・取り込み・QA 生成を夜間枠に自動で行う。オフでも手動実行はできる。新しい窓口は設定中のためオフで始まる"
+                    label={gettext("Nightly automatic run")}
+                    hint={
+                      gettext(
+                        "Runs Google Drive sync, ingestion and QA generation automatically in the night window. Manual runs work even when off. New desks start off while being set up."
+                      )
+                    }
                   />
                   <AskDriveWeb.FeatureToggle.toggle
                     id="toggle-maintenance"
                     feature="maintenance_mode"
                     on={@setting.maintenance_mode}
-                    label="メンテナンスモード"
-                    hint="チャット画面を停止し、上の告知メッセージを表示する"
-                    confirm_on="メンテナンスモードにすると、この窓口のチャットはすぐに使えなくなります。続行しますか？"
+                    label={gettext("Maintenance mode")}
+                    hint={gettext("Stops the chat screen and shows the notice message above")}
+                    confirm_on={
+                      gettext(
+                        "Maintenance mode makes this desk's chat unavailable immediately. Continue?"
+                      )
+                    }
                   />
                   <AskDriveWeb.FeatureToggle.toggle
                     id="toggle-serve-stale"
                     feature="serve_stale_qa"
                     on={@setting.serve_stale_qa}
-                    label="無効化（Stale）された QA を警告付きで配信する"
+                    label={gettext("Serve invalidated (stale) QA pairs with a warning")}
                   />
                   <AskDriveWeb.FeatureToggle.toggle
                     id="toggle-daytime-llm"
                     feature="daytime_llm"
                     on={@setting.daytime_llm_enabled}
-                    label="営業時間中の LLM 生成を例外的に許可する"
-                    hint="RAM の消費に注意"
+                    label={gettext("Allow LLM generation during business hours as an exception")}
+                    hint={gettext("Watch RAM usage")}
                   />
                   <AskDriveWeb.FeatureToggle.toggle
                     id="toggle-chat-summary"
                     feature="chat_summary"
                     on={Map.get(@setting, :chat_summary_enabled, true)}
-                    label="チャットで検索結果の AI 要約を表示する"
-                    hint="上のチャット要約プロバイダを使用。クラウドの場合は質問と抜粋が社外に送信されます"
+                    label={gettext("Show an AI summary of search results in chat")}
+                    hint={
+                      gettext(
+                        "Uses the chat summary provider above. With a cloud provider, questions and excerpts are sent outside your organization"
+                      )
+                    }
                   />
                 </div>
 
@@ -5257,11 +6046,13 @@ defmodule AskDriveWeb.AdminLive do
                     id="save-settings-btn"
                     data-confirm={
                       @scope == :app &&
-                        "設定を保存します。埋め込みモデルまたは次元を変更した場合、ベクトルインデックスを再作成し全件の再ベクトル化が必要になります。続行しますか？"
+                        gettext(
+                          "Save the settings? If you changed the embedding model or dimensions, the vector index is recreated and everything must be re-embedded. Continue?"
+                        )
                     }
                     class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                   >
-                    設定を保存
+                    {gettext("Save settings")}
                   </button>
                 </div>
               </.form>
@@ -5277,17 +6068,19 @@ defmodule AskDriveWeb.AdminLive do
               <div>
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                   <.icon name="hero-arrow-down-tray" class="w-5 h-5 text-indigo-600" />
-                  ローカルモデル（Ollama）
+                  {gettext("Local models (Ollama)")}
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  Ollama はアプリ専用のため、モデルはここ（またはアプリの起動時）に AskDrive が取得します。設定で使うモデルが未取得なら、起動時・設定の保存時に自動で取得を始めます。
+                  {gettext(
+                    "Ollama is dedicated to this app, so AskDrive pulls models here (or when the app starts). If a model in the settings has not been pulled, pulling starts automatically at startup and when settings are saved."
+                  )}
                 </p>
               </div>
 
               <%= case @ollama_installed do %>
                 <% {:error, reason} -> %>
                   <p class="text-xs text-red-600">
-                    Ollama に接続できません: {inspect(reason)}
+                    {gettext("Cannot connect to Ollama: %{reason}", reason: inspect(reason))}
                   </p>
                 <% _ -> %>
               <% end %>
@@ -5296,9 +6089,9 @@ defmodule AskDriveWeb.AdminLive do
                 <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
                   <thead class="text-[11px] text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                     <tr>
-                      <th class="py-2 px-2">用途</th>
-                      <th class="py-2 px-2">モデル</th>
-                      <th class="py-2 px-2">状態</th>
+                      <th class="py-2 px-2">{gettext("Used for")}</th>
+                      <th class="py-2 px-2">{gettext("Model")}</th>
+                      <th class="py-2 px-2">{gettext("Status")}</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
@@ -5314,29 +6107,31 @@ defmodule AskDriveWeb.AdminLive do
                         <%= cond do %>
                           <% pull && pull.status in ["starting", "pulling"] -> %>
                             <span class="text-blue-600">
-                              取得中{if p = pull_percent(pull), do: " #{p}%"}
+                              {gettext("Pulling")}{if p = pull_percent(pull), do: " #{p}%"}
                             </span>
                           <% model_installed?(@ollama_installed, model) -> %>
-                            <span class="text-emerald-600">取得済み</span>
+                            <span class="text-emerald-600">{gettext("Pulled")}</span>
                           <% pull && pull.status == "failed" -> %>
-                            <span class="text-red-600">取得失敗: {pull.error}</span>
+                            <span class="text-red-600">{gettext("Pull failed: %{error}",
+                              error: to_string(pull.error)
+                            )}</span>
                             <button
                               type="button"
                               phx-click="pull_model"
                               phx-value-model={model}
                               class="ml-2 underline text-indigo-600"
                             >
-                              再試行
+                              {gettext("Retry")}
                             </button>
                           <% true -> %>
-                            <span class="text-amber-600">未取得</span>
+                            <span class="text-amber-600">{gettext("Not pulled")}</span>
                             <button
                               type="button"
                               phx-click="pull_model"
                               phx-value-model={model}
                               class="ml-2 underline text-indigo-600"
                             >
-                              取得
+                              {gettext("Pull")}
                             </button>
                         <% end %>
                       </td>
@@ -5353,14 +6148,14 @@ defmodule AskDriveWeb.AdminLive do
                 <input
                   type="text"
                   name="model"
-                  placeholder="例: qwen3:4b-instruct-2507-q4_K_M"
+                  placeholder={gettext("e.g. qwen3:4b-instruct-2507-q4_K_M")}
                   class="flex-1 min-w-[16rem] px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono"
                 />
                 <button
                   type="submit"
                   class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium"
                 >
-                  モデルを取得
+                  {gettext("Pull model")}
                 </button>
               </form>
 
@@ -5372,12 +6167,12 @@ defmodule AskDriveWeb.AdminLive do
                 }
                 class="text-xs text-blue-600"
               >
-                {model}: 取得中{if p = pull_percent(pull), do: " #{p}%"}
+                {model}: {gettext("Pulling")}{if p = pull_percent(pull), do: " #{p}%"}
               </div>
 
               <details :if={match?({:ok, _}, @ollama_installed)} class="text-xs">
                 <summary class="cursor-pointer text-zinc-500">
-                  取得済みのモデル（{length(elem(@ollama_installed, 1))} 件）
+                  {gettext("Pulled models (%{count})", count: length(elem(@ollama_installed, 1)))}
                 </summary>
                 <ul class="mt-1 font-mono text-[11px] text-zinc-600 dark:text-zinc-400 space-y-0.5">
                   <li :for={name <- elem(@ollama_installed, 1)}>{name}</li>
@@ -5393,10 +6188,16 @@ defmodule AskDriveWeb.AdminLive do
             >
               <div>
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-lock-closed" class="w-5 h-5 text-indigo-600" /> HTTPS（SSL 証明書）
+                  <.icon name="hero-lock-closed" class="w-5 h-5 text-indigo-600" /> {gettext(
+                    "HTTPS (SSL certificate)"
+                  )}
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  通信は HTTPS（ポート {AskDrive.SSL.https_port()}）で暗号化されます。HTTP（ポート {AskDrive.SSL.http_port()}）へのアクセスは HTTPS に転送されます（下の「ポートとリバースプロキシ」で指定したプロキシからは、HTTP のまま受け付けます）。
+                  {gettext(
+                    "Traffic is encrypted with HTTPS (port %{https_port}). Access over HTTP (port %{http_port}) is redirected to HTTPS (HTTP is still accepted from the proxies set under Ports and reverse proxies below).",
+                    https_port: AskDrive.SSL.https_port(),
+                    http_port: AskDrive.SSL.http_port()
+                  )}
                 </p>
               </div>
 
@@ -5404,47 +6205,51 @@ defmodule AskDriveWeb.AdminLive do
                 <% cert = AskDrive.SSL.current() || %{} %>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div>
-                    <span class="text-zinc-400 block">使用中の証明書</span>
+                    <span class="text-zinc-400 block">{gettext("Certificate in use")}</span>
                     <span class="font-medium text-zinc-800 dark:text-zinc-200">
                       {case cert["source"] do
                         "custom" ->
-                          "独自の証明書"
+                          gettext("Custom certificate")
 
                         "letsencrypt" ->
                           if cert["acme_staging"],
-                            do: "Let's Encrypt（テスト用 staging。ブラウザに警告が出ます）",
-                            else: "Let's Encrypt（自動更新）"
+                            do:
+                              gettext("Let's Encrypt (staging, for testing; browsers show a warning)"),
+                            else: gettext("Let's Encrypt (auto-renewed)")
 
                         "self_signed" ->
-                          "自己署名証明書（ブラウザに警告が出ます）"
+                          gettext("Self-signed certificate (browsers show a warning)")
 
                         _ ->
-                          "不明"
+                          gettext("Unknown")
                       end}
                     </span>
                   </div>
                   <div>
-                    <span class="text-zinc-400 block">有効期限</span>
+                    <span class="text-zinc-400 block">{gettext("Expiry date")}</span>
                     <span class="font-mono">{format_cert_time(cert["not_after"])}</span>
                   </div>
                   <div>
-                    <span class="text-zinc-400 block">サブジェクト / 発行者</span>
+                    <span class="text-zinc-400 block">{gettext("Subject / issuer")}</span>
                     <span class="font-mono break-all">{cert["subject"]} / {cert["issuer"]}</span>
                   </div>
                   <div>
-                    <span class="text-zinc-400 block">対象のホスト名</span>
+                    <span class="text-zinc-400 block">{gettext("Host names covered")}</span>
                     <span class="font-mono break-all">{Enum.join(cert["names"] || [], ", ")}</span>
                   </div>
                   <div>
                     <span class="text-zinc-400 block">HSTS</span>
                     <span>{if AskDrive.SSL.hsts?(),
-                      do: "有効（信頼された証明書のため）",
-                      else: "無効（自己署名・テスト用の証明書の間は送りません）"}</span>
+                      do: gettext("On (the certificate is trusted)"),
+                      else:
+                        gettext("Off (not sent while the certificate is self-signed or for testing)")}</span>
                   </div>
                 </div>
 
                 <p class="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2">
-                  管理画面が認証なしで開放されている間（POC）は、LAN 内の誰でも証明書を差し替えられます。外部公開の前に認証を有効にしてください。
+                  {gettext(
+                    "While the admin screen is open without login (POC), anyone on the LAN can replace the certificate. Turn on login before exposing it to the internet."
+                  )}
                 </p>
 
                 <form
@@ -5455,15 +6260,17 @@ defmodule AskDriveWeb.AdminLive do
                 >
                   <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                     <label class="space-y-1">
-                      <span class="block font-medium">証明書（PEM・必須）</span>
+                      <span class="block font-medium">{gettext("Certificate (PEM, required)")}</span>
                       <.live_file_input upload={@uploads.ssl_cert} class={ssl_file_input_class()} />
                     </label>
                     <label class="space-y-1">
-                      <span class="block font-medium">秘密鍵（PEM・必須）</span>
+                      <span class="block font-medium">{gettext("Private key (PEM, required)")}</span>
                       <.live_file_input upload={@uploads.ssl_key} class={ssl_file_input_class()} />
                     </label>
                     <label class="space-y-1">
-                      <span class="block font-medium">中間証明書（PEM・任意）</span>
+                      <span class="block font-medium">{gettext(
+                        "Intermediate certificate (PEM, optional)"
+                      )}</span>
                       <.live_file_input upload={@uploads.ssl_chain} class={ssl_file_input_class()} />
                     </label>
                   </div>
@@ -5487,11 +6294,13 @@ defmodule AskDriveWeb.AdminLive do
                     </p>
                   </div>
                   <label class="block text-xs space-y-1 max-w-md">
-                    <span class="block font-medium">公開するホスト名（任意。指定すると証明書に含まれているか検証します）</span>
+                    <span class="block font-medium">{gettext(
+                      "Public host name (optional; if given, checks that the certificate covers it)"
+                    )}</span>
                     <input
                       type="text"
                       name="ssl_hostname"
-                      placeholder="例: askdrive.example.com"
+                      placeholder={gettext("e.g. askdrive.example.com")}
                       class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 font-mono"
                     />
                   </label>
@@ -5501,17 +6310,21 @@ defmodule AskDriveWeb.AdminLive do
                       id="check-ssl-btn"
                       class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium"
                     >
-                      検証する
+                      {gettext("Verify")}
                     </button>
                     <button
                       :if={AskDrive.SSL.current()["source"] != "self_signed"}
                       type="button"
                       id="reset-self-signed-btn"
                       phx-click="reset_self_signed"
-                      data-confirm="独自の証明書をやめ、自己署名証明書に戻します。ブラウザに証明書の警告が出るようになります。続行しますか？"
+                      data-confirm={
+                        gettext(
+                          "Stop using the custom certificate and go back to a self-signed one? Browsers will show a certificate warning."
+                        )
+                      }
                       class="px-4 py-2 rounded-lg text-xs text-zinc-500 underline"
                     >
-                      自己署名証明書に戻す
+                      {gettext("Revert to self-signed certificate")}
                     </button>
                   </div>
                 </form>
@@ -5523,19 +6336,34 @@ defmodule AskDriveWeb.AdminLive do
                       class="text-xs rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 dark:border-emerald-900 px-3 py-2 space-y-1"
                     >
                       <p class="font-medium text-emerald-800 dark:text-emerald-200">
-                        検証に成功しました（証明書と鍵の対応・有効期限・中間証明書・TLS 接続テスト）。
+                        {gettext(
+                          "Verification succeeded (certificate and key match, expiry, intermediate certificates, TLS connection test)."
+                        )}
                       </p>
-                      <p class="font-mono break-all">{info["subject"]}（発行者: {info["issuer"]}）</p>
-                      <p class="font-mono break-all">ホスト名: {Enum.join(info["names"], ", ")}</p>
-                      <p class="font-mono">有効期限: {format_cert_time(info["not_after"])}</p>
+                      <p class="font-mono break-all">
+                        {gettext("%{subject} (issuer: %{issuer})",
+                          subject: to_string(info["subject"]),
+                          issuer: to_string(info["issuer"])
+                        )}
+                      </p>
+                      <p class="font-mono break-all">
+                        {gettext("Host names: %{names}", names: Enum.join(info["names"], ", "))}
+                      </p>
+                      <p class="font-mono">
+                        {gettext("Expires: %{date}", date: format_cert_time(info["not_after"]))}
+                      </p>
                       <button
                         type="button"
                         id="apply-ssl-btn"
                         phx-click="apply_ssl"
-                        data-confirm="この証明書を保存し、HTTPS を再起動します。接続が数秒途切れます。続行しますか？"
+                        data-confirm={
+                          gettext(
+                            "Save this certificate and restart HTTPS? Connections drop for a few seconds."
+                          )
+                        }
                         class="mt-1 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium"
                       >
-                        保存して適用（HTTPS を再起動）
+                        {gettext("Save and apply (restarts HTTPS)")}
                       </button>
                     </div>
                   <% {:error, errors} -> %>
@@ -5543,7 +6371,9 @@ defmodule AskDriveWeb.AdminLive do
                       id="ssl-check-error"
                       class="text-xs rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/40 dark:border-red-900 px-3 py-2 space-y-1 text-red-700 dark:text-red-300"
                     >
-                      <p class="font-medium">検証に失敗しました。証明書は保存していません。</p>
+                      <p class="font-medium">
+                        {gettext("Verification failed. The certificate was not saved.")}
+                      </p>
                       <p :for={e <- errors}>・{e}</p>
                     </div>
                   <% _ -> %>
@@ -5560,7 +6390,7 @@ defmodule AskDriveWeb.AdminLive do
                 />
               <% else %>
                 <p class="text-xs text-zinc-500">
-                  HTTPS は無効です（ASK_DRIVE_SSL=false）。HTTP で待ち受けています。
+                  {gettext("HTTPS is off (ASK_DRIVE_SSL=false). Listening on HTTP.")}
                 </p>
               <% end %>
 
@@ -5571,24 +6401,27 @@ defmodule AskDriveWeb.AdminLive do
                 class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3"
               >
                 <h3 class="font-semibold text-sm text-zinc-800 dark:text-zinc-200">
-                  ポートとリバースプロキシ
+                  {gettext("Ports and reverse proxies")}
                 </h3>
                 <p class="text-xs text-zinc-500 leading-relaxed">
-                  前段のリバースプロキシで HTTPS を終端する場合は、そのプロキシの IP を指定してください。指定した IP からの HTTP は転送せずに受け付け、プロキシが付ける X-Forwarded-For / X-Forwarded-Proto / X-Forwarded-Host（Cloudflare の CF-Connecting-IP）を信頼します（利用者の実際の IP をロックや記録に使います）。それ以外からの HTTP は HTTPS に転送します。判定は接続元の IP で行い、ヘッダーは信頼しません。HSTS はプロキシ側で付けてください。
+                  {gettext(
+                    "If a reverse proxy in front terminates HTTPS, enter its IP. HTTP from that IP is accepted without redirecting, and the X-Forwarded-For / X-Forwarded-Proto / X-Forwarded-Host headers it adds (CF-Connecting-IP for Cloudflare) are trusted (the user's real IP is used for lockouts and logs). HTTP from anywhere else is redirected to HTTPS. The decision uses the connecting IP, not the headers. Add HSTS on the proxy."
+                  )}
                 </p>
                 <p class="text-xs text-zinc-600 dark:text-zinc-400">
-                  この画面の接続元: <span id="peer-ip" class="font-mono">{@peer_ip || "不明"}</span>
+                  {gettext("This screen connects from:")}
+                  <span id="peer-ip" class="font-mono">{@peer_ip || gettext("Unknown")}</span>
                   <span
                     :if={@peer_ip && AskDrive.Network.trusted?(parse_ip(@peer_ip))}
                     class="text-emerald-700"
                   >
-                    （信頼するプロキシに含まれています）
+                    {gettext("(in the trusted proxies)")}
                   </span>
                 </p>
                 <form id="network-form" phx-submit="save_network" class="space-y-3">
                   <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                     <label class="space-y-1">
-                      <span class="block font-medium">HTTPS のポート</span>
+                      <span class="block font-medium">{gettext("HTTPS port")}</span>
                       <input
                         type="number"
                         name="network[https_port]"
@@ -5599,7 +6432,7 @@ defmodule AskDriveWeb.AdminLive do
                       />
                     </label>
                     <label class="space-y-1">
-                      <span class="block font-medium">HTTP のポート</span>
+                      <span class="block font-medium">{gettext("HTTP port")}</span>
                       <input
                         type="number"
                         name="network[http_port]"
@@ -5611,31 +6444,41 @@ defmodule AskDriveWeb.AdminLive do
                     </label>
                     <label class="space-y-1 col-span-2">
                       <span class="block font-medium">
-                        HTTP を受け付けるプロキシの IP（複数可・カンマ区切り、範囲は 10.0.0.0/24 の形。空欄なら無効）
+                        {gettext(
+                          "IPs of proxies to accept HTTP from (comma-separated; ranges like 10.0.0.0/24; blank: off)"
+                        )}
                       </span>
                       <input
                         type="text"
                         name="network[trusted_proxies]"
                         value={Enum.join(net.trusted_proxies, ", ")}
-                        placeholder="例: 127.0.0.1, 192.168.1.10"
+                        placeholder={gettext("e.g. 127.0.0.1, 192.168.1.10")}
                         class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 font-mono"
                       />
                     </label>
                   </div>
                   <p class="text-[11px] text-zinc-400">
-                    ポートを変更すると AskDrive の待ち受けを再起動します（数秒）。新しいポートで起動できなければ元に戻します。締め出された場合はサーバー上で
+                    {gettext(
+                      "Changing a port restarts AskDrive's listener (a few seconds). If it cannot start on the new port, it goes back. If you get locked out, run"
+                    )}
                     <code class="font-mono">./app.sh network ports-reset</code>
                     / <code class="font-mono">./app.sh network proxy-off</code>
-                    で戻せます。プロキシ（Cloudflare Tunnel 等）の中継先ポートも合わせて変更してください。
+                    {gettext(
+                      "on the server to undo it. Also change the target port on the proxy (Cloudflare Tunnel etc.)."
+                    )}
                   </p>
                   <div class="flex justify-end">
                     <button
                       type="submit"
                       id="save-network-btn"
-                      data-confirm="ポート・プロキシの設定を保存しますか？ポートを変えた場合は、新しいポートの URL で開き直す必要があります。"
+                      data-confirm={
+                        gettext(
+                          "Save the port and proxy settings? If you change a port, reopen the screen at the new port's URL."
+                        )
+                      }
                       class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm transition"
                     >
-                      保存
+                      {gettext("Save")}
                     </button>
                   </div>
                 </form>
@@ -5665,7 +6508,9 @@ defmodule AskDriveWeb.AdminLive do
             >
               <div>
                 <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-finger-print" class="w-5 h-5 text-indigo-600" /> 端末の電子証明書によるアクセス制限
+                  <.icon name="hero-finger-print" class="w-5 h-5 text-indigo-600" /> {gettext(
+                    "Restrict access to devices with a certificate"
+                  )}
                   <span
                     id="client-cert-mode"
                     class={[
@@ -5683,19 +6528,23 @@ defmodule AskDriveWeb.AdminLive do
                     ]}
                   >
                     {case cc_mode do
-                      "enforce" -> "強制"
-                      "monitor" -> "監視"
-                      _ -> "無効"
+                      "enforce" -> gettext("Enforce")
+                      "monitor" -> gettext("Monitor")
+                      _ -> gettext("Off")
                     end}
                   </span>
                 </h2>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  AskDrive が発行した電子証明書をインストールした端末（ブラウザ）だけが、ログイン画面を含むすべての画面に入れるようにします。証明書はグループ（部署など）ごとに発行し、パスワード付きの .p12 ファイルで配布します。誰であるかは従来どおりログインで確認し、証明書は「配布した端末であること」を確かめる追加の対策です。導入は「無効 → 監視 → 強制」の順に進めてください。監視では証明書を求めて記録するだけで、誰も拒否しません。
+                  {gettext(
+                    "Only devices (browsers) with a certificate issued by AskDrive can open any screen, including the login screen. Certificates are issued per group (such as a department) and handed out as password-protected .p12 files. Who the user is is still checked by login; the certificate is an extra check that the device is one you handed it to. Roll out in the order Off, Monitor, Enforce. Monitor asks for a certificate and logs it, but refuses no one."
+                  )}
                 </p>
                 <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  HTTPS で直接つなぐ構成が前提です（リバースプロキシで TLS を終端する場合は、プロキシ経由のアクセスには証明書が届きません）。締め出された場合は、サーバー上で
+                  {gettext(
+                    "This assumes clients connect over HTTPS directly (if a reverse proxy terminates TLS, certificates do not reach AskDrive through it). If you get locked out, run"
+                  )}
                   <code class="font-mono">./app.sh mtls off</code>
-                  を実行するか、サーバー自身（localhost）から開いてください。
+                  {gettext("on the server, or open the screen from the server itself (localhost).")}
                 </p>
               </div>
 
@@ -5707,18 +6556,22 @@ defmodule AskDriveWeb.AdminLive do
               >
                 <label class="block space-y-1">
                   <span class="block font-medium text-zinc-700 dark:text-zinc-300">
-                    社内 LAN の IP アドレス・範囲（ここからの接続は、証明書がなくてもログイン画面とログイン後の画面に入れます。複数可・カンマ区切り、範囲は 192.168.0.0/16 の形）
+                    {gettext(
+                      "Office LAN IP addresses and ranges (connections from these can open the login screen and the screens after login without a certificate; comma-separated; ranges like 192.168.0.0/16)"
+                    )}
                   </span>
                   <input
                     type="text"
                     name="lan"
                     value={Enum.join(@client_cert_lan, ", ")}
-                    placeholder="例: 192.168.0.0/16, 10.0.0.0/8"
+                    placeholder={gettext("e.g. 192.168.0.0/16, 10.0.0.0/8")}
                     class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 font-mono"
                   />
                 </label>
                 <p class="text-zinc-500">
-                  リバースプロキシ経由の構成では、「ポートとリバースプロキシ」にプロキシを登録してください。登録しないと、すべての接続がプロキシ（社内 LAN）からに見え、証明書なしで入れてしまいます。
+                  {gettext(
+                    "Behind a reverse proxy, add the proxy under Ports and reverse proxies. Otherwise every connection appears to come from the proxy (the office LAN) and gets in without a certificate."
+                  )}
                 </p>
                 <div class="flex justify-end">
                   <button
@@ -5726,45 +6579,73 @@ defmodule AskDriveWeb.AdminLive do
                     id="save-client-cert-lan-btn"
                     class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium"
                   >
-                    保存
+                    {gettext("Save")}
                   </button>
                 </div>
               </form>
 
               <p id="this-connection-cert" class="text-xs text-zinc-600 dark:text-zinc-400">
-                この接続の証明書: {case AskDrive.ClientCerts.check(@peer_cert) do
-                  {:ok, cert} -> "有効（グループ「#{cert.group.name}」）"
-                  :none -> if(cc_mode == "off", do: "（無効の間は確認しません）", else: "なし")
-                  :revoked -> "失効済み"
-                  :expired -> "期限切れ"
-                  :unknown -> "この AskDrive が発行したものではありません"
+                {gettext("This connection's certificate:")}
+                {case AskDrive.ClientCerts.check(@peer_cert) do
+                  {:ok, cert} ->
+                    gettext("Valid (group %{group})", group: cert.group.name)
+
+                  :none ->
+                    if(cc_mode == "off",
+                      do: gettext("(not checked while off)"),
+                      else: gettext("None")
+                    )
+
+                  :revoked ->
+                    gettext("Revoked")
+
+                  :expired ->
+                    gettext("Expired")
+
+                  :unknown ->
+                    gettext("Not issued by this AskDrive")
                 end}
                 <span
                   :if={AskDrive.Network.in_ranges?(parse_ip(@peer_ip), @client_cert_lan)}
                   id="this-connection-lan"
                   class="text-emerald-700"
                 >
-                  （社内 LAN からの接続のため、証明書なしでも入れます）
+                  {gettext("(from the office LAN, so no certificate is needed)")}
                 </span>
               </p>
 
               <div class="flex flex-wrap gap-2">
                 <button
-                  :for={{mode, label} <- [{"off", "無効"}, {"monitor", "監視"}, {"enforce", "強制"}]}
+                  :for={
+                    {mode, label} <- [
+                      {"off", gettext("Off")},
+                      {"monitor", gettext("Monitor")},
+                      {"enforce", gettext("Enforce")}
+                    ]
+                  }
                   :if={mode != cc_mode}
                   id={"client-cert-mode-#{mode}"}
                   phx-click="set_client_cert_mode"
                   phx-value-mode={mode}
                   data-confirm={
                     case mode do
-                      "enforce" -> "強制にしますか？証明書のない端末は、ログイン画面にも入れなくなります。"
-                      "off" -> "無効にしますか？証明書のない端末からも入れるようになります。"
-                      _ -> "監視にしますか？証明書を求めて記録しますが、誰も拒否しません。"
+                      "enforce" ->
+                        gettext(
+                          "Switch to Enforce? Devices without a certificate can no longer open even the login screen."
+                        )
+
+                      "off" ->
+                        gettext("Switch to Off? Devices without a certificate can get in again.")
+
+                      _ ->
+                        gettext(
+                          "Switch to Monitor? Certificates are requested and logged, but no one is refused."
+                        )
                     end
                   }
                   class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium"
                 >
-                  {label}にする
+                  {gettext("Switch to %{mode}", mode: label)}
                 </button>
               </div>
 
@@ -5775,29 +6656,35 @@ defmodule AskDriveWeb.AdminLive do
               >
                 <p class="font-semibold">
                   {if @issued_cert.again?,
-                    do: "証明書「#{@issued_cert.name}」をダウンロードできます",
-                    else: "証明書「#{@issued_cert.name}」を発行しました"}
+                    do: gettext("Certificate %{name} is ready to download", name: @issued_cert.name),
+                    else: gettext("Issued certificate %{name}", name: @issued_cert.name)}
                 </p>
                 <p class="text-zinc-600 dark:text-zinc-400">
-                  端末やブラウザでは「{@issued_cert.name}」という名前で表示されます。有効期限: {@issued_cert.expires &&
-                    AskDrive.Clock.format(@issued_cert.expires, "%Y-%m-%d")}
+                  {gettext("Devices and browsers show it as %{name}. Expires: %{expires}",
+                    name: @issued_cert.name,
+                    expires:
+                      (@issued_cert.expires && AskDrive.Clock.format(@issued_cert.expires, "%Y-%m-%d")) ||
+                        ""
+                  )}
                 </p>
                 <p>
-                  パスワード:
+                  {gettext("Password:")}
                   <span id="issued-cert-password" class="font-mono text-sm select-all">{@issued_cert.password}</span>
-                  （.p12 ファイルとは別の手段で伝えてください）
+                  {gettext("(send it separately from the .p12 file)")}
                 </p>
                 <p>
-                  配る相手の端末に合わせてダウンロードしてください（10 分間有効。いずれも端末の管理者権限なしでインストールできます。あとから一覧の「再ダウンロード」でも取得できます）:
+                  {gettext(
+                    "Download the file for the recipient's device (valid for 10 minutes; each installs without admin rights on the device; you can also get it later with Download again in the list):"
+                  )}
                 </p>
                 <div class="flex flex-wrap gap-2">
                   <a
                     :for={
                       {format, label} <- [
-                        {"windows", "Windows 用（.pfx）"},
-                        {"macos", "macOS 用（.p12）"},
-                        {"ios", "iPhone / iPad 用（.mobileconfig）"},
-                        {"android", "Android 用（.p12）"}
+                        {"windows", gettext("For Windows (.pfx)")},
+                        {"macos", gettext("For macOS (.p12)")},
+                        {"ios", gettext("For iPhone / iPad (.mobileconfig)")},
+                        {"android", gettext("For Android (.p12)")}
                       ]
                     }
                     id={"issued-cert-download-#{format}"}
@@ -5810,7 +6697,9 @@ defmodule AskDriveWeb.AdminLive do
               </div>
 
               <div class="space-y-3">
-                <h3 class="font-semibold text-sm text-zinc-800 dark:text-zinc-200">グループと証明書</h3>
+                <h3 class="font-semibold text-sm text-zinc-800 dark:text-zinc-200">
+                  {gettext("Groups and certificates")}
+                </h3>
                 <div
                   :for={group <- @client_cert_groups}
                   id={"cert-group-#{group.id}"}
@@ -5825,16 +6714,16 @@ defmodule AskDriveWeb.AdminLive do
                         phx-click={JS.toggle(to: "#issue-cert-form-#{group.id}")}
                         class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
                       >
-                        証明書を発行…
+                        {gettext("Issue certificate…")}
                       </button>
                       <button
                         :if={Enum.all?(group.certs, & &1.revoked_at)}
                         phx-click="delete_client_cert_group"
                         phx-value-group_id={group.id}
-                        data-confirm={"グループ「#{group.name}」を削除しますか？"}
+                        data-confirm={gettext("Delete group %{name}?", name: group.name)}
                         class="px-2.5 py-1 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                       >
-                        削除
+                        {gettext("Delete")}
                       </button>
                     </div>
                   </div>
@@ -5847,17 +6736,19 @@ defmodule AskDriveWeb.AdminLive do
                   >
                     <input type="hidden" name="group_id" value={group.id} />
                     <label class="space-y-1">
-                      <span class="block text-zinc-600 dark:text-zinc-400">メモ（任意・40 文字まで）</span>
+                      <span class="block text-zinc-600 dark:text-zinc-400">{gettext(
+                        "Note (optional, up to 40 characters)"
+                      )}</span>
                       <input
                         type="text"
                         name="label"
                         maxlength="40"
-                        placeholder="例: 受付の PC"
+                        placeholder={gettext("e.g. Reception PC")}
                         class="w-full px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
                       />
                     </label>
                     <label class="space-y-1">
-                      <span class="block text-zinc-600 dark:text-zinc-400">有効期限</span>
+                      <span class="block text-zinc-600 dark:text-zinc-400">{gettext("Expiry date")}</span>
                       <input
                         type="date"
                         name="expires_on"
@@ -5869,21 +6760,24 @@ defmodule AskDriveWeb.AdminLive do
                       />
                     </label>
                     <label class="space-y-1">
-                      <span class="block text-zinc-600 dark:text-zinc-400">パスワード（任意）</span>
+                      <span class="block text-zinc-600 dark:text-zinc-400">{gettext(
+                        "Password (optional)"
+                      )}</span>
                       <input
                         type="text"
                         name="password"
                         autocomplete="off"
                         spellcheck="false"
-                        placeholder="空欄なら自動生成（16 文字）"
+                        placeholder={gettext("Blank: generated (16 characters)")}
                         class="w-full px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 font-mono"
                       />
                     </label>
                     <p class="sm:col-span-3 text-[11px] text-zinc-500">
-                      端末やブラウザでは「{AskDrive.ClientCerts.display_name(group.name, nil)}」（メモを入れると「{AskDrive.ClientCerts.display_name(
-                        group.name,
-                        "メモ"
-                      )}」）と表示されます。パスワードは 8〜64 文字の半角英数字・記号です。
+                      {gettext(
+                        "Devices and browsers show %{name} (with a note: %{with_note}). The password is 8 to 64 ASCII letters, digits and symbols.",
+                        name: AskDrive.ClientCerts.display_name(group.name, nil),
+                        with_note: AskDrive.ClientCerts.display_name(group.name, gettext("note"))
+                      )}
                     </p>
                     <div class="sm:col-span-3">
                       <button
@@ -5891,7 +6785,7 @@ defmodule AskDriveWeb.AdminLive do
                         id={"issue-cert-submit-#{group.id}"}
                         class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
                       >
-                        発行する
+                        {gettext("Issue")}
                       </button>
                     </div>
                   </form>
@@ -5905,19 +6799,26 @@ defmodule AskDriveWeb.AdminLive do
                           </span>
                         </td>
                         <td class="py-1">
-                          発行 {AskDrive.Clock.format(cert.inserted_at, "%Y-%m-%d")}・期限 {cert.not_after &&
-                            AskDrive.Clock.format(cert.not_after, "%Y-%m-%d")}
+                          {gettext("Issued %{issued} · Expires %{expires}",
+                            issued: AskDrive.Clock.format(cert.inserted_at, "%Y-%m-%d"),
+                            expires:
+                              (cert.not_after && AskDrive.Clock.format(cert.not_after, "%Y-%m-%d")) ||
+                                ""
+                          )}
                         </td>
                         <td class="py-1">
-                          最終利用 {if cert.last_seen_at,
-                            do: AskDrive.Clock.format(cert.last_seen_at, "%m/%d %H:%M"),
-                            else: "—"}
+                          {gettext("Last used %{time}",
+                            time:
+                              if(cert.last_seen_at,
+                                do: AskDrive.Clock.format(cert.last_seen_at, "%m/%d %H:%M"),
+                                else: "—"
+                              )
+                          )}
                         </td>
                         <td class="py-1 text-right">
                           <%= if cert.revoked_at do %>
-                            <span class="text-red-600">失効 {AskDrive.Clock.format(
-                              cert.revoked_at,
-                              "%m/%d"
+                            <span class="text-red-600">{gettext("Revoked %{date}",
+                              date: AskDrive.Clock.format(cert.revoked_at, "%m/%d")
                             )}</span>
                           <% else %>
                             <button
@@ -5931,16 +6832,20 @@ defmodule AskDriveWeb.AdminLive do
                               phx-value-id={cert.id}
                               class="px-2 py-0.5 mr-1 rounded border border-indigo-300 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
                             >
-                              再ダウンロード
+                              {gettext("Download again")}
                             </button>
                             <button
                               id={"revoke-cert-#{cert.id}"}
                               phx-click="revoke_client_cert"
                               phx-value-id={cert.id}
-                              data-confirm="この証明書を失効させますか？インストール済みの端末からはすぐに入れなくなります。"
+                              data-confirm={
+                                gettext(
+                                  "Revoke this certificate? Devices that have it installed are locked out immediately."
+                                )
+                              }
                               class="px-2 py-0.5 rounded border border-red-300 text-red-700 hover:bg-red-50"
                             >
-                              失効
+                              {gettext("Revoke")}
                             </button>
                           <% end %>
                         </td>
@@ -5957,18 +6862,20 @@ defmodule AskDriveWeb.AdminLive do
                     type="text"
                     name="name"
                     required
-                    placeholder="グループ名（例: 経理部）"
+                    placeholder={gettext("Group name (e.g. Accounting)")}
                     class="flex-1 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950"
                   />
                   <button
                     type="submit"
                     class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium"
                   >
-                    グループを追加
+                    {gettext("Add group")}
                   </button>
                 </form>
                 <p class="text-[11px] text-zinc-400">
-                  交換するときは、同じグループで新しい証明書を発行して配り、入れ替えが済んだら古い証明書を失効させます（その間は新旧どちらでも入れます）。漏洩した場合はすぐに失効させてください。
+                  {gettext(
+                    "To replace certificates, issue and hand out new ones in the same group, then revoke the old ones once everyone has switched (both work in the meantime). If a certificate leaks, revoke it at once."
+                  )}
                 </p>
               </div>
 
@@ -5978,7 +6885,9 @@ defmodule AskDriveWeb.AdminLive do
                 class="space-y-1"
               >
                 <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300">
-                  証明書なしでアクセスしたユーザー（監視中・強制にする前に確認）
+                  {gettext(
+                    "Users who accessed without a certificate (monitoring; check before switching to Enforce)"
+                  )}
                 </h3>
                 <p
                   :for={u <- @users_without_cert}
@@ -6000,13 +6909,25 @@ defmodule AskDriveWeb.AdminLive do
     do: {:noreply, assign(socket, :drive_sync_test, result)}
 
   def handle_async(:drive_sync_test, {:exit, reason}, socket),
-    do: {:noreply, assign(socket, :drive_sync_test, {:error, "同期テストに失敗しました: #{inspect(reason)}"})}
+    do:
+      {:noreply,
+       assign(
+         socket,
+         :drive_sync_test,
+         {:error, gettext("Sync test failed: %{reason}", reason: inspect(reason))}
+       )}
 
   def handle_async(:acme_dns_test, {:ok, result}, socket),
     do: {:noreply, assign(socket, :acme_dns_test, result)}
 
   def handle_async(:acme_dns_test, {:exit, reason}, socket),
-    do: {:noreply, assign(socket, :acme_dns_test, {:error, "接続テストに失敗しました: #{inspect(reason)}"})}
+    do:
+      {:noreply,
+       assign(
+         socket,
+         :acme_dns_test,
+         {:error, gettext("Connection test failed: %{reason}", reason: inspect(reason))}
+       )}
 
   # Which redirect URIs a 「ウェブ アプリケーション」 client needs (F-349); a 「デスクトップ
   # アプリ」 client needs none for Drive sync
@@ -6014,15 +6935,17 @@ defmodule AskDriveWeb.AdminLive do
     ~H"""
     <div class="text-[11px] text-zinc-500 space-y-1">
       <p>
-        Drive 同期だけなら、種類「デスクトップ アプリ」のクライアントがおすすめです（リダイレクト URI の登録は不要）。種類が「ウェブ アプリケーション」の場合は、「承認済みのリダイレクト URI」に次を登録してください:
+        {gettext(
+          "For Drive sync only, a client of type \"Desktop app\" is recommended (no redirect URI to register). For a client of type \"Web application\", register the following under \"Authorized redirect URIs\":"
+        )}
       </p>
       <ul class="list-disc pl-5 font-mono text-indigo-600 dark:text-indigo-400">
         <li :for={uri <- AskDrive.Drive.OAuth.web_client_redirect_uris()} class="select-all">
           {uri}
         </li>
         <li class="select-all">
-          https://&lt;ホスト名&gt;:{AskDrive.SSL.https_port()}/auth/google/callback
-          <span class="font-sans text-zinc-500">（Google ログインを使う場合）</span>
+          https://&lt;{gettext("host name")}&gt;:{AskDrive.SSL.https_port()}/auth/google/callback
+          <span class="font-sans text-zinc-500">{gettext("(when using Google login)")}</span>
         </li>
       </ul>
     </div>
@@ -6084,20 +7007,36 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
-  defp drive_auth_error(:no_code), do: "認可コードが見つかりません。許可したあとのページのアドレスを、そのまま貼り付けてください。"
+  defp drive_auth_error(:no_code),
+    do:
+      gettext(
+        "No authorization code found. Paste the address of the page you see after allowing access, as it is."
+      )
 
   defp drive_auth_error(:state_mismatch),
-    do: "別の認可のアドレスです。この画面の「Google の認可ページを開く」から認可し直してください。"
+    do:
+      gettext(
+        "This address belongs to another authorization. Authorize again with \"Open Google's authorization page\" on this screen."
+      )
 
-  defp drive_auth_error({:denied, reason}), do: "Google で許可されませんでした（#{reason}）。"
+  defp drive_auth_error({:denied, reason}),
+    do: gettext("Google did not allow it (%{reason}).", reason: to_string(reason))
 
   defp drive_auth_error({:domain, domain}),
-    do: "組織のドメイン（@#{domain}）のアカウントで認可してください。"
+    do:
+      gettext("Authorize with an account in the organization's domain (@%{domain}).",
+        domain: domain
+      )
 
   defp drive_auth_error(reason) when is_binary(reason),
-    do: "トークンを取得できませんでした: #{reason}（コードは一度しか使えません。期限切れの場合は認可し直してください）"
+    do:
+      gettext(
+        "Could not get a token: %{reason} (a code can be used only once; if it has expired, authorize again)",
+        reason: reason
+      )
 
-  defp drive_auth_error(reason), do: "トークンを取得できませんでした: #{inspect(reason)}"
+  defp drive_auth_error(reason),
+    do: gettext("Could not get a token: %{reason}", reason: inspect(reason))
 
   # Whether this desk can authorize Drive by OAuth: its own client (F-346) or the platform's
   defp assign_drive_mode(socket) do
@@ -6176,42 +7115,59 @@ defmodule AskDriveWeb.AdminLive do
          sample: files |> Enum.map(& &1["path"]) |> Enum.sort() |> Enum.take(5)
        }}
     else
-      {:error, "HTTP 404" <> _} -> {:error, folder_not_found_hint(setting)}
-      {:error, reason} -> {:error, "同期フォルダを読み取れませんでした: #{inspect(reason)}"}
+      {:error, "HTTP 404" <> _} ->
+        {:error, folder_not_found_hint(setting)}
+
+      {:error, reason} ->
+        {:error, gettext("Could not read the sync folder: %{reason}", reason: inspect(reason))}
     end
   rescue
-    e -> {:error, "同期テストに失敗しました: #{Exception.message(e)}"}
+    e -> {:error, gettext("Sync test failed: %{reason}", reason: Exception.message(e))}
   end
 
   # A token alone proves only that Google accepted the key (and the delegation). What sync
   # actually needs is read access to the folder, which is exactly what failed with a bare
   # 404 when an org-only shared drive refused the service account — so check that too.
   defp check_drive_folder(%{drive_folder_id: folder_id}) when folder_id in [nil, ""] do
-    {:ok, "トークンの取得に成功しました（#{Accounts.drive_identity()}）。同期フォルダが未設定のため、フォルダの読み取りは確認していません。"}
+    {:ok,
+     gettext(
+       "Got a token (%{identity}). No sync folder is set, so reading the folder was not checked.",
+       identity: to_string(Accounts.drive_identity())
+     )}
   end
 
   defp check_drive_folder(%{drive_folder_id: folder_id} = setting) do
     case Client.get_metadata(folder_id) do
       {:ok, folder} ->
-        {:ok, "接続に成功しました（#{Accounts.drive_identity()}）。同期フォルダ「#{folder["name"]}」を読み取れます。"}
+        {:ok,
+         gettext("Connected (%{identity}). The sync folder \"%{folder}\" can be read.",
+           identity: to_string(Accounts.drive_identity()),
+           folder: to_string(folder["name"])
+         )}
 
       {:error, "HTTP 404" <> _} ->
         {:error, folder_not_found_hint(setting)}
 
       {:error, reason} ->
-        {:error, "トークンは取得できましたが、同期フォルダを読み取れませんでした: #{inspect(reason)}"}
+        {:error,
+         gettext("Got a token, but could not read the sync folder: %{reason}",
+           reason: inspect(reason)
+         )}
     end
   end
 
   defp folder_not_found_hint(%{drive_impersonate_email: subject})
        when is_binary(subject) and subject != "" do
-    "トークンは取得できましたが、#{subject} には同期フォルダの閲覧権限がありません。そのユーザーにフォルダ（または共有ドライブ）へのアクセス権を付与してください。"
+    gettext(
+      "Got a token, but %{user} has no permission to view the sync folder. Give that user access to the folder (or the shared drive).",
+      user: subject
+    )
   end
 
   defp folder_not_found_hint(_setting) do
-    "トークンは取得できましたが、同期フォルダを読み取れません（Drive は権限のないファイルを「見つからない」と返します）。" <>
-      "フォルダをサービスアカウントに共有してください。社内限定の共有ドライブでサービスアカウントを追加できない場合は、" <>
-      "下の「アクセスユーザー」を設定してドメイン全体の委任を使ってください。"
+    gettext(
+      "Got a token, but the sync folder can't be read (Drive reports files you have no permission for as \"not found\"). Share the folder with the service account. If an organization-only shared drive doesn't let you add the service account, set the \"Access user\" below and use domain-wide delegation."
+    )
   end
 
   defp service_account_client_id(%{drive_service_account_json: json})
@@ -6236,19 +7192,19 @@ defmodule AskDriveWeb.AdminLive do
     |> Enum.sum()
   end
 
-  defp phase_label("sync"), do: "同期"
-  defp phase_label("embed_chunks"), do: "取り込み"
-  defp phase_label("generate"), do: "生成"
+  defp phase_label("sync"), do: gettext("Sync")
+  defp phase_label("embed_chunks"), do: gettext("Ingestion")
+  defp phase_label("generate"), do: gettext("Generation")
   defp phase_label(other), do: other
 
-  defp item_status_label("created"), do: "新規"
-  defp item_status_label("updated"), do: "更新"
-  defp item_status_label("unchanged"), do: "変更なし"
-  defp item_status_label("deleted"), do: "削除"
-  defp item_status_label("indexed"), do: "取り込み完了"
-  defp item_status_label("empty"), do: "本文なし"
-  defp item_status_label("skipped"), do: "対象外"
-  defp item_status_label("failed"), do: "失敗"
+  defp item_status_label("created"), do: gettext("New")
+  defp item_status_label("updated"), do: gettext("Updated")
+  defp item_status_label("unchanged"), do: gettext("Unchanged")
+  defp item_status_label("deleted"), do: gettext("Deleted")
+  defp item_status_label("indexed"), do: gettext("Ingested")
+  defp item_status_label("empty"), do: gettext("No text")
+  defp item_status_label("skipped"), do: gettext("Skipped")
+  defp item_status_label("failed"), do: gettext("Failed")
   defp item_status_label(other), do: other
 
   defp item_status_class("failed"),
@@ -6262,14 +7218,14 @@ defmodule AskDriveWeb.AdminLive do
 
   defp item_status_class(_), do: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
 
-  defp status_label("completed"), do: "完了"
-  defp status_label("running"), do: "実行中"
-  defp status_label("waiting"), do: "生成待ち（取り込み済み）"
-  defp status_label("aborted"), do: "中断（再起動）"
-  defp status_label("failed"), do: "失敗"
-  defp status_label("deadline_reached"), do: "時間切れ"
-  defp status_label("stopped"), do: "停止（手動）"
-  defp status_label("skipped"), do: "未実行（API キー未設定）"
+  defp status_label("completed"), do: gettext("Completed")
+  defp status_label("running"), do: gettext("Running")
+  defp status_label("waiting"), do: gettext("Waiting for generation (ingested)")
+  defp status_label("aborted"), do: gettext("Aborted (restart)")
+  defp status_label("failed"), do: gettext("Failed")
+  defp status_label("deadline_reached"), do: gettext("Out of time")
+  defp status_label("stopped"), do: gettext("Stopped (manual)")
+  defp status_label("skipped"), do: gettext("Not run (API key not set)")
   defp status_label(other), do: other
 
   defp status_class("completed"),
@@ -6292,16 +7248,16 @@ defmodule AskDriveWeb.AdminLive do
 
   defp status_class(_), do: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
 
-  defp trigger_label("auto"), do: "自動"
-  defp trigger_label(_), do: "手動"
+  defp trigger_label("auto"), do: gettext("Auto")
+  defp trigger_label(_), do: gettext("Manual")
 
   defp pad2(n), do: n |> Integer.to_string() |> String.pad_leading(2, "0")
 
   # An aborted run's finished_at is when the next boot noticed it, not when it stopped.
-  defp duration_label(%{status: "aborted"}), do: "—（中断）"
+  defp duration_label(%{status: "aborted"}), do: gettext("— (aborted)")
 
   defp duration_label(%{started_at: s, finished_at: nil}) when not is_nil(s) do
-    "#{format_seconds(DateTime.diff(DateTime.utc_now(), s))}〜"
+    gettext("%{duration} so far", duration: format_seconds(DateTime.diff(DateTime.utc_now(), s)))
   end
 
   defp duration_label(%{started_at: s, finished_at: f}) when not is_nil(s) and not is_nil(f),
@@ -6402,9 +7358,17 @@ defmodule AskDriveWeb.AdminLive do
   # typos (F-1115): with Secure LDAP on, every address must exist in the directory
   defp check_directory(emails) do
     case AskDrive.Ldap.unknown_emails(Settings.platform_setting!(), emails) do
-      {:ok, []} -> :ok
-      {:ok, missing} -> {:error, "ディレクトリ（Google Workspace）に見つかりません: #{Enum.join(missing, "、")}"}
-      :skip -> :ok
+      {:ok, []} ->
+        :ok
+
+      {:ok, missing} ->
+        {:error,
+         gettext("Not found in the directory (Google Workspace): %{emails}",
+           emails: join_list(missing)
+         )}
+
+      :skip ->
+        :ok
     end
   end
 
@@ -6425,10 +7389,22 @@ defmodule AskDriveWeb.AdminLive do
         else: []
 
     cond do
-      emails == [] -> {:error, "管理者のメールアドレスを入力してください。"}
-      bad != [] -> {:error, "メールアドレスとして読み取れません: #{Enum.join(bad, "、")}"}
-      outside != [] -> {:error, "@#{domain} 以外のアドレスは指定できません: #{Enum.join(outside, "、")}"}
-      true -> {:ok, emails}
+      emails == [] ->
+        {:error, gettext("Enter the administrators' email addresses.")}
+
+      bad != [] ->
+        {:error,
+         gettext("Can't read these as email addresses: %{values}", values: join_list(bad))}
+
+      outside != [] ->
+        {:error,
+         gettext("Addresses outside @%{domain} can't be used: %{emails}",
+           domain: domain,
+           emails: join_list(outside)
+         )}
+
+      true ->
+        {:ok, emails}
     end
   end
 
@@ -6437,6 +7413,7 @@ defmodule AskDriveWeb.AdminLive do
 
   defp set_feature(feature, on?, socket) when is_map_key(@setting_toggles, feature) do
     {field, label} = @setting_toggles[feature]
+    label = Gettext.gettext(AskDriveWeb.Gettext, label)
 
     case Settings.update_setting(socket.assigns.setting, %{field => on?}) do
       {:ok, updated} -> {:ok, refresh_setting(socket, updated), label}
@@ -6445,10 +7422,10 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   defp set_feature("oauth_login", on?, socket) do
-    label = "Google ログイン"
+    label = gettext("Google login")
 
     if on? and not AskDrive.Drive.OAuth.client_configured?() do
-      {:error, "先に OAuth クライアント ID とシークレットを保存してください", label}
+      {:error, gettext("Save the OAuth client ID and secret first"), label}
     else
       case Settings.update_setting(socket.assigns.setting, %{oauth_login_enabled: on?}) do
         {:ok, updated} -> {:ok, refresh_setting(socket, updated), label}
@@ -6461,15 +7438,15 @@ defmodule AskDriveWeb.AdminLive do
     case Settings.update_ldap(socket.assigns.setting, %{"ldap_enabled" => to_string(on?)}) do
       {:ok, updated} ->
         {:ok, socket |> refresh_setting(updated) |> assign(:ldap_form, ldap_form(updated)),
-         "LDAP でのログイン"}
+         gettext("Sign-in with LDAP")}
 
       {:error, changeset} ->
-        {:error, changeset_messages(changeset), "LDAP でのログイン"}
+        {:error, changeset_messages(changeset), gettext("Sign-in with LDAP")}
     end
   end
 
   defp set_feature("access_password", on?, socket) do
-    label = "パスワードによる利用制限"
+    label = gettext("Restrict access by password")
 
     result =
       if on?,
@@ -6478,13 +7455,13 @@ defmodule AskDriveWeb.AdminLive do
 
     case result do
       {:ok, updated} -> {:ok, socket |> assign(:setting, updated) |> load_dashboard_data(), label}
-      {:error, :no_password} -> {:error, "先にパスワードを保存してください", label}
+      {:error, :no_password} -> {:error, gettext("Save a password first"), label}
       {:error, reason} -> {:error, inspect(reason), label}
     end
   end
 
   defp set_feature("gateway", on?, socket) do
-    label = "API ゲートウェイの確認"
+    label = gettext("API gateway check")
     current = AskDrive.Gateway.settings()
     problems = if on?, do: AskDrive.Gateway.enable_problems(current), else: []
 
@@ -6499,7 +7476,7 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   defp set_feature("acme", on?, socket) do
-    label = "Let's Encrypt の自動更新"
+    label = gettext("Let's Encrypt automatic renewal")
 
     case Settings.set_acme_enabled(socket.assigns.setting, on?) do
       {:ok, updated} ->
@@ -6510,7 +7487,8 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
-  defp set_feature(_feature, _on?, _socket), do: {:error, "不明な機能です", "この機能"}
+  defp set_feature(_feature, _on?, _socket),
+    do: {:error, gettext("Unknown feature"), gettext("This feature")}
 
   defp refresh_setting(socket, updated),
     do:
@@ -6567,17 +7545,23 @@ defmodule AskDriveWeb.AdminLive do
     assign(socket, :ldap_pending, pending)
   end
 
+  # a list of addresses / values in a message ("、" in Japanese)
+  defp join_list(items), do: Enum.join(items, gettext(", "))
+
   defp changeset_messages(changeset) do
     changeset
-    |> Ecto.Changeset.traverse_errors(fn {msg, _} -> msg end)
+    |> Ecto.Changeset.traverse_errors(&translate_error/1)
     |> Map.values()
     |> List.flatten()
     |> Enum.join("／")
   end
 
-  defp eta_label(sec) when sec < 60, do: "1 分未満"
-  defp eta_label(sec) when sec < 3600, do: "約 #{div(sec + 59, 60)} 分"
-  defp eta_label(sec), do: "約 #{div(sec, 3600)} 時間 #{div(rem(sec, 3600), 60)} 分"
+  defp eta_label(sec) when sec < 60, do: gettext("Less than 1 min")
+  defp eta_label(sec) when sec < 3600, do: gettext("About %{min} min", min: div(sec + 59, 60))
+
+  defp eta_label(sec),
+    do:
+      gettext("About %{hours} h %{min} min", hours: div(sec, 3600), min: div(rem(sec, 3600), 60))
 
   # Progress.overview plus, while generating, whether the pace reaches the cut-off time.
   # The overall percentage is by expected time, from earlier runs' phase times (F-354).
@@ -6605,9 +7589,13 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
-  defp format_seconds(sec) when sec < 60, do: "#{sec}秒"
-  defp format_seconds(sec) when sec < 3600, do: "#{div(sec, 60)}分#{rem(sec, 60)}秒"
-  defp format_seconds(sec), do: "#{div(sec, 3600)}時間#{div(rem(sec, 3600), 60)}分"
+  defp format_seconds(sec) when sec < 60, do: gettext("%{sec}s", sec: sec)
+
+  defp format_seconds(sec) when sec < 3600,
+    do: gettext("%{min}m %{sec}s", min: div(sec, 60), sec: rem(sec, 60))
+
+  defp format_seconds(sec),
+    do: gettext("%{hours}h %{min}m", hours: div(sec, 3600), min: div(rem(sec, 3600), 60))
 
   # Installed / required Ollama models and download progress for the settings screen.
   defp assign_ollama_models(socket) do
@@ -6645,9 +7633,12 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
-  defp upload_error_label(:too_large), do: "ファイルが大きすぎます"
-  defp upload_error_label(:not_accepted), do: "PEM 形式（.pem / .crt / .cer / .key）のファイルを選んでください"
-  defp upload_error_label(:too_many_files), do: "1 ファイルだけ選んでください"
+  defp upload_error_label(:too_large), do: gettext("The file is too large")
+
+  defp upload_error_label(:not_accepted),
+    do: gettext("Choose a PEM file (.pem / .crt / .cer / .key)")
+
+  defp upload_error_label(:too_many_files), do: gettext("Choose only one file")
   defp upload_error_label(other), do: inspect(other)
 
   # The page that clicked "apply" is gone after the endpoint restart; a failure (rolled back
@@ -6678,7 +7669,10 @@ defmodule AskDriveWeb.AdminLive do
        else:
          {:error,
           [
-            "この接続（#{socket.assigns.peer_ip || "不明"}）が拒否されるようになります。ゲートウェイ経由で開き直すか、サーバー自身（localhost）から操作するか、この IP を「直接アクセスを許可する IP」に保存してください"
+            gettext(
+              "This connection (%{ip}) would be refused. Reopen the page through the gateway, do this from the server itself (localhost), or save this IP under \"IPs allowed direct access\"",
+              ip: socket.assigns.peer_ip || gettext("unknown")
+            )
           ]}
   end
 
@@ -6773,7 +7767,12 @@ defmodule AskDriveWeb.AdminLive do
         {:noreply, assign(socket, :app_form, to_form(Map.put(cs, :action, :insert), as: :app))}
 
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "窓口を作成できませんでした: #{inspect(reason)}")}
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Could not create the desk: %{reason}", reason: inspect(reason))
+         )}
     end
   end
 
@@ -6782,14 +7781,17 @@ defmodule AskDriveWeb.AdminLive do
 
   defp slug_preview(form) do
     case form[:slug].value |> to_string() |> String.trim() |> String.downcase() do
-      "" -> "（URL 名）"
+      "" -> gettext("(URL name)")
       slug -> slug
     end
   end
 
   # no authorization started (no OAuth client yet): nothing to complete the pasted address with
   defp finish_drive_auth(%{assigns: %{drive_auth: nil}} = socket) do
-    message = "先に OAuth クライアントを設定し、「Google の認可画面を開く」から認可してください。"
+    message =
+      gettext(
+        "Set up an OAuth client first, then authorize with \"Open Google's authorization screen\"."
+      )
 
     {:noreply,
      socket |> assign(:drive_auth_result, {:error, message}) |> put_flash(:error, message)}
@@ -6817,8 +7819,17 @@ defmodule AskDriveWeb.AdminLive do
          socket
          |> assign(:drive_auth_code, "")
          |> assign(:drive_auth, nil)
-         |> assign(:drive_auth_result, {:ok, "#{account.email} と連携しました。"})
-         |> put_flash(:info, "Google Drive 同期アカウント（#{account.email}）と連携しました。「同期テスト」で確認してください。")
+         |> assign(
+           :drive_auth_result,
+           {:ok, gettext("Connected %{email}.", email: account.email)}
+         )
+         |> put_flash(
+           :info,
+           gettext(
+             "Connected the Google Drive sync account (%{email}). Check it with \"Test sync\".",
+             email: account.email
+           )
+         )
          |> load_dashboard_data()}
 
       {:error, reason} ->
@@ -6853,7 +7864,9 @@ defmodule AskDriveWeb.AdminLive do
        put_flash(
          socket,
          :error,
-         "アクセスユーザーは組織のドメイン（@#{domain}）のアドレスを指定してください。"
+         gettext("The access user must be an address in the organization's domain (@%{domain}).",
+           domain: domain
+         )
        )}
     else
       save_drive_settings(socket, attrs)
@@ -6869,13 +7882,16 @@ defmodule AskDriveWeb.AdminLive do
          |> assign_settings_form(updated)
          |> assign(:service_account_test, nil)
          |> assign_drive_mode()
-         |> put_flash(:info, "Google Drive 同期設定を保存しました。")}
+         |> put_flash(:info, gettext("Google Drive sync settings saved."))}
 
       {:error, changeset} ->
         {:noreply,
          socket
          |> assign(:form, to_form(changeset))
-         |> put_flash(:error, "保存に失敗しました: " <> changeset_messages(changeset))}
+         |> put_flash(
+           :error,
+           gettext("Save failed: %{errors}", errors: changeset_messages(changeset))
+         )}
     end
   end
 end

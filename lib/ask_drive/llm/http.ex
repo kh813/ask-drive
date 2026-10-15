@@ -15,6 +15,7 @@ defmodule AskDrive.LLM.HTTP do
   (spec 9.6 N-606).
   """
   require Logger
+  use Gettext, backend: AskDriveWeb.Gettext
 
   @max_attempts 3
   # Rate limits (429) get more attempts and honour the provider's own wait hint: Gemini's
@@ -141,13 +142,26 @@ defmodule AskDrive.LLM.HTTP do
   @doc """
   Renders an error tuple as a short, user-facing Japanese hint for the admin dashboard.
   """
-  def describe({:unauthorized, msg}), do: "認証に失敗しました。API キーを確認してください (#{msg})"
-  def describe({:rate_limited, msg}), do: "レート制限に達しました (#{msg})"
-  def describe({:model_not_found, msg}), do: "モデルが見つかりません。モデル名を確認してください (#{msg})"
-  def describe({:server_error, msg}), do: "プロバイダ側のエラーです (#{msg})"
-  def describe({:timeout, msg}), do: "タイムアウトしました (#{msg})"
-  def describe({:network, _reason}), do: "接続できませんでした。エンドポイントの疎通を確認してください"
-  def describe({:invalid_response, msg}), do: "想定外の応答です (#{msg})"
+  def describe({:unauthorized, msg}),
+    do: gettext("Authentication failed. Check the API key (%{detail})", detail: to_string(msg))
+
+  def describe({:rate_limited, msg}),
+    do: gettext("Rate limit reached (%{detail})", detail: to_string(msg))
+
+  def describe({:model_not_found, msg}),
+    do: gettext("Model not found. Check the model name (%{detail})", detail: to_string(msg))
+
+  def describe({:server_error, msg}),
+    do: gettext("Error on the provider's side (%{detail})", detail: to_string(msg))
+
+  def describe({:timeout, msg}), do: gettext("Timed out (%{detail})", detail: to_string(msg))
+
+  def describe({:network, _reason}),
+    do: gettext("Could not connect. Check that the endpoint is reachable")
+
+  def describe({:invalid_response, msg}),
+    do: gettext("Unexpected response (%{detail})", detail: to_string(msg))
+
   def describe({:unsupported, msg}), do: msg
   def describe(other), do: inspect(other)
 

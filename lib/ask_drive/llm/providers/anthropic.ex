@@ -7,6 +7,8 @@ defmodule AskDrive.LLM.Providers.Anthropic do
   """
   @behaviour AskDrive.LLM.Provider
 
+  use Gettext, backend: AskDriveWeb.Gettext
+
   alias AskDrive.LLM.HTTP
 
   @default_base_url "https://api.anthropic.com"
@@ -62,7 +64,11 @@ defmodule AskDrive.LLM.Providers.Anthropic do
 
   @impl true
   def embed(_model, _inputs, _opts \\ []) do
-    {:error, {:unsupported, "Claude API は埋め込みに対応していません。埋め込みには別のプロバイダを選択してください。"}}
+    {:error,
+     {:unsupported,
+      gettext(
+        "The Claude API does not support embeddings. Choose another provider for embedding."
+      )}}
   end
 
   @impl true

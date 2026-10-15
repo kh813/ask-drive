@@ -10,6 +10,7 @@ defmodule AskDrive.Accounts do
     * `AskDrive.Accounts.User` — the people who sign in, with an `admin` / `user` role.
       No tokens are kept; sign-in only establishes identity.
   """
+  use Gettext, backend: AskDriveWeb.Gettext
   import Ecto.Query, warn: false
 
   alias AskDrive.Accounts.{AppAdmin, GoogleAccount, User}
@@ -156,7 +157,7 @@ defmodule AskDrive.Accounts do
       when is_binary(json) and json != "" ->
         case {ServiceAccount.parse(json), setting.drive_impersonate_email} do
           {{:ok, _}, subject} when is_binary(subject) and subject != "" ->
-            "#{subject}（サービスアカウントによる委任）"
+            gettext("%{subject} (delegated via service account)", subject: subject)
 
           {{:ok, %{client_email: email}}, _} ->
             email
