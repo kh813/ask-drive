@@ -94,6 +94,7 @@ defmodule AskDriveWeb.AdminLive do
      |> assign(:setting, setting)
      |> assign(:ldap_form, ldap_form(setting))
      |> assign(:form, form)
+     |> assign(:llm_view, llm_view(setting))
      |> assign(:trigger_batch_loading, false)
      |> assign(:connection_test, %{})
      |> assign(:service_account_test, nil)
@@ -326,7 +327,7 @@ defmodule AskDriveWeb.AdminLive do
           {:noreply,
            socket
            |> assign(:setting, updated)
-           |> assign(:form, to_form(Settings.change_setting(updated)))
+           |> assign_settings_form(updated)
            |> assign(:ldap_form, ldap_form(updated))
            |> assign(:ldap_pending, %{})
            |> put_flash(:info, "LDAP ログインの設定を保存しました。")}
@@ -590,7 +591,7 @@ defmodule AskDriveWeb.AdminLive do
     {:noreply,
      socket
      |> assign(:setting, updated)
-     |> assign(:form, to_form(Settings.change_setting(updated)))
+     |> assign_settings_form(updated)
      |> put_flash(
        :info,
        if(on?,
@@ -825,7 +826,7 @@ defmodule AskDriveWeb.AdminLive do
         {:noreply,
          socket
          |> assign(:setting, updated)
-         |> assign(:form, to_form(Settings.change_setting(updated)))
+         |> assign_settings_form(updated)
          |> assign(:notify_test, nil)
          |> put_flash(:info, "Google Chat の通知先を保存しました。「テスト送信」で確認できます。")}
 
@@ -859,7 +860,7 @@ defmodule AskDriveWeb.AdminLive do
     {:noreply,
      socket
      |> assign(:setting, updated)
-     |> assign(:form, to_form(Settings.change_setting(updated)))
+     |> assign_settings_form(updated)
      |> assign(:notify_test, nil)
      |> put_flash(:info, "Google Chat の通知先を削除しました。")}
   end
@@ -915,7 +916,16 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   @impl true
+  # Which provider fields the AI settings show follows the form as it is edited, before it is
+  # saved: only the selected side's (local or cloud) fields are shown.
+  def handle_event("settings_change", %{"setting" => params}, socket) do
+    {:noreply, assign(socket, :llm_view, llm_view_from_params(params, socket.assigns.llm_view))}
+  end
+
+  def handle_event("settings_change", _params, socket), do: {:noreply, socket}
+
   def handle_event("save_settings", %{"setting" => setting_params}, socket) do
+    setting_params = normalize_chat_summary_params(setting_params)
     # `vec0` fixes the vector width at CREATE time, so a new embedding model or dimension
     # means dropping and rebuilding the index before anything can be re-embedded (F-809).
     reindex? = Settings.reindex_required?(socket.assigns.setting, setting_params)
@@ -942,7 +952,7 @@ defmodule AskDriveWeb.AdminLive do
         {:noreply,
          socket
          |> assign(:setting, updated)
-         |> assign(:form, to_form(Settings.change_setting(updated)))
+         |> assign_settings_form(updated)
          |> put_flash(:info, message)
          |> load_dashboard_data()}
 
@@ -950,6 +960,7 @@ defmodule AskDriveWeb.AdminLive do
         {:noreply,
          socket
          |> assign(:form, to_form(changeset))
+         |> assign(:llm_view, llm_view_from_params(setting_params, socket.assigns.llm_view))
          |> put_flash(:error, "設定の保存に失敗しました。入力内容を確認してください。")}
     end
   end
@@ -970,7 +981,7 @@ defmodule AskDriveWeb.AdminLive do
         {:noreply,
          socket
          |> assign(:setting, updated)
-         |> assign(:form, to_form(Settings.change_setting(updated)))
+         |> assign_settings_form(updated)
          |> assign(:service_account_test, nil)
          |> assign_drive_mode()}
 
@@ -1384,6 +1395,95 @@ defmodule AskDriveWeb.AdminLive do
   defp provider_options(providers) do
     Enum.map(providers, fn provider -> {LLM.label(provider), provider} end)
   end
+
+  defp assign_settings_form(socket, setting) do
+    socket
+    |> assign(:form, to_form(Settings.change_setting(setting)))
+    |> assign(:llm_view, llm_view(setting))
+  end
+
+  # --- Local or cloud: which AI fields the settings form shows ---------------------------
+
+  @local_llm_providers Enum.filter(
+                         AskDrive.Settings.Setting.generation_providers(),
+                         &LLM.local?/1
+                       )
+  @cloud_llm_providers AskDrive.Settings.Setting.cloud_providers()
+
+  defp llm_providers_for("local"), do: @local_llm_providers
+  defp llm_providers_for(_cloud), do: @cloud_llm_providers
+
+  # The nightly batch's and the chat summary's choice of local or cloud, the providers chosen
+  # on each side, and the embedding provider.
+  defp llm_view(setting) do
+    chat_provider = setting.chat_summary_provider
+
+    chat =
+      cond do
+        chat_provider in [nil, ""] -> "same"
+        LLM.local?(chat_provider) -> "local"
+        true -> "cloud"
+      end
+
+    build_llm_view(%{
+      batch: if(setting.batch_llm_mode == "cloud", do: "cloud", else: "local"),
+      local: setting.llm_provider,
+      cloud: setting.cloud_llm_provider,
+      chat: chat,
+      chat_provider: chat_provider,
+      embed: LLM.embedding_provider(setting)
+    })
+  end
+
+  defp llm_view_from_params(params, current) do
+    build_llm_view(%{
+      batch: if(params["batch_llm_mode"] == "cloud", do: "cloud", else: "local"),
+      local: params["llm_provider"] || current.local,
+      cloud: params["cloud_llm_provider"] || current.cloud,
+      chat:
+        if(params["chat_summary_mode"] in ~w(same local cloud),
+          do: params["chat_summary_mode"],
+          else: current.chat
+        ),
+      chat_provider: params["chat_summary_provider"] || current.chat_provider,
+      embed: params["embed_provider"] || current.embed
+    })
+  end
+
+  # A provider that isn't on the chosen side (the select is about to list the other side's)
+  # becomes that side's first, as the browser will show it.
+  defp build_llm_view(view) do
+    local = pick(view.local, @local_llm_providers)
+    cloud = pick(view.cloud, @cloud_llm_providers)
+    batch_provider = if view.batch == "cloud", do: cloud, else: local
+
+    chat_provider =
+      if view.chat == "same",
+        do: batch_provider,
+        else: pick(view.chat_provider, llm_providers_for(view.chat))
+
+    chat_side =
+      if view.chat == "same", do: view.batch, else: view.chat
+
+    %{
+      view
+      | local: local,
+        cloud: cloud,
+        chat_provider: chat_provider
+    }
+    |> Map.merge(%{
+      chat_side: chat_side,
+      in_use: Enum.uniq([batch_provider, chat_provider, view.embed])
+    })
+  end
+
+  defp pick(provider, providers), do: if(provider in providers, do: provider, else: hd(providers))
+
+  # 「夜間バッチと同じ」 is stored as no chat summary provider of its own.
+  defp normalize_chat_summary_params(%{"chat_summary_mode" => "same"} = params),
+    do: params |> Map.delete("chat_summary_mode") |> Map.put("chat_summary_provider", "")
+
+  defp normalize_chat_summary_params(params), do: Map.delete(params, "chat_summary_mode")
 
   defp load_dashboard_data(socket) do
     # 1. Batch history (spec F-338): recent runs, the one being inspected (latest unless the
@@ -4749,85 +4849,134 @@ defmodule AskDriveWeb.AdminLive do
                 {if @scope == :platform, do: "夜間バッチの時間帯", else: "AI・Drive・チャットの設定"}
               </h2>
 
-              <.form for={@form} id="settings-form" phx-submit="save_settings" class="space-y-5">
-                <%!-- LLM Provider Selection --%>
+              <.form
+                for={@form}
+                id="settings-form"
+                phx-change="settings_change"
+                phx-submit="save_settings"
+                class="space-y-5"
+              >
+                <%!-- LLM Provider Selection. The nightly batch and the chat summary each run on
+                      a local LLM or a cloud API (spec F-821, F-415); only the chosen side's fields
+                      are shown (F-833). The other side's are hidden, not removed, so their saved
+                      values are kept and switching back doesn't mean retyping them. --%>
                 <div
                   :if={@scope == :app}
-                  class="space-y-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
+                  id="llm-settings"
+                  class="space-y-4 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
                 >
                   <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                     <.icon name="hero-cpu-chip" class="w-4 h-4 text-indigo-500" /> LLM プロバイダとモデル
                   </h3>
 
-                  <%!-- Nightly batch: local LLM or cloud API (spec F-821). Both configurations
-                        are kept so switching doesn't mean retyping model names. --%>
-                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <.input
-                      field={@form[:batch_llm_mode]}
-                      type="select"
-                      label="夜間バッチ（QA 生成）の実行方法"
-                      options={[{"ローカル LLM", "local"}, {"クラウド API", "cloud"}]}
-                    />
-                    <.input
-                      field={@form[:llm_max_tokens]}
-                      type="number"
-                      label="生成トークン上限 (外部 API)"
-                      min="1"
-                    />
-                    <p class="text-[11px] text-zinc-500 leading-relaxed sm:pt-6">
-                      クラウド API は高精度・高速ですが、夜間に全チャンクの本文が API 提供元に送信され、従量課金になります。
-                    </p>
-                  </div>
+                  <%!-- Nightly batch (QA generation) --%>
+                  <div id="batch-llm" class="space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <.input
+                        field={@form[:batch_llm_mode]}
+                        type="select"
+                        label="夜間バッチ（QA 生成）の実行方法"
+                        options={[{"ローカル LLM", "local"}, {"クラウド API", "cloud"}]}
+                      />
+                      <p class="sm:col-span-2 text-[11px] text-zinc-500 leading-relaxed sm:pt-6">
+                        {if @llm_view.batch == "cloud",
+                          do: "クラウド API は高精度・高速ですが、夜間に全チャンクの本文が API 提供元に送信され、従量課金になります。",
+                          else: "このサーバー上の Ollama または LM Studio で生成します。文書は社外に送信されません。"}
+                      </p>
+                    </div>
 
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <.input
-                      field={@form[:llm_provider]}
-                      type="select"
-                      label="ローカル LLM プロバイダ"
-                      options={
-                        provider_options(Enum.filter(LLM.generation_providers(), &LLM.local?/1))
-                      }
-                    />
-                    <.input
-                      field={@form[:batch_model]}
-                      type="text"
-                      label="ローカル LLM のモデル名"
-                    />
-                  </div>
+                    <div
+                      id="batch-local-fields"
+                      class={[
+                        "grid grid-cols-1 sm:grid-cols-2 gap-4",
+                        @llm_view.batch != "local" && "hidden"
+                      ]}
+                    >
+                      <.input
+                        field={@form[:llm_provider]}
+                        type="select"
+                        label="ローカル LLM プロバイダ"
+                        options={provider_options(llm_providers_for("local"))}
+                      />
+                      <.input
+                        field={@form[:batch_model]}
+                        type="text"
+                        label="ローカル LLM のモデル名"
+                      />
+                    </div>
 
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <.input
-                      field={@form[:cloud_llm_provider]}
-                      type="select"
-                      label="クラウド API プロバイダ"
-                      options={provider_options(AskDrive.Settings.Setting.cloud_providers())}
-                    />
-                    <.input
-                      field={@form[:cloud_llm_model]}
-                      type="text"
-                      label="クラウド API のモデル名"
-                      placeholder="例: Gemini のモデル名"
-                    />
+                    <div
+                      id="batch-cloud-fields"
+                      class={[
+                        "grid grid-cols-1 sm:grid-cols-3 gap-4",
+                        @llm_view.batch != "cloud" && "hidden"
+                      ]}
+                    >
+                      <.input
+                        field={@form[:cloud_llm_provider]}
+                        type="select"
+                        label="クラウド API プロバイダ"
+                        options={provider_options(llm_providers_for("cloud"))}
+                      />
+                      <.input
+                        field={@form[:cloud_llm_model]}
+                        type="text"
+                        label="クラウド API のモデル名"
+                        placeholder="例: Gemini のモデル名"
+                      />
+                      <.input
+                        field={@form[:llm_max_tokens]}
+                        type="number"
+                        label="生成トークン上限"
+                        min="1"
+                      />
+                    </div>
                   </div>
 
                   <%!-- Chat answers can use their own (fast, cloud) provider while the
                         nightly batch keeps generating locally (spec F-415). --%>
-                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <.input
-                      field={@form[:chat_summary_provider]}
-                      type="select"
-                      label="チャット要約プロバイダ"
-                      prompt="回答生成と同じ"
-                      options={provider_options(LLM.generation_providers())}
-                    />
-                    <.input
-                      field={@form[:chat_summary_model]}
-                      type="text"
-                      label="チャット要約モデル名"
-                      placeholder="空欄なら生成モデル名"
-                    />
-                    <p class="text-[11px] text-zinc-500 leading-relaxed sm:pt-6">
-                      夜間バッチ（QA 生成）は上の回答生成プロバイダ、チャットの要約はこちらを使います。クラウドを選ぶと、質問と検索された抜粋が API 提供元に送信されます。
+                  <div
+                    id="chat-summary-llm"
+                    class="space-y-3 pt-3 border-t border-zinc-200/60 dark:border-zinc-800"
+                  >
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <.input
+                        type="select"
+                        id="chat-summary-mode"
+                        name="setting[chat_summary_mode]"
+                        value={@llm_view.chat}
+                        label="チャット要約の実行方法"
+                        options={[
+                          {"夜間バッチと同じ", "same"},
+                          {"ローカル LLM", "local"},
+                          {"クラウド API", "cloud"}
+                        ]}
+                      />
+                      <.input
+                        :if={@llm_view.chat != "same"}
+                        field={@form[:chat_summary_provider]}
+                        type="select"
+                        label={
+                          if(@llm_view.chat == "cloud",
+                            do: "チャット要約のクラウド API プロバイダ",
+                            else: "チャット要約のローカル LLM プロバイダ"
+                          )
+                        }
+                        options={provider_options(llm_providers_for(@llm_view.chat))}
+                      />
+                      <.input
+                        field={@form[:chat_summary_model]}
+                        type="text"
+                        label="チャット要約モデル名"
+                        placeholder="空欄なら夜間バッチのモデル名"
+                      />
+                    </div>
+                    <p class="text-[11px] text-zinc-500 leading-relaxed">
+                      {if @llm_view.chat_side == "cloud",
+                        do: "クラウド API で要約します。質問と検索された抜粋が API 提供元に送信されます。",
+                        else: "ローカル LLM で要約します。質問と抜粋は社外に送信されません。"}
+                      {if @llm_view.chat != "same",
+                        do: "夜間バッチと別のプロバイダにする場合は、モデル名を指定してください。"}
                     </p>
                   </div>
 
@@ -4861,7 +5010,7 @@ defmodule AskDriveWeb.AdminLive do
                     </div>
                   </div>
 
-                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-zinc-200/60 dark:border-zinc-800">
                     <.input
                       field={@form[:embed_provider]}
                       type="select"
@@ -4880,11 +5029,6 @@ defmodule AskDriveWeb.AdminLive do
 
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <.input
-                      field={@form[:batch_num_ctx]}
-                      type="number"
-                      label="コンテキスト長 (num_ctx / Ollama のみ)"
-                    />
-                    <.input
                       field={@form[:llm_temperature]}
                       type="number"
                       step="0.1"
@@ -4900,25 +5044,47 @@ defmodule AskDriveWeb.AdminLive do
                   </p>
                 </div>
 
-                <%!-- Provider Endpoints and API Keys --%>
+                <%!-- Provider Endpoints and API Keys: only those of the providers in use (the
+                      nightly batch's, the chat summary's and the embedding's) are shown --%>
                 <div
                   :if={@scope == :app}
+                  id="provider-connections"
                   class="space-y-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
                 >
                   <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                     <.icon name="hero-key" class="w-4 h-4 text-indigo-500" /> プロバイダ接続情報
                   </h3>
                   <p class="text-[11px] text-zinc-500">
-                    API キーは暗号化して保存されます。空欄のまま保存すると既存の値を維持します。使用しないプロバイダの欄は空のままで構いません。
+                    上で選んだプロバイダ（夜間バッチ・チャット要約・埋め込み）の接続情報だけを表示しています。API キーは暗号化して保存されます。空欄のまま保存すると既存の値を維持します。
                   </p>
 
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div
+                    id="connection-ollama"
+                    class={[
+                      "grid grid-cols-1 sm:grid-cols-2 gap-4",
+                      "ollama" not in @llm_view.in_use && "hidden"
+                    ]}
+                  >
                     <.input
                       field={@form[:ollama_host]}
                       type="text"
                       label="Ollama エンドポイント"
                       placeholder={LLM.default_base_url("ollama")}
                     />
+                    <.input
+                      field={@form[:batch_num_ctx]}
+                      type="number"
+                      label="Ollama のコンテキスト長 (num_ctx)"
+                    />
+                  </div>
+
+                  <div
+                    id="connection-lmstudio"
+                    class={[
+                      "grid grid-cols-1 sm:grid-cols-2 gap-4",
+                      "lmstudio" not in @llm_view.in_use && "hidden"
+                    ]}
+                  >
                     <.input
                       field={@form[:lmstudio_base_url]}
                       type="text"
@@ -4927,7 +5093,13 @@ defmodule AskDriveWeb.AdminLive do
                     />
                   </div>
 
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div
+                    id="connection-anthropic"
+                    class={[
+                      "grid grid-cols-1 sm:grid-cols-2 gap-4",
+                      "anthropic" not in @llm_view.in_use && "hidden"
+                    ]}
+                  >
                     <.input
                       field={@form[:anthropic_api_key]}
                       type="password"
@@ -4943,7 +5115,13 @@ defmodule AskDriveWeb.AdminLive do
                     />
                   </div>
 
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div
+                    id="connection-gemini"
+                    class={[
+                      "grid grid-cols-1 sm:grid-cols-2 gap-4",
+                      "gemini" not in @llm_view.in_use && "hidden"
+                    ]}
+                  >
                     <.input
                       field={@form[:gemini_api_key]}
                       type="password"
@@ -4959,7 +5137,13 @@ defmodule AskDriveWeb.AdminLive do
                     />
                   </div>
 
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div
+                    id="connection-openai"
+                    class={[
+                      "grid grid-cols-1 sm:grid-cols-2 gap-4",
+                      "openai" not in @llm_view.in_use && "hidden"
+                    ]}
+                  >
                     <.input
                       field={@form[:openai_api_key]}
                       type="password"
@@ -6332,7 +6516,7 @@ defmodule AskDriveWeb.AdminLive do
     do:
       socket
       |> assign(:setting, updated)
-      |> assign(:form, to_form(Settings.change_setting(updated)))
+      |> assign_settings_form(updated)
 
   # the Let's Encrypt form (F-1009); the API key is never echoed back
   defp acme_form(setting),
@@ -6682,7 +6866,7 @@ defmodule AskDriveWeb.AdminLive do
         {:noreply,
          socket
          |> assign(:setting, updated)
-         |> assign(:form, to_form(Settings.change_setting(updated)))
+         |> assign_settings_form(updated)
          |> assign(:service_account_test, nil)
          |> assign_drive_mode()
          |> put_flash(:info, "Google Drive 同期設定を保存しました。")}

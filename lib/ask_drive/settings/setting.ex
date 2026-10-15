@@ -504,8 +504,14 @@ defmodule AskDrive.Settings.Setting do
         message: "は対応していないプロバイダです"
       )
       |> then(fn cs ->
-        if provider != get_field(cs, :llm_provider) and blank?(get_field(cs, :chat_summary_model)) do
-          add_error(cs, :chat_summary_model, "チャット要約プロバイダを回答生成と別にする場合は、モデル名を指定してください")
+        # the batch's provider in effect: the cloud one in cloud mode (F-821)
+        batch_provider =
+          if get_field(cs, :batch_llm_mode) == "cloud",
+            do: get_field(cs, :cloud_llm_provider),
+            else: get_field(cs, :llm_provider)
+
+        if provider != batch_provider and blank?(get_field(cs, :chat_summary_model)) do
+          add_error(cs, :chat_summary_model, "チャット要約のプロバイダを夜間バッチと別にする場合は、モデル名を指定してください")
         else
           cs
         end
