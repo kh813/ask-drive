@@ -1207,53 +1207,34 @@ defmodule AskDriveWeb.AdminLive do
     {:noreply, maybe_load_cloud_models(socket)}
   end
 
-  def handle_event("settings_change", _params, socket), do: {:noreply, socket}
-
   def handle_event("save_settings", %{"setting" => setting_params}, socket) do
-    setting_params = normalize_chat_summary_params(setting_params)
-    # `vec0` fixes the vector width at CREATE time, so a new embedding model or dimension
-    # means dropping and rebuilding the index before anything can be re-embedded (F-809).
-    reindex? = Settings.reindex_required?(socket.assigns.setting, setting_params)
+    setting_params =
+      setting_params
+      |> normalize_chat_summary_params()
+      |> put_ollama_embedding_dim(socket.assigns.ollama_catalog, socket.assigns.setting)
 
-    case Settings.update_setting(socket.assigns.setting, setting_params) do
-      {:ok, updated} ->
-        # whether Ollama is needed now (and running if so); pulling models is the platform
-        # administrator's (F-838)
-        AskDrive.LLM.OllamaModels.sync_needed(updated)
+    case unpulled_ollama_models(
+           setting_params,
+           socket.assigns.ollama_catalog,
+           socket.assigns.setting
+         ) do
+      [] ->
+        save_settings(socket, setting_params)
 
-        message =
-          if reindex? do
-            case Vector.rebuild_index(updated.embedding_dim) do
-              {:ok, _dim} ->
-                gettext(
-                  "Settings saved and the vector index rebuilt. The next nightly batch re-embeds all chunks."
-                )
-
-              {:error, reason} ->
-                Logger.error("Vector index rebuild failed: #{inspect(reason)}")
-                gettext("Settings saved, but rebuilding the vector index failed. Check the logs.")
-            end
-          else
-            gettext("Settings saved.")
-          end
-
+      models ->
         {:noreply,
-         socket
-         |> assign(:setting, updated)
-         |> assign_settings_form(updated)
-         |> assign(:cloud_models, %{})
-         |> maybe_load_cloud_models()
-         |> put_flash(:info, message)
-         |> load_dashboard_data()}
-
-      {:error, changeset} ->
-        {:noreply,
-         socket
-         |> assign(:form, to_form(changeset))
-         |> assign(:llm_view, llm_view_from_params(setting_params, socket.assigns.llm_view))
-         |> put_flash(:error, gettext("Could not save the settings. Check your input."))}
+         put_flash(
+           socket,
+           :error,
+           gettext(
+             "Not saved: %{models} isn't one of Ollama's pulled models. Choose a pulled model (a platform administrator pulls them in the platform settings).",
+             models: join_list(models)
+           )
+         )}
     end
   end
+
+  def handle_event("settings_change", _params, socket), do: {:noreply, socket}
 
   def handle_event("refresh_cloud_models", _params, socket) do
     {:noreply, maybe_load_cloud_models(socket, force: true)}
@@ -1797,15 +1778,27 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   # A desk's Ollama model field (F-838): a choice among the models pulled on the platform
-  # screen that can do `kind` — a desk can't pull one itself. A saved name that isn't pulled
-  # stays an option of its own. Without a connection to Ollama the name is typed.
+  # screen that can do `kind` — only those; a desk can't pull one itself. A saved name that
+  # isn't one of them (not pulled, or not an Ollama model at all, e.g. left over from a cloud
+  # API) is pointed out and must be replaced: the field then starts empty and, where a model
+  # is needed (`required`), the form isn't sent until one is chosen. Without a connection to
+  # Ollama the name is typed.
   attr :field, Phoenix.HTML.FormField, required: true
   attr :kind, :atom, required: true, values: [:embedding, :generation]
   attr :catalog, :any, required: true
   attr :label, :string, required: true
-  attr :prompt, :string, default: nil
+  attr :prompt, :string, default: nil, doc: "the blank choice's label (blank allowed)"
+  attr :required, :boolean, default: false
 
   defp ollama_model_field(assigns) do
+    current = to_string(assigns.field.value || "")
+
+    stale? =
+      match?({:ok, _}, assigns.catalog) and current != "" and
+        not AskDrive.LLM.OllamaModels.choosable?(elem(assigns.catalog, 1), assigns.kind, current)
+
+    assigns = assign(assigns, current: current, stale?: stale?)
+
     ~H"""
     <div>
       <%= case @catalog do %>
@@ -1814,11 +1807,22 @@ defmodule AskDriveWeb.AdminLive do
             field={@field}
             type="select"
             label={@label}
-            prompt={@prompt}
-            options={AskDrive.LLM.OllamaModels.options(models, @kind, @field.value)}
+            value={if(@stale?, do: "", else: @field.value)}
+            prompt={@prompt || gettext("Choose a pulled model")}
+            options={AskDrive.LLM.OllamaModels.options(models, @kind)}
+            required={@required and @prompt == nil}
           />
           <p
-            :if={AskDrive.LLM.OllamaModels.options(models, @kind, nil) == []}
+            :if={@stale?}
+            class="mt-1 text-[11px] text-amber-700 dark:text-amber-300 leading-snug"
+          >
+            {gettext(
+              "The saved model %{model} isn't one of the pulled models (it may not be an Ollama model at all). Choose one of the pulled models and save.",
+              model: @current
+            )}
+          </p>
+          <p
+            :if={AskDrive.LLM.OllamaModels.options(models, @kind) == []}
             class="mt-1 text-[11px] text-amber-700 dark:text-amber-300 leading-snug"
           >
             {gettext(
@@ -1992,6 +1996,108 @@ defmodule AskDriveWeb.AdminLive do
     </div>
     """
   end
+
+  defp save_settings(socket, setting_params) do
+    # `vec0` fixes the vector width at CREATE time, so a new embedding model or dimension
+    # means dropping and rebuilding the index before anything can be re-embedded (F-809).
+    reindex? = Settings.reindex_required?(socket.assigns.setting, setting_params)
+
+    case Settings.update_setting(socket.assigns.setting, setting_params) do
+      {:ok, updated} ->
+        # whether Ollama is needed now (and running if so); pulling models is the platform
+        # administrator's (F-838)
+        AskDrive.LLM.OllamaModels.sync_needed(updated)
+
+        message =
+          if reindex? do
+            case Vector.rebuild_index(updated.embedding_dim) do
+              {:ok, _dim} ->
+                gettext(
+                  "Settings saved and the vector index rebuilt. The next nightly batch re-embeds all chunks."
+                )
+
+              {:error, reason} ->
+                Logger.error("Vector index rebuild failed: #{inspect(reason)}")
+                gettext("Settings saved, but rebuilding the vector index failed. Check the logs.")
+            end
+          else
+            gettext("Settings saved.")
+          end
+
+        {:noreply,
+         socket
+         |> assign(:setting, updated)
+         |> assign_settings_form(updated)
+         |> assign(:cloud_models, %{})
+         |> maybe_load_cloud_models()
+         |> put_flash(:info, message)
+         |> load_dashboard_data()}
+
+      {:error, changeset} ->
+        {:noreply,
+         socket
+         |> assign(:form, to_form(changeset))
+         |> assign(:llm_view, llm_view_from_params(setting_params, socket.assigns.llm_view))
+         |> put_flash(:error, gettext("Could not save the settings. Check your input."))}
+    end
+  end
+
+  # --- A desk's Ollama models: only pulled ones (F-838) ---------------------------------
+
+  # The Ollama model fields being saved, with the provider each one runs on
+  defp ollama_model_fields(params, setting) do
+    get = fn key ->
+      Map.get(params, key, to_string(Map.get(setting, String.to_existing_atom(key)) || ""))
+    end
+
+    batch_provider = if get.("batch_llm_mode") == "cloud", do: nil, else: get.("llm_provider")
+
+    chat_provider =
+      case get.("chat_summary_provider") do
+        "" ->
+          if get.("batch_llm_mode") == "cloud",
+            do: get.("cloud_llm_provider"),
+            else: batch_provider
+
+        provider ->
+          provider
+      end
+
+    [
+      {"batch_model", :generation, batch_provider},
+      {"chat_summary_model", :generation, chat_provider},
+      {"embed_model", :embedding, get.("embed_provider")}
+    ]
+    |> Enum.filter(fn {key, _kind, provider} ->
+      provider == "ollama" and Map.has_key?(params, key)
+    end)
+  end
+
+  # Names sent for Ollama fields that aren't pulled models of the right kind (only checked
+  # when Ollama could be asked; blank means "the default" and is left to the settings)
+  defp unpulled_ollama_models(params, {:ok, models}, setting) do
+    for {key, kind, _provider} <- ollama_model_fields(params, setting),
+        name = String.trim(params[key] || ""),
+        name != "",
+        not AskDrive.LLM.OllamaModels.choosable?(models, kind, name),
+        do: name
+  end
+
+  defp unpulled_ollama_models(_params, _catalog, _setting), do: []
+
+  # An Ollama embedding model's vectors have the size the model says: the dimension follows it
+  # (a leftover 768 from a cloud model would make every embedding fail)
+  defp put_ollama_embedding_dim(params, {:ok, models}, setting) do
+    with true <- Enum.any?(ollama_model_fields(params, setting), &(elem(&1, 0) == "embed_model")),
+         %{embedding_length: length} when is_integer(length) <-
+           AskDrive.LLM.OllamaModels.find(models, params["embed_model"]) do
+      Map.put(params, "embedding_dim", Integer.to_string(length))
+    else
+      _ -> params
+    end
+  end
+
+  defp put_ollama_embedding_dim(params, _catalog, _setting), do: params
 
   defp provider_options(providers) do
     Enum.map(providers, fn provider -> {LLM.label(provider), provider} end)
@@ -6018,6 +6124,7 @@ defmodule AskDriveWeb.AdminLive do
                           kind={:generation}
                           catalog={@ollama_catalog}
                           label={gettext("Local LLM model name")}
+                          required={@llm_view.batch == "local"}
                         />
                       <% else %>
                         <.input
@@ -6268,6 +6375,7 @@ defmodule AskDriveWeb.AdminLive do
                         kind={:embedding}
                         catalog={@ollama_catalog}
                         label={gettext("Embedding model name")}
+                        required
                       />
                     <% else %>
                       <.input
@@ -6309,6 +6417,16 @@ defmodule AskDriveWeb.AdminLive do
                       label={gettext("Temperature (blank: provider default)")}
                     />
                   </div>
+
+                  <p
+                    :if={@llm_view.embed == "ollama"}
+                    id="ollama-embedding-dim-note"
+                    class="text-[11px] text-zinc-500 leading-relaxed"
+                  >
+                    {gettext(
+                      "With an Ollama model, the dimensions are set to the model's own when saving (e.g. bge-m3: 1024)."
+                    )}
+                  </p>
 
                   <p class="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
                     <.icon name="hero-exclamation-triangle" class="w-3.5 h-3.5 inline" />

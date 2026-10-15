@@ -58,9 +58,47 @@ defmodule AskDriveWeb.AdminOllamaModelsTest do
       assert has_element?(view, "#{batch} option[value='#{setting.batch_model}']")
       refute has_element?(view, "#{batch} option[value='#{setting.embed_model}:latest']")
 
-      # the chat summary's saved model isn't pulled: kept, marked, and selected
+      # the chat summary's saved model isn't pulled: not offered, and pointed out
       chat = "#settings-form select[name='setting[chat_summary_model]']"
-      assert has_element?(view, "#{chat} option[value='qwen3:4b-instruct-2507-q4_K_M'][selected]")
+      refute has_element?(view, "#{chat} option[value='qwen3:4b-instruct-2507-q4_K_M']")
+      assert render(view) =~ "qwen3:4b-instruct-2507-q4_K_M"
+    end
+
+    test "a cloud model name left in the Ollama embedding field must be replaced", %{
+      conn: conn,
+      setting: setting
+    } do
+      {:ok, _} =
+        Settings.update_setting(setting, %{
+          embed_model: "gemini-embedding-001",
+          embedding_dim: 768
+        })
+
+      {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
+
+      embed = "#settings-form select[name='setting[embed_model]']"
+      assert has_element?(view, "#{embed}[required]")
+      refute has_element?(view, "#{embed} option[value='gemini-embedding-001']")
+      assert render(view) =~ "gemini-embedding-001"
+
+      # sent anyway (bypassing the pull-down): refused, nothing saved
+      render_submit(view, "save_settings", %{
+        "setting" => %{"embed_model" => "gemini-embedding-001"}
+      })
+
+      assert render(view) =~ "保存していません"
+      assert Settings.get_setting!().embed_model == "gemini-embedding-001"
+
+      # a pulled model: saved, and the dimensions follow the model (bge-m3: 1024)
+      view
+      |> form("#settings-form", %{
+        "setting" => %{"embed_model" => "#{setting.embed_model}:latest"}
+      })
+      |> render_submit()
+
+      saved = Settings.get_setting!()
+      assert saved.embed_model == "#{setting.embed_model}:latest"
+      assert saved.embedding_dim == 1024
     end
 
     test "not in the platform settings, nor on a desk that doesn't use Ollama (F-830)", %{

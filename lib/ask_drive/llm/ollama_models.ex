@@ -110,24 +110,32 @@ defmodule AskDrive.LLM.OllamaModels do
     do: Ollama.catalog(LLM.provider_opts("ollama", setting))
 
   @doc """
-  The pull-down options for a desk's Ollama model field: the pulled models that can do `kind`
-  (`:embedding` or `:generation`; a model whose capabilities Ollama doesn't report is offered
-  for both), and `current` — the saved name — kept as an option of its own when it isn't
-  pulled, so saving doesn't silently change the model.
+  The pull-down options for a desk's Ollama model field: only the pulled models that can do
+  `kind` (`:embedding` or `:generation`; a model whose capabilities Ollama doesn't report is
+  offered for both). A saved name that isn't among them can't be chosen again (F-838): the
+  field asks for one of these instead.
   """
-  def options(models, kind, current) do
+  def options(models, kind) do
+    for model <- models, suits?(model, kind), do: {model.name, model.name}
+  end
+
+  @doc "The pulled model `name` refers to (a missing tag means \":latest\"), or nil."
+  def find(models, name) when is_binary(name) and name != "",
+    do: Enum.find(models, &(normalize(&1.name) == normalize(name)))
+
+  def find(_models, _name), do: nil
+
+  @doc "Whether `name` is a pulled model that can do `kind`."
+  def choosable?(models, kind, name) do
+    case find(models, name) do
+      nil -> false
+      model -> suits?(model, kind)
+    end
+  end
+
+  defp suits?(model, kind) do
     wanted = if kind == :embedding, do: "embedding", else: "completion"
-
-    options =
-      for model <- models,
-          model.capabilities == [] or wanted in model.capabilities,
-          do: {model.name, model.name}
-
-    names = Enum.map(models, & &1.name)
-
-    if current in [nil, ""] or installed?(current, names),
-      do: options,
-      else: [{gettext("%{model} (not pulled)", model: current), current} | options]
+    model.capabilities == [] or wanted in model.capabilities
   end
 
   @doc """
@@ -291,6 +299,15 @@ defmodule AskDrive.LLM.OllamaModels do
     state
   end
 
-  defp describe(reason) when is_binary(reason), do: reason
+  # Ollama's answer for a name its library doesn't have (e.g. a cloud API's model name)
+  defp describe(reason) when is_binary(reason) do
+    if String.contains?(reason, "file does not exist"),
+      do:
+        gettext("There's no such model in Ollama's library: check the name (%{detail})",
+          detail: reason
+        ),
+      else: reason
+  end
+
   defp describe(reason), do: inspect(reason)
 end

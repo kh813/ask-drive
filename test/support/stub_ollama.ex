@@ -104,7 +104,10 @@ defmodule AskDrive.StubOllama do
 
     conn
     |> put_resp_content_type("application/json")
-    |> send_resp(200, Jason.encode!(%{capabilities: capabilities}))
+    |> send_resp(
+      200,
+      Jason.encode!(%{capabilities: capabilities, model_info: %{"bert.embedding_length" => 1024}})
+    )
   end
 
   delete "/api/delete" do

@@ -265,9 +265,10 @@ defmodule AskDrive.LLM.Providers.Ollama do
 
   @doc """
   The installed models with what they are, for choosing and managing them (spec F-838):
-  `{:ok, [%{name, size, parameter_size, quantization, capabilities}]}`. `capabilities` is what
-  `/api/show` reports (`"embedding"`, `"completion"`, …), kept per model digest so a page load
-  doesn't ask again; `[]` when this Ollama doesn't say.
+  `{:ok, [%{name, size, parameter_size, quantization, capabilities, embedding_length}]}`.
+  `capabilities` is what `/api/show` reports (`"embedding"`, `"completion"`, …; `[]` when
+  this Ollama doesn't say) and `embedding_length` the vector size of an embedding model (nil
+  if unknown), kept per model digest so a page load doesn't ask again.
   """
   def catalog(opts \\ []) do
     case HTTP.get_json(base_url(opts) <> "/api/tags", [], 5_000, retry: false) do
@@ -276,12 +277,15 @@ defmodule AskDrive.LLM.Providers.Ollama do
          Enum.map(models, fn model ->
            details = model["details"] || %{}
 
+           info = show(model["name"], model["digest"], opts)
+
            %{
              name: model["name"],
              size: model["size"],
              parameter_size: details["parameter_size"],
              quantization: details["quantization_level"],
-             capabilities: capabilities(model["name"], model["digest"], opts)
+             capabilities: info.capabilities,
+             embedding_length: info.embedding_length
            }
          end)}
 
@@ -293,24 +297,35 @@ defmodule AskDrive.LLM.Providers.Ollama do
     end
   end
 
-  defp capabilities(name, digest, opts) do
-    key = {__MODULE__, :capabilities, digest || name}
+  defp show(name, digest, opts) do
+    key = {__MODULE__, :show, digest || name}
 
     case :persistent_term.get(key, nil) do
       nil ->
-        caps =
+        info =
           case HTTP.post_json(base_url(opts) <> "/api/show", %{model: name}, [], 5_000,
                  retry: false
                ) do
-            {:ok, %{"capabilities" => caps}} when is_list(caps) -> caps
-            _ -> []
+            {:ok, %{} = body} ->
+              caps = if is_list(body["capabilities"]), do: body["capabilities"], else: []
+
+              # "<architecture>.embedding_length", e.g. "bert.embedding_length": 1024
+              length =
+                Enum.find_value(body["model_info"] || %{}, fn {k, v} ->
+                  if String.ends_with?(k, ".embedding_length") and is_integer(v), do: v
+                end)
+
+              %{capabilities: caps, embedding_length: length}
+
+            _ ->
+              %{capabilities: [], embedding_length: nil}
           end
 
-        if caps != [], do: :persistent_term.put(key, caps)
-        caps
+        if info.capabilities != [], do: :persistent_term.put(key, info)
+        info
 
-      caps ->
-        caps
+      info ->
+        info
     end
   end
 

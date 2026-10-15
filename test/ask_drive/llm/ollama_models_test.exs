@@ -102,21 +102,25 @@ defmodule AskDrive.LLM.OllamaModelsTest do
     assert "qwen3:4b-instruct-2507-q4_K_M" in Enum.map(missing, &elem(&1, 2))
   end
 
-  test "options/3: only models that can do the job, and the saved one kept" do
+  test "options/2: only pulled models that can do the job; choosable?/3 for a saved name" do
     models = [
       %{name: "bge-m3:latest", capabilities: ["embedding"]},
       %{name: "qwen3:4b", capabilities: ["completion", "thinking"]},
       %{name: "old:latest", capabilities: []}
     ]
 
-    assert OllamaModels.options(models, :embedding, "bge-m3") == [
+    assert OllamaModels.options(models, :embedding) == [
              {"bge-m3:latest", "bge-m3:latest"},
              {"old:latest", "old:latest"}
            ]
 
-    assert [{label, "gone:7b"} | rest] = OllamaModels.options(models, :generation, "gone:7b")
-    assert label =~ "gone:7b"
-    assert Enum.map(rest, &elem(&1, 1)) == ["qwen3:4b", "old:latest"]
+    assert Enum.map(OllamaModels.options(models, :generation), &elem(&1, 1)) ==
+             ["qwen3:4b", "old:latest"]
+
+    assert OllamaModels.choosable?(models, :embedding, "bge-m3")
+    refute OllamaModels.choosable?(models, :embedding, "qwen3:4b")
+    # a cloud API's model name left in an Ollama field
+    refute OllamaModels.choosable?(models, :embedding, "gemini-embedding-001")
   end
 
   test "delete/1 refuses a model a desk uses, and deletes one nobody does", %{setting: setting} do
