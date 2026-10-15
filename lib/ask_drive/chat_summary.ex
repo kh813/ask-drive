@@ -295,20 +295,18 @@ defmodule AskDrive.ChatSummary do
     end
   end
 
-  # A chat model that isn't pulled yet (e.g. right after an update switched to it, while the
-  # app is still downloading it) would fail every summary. Start the pull and answer with
-  # the batch model meanwhile.
+  # A chat model that isn't pulled (pulling is the platform administrator's, F-838) would
+  # fail every summary: answer with the batch model meanwhile.
   defp available_model("ollama", model, setting) do
     alias AskDrive.LLM.OllamaModels
 
     with {:ok, names} <- OllamaModels.installed(setting),
          false <- OllamaModels.installed?(model, names) do
-      OllamaModels.pull_async(model)
       fallback = LLM.generation_model(setting)
 
       if LLM.generation_provider(setting) == "ollama" and is_binary(fallback) and
            OllamaModels.installed?(fallback, names) do
-        Logger.info("ChatSummary: #{model} not installed yet (pulling); using #{fallback}")
+        Logger.info("ChatSummary: #{model} not pulled; using #{fallback}")
         fallback
       else
         model

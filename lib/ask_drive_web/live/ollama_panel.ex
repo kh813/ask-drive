@@ -1,8 +1,11 @@
 defmodule AskDriveWeb.OllamaPanel do
   @moduledoc """
-  The platform admin screen's Ollama card (spec F-837): whether AskDrive's own Ollama is
-  installed and running, which desks need it, and installing it from here. Events go to
-  `AskDriveWeb.AdminLive` (`install_ollama`, `start_ollama`, `refresh_ollama`).
+  The platform admin screen's Ollama card (spec F-837, F-838): whether AskDrive's own Ollama
+  is installed and running, which desks need it, installing it from here, and its models —
+  pulled, pulled by name, deleted, and those the desks' settings name that aren't pulled.
+  Desks only choose among the pulled models. Events go to `AskDriveWeb.AdminLive`
+  (`install_ollama`, `start_ollama`, `refresh_ollama`, `pull_model`, `pull_missing_models`,
+  `delete_model`).
   """
   use AskDriveWeb, :html
 
@@ -15,12 +18,26 @@ defmodule AskDriveWeb.OllamaPanel do
   attr :install, :map, required: true, doc: "`AskDrive.LLM.OllamaInstaller.status/0`"
   attr :starting, :boolean, default: false
 
+  attr :overview, :any,
+    required: true,
+    doc: "`OllamaModels.overview/0`: `{:ok, %{models, missing}}` or `{:error, reason}`"
+
+  attr :pulls, :map, required: true, doc: "`OllamaModels.pulls/0`"
+
+  # offered when typing a model to pull (any name from the Ollama library can be typed)
+  @suggested [
+    {"bge-m3", gettext_noop("embedding (search), multilingual")},
+    {"qwen3:4b-instruct-2507-q4_K_M", gettext_noop("generation, no thinking")},
+    {"qwen3:4b", gettext_noop("generation, thinking")}
+  ]
+
   def ollama_card(assigns) do
     assigns =
       assigns
       |> assign(:installed?, is_binary(assigns.status.installed))
       |> assign(:running?, match?({:ok, _}, assigns.status.running))
       |> assign(:installing?, assigns.install.status == :installing)
+      |> assign(:suggested, @suggested)
 
     ~H"""
     <div
@@ -94,8 +111,9 @@ defmodule AskDriveWeb.OllamaPanel do
         {gettext("AskDrive doesn't manage Ollama on this server (started without app.sh).")}
       </p>
 
-      <div :if={@install.available?} class="flex flex-wrap items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <button
+          :if={@install.available?}
           type="button"
           id="install-ollama-btn"
           phx-click="install_ollama"
@@ -125,7 +143,7 @@ defmodule AskDriveWeb.OllamaPanel do
           end}
         </button>
         <button
-          :if={@installed? and not @running? and not @installing?}
+          :if={@install.available? and @installed? and not @running? and not @installing?}
           type="button"
           id="start-ollama-btn"
           phx-click="start_ollama"
@@ -174,7 +192,179 @@ defmodule AskDriveWeb.OllamaPanel do
           class="max-h-48 overflow-auto p-3 rounded-lg bg-zinc-950 text-zinc-200 text-[11px] leading-relaxed whitespace-pre-wrap"
         >{Enum.join(@install.log, "\n")}</pre>
       </div>
+
+      <.models
+        :if={@running?}
+        overview={@overview}
+        pulls={@pulls}
+        suggested={@suggested}
+      />
     </div>
     """
   end
+
+  attr :overview, :any, required: true
+  attr :pulls, :map, required: true
+  attr :suggested, :list, required: true
+
+  # Ollama's models (F-838): what's pulled and who uses it, what's missing, pulling by name
+  defp models(assigns) do
+    ~H"""
+    <div
+      id="ollama-models-admin"
+      class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-3"
+    >
+      <h3 class="font-semibold text-sm text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
+        <.icon name="hero-cube" class="w-4 h-4 text-indigo-600" />
+        {gettext("Models")}
+      </h3>
+      <p class="text-[11px] text-zinc-500 leading-relaxed">
+        {gettext(
+          "Desks choose their Ollama models among the ones pulled here; a desk can't pull one itself. A model takes from a few hundred MB to several GB of disk."
+        )}
+      </p>
+
+      <%= case @overview do %>
+        <% {:error, reason} -> %>
+          <p class="text-xs text-red-600">
+            {gettext("Cannot connect to Ollama: %{reason}", reason: inspect(reason))}
+          </p>
+        <% {:ok, %{models: models, missing: missing}} -> %>
+          <div
+            :if={missing != []}
+            id="ollama-missing-models"
+            class="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 text-xs space-y-2"
+          >
+            <p class="font-medium">
+              {gettext("Models the desks' settings name but that aren't pulled:")}
+            </p>
+            <ul class="space-y-0.5">
+              <li :for={{app, role, model} <- missing}>
+                {app.name}: {role} — <span class="font-mono">{model}</span>
+              </li>
+            </ul>
+            <button
+              type="button"
+              id="pull-missing-models-btn"
+              phx-click="pull_missing_models"
+              class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium transition"
+            >
+              {gettext("Pull them all")}
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table
+              id="ollama-model-table"
+              class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400"
+            >
+              <thead class="text-[11px] text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                <tr>
+                  <th class="py-2 px-2">{gettext("Model")}</th>
+                  <th class="py-2 px-2">{gettext("Used for")}</th>
+                  <th class="py-2 px-2 text-right">{gettext("Size")}</th>
+                  <th class="py-2 px-2">{gettext("Used by")}</th>
+                  <th class="py-2 px-2"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                <tr :if={models == []}>
+                  <td colspan="5" class="py-3 px-2 text-zinc-400">
+                    {gettext("No model is pulled yet.")}
+                  </td>
+                </tr>
+                <tr :for={model <- models} data-model={model.name}>
+                  <td class="py-2 px-2 font-mono">{model.name}</td>
+                  <td class="py-2 px-2">{kind_label(model.capabilities)}</td>
+                  <td class="py-2 px-2 text-right whitespace-nowrap">{format_size(model.size)}</td>
+                  <td class="py-2 px-2">
+                    <%= if model.used_by == [] do %>
+                      <span class="text-zinc-400">—</span>
+                    <% else %>
+                      <span :for={{app, role} <- model.used_by} class="block">{app.name}: {role}</span>
+                    <% end %>
+                  </td>
+                  <td class="py-2 px-2 text-right">
+                    <button
+                      type="button"
+                      phx-click="delete_model"
+                      phx-value-model={model.name}
+                      disabled={model.used_by != []}
+                      title={if(model.used_by != [], do: gettext("A desk uses it"))}
+                      data-confirm={
+                        gettext("Delete %{model}? A desk can't choose it any more.",
+                          model: model.name
+                        )
+                      }
+                      class="text-red-600 hover:underline disabled:text-zinc-300 disabled:no-underline disabled:cursor-not-allowed"
+                    >
+                      {gettext("Delete")}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+      <% end %>
+
+      <div :if={@pulls != %{}} id="ollama-pulls" class="space-y-1 text-xs">
+        <p :for={{model, pull} <- @pulls} data-pull={model}>
+          <span class="font-mono">{model}</span>:
+          <%= case pull.status do %>
+            <% status when status in ["starting", "pulling"] -> %>
+              <span class="text-blue-600">
+                {gettext("Pulling")}{if p = pull_percent(pull), do: " #{p}%"}
+              </span>
+            <% "done" -> %>
+              <span class="text-emerald-600">{gettext("Pulled")}</span>
+            <% _ -> %>
+              <span class="text-red-600">{gettext("Pull failed: %{error}",
+                error: to_string(pull.error)
+              )}</span>
+          <% end %>
+        </p>
+      </div>
+
+      <form id="pull-model-form" phx-submit="pull_model" class="flex flex-wrap items-center gap-2">
+        <input
+          type="text"
+          name="model"
+          list="ollama-model-suggestions"
+          autocomplete="off"
+          placeholder={gettext("Model name, e.g. bge-m3")}
+          class="flex-1 min-w-[16rem] px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono"
+        />
+        <datalist id="ollama-model-suggestions">
+          <option :for={{name, note} <- @suggested} value={name}>
+            {Gettext.gettext(AskDriveWeb.Gettext, note)}
+          </option>
+        </datalist>
+        <button
+          type="submit"
+          class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition"
+        >
+          {gettext("Pull model")}
+        </button>
+      </form>
+    </div>
+    """
+  end
+
+  defp kind_label(caps) do
+    cond do
+      caps == [] -> gettext("Unknown")
+      "embedding" in caps and "completion" in caps -> gettext("Embedding and generation")
+      "embedding" in caps -> gettext("Embedding")
+      true -> gettext("Generation")
+    end
+  end
+
+  defp format_size(bytes) when is_integer(bytes) and bytes >= 1_000_000_000,
+    do: "#{Float.round(bytes / 1_000_000_000, 1)} GB"
+
+  defp format_size(bytes) when is_integer(bytes), do: "#{div(bytes, 1_000_000)} MB"
+  defp format_size(_), do: "—"
+
+  defp pull_percent(%{completed: c, total: t}) when is_integer(t) and t > 0, do: div(c * 100, t)
+  defp pull_percent(_), do: nil
 end

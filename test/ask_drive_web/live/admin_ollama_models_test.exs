@@ -1,4 +1,9 @@
 defmodule AskDriveWeb.AdminOllamaModelsTest do
+  @moduledoc """
+  Ollama's models are the platform administrator's (spec F-838): pulled and deleted on the
+  platform screen; a desk only chooses among the pulled models and sees whether the ones its
+  settings name are pulled.
+  """
   use AskDriveWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
@@ -25,39 +30,117 @@ defmodule AskDriveWeb.AdminOllamaModelsTest do
     %{setting: setting}
   end
 
-  test "a desk on Ollama shows its models' state and can pull a model by name", %{conn: conn} do
-    {:ok, view, html} = live(conn, "/it-support/admin?tab=settings")
+  describe "a desk" do
+    test "sees whether its models are pulled, and can't pull one", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
 
-    assert html =~ "ローカルモデル（Ollama）"
-    assert has_element?(view, ~s(tr[data-model="qwen3:4b-instruct-2507-q4_K_M"]), "未取得")
+      assert has_element?(view, "#ollama-models")
+      assert has_element?(view, ~s(tr[data-model="qwen3:4b-instruct-2507-q4_K_M"]), "未取得")
+      refute has_element?(view, "#ollama-models button")
+      refute has_element?(view, "#pull-model-form")
 
-    view
-    |> form("#pull-model-form", %{"model" => "qwen3:4b-instruct-2507-q4_K_M"})
-    |> render_submit()
+      # an event sent anyway does nothing on a desk
+      render_hook(view, "pull_model", %{"model" => "qwen3:4b-instruct-2507-q4_K_M"})
+      refute_receive {:stub_pull, _}, 200
+    end
 
-    assert_receive {:stub_pull, "qwen3:4b-instruct-2507-q4_K_M"}, 2_000
+    test "chooses its Ollama models among the pulled ones that can do the job", %{
+      conn: conn,
+      setting: setting
+    } do
+      {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
 
-    # once the pull finishes the row turns to 取得済み
-    Process.sleep(300)
-    assert has_element?(view, ~s(tr[data-model="qwen3:4b-instruct-2507-q4_K_M"]), "取得済み")
+      embed = "#settings-form select[name='setting[embed_model]']"
+      assert has_element?(view, "#{embed} option[value='#{setting.embed_model}:latest']")
+      refute has_element?(view, "#{embed} option[value='#{setting.batch_model}']")
+
+      batch = "#settings-form select[name='setting[batch_model]']"
+      assert has_element?(view, "#{batch} option[value='#{setting.batch_model}']")
+      refute has_element?(view, "#{batch} option[value='#{setting.embed_model}:latest']")
+
+      # the chat summary's saved model isn't pulled: kept, marked, and selected
+      chat = "#settings-form select[name='setting[chat_summary_model]']"
+      assert has_element?(view, "#{chat} option[value='qwen3:4b-instruct-2507-q4_K_M'][selected]")
+    end
+
+    test "not in the platform settings, nor on a desk that doesn't use Ollama (F-830)", %{
+      conn: conn,
+      setting: setting
+    } do
+      {:ok, _view, html} = live(conn, ~p"/admin?tab=settings")
+      refute html =~ ~s(id="ollama-models")
+
+      {:ok, _} =
+        Settings.update_setting(setting, %{
+          llm_provider: "gemini",
+          embed_provider: "gemini",
+          chat_summary_provider: "",
+          chat_summary_model: ""
+        })
+
+      {:ok, _view, html} = live(conn, "/it-support/admin?tab=settings")
+      refute html =~ ~s(id="ollama-models")
+    end
   end
 
-  test "not in the platform settings, nor on a desk that doesn't use Ollama (F-830)", %{
-    conn: conn,
-    setting: setting
-  } do
-    {:ok, _view, html} = live(conn, ~p"/admin?tab=settings")
-    refute html =~ ~s(id="ollama-models")
+  describe "the platform administrator" do
+    test "sees the pulled models and what the desks miss, and pulls them", %{
+      conn: conn,
+      setting: setting
+    } do
+      Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.LLM.OllamaModels.topic())
+      {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
 
-    {:ok, _} =
-      Settings.update_setting(setting, %{
-        llm_provider: "gemini",
-        embed_provider: "gemini",
-        chat_summary_provider: "",
-        chat_summary_model: ""
-      })
+      assert has_element?(
+               view,
+               ~s(#ollama-model-table tr[data-model="#{setting.embed_model}:latest"]),
+               "IT-Support"
+             )
 
-    {:ok, _view, html} = live(conn, "/it-support/admin?tab=settings")
-    refute html =~ ~s(id="ollama-models")
+      assert has_element?(view, "#ollama-missing-models", "qwen3:4b-instruct-2507-q4_K_M")
+
+      view |> element("#pull-missing-models-btn") |> render_click()
+      assert_receive {:stub_pull, "qwen3:4b-instruct-2507-q4_K_M"}, 2_000
+
+      assert_receive {:ollama_pulls, %{"qwen3:4b-instruct-2507-q4_K_M" => %{status: "done"}}},
+                     2_000
+
+      _ = :sys.get_state(view.pid)
+      refute has_element?(view, "#ollama-missing-models")
+
+      assert has_element?(
+               view,
+               ~s(#ollama-model-table tr[data-model="qwen3:4b-instruct-2507-q4_K_M"])
+             )
+    end
+
+    test "pulls a model by name, and deletes one no desk uses", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
+
+      view |> form("#pull-model-form", %{"model" => "llama-extra"}) |> render_submit()
+      assert_receive {:stub_pull, "llama-extra"}, 2_000
+
+      # wait for the pull to land, then refresh the card
+      Process.sleep(200)
+      view |> element("#refresh-ollama-btn") |> render_click()
+      row = ~s(#ollama-model-table tr[data-model="llama-extra"])
+      assert has_element?(view, row)
+
+      view |> element("#{row} button", "削除") |> render_click()
+      assert_receive {:stub_delete, "llama-extra"}
+      refute has_element?(view, row)
+    end
+
+    test "can't delete a model a desk uses", %{conn: conn, setting: setting} do
+      {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
+
+      assert has_element?(
+               view,
+               ~s(#ollama-model-table tr[data-model="#{setting.embed_model}:latest"] button[disabled])
+             )
+
+      render_hook(view, "delete_model", %{"model" => setting.embed_model})
+      refute_receive {:stub_delete, _}, 200
+    end
   end
 end

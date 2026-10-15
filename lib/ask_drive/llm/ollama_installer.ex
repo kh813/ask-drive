@@ -7,8 +7,8 @@ defmodule AskDrive.LLM.OllamaInstaller do
   Runs `./app.sh install-ollama` (the same download into `.runtime` as `./app.sh setup` and
   `repair-ollama`, without their rebuild or restart) in the background, keeps its output and
   broadcasts it on `"ollama_install"` as `{:ollama_install, status}`. When it succeeds, Ollama
-  is started (`OllamaServer.ensure_running/1`) and the models the desks need are pulled
-  (`OllamaModels.ensure_required(:all)`).
+  is started (`OllamaServer.ensure_running/1`); the models the desks need are then pulled
+  by the platform administrator on the same card (F-838).
   """
   use GenServer
   require Logger
@@ -150,12 +150,12 @@ defmodule AskDrive.LLM.OllamaInstaller do
     end
   end
 
-  # Start it and pull what the desks need, off this process (a pull or a start can take long)
+  # Start it (and record that it's needed), off this process (a start can take a while)
   defp after_install do
     if Application.get_env(:ask_drive, :manage_ollama, true) do
       Task.Supervisor.start_child(AskDrive.TaskSupervisor, fn ->
         OllamaServer.ensure_running(AskDrive.Settings.platform_setting!())
-        OllamaModels.ensure_required(:all)
+        OllamaModels.sync_needed(:all)
       end)
     end
   end

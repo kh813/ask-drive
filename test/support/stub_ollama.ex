@@ -79,7 +79,39 @@ defmodule AskDrive.StubOllama do
 
     conn
     |> put_resp_content_type("application/json")
-    |> send_resp(200, Jason.encode!(%{models: Enum.map(names, &%{name: &1})}))
+    |> send_resp(
+      200,
+      Jason.encode!(%{
+        models:
+          Enum.map(names, &%{name: &1, size: 1_200_000_000, digest: "d-" <> &1, details: %{}})
+      })
+    )
+  end
+
+  get "/api/version" do
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(%{version: "0.0.0-stub"}))
+  end
+
+  # What a model can do, as newer Ollama reports it: names with "bge" or "embed" embed,
+  # the rest generate (F-838)
+  post "/api/show" do
+    name = conn.body_params["model"] || ""
+
+    capabilities =
+      if String.contains?(name, ["bge", "embed"]), do: ["embedding"], else: ["completion"]
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(%{capabilities: capabilities}))
+  end
+
+  delete "/api/delete" do
+    model = conn.body_params["model"]
+    if pid = :persistent_term.get({__MODULE__, :owner}, nil), do: send(pid, {:stub_delete, model})
+    put_installed(:persistent_term.get({__MODULE__, :installed}, []) -- [model])
+    send_resp(conn, 200, "")
   end
 
   # Streams two progress lines then success, and marks the model installed.

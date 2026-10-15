@@ -55,14 +55,14 @@ defmodule AskDrive.LLM.OllamaModelsTest do
     assert OllamaModels.required(cloud) == []
     # the stub answers /api/tags with whatever is installed; it must not even be asked
     StubOllama.put_installed([])
-    assert {:ok, :not_used} = OllamaModels.ensure_required(:all)
+    assert {:ok, :not_used} = OllamaModels.sync_needed(:all)
     assert File.read!(Path.join(dir, "ollama_needed")) == "no\n"
     refute_receive {:stub_pull, _}, 200
 
     # switched back to Ollama: needed again
     {:ok, local} = Settings.update_setting(cloud, %{embed_provider: "ollama"})
     StubOllama.put_installed(["#{local.embed_model}:latest"])
-    assert {:ok, []} = OllamaModels.ensure_required(local)
+    assert {:ok, []} = OllamaModels.sync_needed(local)
     assert File.read!(Path.join(dir, "ollama_needed")) == "yes\n"
   end
 
@@ -71,19 +71,65 @@ defmodule AskDrive.LLM.OllamaModelsTest do
     refute OllamaModels.installed?("qwen3:4b-instruct-2507-q4_K_M", ["qwen3:4b"])
   end
 
-  test "ensure_required/1 pulls exactly the missing models, reporting progress", %{
+  test "sync_needed/1 reports the missing models and pulls nothing (F-838)", %{
     setting: setting
   } do
     StubOllama.put_installed(["#{setting.embed_model}:latest", setting.batch_model])
 
-    assert {:ok, ["qwen3:4b-instruct-2507-q4_K_M"]} = OllamaModels.ensure_required(setting)
-    assert_receive {:stub_pull, "qwen3:4b-instruct-2507-q4_K_M"}, 2_000
-    assert_receive {:ollama_pulls, %{"qwen3:4b-instruct-2507-q4_K_M" => %{status: "done"}}}, 2_000
-
-    assert {:ok, []} = OllamaModels.ensure_required(setting)
+    assert {:ok, ["qwen3:4b-instruct-2507-q4_K_M"]} = OllamaModels.sync_needed(setting)
+    refute_receive {:stub_pull, _}, 200
   end
 
-  test "a chat model that isn't pulled yet falls back to the batch model and starts its pull",
+  test "a pull (the platform administrator's) reports progress and finishes" do
+    OllamaModels.pull_async("qwen3:4b-instruct-2507-q4_K_M")
+    assert_receive {:stub_pull, "qwen3:4b-instruct-2507-q4_K_M"}, 2_000
+    assert_receive {:ollama_pulls, %{"qwen3:4b-instruct-2507-q4_K_M" => %{status: "done"}}}, 2_000
+  end
+
+  test "overview/0: the pulled models, who uses each, and what the desks miss", %{
+    setting: setting
+  } do
+    StubOllama.put_installed(["#{setting.embed_model}:latest", "llama-unused:latest"])
+
+    assert {:ok, %{models: models, missing: missing}} = OllamaModels.overview()
+
+    bge = Enum.find(models, &(&1.name == "#{setting.embed_model}:latest"))
+    assert bge.capabilities == ["embedding"]
+    assert [{%{slug: "it-support"}, "埋め込み"}] = bge.used_by
+    assert Enum.find(models, &(&1.name == "llama-unused:latest")).used_by == []
+
+    assert setting.batch_model in Enum.map(missing, &elem(&1, 2))
+    assert "qwen3:4b-instruct-2507-q4_K_M" in Enum.map(missing, &elem(&1, 2))
+  end
+
+  test "options/3: only models that can do the job, and the saved one kept" do
+    models = [
+      %{name: "bge-m3:latest", capabilities: ["embedding"]},
+      %{name: "qwen3:4b", capabilities: ["completion", "thinking"]},
+      %{name: "old:latest", capabilities: []}
+    ]
+
+    assert OllamaModels.options(models, :embedding, "bge-m3") == [
+             {"bge-m3:latest", "bge-m3:latest"},
+             {"old:latest", "old:latest"}
+           ]
+
+    assert [{label, "gone:7b"} | rest] = OllamaModels.options(models, :generation, "gone:7b")
+    assert label =~ "gone:7b"
+    assert Enum.map(rest, &elem(&1, 1)) == ["qwen3:4b", "old:latest"]
+  end
+
+  test "delete/1 refuses a model a desk uses, and deletes one nobody does", %{setting: setting} do
+    StubOllama.put_installed(["#{setting.embed_model}:latest", "llama-unused:latest"])
+
+    assert {:error, {:in_use, ["IT-Support"]}} = OllamaModels.delete(setting.embed_model)
+    refute_receive {:stub_delete, _}, 100
+
+    assert :ok = OllamaModels.delete("llama-unused:latest")
+    assert_receive {:stub_delete, "llama-unused:latest"}
+  end
+
+  test "a chat model that isn't pulled falls back to the batch model, pulling nothing",
        %{setting: setting} do
     StubOllama.put_installed([setting.batch_model])
     StubOllama.put_generate_pieces(["要約です [1]。"])
@@ -93,6 +139,6 @@ defmodule AskDrive.LLM.OllamaModelsTest do
 
     assert_receive {:stub_generate, %{"model" => model}}, 2_000
     assert model == setting.batch_model
-    assert_receive {:stub_pull, "qwen3:4b-instruct-2507-q4_K_M"}, 2_000
+    refute_receive {:stub_pull, _}, 200
   end
 end

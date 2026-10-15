@@ -1,17 +1,14 @@
 defmodule AskDrive.LLM.OllamaModels do
   @moduledoc """
-  Keeps the Ollama models AskDrive needs available, pulling them through Ollama's HTTP API
-  (spec F-827).
+  The models of AskDrive's own Ollama (spec F-827, F-838). Ollama runs privately for the app
+  (`.runtime/bin`, not on anyone's PATH), so models are pulled through its HTTP API.
 
-  Ollama runs privately for the app (`.runtime/bin`, not on anyone's PATH), so an admin can't
-  simply type `ollama pull` any more. Instead:
-
-    * at boot — i.e. after every update — models referenced by the settings (embedding,
-      local batch generation, chat summary) that aren't installed are pulled in the
-      background;
-    * the admin screen lists installed and required models and can pull any model by name,
-      with progress;
-    * saving settings that name a missing model starts its pull.
+  One Ollama serves every desk and its models take gigabytes of the server's disk and memory,
+  so they are the platform administrator's to manage, on the platform screen's Ollama card:
+  pull a model by name (with progress), delete one no desk uses, and see the models the desks'
+  settings name that aren't pulled. A desk only chooses among the pulled models; nothing is
+  pulled because a desk saved its settings, nor at boot (which only records whether Ollama is
+  needed and starts it if so).
 
   Pull progress lives in this GenServer and is broadcast on PubSub topic "ollama_models".
   """
@@ -55,35 +52,107 @@ defmodule AskDrive.LLM.OllamaModels do
   end
 
   @doc """
-  Starts pulls for every required model that isn't installed — of the given settings' app,
-  or of all apps when called with `:all` (boot). Returns what it started.
+  After a desk's settings change (or at boot, `:all`): records for `app.sh start` whether any
+  desk uses Ollama (F-829) and, if one does, starts it when it isn't running. Pulls nothing
+  (F-838). `{:ok, :not_used}`, or `{:ok, missing}` — the models the settings name that aren't
+  pulled — or `{:error, reason}` when Ollama can't be asked.
   """
-  def ensure_required(setting \\ Settings.get_setting!())
+  def sync_needed(setting \\ Settings.get_setting!())
 
-  # No desk on Ollama: nothing to pull, and Ollama isn't contacted (or started) at all.
-  # Records for `app.sh start` whether it is needed (F-829).
-  def ensure_required(:all) do
-    models = required_all() |> Enum.map(fn {_app, _role, model} -> model end) |> Enum.uniq()
-    OllamaServer.record_needed(models != [])
+  def sync_needed(:all), do: sync(required_all(), Settings.platform_setting!())
 
-    if models == [],
-      do: {:ok, :not_used},
-      else: pull_missing(models, Settings.platform_setting!())
-  end
-
-  def ensure_required(setting) do
+  def sync_needed(setting) do
+    rows = required(setting)
     OllamaServer.record_needed(required_all() != [])
-    models = setting |> required() |> Enum.map(fn {_role, model} -> model end) |> Enum.uniq()
-    if models == [], do: {:ok, []}, else: pull_missing(models, setting)
+    if rows == [], do: {:ok, []}, else: missing_of(Enum.map(rows, &elem(&1, 1)), setting)
   end
 
-  defp pull_missing(models, setting) do
+  defp sync(rows, setting) do
+    models = rows |> Enum.map(&elem(&1, 2)) |> Enum.uniq()
+    OllamaServer.record_needed(models != [])
+    if models == [], do: {:ok, :not_used}, else: missing_of(models, setting)
+  end
+
+  defp missing_of(models, setting) do
     OllamaServer.ensure_running(setting)
 
-    with {:ok, names} <- installed(setting) do
-      missing = Enum.reject(models, &installed?(&1, names))
-      Enum.each(missing, &pull_async/1)
-      {:ok, missing}
+    with {:ok, names} <- installed(setting),
+         do: {:ok, models |> Enum.uniq() |> Enum.reject(&installed?(&1, names))}
+  end
+
+  @doc """
+  The platform screen's model list (F-838): the installed models
+  (`Ollama.catalog/1`), each with `used_by: [{app, role}]`, and `missing: [{app, role,
+  model}]` — what the desks' settings name that isn't pulled. `{:ok, map}` or `{:error, reason}`.
+  """
+  def overview(setting \\ Settings.platform_setting!()) do
+    with {:ok, models} <- Ollama.catalog(LLM.provider_opts("ollama", setting)) do
+      rows = required_all()
+      names = Enum.map(models, & &1.name)
+
+      models =
+        Enum.map(models, fn model ->
+          used_by =
+            for {app, role, name} <- rows,
+                normalize(name) == normalize(model.name),
+                do: {app, role}
+
+          Map.put(model, :used_by, used_by)
+        end)
+
+      {:ok,
+       %{models: models, missing: Enum.reject(rows, fn {_, _, m} -> installed?(m, names) end)}}
+    end
+  end
+
+  @doc "A desk's choice of pulled models (F-838): `Ollama.catalog/1` with the desk's endpoint."
+  def catalog(setting \\ Settings.get_setting!()),
+    do: Ollama.catalog(LLM.provider_opts("ollama", setting))
+
+  @doc """
+  The pull-down options for a desk's Ollama model field: the pulled models that can do `kind`
+  (`:embedding` or `:generation`; a model whose capabilities Ollama doesn't report is offered
+  for both), and `current` — the saved name — kept as an option of its own when it isn't
+  pulled, so saving doesn't silently change the model.
+  """
+  def options(models, kind, current) do
+    wanted = if kind == :embedding, do: "embedding", else: "completion"
+
+    options =
+      for model <- models,
+          model.capabilities == [] or wanted in model.capabilities,
+          do: {model.name, model.name}
+
+    names = Enum.map(models, & &1.name)
+
+    if current in [nil, ""] or installed?(current, names),
+      do: options,
+      else: [{gettext("%{model} (not pulled)", model: current), current} | options]
+  end
+
+  @doc """
+  Deletes a pulled model no desk uses: `:ok`, `{:error, {:in_use, [app name]}}` or
+  `{:error, reason}`.
+  """
+  def delete(model) do
+    users =
+      for {app, _role, name} <- required_all(),
+          normalize(name) == normalize(model),
+          uniq: true,
+          do: app.name
+
+    if users != [] do
+      {:error, {:in_use, users}}
+    else
+      case Ollama.delete_model(model, LLM.provider_opts("ollama", Settings.platform_setting!())) do
+        :ok ->
+          Logger.info("OllamaModels: deleted #{model}")
+          GenServer.call(__MODULE__, {:forget, model})
+          :ok
+
+        error ->
+          error
+      end
     end
   end
 
@@ -126,7 +195,7 @@ defmodule AskDrive.LLM.OllamaModels do
   @impl true
   def init(_opts) do
     if Application.get_env(:ask_drive, :auto_pull_models, true),
-      do: Process.send_after(self(), :ensure_required, @boot_delay_ms)
+      do: Process.send_after(self(), :boot_sync, @boot_delay_ms)
 
     {:ok, %{pulls: %{}}}
   end
@@ -136,13 +205,21 @@ defmodule AskDrive.LLM.OllamaModels do
 
   def handle_call(:reset_pulls, _from, state), do: {:reply, :ok, %{state | pulls: %{}}}
 
+  # a deleted model's finished pull would still show it as pulled
+  def handle_call({:forget, model}, _from, state) do
+    state = %{state | pulls: Map.delete(state.pulls, model)}
+    Phoenix.PubSub.broadcast(AskDrive.PubSub, @topic, {:ollama_pulls, state.pulls})
+    {:reply, :ok, state}
+  end
+
   @impl true
   def handle_cast({:pull, model}, state) do
     if get_in(state.pulls, [model, :status]) in ["pulling", "starting"] do
       {:noreply, state}
     else
       server = self()
-      setting = Settings.get_setting!()
+      # the one Ollama, at the platform's endpoint
+      setting = Settings.platform_setting!()
 
       Task.start(fn ->
         result =
@@ -161,8 +238,8 @@ defmodule AskDrive.LLM.OllamaModels do
   end
 
   @impl true
-  def handle_info(:ensure_required, state) do
-    case ensure_required(:all) do
+  def handle_info(:boot_sync, state) do
+    case sync_needed(:all) do
       {:ok, :not_used} ->
         Logger.info("OllamaModels: no desk uses Ollama; it is not started")
 
@@ -170,7 +247,10 @@ defmodule AskDrive.LLM.OllamaModels do
         Logger.info("OllamaModels: all required models are installed")
 
       {:ok, missing} ->
-        Logger.info("OllamaModels: pulling missing models #{inspect(missing)}")
+        # pulled by the platform administrator (F-838); the platform screen lists them
+        Logger.warning(
+          "OllamaModels: models the desks' settings name aren't pulled: #{inspect(missing)}"
+        )
 
       {:error, reason} ->
         Logger.warning("OllamaModels: could not list models: #{inspect(reason)}")
@@ -179,7 +259,7 @@ defmodule AskDrive.LLM.OllamaModels do
     {:noreply, state}
   rescue
     e ->
-      Logger.warning("OllamaModels: ensure_required failed: #{Exception.message(e)}")
+      Logger.warning("OllamaModels: boot sync failed: #{Exception.message(e)}")
       {:noreply, state}
   end
 

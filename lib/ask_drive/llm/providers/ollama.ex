@@ -263,6 +263,70 @@ defmodule AskDrive.LLM.Providers.Ollama do
     end
   end
 
+  @doc """
+  The installed models with what they are, for choosing and managing them (spec F-838):
+  `{:ok, [%{name, size, parameter_size, quantization, capabilities}]}`. `capabilities` is what
+  `/api/show` reports (`"embedding"`, `"completion"`, …), kept per model digest so a page load
+  doesn't ask again; `[]` when this Ollama doesn't say.
+  """
+  def catalog(opts \\ []) do
+    case HTTP.get_json(base_url(opts) <> "/api/tags", [], 5_000, retry: false) do
+      {:ok, %{"models" => models}} when is_list(models) ->
+        {:ok,
+         Enum.map(models, fn model ->
+           details = model["details"] || %{}
+
+           %{
+             name: model["name"],
+             size: model["size"],
+             parameter_size: details["parameter_size"],
+             quantization: details["quantization_level"],
+             capabilities: capabilities(model["name"], model["digest"], opts)
+           }
+         end)}
+
+      {:ok, _} ->
+        {:ok, []}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp capabilities(name, digest, opts) do
+    key = {__MODULE__, :capabilities, digest || name}
+
+    case :persistent_term.get(key, nil) do
+      nil ->
+        caps =
+          case HTTP.post_json(base_url(opts) <> "/api/show", %{model: name}, [], 5_000,
+                 retry: false
+               ) do
+            {:ok, %{"capabilities" => caps}} when is_list(caps) -> caps
+            _ -> []
+          end
+
+        if caps != [], do: :persistent_term.put(key, caps)
+        caps
+
+      caps ->
+        caps
+    end
+  end
+
+  @doc "Deletes an installed model (`DELETE /api/delete`): `:ok` or `{:error, reason}`."
+  def delete_model(model, opts \\ []) do
+    case Req.delete(base_url(opts) <> "/api/delete",
+           json: %{model: model},
+           receive_timeout: 30_000,
+           retry: false
+         ) do
+      {:ok, %{status: 200}} -> :ok
+      {:ok, %{status: status, body: body}} -> {:error, "HTTP #{status}: #{inspect(body)}"}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   @impl true
   def health(opts \\ []) do
     case HTTP.get_json(base_url(opts) <> "/api/version", [], 3_000, retry: false) do
