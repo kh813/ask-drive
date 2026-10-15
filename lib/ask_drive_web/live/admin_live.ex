@@ -44,6 +44,10 @@ defmodule AskDriveWeb.AdminLive do
       # a Let's Encrypt run's steps (F-1012), on the platform screen
       if socket.assigns.live_action == :platform,
         do: Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.ACME.Renewal.topic())
+
+      # installing Ollama from the platform screen (F-837)
+      if socket.assigns.live_action == :platform,
+        do: Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.LLM.OllamaInstaller.topic())
     end
 
     setting = Settings.get_setting!()
@@ -108,7 +112,22 @@ defmodule AskDriveWeb.AdminLive do
      |> assign(:acme_dns_test, nil)
      |> assign(:cloud_models, %{})
      |> maybe_load_cloud_models()
+     |> assign(:ollama_starting, false)
+     |> assign_ollama_runtime()
      |> load_dashboard_data()}
+  end
+
+  # The platform screen's Ollama card (F-837): installed, running, which desks need it, and an
+  # install in progress. Asks Ollama (a short request), so only on the platform screen.
+  defp assign_ollama_runtime(socket) do
+    if socket.assigns.scope == :platform do
+      socket
+      |> assign(:ollama_runtime, AskDrive.LLM.OllamaServer.status())
+      |> assign(:ollama_needed, AskDrive.LLM.OllamaModels.required_all())
+      |> assign(:ollama_install, AskDrive.LLM.OllamaInstaller.status())
+    else
+      socket
+    end
   end
 
   @impl true
@@ -154,6 +173,18 @@ defmodule AskDriveWeb.AdminLive do
 
   def handle_info({:update_status, status}, socket),
     do: {:noreply, assign(socket, :update_status, status)}
+
+  # an Ollama install's progress (F-837); once done, AskDrive starts it: look again shortly
+  def handle_info({:ollama_install, status}, socket) do
+    if status.status == :done and socket.assigns.ollama_install.status == :installing do
+      Process.send_after(self(), :refresh_ollama, 3_000)
+      Process.send_after(self(), :refresh_ollama, 15_000)
+    end
+
+    {:noreply, assign(socket, :ollama_install, status)}
+  end
+
+  def handle_info(:refresh_ollama, socket), do: {:noreply, assign_ollama_runtime(socket)}
 
   def handle_info({:update_log, line}, socket) do
     {:noreply,
@@ -1065,6 +1096,40 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   @impl true
+  # --- Ollama on the platform screen (F-837) ---
+
+  def handle_event("install_ollama", _params, %{assigns: %{scope: :platform}} = socket) do
+    by = (socket.assigns[:current_user] && socket.assigns.current_user.email) || "admin"
+
+    case AskDrive.LLM.OllamaInstaller.install(by) do
+      :ok ->
+        {:noreply, assign(socket, :ollama_install, AskDrive.LLM.OllamaInstaller.status())}
+
+      {:error, :busy} ->
+        {:noreply, put_flash(socket, :error, gettext("Ollama is already being installed."))}
+
+      {:error, :unavailable} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Ollama can't be installed from here: AskDrive wasn't started with app.sh.")
+         )}
+    end
+  end
+
+  def handle_event("start_ollama", _params, %{assigns: %{scope: :platform}} = socket) do
+    {:noreply,
+     socket
+     |> assign(:ollama_starting, true)
+     |> start_async(:start_ollama, fn ->
+       AskDrive.LLM.OllamaServer.ensure_running(Settings.platform_setting!())
+     end)}
+  end
+
+  def handle_event("refresh_ollama", _params, socket),
+    do: {:noreply, assign_ollama_runtime(socket)}
+
   # Which provider fields the AI settings show follows the form as it is edited, before it is
   # saved: only the selected side's (local or cloud) fields are shown.
   def handle_event("settings_change", %{"setting" => params}, socket) do
@@ -1662,6 +1727,164 @@ defmodule AskDriveWeb.AdminLive do
     end
   end
 
+  # The endpoint and key fields of one provider (F-836), shown right under the setting that
+  # uses it — the nightly batch's, the chat summary's or the embedding's provider — and only
+  # once when several use the same one. API keys are stored encrypted; a blank key keeps the
+  # saved one.
+  attr :provider, :string, required: true
+  attr :form, :any, required: true
+  attr :setting, :any, required: true
+
+  defp provider_connection(assigns) do
+    ~H"""
+    <div class="p-3 rounded-lg bg-white/70 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800 space-y-2">
+      <p class="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 flex items-center gap-1">
+        <.icon name="hero-key" class="w-3.5 h-3.5 text-indigo-500" />
+        {gettext("Connection: %{provider}", provider: LLM.label(@provider))}
+      </p>
+      <%= case @provider do %>
+        <% "ollama" -> %>
+          <div
+            id="connection-ollama"
+            class="grid grid-cols-1 sm:grid-cols-2 gap-4"
+          >
+            <.input
+              field={@form[:ollama_host]}
+              type="text"
+              label={gettext("Ollama endpoint")}
+              placeholder={LLM.default_base_url("ollama")}
+            />
+            <.input
+              field={@form[:batch_num_ctx]}
+              type="number"
+              label={gettext("Ollama context length (num_ctx)")}
+            />
+          </div>
+        <% "lmstudio" -> %>
+          <div
+            id="connection-lmstudio"
+            class="grid grid-cols-1 sm:grid-cols-2 gap-4"
+          >
+            <.input
+              field={@form[:lmstudio_base_url]}
+              type="text"
+              label={gettext("LM Studio endpoint")}
+              placeholder={LLM.default_base_url("lmstudio")}
+            />
+          </div>
+        <% "gemini" -> %>
+          <div
+            id="connection-gemini"
+            class="grid grid-cols-1 sm:grid-cols-2 gap-4"
+          >
+            <.input
+              field={@form[:gemini_api_key]}
+              type="password"
+              value=""
+              label={
+                gettext("Google Gemini API key (%{key})",
+                  key: LLM.masked_api_key("gemini", @setting)
+                )
+              }
+              placeholder="AIza..."
+            />
+            <.input
+              field={@form[:gemini_base_url]}
+              type="text"
+              label={gettext("Gemini base URL")}
+              placeholder={LLM.default_base_url("gemini")}
+            />
+          </div>
+        <% "vertex" -> %>
+          <%!-- Agent Platform (formerly Vertex AI) with an API key (F-835): no project
+              means the global endpoint the API key is documented with --%>
+          <div
+            id="connection-vertex"
+            class="grid grid-cols-1 sm:grid-cols-3 gap-4"
+          >
+            <.input
+              field={@form[:vertex_api_key]}
+              type="password"
+              value=""
+              label={
+                gettext("Agent Platform (Vertex AI) API key (%{key})",
+                  key: LLM.masked_api_key("vertex", @setting)
+                )
+              }
+            />
+            <.input
+              field={@form[:vertex_project]}
+              type="text"
+              label={gettext("Google Cloud project ID (optional)")}
+              placeholder={gettext("Blank: the global endpoint")}
+            />
+            <.input
+              field={@form[:vertex_location]}
+              type="text"
+              label={gettext("Location (optional)")}
+              placeholder="global"
+            />
+            <p class="sm:col-span-3 -mt-2 text-[11px] text-zinc-500 leading-relaxed">
+              {gettext(
+                "Create the key in the Google Cloud console (Agent Platform › API keys, or express mode). With the project ID blank, requests go to the global endpoint (aiplatform.googleapis.com); enter a project ID and location to use that project's endpoint, e.g. asia-northeast1 (Tokyo) to keep processing in Japan."
+              )}
+              <span class="block font-mono text-zinc-400 mt-0.5">
+                {LLM.base_url("vertex", @setting)}
+              </span>
+            </p>
+          </div>
+        <% "anthropic" -> %>
+          <div
+            id="connection-anthropic"
+            class="grid grid-cols-1 sm:grid-cols-2 gap-4"
+          >
+            <.input
+              field={@form[:anthropic_api_key]}
+              type="password"
+              value=""
+              label={
+                gettext("Anthropic Claude API key (%{key})",
+                  key: LLM.masked_api_key("anthropic", @setting)
+                )
+              }
+              placeholder="sk-ant-..."
+            />
+            <.input
+              field={@form[:anthropic_base_url]}
+              type="text"
+              label={gettext("Anthropic base URL")}
+              placeholder={LLM.default_base_url("anthropic")}
+            />
+          </div>
+        <% "openai" -> %>
+          <div
+            id="connection-openai"
+            class="grid grid-cols-1 sm:grid-cols-2 gap-4"
+          >
+            <.input
+              field={@form[:openai_api_key]}
+              type="password"
+              value=""
+              label={
+                gettext("OpenAI API key (%{key})",
+                  key: LLM.masked_api_key("openai", @setting)
+                )
+              }
+              placeholder="sk-..."
+            />
+            <.input
+              field={@form[:openai_base_url]}
+              type="text"
+              label={gettext("OpenAI base URL")}
+              placeholder={LLM.default_base_url("openai")}
+            />
+          </div>
+        <% _ -> %>
+      <% end %>
+    </div>
+    """
+  end
+
   defp provider_options(providers) do
     Enum.map(providers, fn provider -> {LLM.label(provider), provider} end)
   end
@@ -1735,15 +1958,26 @@ defmodule AskDriveWeb.AdminLive do
     chat_side =
       if view.chat == "same", do: view.batch, else: view.chat
 
-    %{
-      view
-      | local: local,
-        cloud: cloud,
-        chat_provider: chat_provider
-    }
+    # where each provider's connection fields go (F-836): under the first of the nightly
+    # batch, the chat summary (its own provider) and the embedding that uses it
+    connection_at =
+      [
+        {:batch, batch_provider},
+        {:chat, view.chat != "same" && chat_provider},
+        {:embed, view.embed}
+      ]
+      |> Enum.reduce(%{}, fn
+        {_slot, provider}, acc when provider in [nil, false] -> acc
+        {slot, provider}, acc -> Map.put_new(acc, provider, slot)
+      end)
+
+    view
+    |> Map.merge(%{local: local, cloud: cloud, chat_provider: chat_provider})
     |> Map.merge(%{
+      batch_provider: batch_provider,
       chat_side: chat_side,
-      in_use: Enum.uniq([batch_provider, chat_provider, view.embed])
+      in_use: Enum.uniq([batch_provider, chat_provider, view.embed]),
+      connection_at: connection_at
     })
   end
 
@@ -5780,6 +6014,13 @@ defmodule AskDriveWeb.AdminLive do
                         min="1"
                       />
                     </div>
+
+                    <.provider_connection
+                      :if={@llm_view.connection_at[@llm_view.batch_provider] == :batch}
+                      provider={@llm_view.batch_provider}
+                      form={@form}
+                      setting={@setting}
+                    />
                   </div>
 
                   <%!-- Chat answers can use their own (fast, cloud) provider while the
@@ -5820,6 +6061,23 @@ defmodule AskDriveWeb.AdminLive do
                         placeholder={gettext("Blank: the nightly batch model")}
                       />
                     </div>
+                    <%= if @llm_view.chat != "same" do %>
+                      <.provider_connection
+                        :if={@llm_view.connection_at[@llm_view.chat_provider] == :chat}
+                        provider={@llm_view.chat_provider}
+                        form={@form}
+                        setting={@setting}
+                      />
+                      <p
+                        :if={@llm_view.connection_at[@llm_view.chat_provider] != :chat}
+                        class="text-[11px] text-zinc-500"
+                      >
+                        {gettext(
+                          "The connection for %{provider} is set above, under the nightly batch.",
+                          provider: LLM.label(@llm_view.chat_provider)
+                        )}
+                      </p>
+                    <% end %>
                     <p class="text-[11px] text-zinc-500 leading-relaxed">
                       {if @llm_view.chat_side == "cloud",
                         do:
@@ -5890,6 +6148,20 @@ defmodule AskDriveWeb.AdminLive do
                       max="4096"
                     />
                   </div>
+                  <.provider_connection
+                    :if={@llm_view.connection_at[@llm_view.embed] == :embed}
+                    provider={@llm_view.embed}
+                    form={@form}
+                    setting={@setting}
+                  />
+                  <p
+                    :if={@llm_view.connection_at[@llm_view.embed] != :embed}
+                    class="-mt-2 text-[11px] text-zinc-500"
+                  >
+                    {gettext("The connection for %{provider} is set above.",
+                      provider: LLM.label(@llm_view.embed)
+                    )}
+                  </p>
 
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <.input
@@ -5908,179 +6180,6 @@ defmodule AskDriveWeb.AdminLive do
                       "Changing the embedding model or dimensions recreates the vector table and discards all existing vectors. Tier 1 / Tier 2 do not work until the next nightly batch re-embeds every chunk."
                     )}
                   </p>
-                </div>
-
-                <%!-- Provider Endpoints and API Keys: only those of the providers in use (the
-                      nightly batch's, the chat summary's and the embedding's) are shown --%>
-                <div
-                  :if={@scope == :app}
-                  id="provider-connections"
-                  class="space-y-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800"
-                >
-                  <h3 class="font-semibold text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                    <.icon name="hero-key" class="w-4 h-4 text-indigo-500" /> {gettext(
-                      "Provider connections"
-                    )}
-                  </h3>
-                  <p class="text-[11px] text-zinc-500">
-                    {gettext(
-                      "Only the providers chosen above (nightly batch, chat summary, embedding) are shown. API keys are stored encrypted. Leaving a field blank keeps the current value."
-                    )}
-                  </p>
-
-                  <div
-                    id="connection-ollama"
-                    class={[
-                      "grid grid-cols-1 sm:grid-cols-2 gap-4",
-                      "ollama" not in @llm_view.in_use && "hidden"
-                    ]}
-                  >
-                    <.input
-                      field={@form[:ollama_host]}
-                      type="text"
-                      label={gettext("Ollama endpoint")}
-                      placeholder={LLM.default_base_url("ollama")}
-                    />
-                    <.input
-                      field={@form[:batch_num_ctx]}
-                      type="number"
-                      label={gettext("Ollama context length (num_ctx)")}
-                    />
-                  </div>
-
-                  <div
-                    id="connection-lmstudio"
-                    class={[
-                      "grid grid-cols-1 sm:grid-cols-2 gap-4",
-                      "lmstudio" not in @llm_view.in_use && "hidden"
-                    ]}
-                  >
-                    <.input
-                      field={@form[:lmstudio_base_url]}
-                      type="text"
-                      label={gettext("LM Studio endpoint")}
-                      placeholder={LLM.default_base_url("lmstudio")}
-                    />
-                  </div>
-
-                  <div
-                    id="connection-anthropic"
-                    class={[
-                      "grid grid-cols-1 sm:grid-cols-2 gap-4",
-                      "anthropic" not in @llm_view.in_use && "hidden"
-                    ]}
-                  >
-                    <.input
-                      field={@form[:anthropic_api_key]}
-                      type="password"
-                      value=""
-                      label={
-                        gettext("Anthropic Claude API key (%{key})",
-                          key: LLM.masked_api_key("anthropic", @setting)
-                        )
-                      }
-                      placeholder="sk-ant-..."
-                    />
-                    <.input
-                      field={@form[:anthropic_base_url]}
-                      type="text"
-                      label={gettext("Anthropic base URL")}
-                      placeholder={LLM.default_base_url("anthropic")}
-                    />
-                  </div>
-
-                  <div
-                    id="connection-gemini"
-                    class={[
-                      "grid grid-cols-1 sm:grid-cols-2 gap-4",
-                      "gemini" not in @llm_view.in_use && "hidden"
-                    ]}
-                  >
-                    <.input
-                      field={@form[:gemini_api_key]}
-                      type="password"
-                      value=""
-                      label={
-                        gettext("Google Gemini API key (%{key})",
-                          key: LLM.masked_api_key("gemini", @setting)
-                        )
-                      }
-                      placeholder="AIza..."
-                    />
-                    <.input
-                      field={@form[:gemini_base_url]}
-                      type="text"
-                      label={gettext("Gemini base URL")}
-                      placeholder={LLM.default_base_url("gemini")}
-                    />
-                  </div>
-
-                  <%!-- Agent Platform (formerly Vertex AI) with an API key (F-835): no project
-                        means the global endpoint the API key is documented with --%>
-                  <div
-                    id="connection-vertex"
-                    class={[
-                      "grid grid-cols-1 sm:grid-cols-3 gap-4",
-                      "vertex" not in @llm_view.in_use && "hidden"
-                    ]}
-                  >
-                    <.input
-                      field={@form[:vertex_api_key]}
-                      type="password"
-                      value=""
-                      label={
-                        gettext("Agent Platform (Vertex AI) API key (%{key})",
-                          key: LLM.masked_api_key("vertex", @setting)
-                        )
-                      }
-                    />
-                    <.input
-                      field={@form[:vertex_project]}
-                      type="text"
-                      label={gettext("Google Cloud project ID (optional)")}
-                      placeholder={gettext("Blank: the global endpoint")}
-                    />
-                    <.input
-                      field={@form[:vertex_location]}
-                      type="text"
-                      label={gettext("Location (optional)")}
-                      placeholder="global"
-                    />
-                    <p class="sm:col-span-3 -mt-2 text-[11px] text-zinc-500 leading-relaxed">
-                      {gettext(
-                        "Create the key in the Google Cloud console (Agent Platform › API keys, or express mode). With the project ID blank, requests go to the global endpoint (aiplatform.googleapis.com); enter a project ID and location to use that project's endpoint, e.g. asia-northeast1 (Tokyo) to keep processing in Japan."
-                      )}
-                      <span class="block font-mono text-zinc-400 mt-0.5">
-                        {LLM.base_url("vertex", @setting)}
-                      </span>
-                    </p>
-                  </div>
-
-                  <div
-                    id="connection-openai"
-                    class={[
-                      "grid grid-cols-1 sm:grid-cols-2 gap-4",
-                      "openai" not in @llm_view.in_use && "hidden"
-                    ]}
-                  >
-                    <.input
-                      field={@form[:openai_api_key]}
-                      type="password"
-                      value=""
-                      label={
-                        gettext("OpenAI API key (%{key})",
-                          key: LLM.masked_api_key("openai", @setting)
-                        )
-                      }
-                      placeholder="sk-..."
-                    />
-                    <.input
-                      field={@form[:openai_base_url]}
-                      type="text"
-                      label={gettext("OpenAI base URL")}
-                      placeholder={LLM.default_base_url("openai")}
-                    />
-                  </div>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -6214,6 +6313,14 @@ defmodule AskDriveWeb.AdminLive do
               </.form>
             </div>
 
+            <AskDriveWeb.OllamaPanel.ollama_card
+              :if={@scope == :platform}
+              status={@ollama_runtime}
+              needed={@ollama_needed}
+              install={@ollama_install}
+              starting={@ollama_starting}
+            />
+
             <%!-- Local models (Ollama) — pulled by the app itself, spec F-827. Only on a desk
                   that runs something on Ollama: each desk sets up its own AI (F-830) --%>
             <div
@@ -6235,7 +6342,18 @@ defmodule AskDriveWeb.AdminLive do
 
               <%= case @ollama_installed do %>
                 <% {:error, reason} -> %>
-                  <p class="text-xs text-red-600">
+                  <%!-- not installed yet (a server set up for cloud APIs only): installed from
+                        the platform settings (F-837) --%>
+                  <p
+                    :if={is_nil(System.find_executable("ollama"))}
+                    id="ollama-not-installed"
+                    class="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 text-xs leading-relaxed"
+                  >
+                    {gettext(
+                      "Ollama isn't installed on this server yet. A platform administrator can install it in the platform settings, under Ollama (local inference); the models here are pulled once it runs."
+                    )}
+                  </p>
+                  <p :if={System.find_executable("ollama")} class="text-xs text-red-600">
                     {gettext("Cannot connect to Ollama: %{reason}", reason: inspect(reason))}
                   </p>
                 <% _ -> %>
@@ -7061,6 +7179,31 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   @impl true
+  def handle_async(:start_ollama, result, socket) do
+    socket = socket |> assign(:ollama_starting, false) |> assign_ollama_runtime()
+
+    case result do
+      {:ok, ok} when ok in [:ok, :started] ->
+        {:noreply, put_flash(socket, :info, gettext("Ollama is running."))}
+
+      {:ok, {:error, reason}} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Ollama didn't start: %{reason}", reason: inspect(reason))
+         )}
+
+      {:exit, reason} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Ollama didn't start: %{reason}", reason: inspect(reason))
+         )}
+    end
+  end
+
   def handle_async(:drive_sync_test, {:ok, result}, socket),
     do: {:noreply, assign(socket, :drive_sync_test, result)}
 

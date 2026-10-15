@@ -25,13 +25,13 @@ defmodule AskDrive.LLM.Providers.Gemini do
 
     case HTTP.post_json(
            url,
-           payload(prompt, opts),
+           payload(model, prompt, opts),
            headers(opts),
            Keyword.get(opts, :timeout, @generate_timeout)
          ) do
-      {:ok, %{"candidates" => [%{"content" => %{"parts" => parts}} | _]}} when is_list(parts) ->
-        case answer_text(parts) do
-          "" -> {:error, {:invalid_response, "no text part in response"}}
+      {:ok, %{"candidates" => [candidate | _]}} when is_map(candidate) ->
+        case answer_text(get_in(candidate, ["content", "parts"]) || []) do
+          "" -> {:error, {:invalid_response, no_answer(candidate)}}
           text -> {:ok, text}
         end
 
@@ -43,7 +43,7 @@ defmodule AskDrive.LLM.Providers.Gemini do
 
       {:error, {:invalid_response, message}} = error ->
         if thinking_rejected?(message, opts),
-          do: generate(model, prompt, Keyword.put(opts, :think, nil)),
+          do: generate(model, prompt, Keyword.put(opts, :think, next_think(model, opts))),
           else: error
 
       {:error, reason} ->
@@ -89,7 +89,7 @@ defmodule AskDrive.LLM.Providers.Gemini do
     end
 
     case Req.post(url,
-           json: payload(prompt, opts),
+           json: payload(model, prompt, opts),
            headers: headers(opts),
            into: collect,
            receive_timeout: Keyword.get(opts, :timeout, @generate_timeout),
@@ -103,7 +103,13 @@ defmodule AskDrive.LLM.Providers.Gemini do
         {_kind, message} = error = HTTP.classify(status, body)
 
         if status == 400 and thinking_rejected?(message, opts),
-          do: generate_stream(model, prompt, Keyword.put(opts, :think, nil), on_delta),
+          do:
+            generate_stream(
+              model,
+              prompt,
+              Keyword.put(opts, :think, next_think(model, opts)),
+              on_delta
+            ),
           else: {:error, error}
 
       {:error, %{__struct__: Req.TransportError, reason: :timeout}} ->
@@ -114,15 +120,25 @@ defmodule AskDrive.LLM.Providers.Gemini do
     end
   end
 
-  # think: false turns Gemini 2.5+'s default reasoning off (thinkingBudget 0) — its thinking
-  # tokens count against maxOutputTokens, so a short chat-summary cap would otherwise be
-  # spent before any answer. Models that can't switch it off reject the request; the callers
-  # then retry without it.
-  defp payload(prompt, opts) do
+  # think: false keeps the model's reasoning as small as it goes — its thinking tokens count
+  # against maxOutputTokens, so a short cap (the chat summary's, the connection test's) would
+  # otherwise be spent before any answer. Gemini 2.x switches it off with thinkingBudget 0;
+  # Gemini 3 and later take a thinkingLevel instead ("minimal" on Flash; Pro goes no lower
+  # than "low"). A model that rejects the setting is asked again one step up: "minimal" →
+  # "low" (think: :low) → the model's default (think: nil).
+  defp payload(model, prompt, opts) do
     thinking =
       case Keyword.get(opts, :think) do
-        false -> %{thinkingBudget: 0}
-        _ -> nil
+        false ->
+          if budget_thinking?(model),
+            do: %{thinkingBudget: 0},
+            else: %{thinkingLevel: "minimal"}
+
+        :low ->
+          %{thinkingLevel: "low"}
+
+        _ ->
+          nil
       end
 
     generation_config =
@@ -137,8 +153,34 @@ defmodule AskDrive.LLM.Providers.Gemini do
   end
 
   defp thinking_rejected?(message, opts) do
-    Keyword.get(opts, :think) == false and is_binary(message) and
+    Keyword.get(opts, :think) in [false, :low] and is_binary(message) and
       String.contains?(String.downcase(message), "think")
+  end
+
+  # Gemini 1.x / 2.x take a thinking budget; later models a thinking level
+  defp budget_thinking?(model),
+    do: String.starts_with?(to_string(model), ["gemini-1", "gemini-2"])
+
+  defp next_think(model, opts) do
+    case Keyword.get(opts, :think) do
+      false -> if budget_thinking?(model), do: nil, else: :low
+      _ -> nil
+    end
+  end
+
+  # A candidate without answer text: say why (finishReason) instead of a bare "no text"
+  defp no_answer(candidate) do
+    case candidate["finishReason"] do
+      "MAX_TOKENS" ->
+        "no answer text: the output limit (maxOutputTokens) was used up before the answer " <>
+          "(a thinking model spends part of it thinking)"
+
+      reason when is_binary(reason) ->
+        "no answer text (finishReason: #{reason})"
+
+      _ ->
+        "no answer text in the response"
+    end
   end
 
   # Parts flagged `thought: true` are the model's reasoning, not the answer.

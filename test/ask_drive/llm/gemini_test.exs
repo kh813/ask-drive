@@ -14,10 +14,44 @@ defmodule AskDrive.LLM.GeminiTest do
   test "think: false turns reasoning off and thought parts never reach the answer", %{opts: opts} do
     StubGemini.set(:parts, [%{"text" => "考え中", "thought" => true}, %{"text" => "回答です"}])
 
-    assert {:ok, "回答です"} = Gemini.generate("m", "q", opts ++ [think: false, max_tokens: 450])
-    assert_received {:stub_gemini, "m:generateContent", body}
+    assert {:ok, "回答です"} =
+             Gemini.generate("gemini-2.5-flash", "q", opts ++ [think: false, max_tokens: 450])
+
+    assert_received {:stub_gemini, "gemini-2.5-flash:generateContent", body}
     assert body["generationConfig"]["thinkingConfig"] == %{"thinkingBudget" => 0}
     assert body["generationConfig"]["maxOutputTokens"] == 450
+  end
+
+  test "Gemini 3 and later: think: false asks for the minimal thinking level", %{opts: opts} do
+    StubGemini.set(:parts, [%{"text" => "回答"}])
+
+    assert {:ok, "回答"} = Gemini.generate("gemini-3.8-flash", "q", opts ++ [think: false])
+    assert_received {:stub_gemini, _, body}
+    assert body["generationConfig"]["thinkingConfig"] == %{"thinkingLevel" => "minimal"}
+  end
+
+  test "a level the model refuses steps up: minimal, then low, then its default", %{opts: opts} do
+    StubGemini.set(:parts, [%{"text" => "回答"}])
+    StubGemini.set(:reject_thinking, :all)
+
+    assert {:ok, "回答"} = Gemini.generate("gemini-3.1-pro-preview", "q", opts ++ [think: false])
+
+    assert_received {:stub_gemini, _, %{"generationConfig" => %{"thinkingConfig" => first}}}
+    assert first == %{"thinkingLevel" => "minimal"}
+    assert_received {:stub_gemini, _, %{"generationConfig" => %{"thinkingConfig" => second}}}
+    assert second == %{"thinkingLevel" => "low"}
+    assert_received {:stub_gemini, _, third}
+    refute Map.has_key?(third["generationConfig"] || %{}, "thinkingConfig")
+  end
+
+  test "an answer without text says why (the limit spent thinking)", %{opts: opts} do
+    StubGemini.set(:no_text, "MAX_TOKENS")
+
+    assert {:error, {:invalid_response, message}} =
+             Gemini.generate("gemini-3.8-flash", "q", opts ++ [max_tokens: 16])
+
+    assert message =~ "maxOutputTokens"
+    refute message =~ "candidates missing"
   end
 
   test "streams answer pieces over SSE, skipping thoughts", %{opts: opts} do
@@ -37,12 +71,12 @@ defmodule AskDrive.LLM.GeminiTest do
     refute_received {:d, "推論"}
   end
 
-  test "a model that can't switch thinking off is retried without it", %{opts: opts} do
+  test "a Gemini 2.x model that can't switch thinking off is retried without it", %{opts: opts} do
     StubGemini.set(:reject_thinking, true)
     StubGemini.set(:parts, [%{"text" => "回答"}])
 
     assert {:ok, "回答"} =
-             Gemini.generate_stream("pro", "q", opts ++ [think: false], fn _ -> :ok end)
+             Gemini.generate_stream("gemini-2.5-pro", "q", opts ++ [think: false], fn _ -> :ok end)
 
     assert_received {:stub_gemini, _, %{"generationConfig" => %{"thinkingConfig" => _}}}
     assert_received {:stub_gemini, _, second}

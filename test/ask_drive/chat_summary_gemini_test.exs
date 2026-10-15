@@ -28,7 +28,8 @@ defmodule AskDrive.ChatSummaryGeminiTest do
              ChatSummary.generate("USBメモリの利用ルールは？", [chunk], &send(test_pid, {:ev, &1}))
 
     assert_received {:stub_gemini, "gemini-flash-latest:streamGenerateContent", body}
-    assert body["generationConfig"]["thinkingConfig"] == %{"thinkingBudget" => 0}
+    # a Gemini 3-era model (the -latest alias): the minimal thinking level
+    assert body["generationConfig"]["thinkingConfig"] == %{"thinkingLevel" => "minimal"}
     assert body["generationConfig"]["maxOutputTokens"] == 450
     assert body["systemInstruction"]
     refute body["contents"] |> hd() |> get_in(["parts", Access.at(0), "text"]) =~ "/no_think"

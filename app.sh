@@ -50,6 +50,7 @@ AskDrive 管理スクリプト
   deploy             最新コードを取得し、マイグレーションと再ビルド・再起動を実行
   update [options]   Git/Release から自己アップデート (--yes, --ver <version>, --build-only: ビルドのみ・再起動なし)
   repair-ollama      .runtime に Ollama をインストール / 再インストール (あとで Ollama に切り替えるとき・llama-server 欠落の修復)
+  install-ollama     .runtime に Ollama をインストールするだけ (デプロイしない。管理画面の「Ollama」から実行される)
   admin grant <mail> 指定メールアドレスを全体管理者にする (ロックアウト時の復旧)
   auth status        ログイン認証・LDAP・管理者アカウントの状態
   auth disable       ログイン認証を無効に戻す (ゲスト・POC。締め出されたときの復旧)
@@ -352,6 +353,19 @@ cmd_repair_ollama() {
   echo -e "${GREEN}ollama と推論ランナーを ${RUNTIME_DIR} に再インストールしました。${NC}"
   echo "稼働中の Ollama があれば再起動してください: ./app.sh restart"
   cmd_deploy
+}
+
+# 管理画面の全体設定「Ollama（ローカル推論）」から実行する（F-837）。Ollama の本体と推論
+# ランナーを .runtime に置くだけで、repair-ollama と違ってデプロイ（再ビルド・再起動）はしない。
+# 稼働中の古い ollama serve は止める（アプリが新しいもので起動し直す）。
+cmd_install_ollama() {
+  echo "Ollama をダウンロードしています（数百 MB〜1 GB 以上。回線によって数分かかります）..."
+  if ! install_ollama_runtime; then
+    echo "Ollama のインストールに失敗しました。" >&2
+    exit 1
+  fi
+  pkill -f "^(${RUNTIME_BIN}/)?ollama serve" 2>/dev/null || true
+  echo "Ollama を ${RUNTIME_DIR} にインストールしました。"
 }
 
 cmd_admin() {
@@ -829,6 +843,9 @@ case "${COMMAND}" in
     ;;
   repair-ollama)
     cmd_repair_ollama "$@"
+    ;;
+  install-ollama)
+    cmd_install_ollama "$@"
     ;;
   admin)
     cmd_admin "$@"

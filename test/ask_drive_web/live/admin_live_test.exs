@@ -60,8 +60,9 @@ defmodule AskDriveWeb.AdminLiveTest do
       html = render(view)
 
       assert html =~ "夜間バッチ（QA 生成）の実行方法"
-      assert html =~ "Google Gemini API キー"
-      assert html =~ "プロバイダ接続情報"
+      # the chosen provider's connection, right under it (F-836)
+      assert html =~ "接続情報: Ollama"
+      assert html =~ "Ollama エンドポイント"
     end
 
     test "an app admin gets into their app's admin screen only, not /admin", %{conn: _conn} do

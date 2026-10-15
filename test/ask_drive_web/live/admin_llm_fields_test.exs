@@ -37,9 +37,11 @@ defmodule AskDriveWeb.AdminLlmFieldsTest do
 
     refute hidden?(view, "batch-local-fields")
     assert hidden?(view, "batch-cloud-fields")
-    refute hidden?(view, "connection-ollama")
+    # the provider's connection right under the nightly batch's choice
+    assert has_element?(view, "#batch-llm #connection-ollama")
 
-    for p <- ~w(lmstudio gemini openai anthropic), do: assert(hidden?(view, "connection-#{p}"))
+    for p <- ~w(lmstudio gemini vertex openai anthropic),
+        do: refute(has_element?(view, "#connection-#{p}"))
 
     # 夜間バッチと同じ: no provider of its own to pick
     refute has_element?(view, "select[name='setting[chat_summary_provider]']")
@@ -60,10 +62,19 @@ defmodule AskDriveWeb.AdminLlmFieldsTest do
 
     assert hidden?(view, "batch-local-fields")
     refute hidden?(view, "batch-cloud-fields")
-    refute hidden?(view, "connection-gemini")
-    assert hidden?(view, "connection-ollama")
-    assert hidden?(view, "connection-lmstudio")
-    assert hidden?(view, "connection-openai")
+    # Gemini's fields under the batch, once (the embedding uses it too), and no local ones
+    assert has_element?(view, "#batch-llm #connection-gemini")
+
+    assert [_] =
+             view
+             |> render()
+             |> LazyHTML.from_fragment()
+             |> LazyHTML.query("#connection-gemini")
+             |> Enum.to_list()
+
+    refute has_element?(view, "#connection-ollama")
+    refute has_element?(view, "#connection-lmstudio")
+    refute has_element?(view, "#connection-openai")
   end
 
   test "the chat summary's own side lists only that side's providers", %{conn: conn} do
@@ -84,8 +95,8 @@ defmodule AskDriveWeb.AdminLlmFieldsTest do
            )
 
     # the batch stays local, so Ollama is still needed; the summary's Gemini is too
-    refute hidden?(view, "connection-ollama")
-    refute hidden?(view, "connection-gemini")
+    assert has_element?(view, "#batch-llm #connection-ollama")
+    assert has_element?(view, "#chat-summary-llm #connection-gemini")
 
     view
     |> form("#settings-form", %{
@@ -103,6 +114,19 @@ defmodule AskDriveWeb.AdminLlmFieldsTest do
     # the batch's local settings were kept
     assert setting.llm_provider == "ollama"
     assert has_element?(view, "#chat-summary-mode option[value='cloud'][selected]")
+  end
+
+  test "a chat summary on the batch's provider doesn't repeat its connection fields", %{
+    conn: conn
+  } do
+    view = open(conn)
+
+    view
+    |> form("#settings-form", %{"setting" => %{"chat_summary_mode" => "local"}})
+    |> render_change()
+
+    assert has_element?(view, "#batch-llm #connection-ollama")
+    refute has_element?(view, "#chat-summary-llm #connection-ollama")
   end
 
   test "夜間バッチと同じ is saved as no provider of its own", %{conn: conn} do
@@ -226,8 +250,8 @@ defmodule AskDriveWeb.AdminLlmFieldsTest do
       view = open(conn)
       _ = render_async(view)
 
-      refute hidden?(view, "connection-vertex")
-      assert hidden?(view, "connection-gemini")
+      assert has_element?(view, "#batch-llm #connection-vertex")
+      refute has_element?(view, "#connection-gemini")
       assert has_element?(view, "#cloud-llm-model-suggestions option[value='gemini-2.5-pro']")
       # nothing is asked for a list
       refute_received {:stub_gemini, "models", _}

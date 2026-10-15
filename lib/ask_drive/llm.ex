@@ -415,7 +415,13 @@ defmodule AskDrive.LLM do
         provider = generation_provider(setting)
         model = generation_model(setting)
 
-        case generate(model, "ping", setting: setting, max_tokens: 16, timeout: 30_000) do
+        # A thinking model (Gemini 3 and later think by default) spends its output limit
+        # on thinking first: give it room, and keep the thinking down where that's possible
+        test_opts =
+          [setting: setting, max_tokens: 512, timeout: 30_000] ++
+            if(provider in ["gemini", "vertex"], do: [think: false], else: [])
+
+        case generate(model, "ping", test_opts) do
           {:ok, _text} ->
             {:ok,
              gettext("Connected to %{provider} / %{model}.",

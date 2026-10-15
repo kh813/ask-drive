@@ -23,6 +23,18 @@ defmodule AskDrive.LLM.OllamaServer do
     Path.join(dir, "ollama_needed")
   end
 
+  @doc """
+  What the platform admin screen shows (F-837): `%{installed: path | nil, running: {:ok,
+  version} | {:error, reason}}` — whether AskDrive's own Ollama is on the PATH
+  (`.runtime/bin`), and whether it answers at the configured endpoint.
+  """
+  def status(setting \\ Settings.platform_setting!()) do
+    %{
+      installed: System.find_executable("ollama"),
+      running: Ollama.health(LLM.provider_opts("ollama", setting))
+    }
+  end
+
   @doc "Records whether Ollama is needed (the file `app.sh start` reads)."
   def record_needed(needed?) when is_boolean(needed?) do
     if managed?(), do: File.write(flag_path(), if(needed?, do: "yes\n", else: "no\n")), else: :ok
