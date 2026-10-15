@@ -136,4 +136,69 @@ defmodule AskDriveWeb.AdminLlmFieldsTest do
                chat_summary_model: ""
              })
   end
+
+  describe "the cloud API's model pull-down (F-834)" do
+    setup do
+      {server, url} = AskDrive.StubGemini.start!(self())
+      on_exit(fn -> Process.exit(server, :normal) end)
+
+      AskDrive.StubGemini.set(:models, [
+        %{
+          "name" => "models/gemini-2.5-flash",
+          "displayName" => "Gemini 2.5 Flash",
+          "supportedGenerationMethods" => ["generateContent"]
+        },
+        %{
+          "name" => "models/gemini-embedding-001",
+          "supportedGenerationMethods" => ["embedContent"]
+        }
+      ])
+
+      {:ok, _} =
+        Settings.update_setting(Settings.get_setting!(), %{
+          batch_llm_mode: "cloud",
+          cloud_llm_provider: "gemini",
+          cloud_llm_model: "gemini-old",
+          gemini_base_url: url,
+          gemini_api_key: "k-#{System.unique_integer([:positive])}"
+        })
+
+      :ok
+    end
+
+    test "lists the provider's generation models, keeping the saved one", %{conn: conn} do
+      view = open(conn)
+      _ = render_async(view)
+
+      select = "#cloud-llm-model-field select[name='setting[cloud_llm_model]']"
+      assert has_element?(view, "#{select} option[value='gemini-2.5-flash']")
+      refute has_element?(view, "#{select} option[value='gemini-embedding-001']")
+      assert has_element?(view, "#{select} option[value='gemini-old'][selected]")
+
+      view |> element("#refresh-cloud-models") |> render_click()
+      _ = render_async(view)
+      assert_received {:stub_gemini, "models", _}
+      assert_received {:stub_gemini, "models", _}
+
+      view
+      |> form("#settings-form", %{"setting" => %{"cloud_llm_model" => "gemini-2.5-flash"}})
+      |> render_submit()
+
+      assert Settings.get_setting!().cloud_llm_model == "gemini-2.5-flash"
+    end
+
+    test "without an API key the name is typed by hand", %{conn: conn} do
+      # no Claude key saved (a blank key field keeps the saved one, so use another provider)
+      {:ok, _} =
+        Settings.update_setting(Settings.get_setting!(), %{cloud_llm_provider: "anthropic"})
+
+      assert AskDrive.LLM.api_key("anthropic", Settings.get_setting!()) in [nil, ""]
+
+      view = open(conn)
+      _ = render_async(view)
+
+      assert has_element?(view, "#cloud-llm-model-field input[name='setting[cloud_llm_model]']")
+      assert has_element?(view, "#cloud-models-status")
+    end
+  end
 end

@@ -67,7 +67,7 @@ msgid "Act as administrator"
 msgstr ""
 
 #: lib/ask_drive_web/components/core_components.ex:375
-#: lib/ask_drive_web/live/admin_live.ex:3386
+#: lib/ask_drive_web/live/admin_live.ex:3424
 #, elixir-autogen, elixir-format
 msgid "Actions"
 msgstr ""
@@ -154,7 +154,7 @@ msgstr ""
 msgid "Desk list"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4003
+#: lib/ask_drive_web/live/admin_live.ex:4041
 #: lib/ask_drive_web/live/chat_live.ex:879
 #: lib/ask_drive_web/live/chat_live.ex:1000
 #, elixir-autogen, elixir-format
@@ -567,9 +567,9 @@ msgstr ""
 msgid "Summary stopped. Please check the excerpts below."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3291
-#: lib/ask_drive_web/live/admin_live.ex:5042
-#: lib/ask_drive_web/live/admin_live.ex:6726
+#: lib/ask_drive_web/live/admin_live.ex:3329
+#: lib/ask_drive_web/live/admin_live.ex:5080
+#: lib/ask_drive_web/live/admin_live.ex:6813
 #: lib/ask_drive_web/live/chat_live.ex:617
 #: lib/ask_drive_web/live/update_panel.ex:348
 #, elixir-autogen, elixir-format
@@ -716,7 +716,7 @@ msgstr ""
 msgid "Ask more about this answer..."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3146
+#: lib/ask_drive_web/live/admin_live.ex:3184
 #: lib/ask_drive_web/live/chat_live.ex:1225
 #, elixir-autogen, elixir-format
 msgid "Cancel"
@@ -747,18 +747,18 @@ msgstr ""
 msgid "Click to show or hide the whole excerpt"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4584
+#: lib/ask_drive_web/live/admin_live.ex:4622
 #, elixir-autogen, elixir-format
 msgid " (.env.prod). To switch it from this screen or with ./app.sh auth, remove that line from .env.prod and restart."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2666
+#: lib/ask_drive_web/live/admin_live.ex:2704
 #, elixir-autogen, elixir-format
 msgid " (chunk %{number})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4797
-#: lib/ask_drive_web/live/admin_live.ex:4803
+#: lib/ask_drive_web/live/admin_live.ex:4835
+#: lib/ask_drive_web/live/admin_live.ex:4841
 #, elixir-autogen, elixir-format
 msgid " (platform admin)"
 msgstr ""
@@ -768,137 +768,137 @@ msgstr ""
 msgid " (recommended; it stops once the file / chunk being processed is finished)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2139
+#: lib/ask_drive_web/live/admin_live.ex:2177
 #, elixir-autogen, elixir-format
 msgid " (still being set up). \"Run now\" and \"Ingest only\" can be run manually."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2036
+#: lib/ask_drive_web/live/admin_live.ex:2074
 #, elixir-autogen, elixir-format
 msgid " and register it there."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4093
+#: lib/ask_drive_web/live/admin_live.ex:4131
 #, elixir-autogen, elixir-format
 msgid " and save (any Google account can then sign in and connect Drive)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2590
+#: lib/ask_drive_web/live/admin_live.ex:2628
 #, elixir-autogen, elixir-format
 msgid " · %{eta} left (estimated from the pace so far)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4283
+#: lib/ask_drive_web/live/admin_live.ex:4321
 #, elixir-autogen, elixir-format
 msgid " · Expires"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3318
+#: lib/ask_drive_web/live/admin_live.ex:3356
 #, elixir-autogen, elixir-format
 msgid "\"Can elevate\""
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4795
+#: lib/ask_drive_web/live/admin_live.ex:4833
 #, elixir-autogen, elixir-format
 msgid "%{actor}%{by} added %{target}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4801
+#: lib/ask_drive_web/live/admin_live.ex:4839
 #, elixir-autogen, elixir-format
 msgid "%{actor}%{by} removed %{target}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2390
+#: lib/ask_drive_web/live/admin_live.ex:2428
 #, elixir-autogen, elixir-format
 msgid "%{chunks} chunks / %{qas} QA"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1015
+#: lib/ask_drive_web/live/admin_live.ex:1017
 #, elixir-autogen, elixir-format
 msgid "%{count} chunks are back in line for QA generation. The next batch generates them again."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2805
+#: lib/ask_drive_web/live/admin_live.ex:2843
 #, elixir-autogen, elixir-format
 msgid "%{count} dimensions"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2915
+#: lib/ask_drive_web/live/admin_live.ex:2953
 #, elixir-autogen, elixir-format
 msgid "%{count} in total"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2843
+#: lib/ask_drive_web/live/admin_live.ex:2881
 #, elixir-autogen, elixir-format
 msgid "%{count} items"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3324
+#: lib/ask_drive_web/live/admin_live.ex:3362
 #, elixir-autogen, elixir-format
 msgid "%{count} users in total"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2624
+#: lib/ask_drive_web/live/admin_live.ex:2662
 #, elixir-autogen, elixir-format
 msgid "%{count}s"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2373
+#: lib/ask_drive_web/live/admin_live.ex:2411
 #, elixir-autogen, elixir-format
 msgid "%{documents} documents / %{chunks} chunks"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2553
+#: lib/ask_drive_web/live/admin_live.ex:2591
 #, elixir-autogen, elixir-format
 msgid "%{done} / %{total} (%{percent}%)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7260
+#: lib/ask_drive_web/live/admin_live.ex:7357
 #, elixir-autogen, elixir-format
 msgid "%{duration} so far"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1405
+#: lib/ask_drive_web/live/admin_live.ex:1416
 #, elixir-autogen, elixir-format
 msgid "%{emails} are now administrators of desk \"%{name}\"."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:434
+#: lib/ask_drive_web/live/admin_live.ex:436
 #, elixir-autogen, elixir-format
 msgid "%{emails} can now elevate to admin."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2528
+#: lib/ask_drive_web/live/admin_live.ex:2566
 #, elixir-autogen, elixir-format
 msgid "%{eta} left overall"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1542
+#: lib/ask_drive_web/live/admin_live.ex:1553
 #, elixir-autogen, elixir-format
 msgid "%{feature} could not be turned off: %{message}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1537
+#: lib/ask_drive_web/live/admin_live.ex:1548
 #, elixir-autogen, elixir-format
 msgid "%{feature} could not be turned on: %{message}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1526
+#: lib/ask_drive_web/live/admin_live.ex:1537
 #, elixir-autogen, elixir-format
 msgid "%{feature} turned off."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1525
+#: lib/ask_drive_web/live/admin_live.ex:1536
 #, elixir-autogen, elixir-format
 msgid "%{feature} turned on."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7598
+#: lib/ask_drive_web/live/admin_live.ex:7695
 #, elixir-autogen, elixir-format
 msgid "%{hours}h %{min}m"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7595
+#: lib/ask_drive_web/live/admin_live.ex:7692
 #, elixir-autogen, elixir-format
 msgid "%{min}m %{sec}s"
 msgstr ""
@@ -918,117 +918,117 @@ msgstr ""
 msgid "%{provider} does not support embeddings."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2399
+#: lib/ask_drive_web/live/admin_live.ex:2437
 #, elixir-autogen, elixir-format
 msgid "%{resolved} resolved / %{queued} queued"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7592
+#: lib/ask_drive_web/live/admin_live.ex:7689
 #, elixir-autogen, elixir-format
 msgid "%{sec}s"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6344
+#: lib/ask_drive_web/live/admin_live.ex:6431
 #, elixir-autogen, elixir-format
 msgid "%{subject} (issuer: %{issuer})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2450
+#: lib/ask_drive_web/live/admin_live.ex:2488
 #, elixir-autogen, elixir-format
 msgid "(%{count} chunks excluded after 3 failures)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2381
+#: lib/ask_drive_web/live/admin_live.ex:2419
 #, elixir-autogen, elixir-format
 msgid "(%{count} failed)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2625
+#: lib/ask_drive_web/live/admin_live.ex:2663
 #, elixir-autogen, elixir-format
 msgid "(%{count} items)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2162
+#: lib/ask_drive_web/live/admin_live.ex:2200
 #, elixir-autogen, elixir-format
 msgid "(%{eta} left)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3715
+#: lib/ask_drive_web/live/admin_live.ex:3753
 #, elixir-autogen, elixir-format
 msgid "(429 rate limit: %{count})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7784
+#: lib/ask_drive_web/live/admin_live.ex:7881
 #, elixir-autogen, elixir-format
 msgid "(URL name)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2511
+#: lib/ask_drive_web/live/admin_live.ex:2549
 #, elixir-autogen, elixir-format
 msgid "(based on expected processing time, estimated from recent batches' step durations and this step's pace)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2515
+#: lib/ask_drive_web/live/admin_live.ex:2553
 #, elixir-autogen, elixir-format
 msgid "(based on fixed per-step ratios; switches to processing time once enough durations are recorded)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3424
+#: lib/ask_drive_web/live/admin_live.ex:3462
 #, elixir-autogen, elixir-format
 msgid "(can administer all desks)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5020
+#: lib/ask_drive_web/live/admin_live.ex:5058
 #, elixir-autogen, elixir-format
 msgid "(client_id from the JSON key)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2788
+#: lib/ask_drive_web/live/admin_live.ex:2826
 #, elixir-autogen, elixir-format
 msgid "(cloud)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6613
+#: lib/ask_drive_web/live/admin_live.ex:6700
 #, elixir-autogen, elixir-format
 msgid "(from the office LAN, so no certificate is needed)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6418
+#: lib/ask_drive_web/live/admin_live.ex:6505
 #, elixir-autogen, elixir-format
 msgid "(in the trusted proxies)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4725
+#: lib/ask_drive_web/live/admin_live.ex:4763
 #, elixir-autogen, elixir-format
 msgid "(never signed in)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6595
+#: lib/ask_drive_web/live/admin_live.ex:6682
 #, elixir-autogen, elixir-format
 msgid "(not checked while off)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3319
+#: lib/ask_drive_web/live/admin_live.ex:3357
 #, elixir-autogen, elixir-format
 msgid "(platform administrators) can verify their identity and temporarily enter platform administration."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6673
+#: lib/ask_drive_web/live/admin_live.ex:6760
 #, elixir-autogen, elixir-format
 msgid "(send it separately from the .p12 file)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5074
+#: lib/ask_drive_web/live/admin_live.ex:5112
 #, elixir-autogen, elixir-format
 msgid "(syncs with this account's permissions)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6948
+#: lib/ask_drive_web/live/admin_live.ex:7045
 #, elixir-autogen, elixir-format
 msgid "(when using Google login)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3403
+#: lib/ask_drive_web/live/admin_live.ex:3441
 #, elixir-autogen, elixir-format
 msgid "(you)"
 msgstr ""
@@ -1038,7 +1038,7 @@ msgstr ""
 msgid ") registered on the server."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4090
+#: lib/ask_drive_web/live/admin_live.ex:4128
 #, elixir-autogen, elixir-format
 msgid ") to allow access only from that domain. For personal use ("
 msgstr ""
@@ -1048,67 +1048,67 @@ msgstr ""
 msgid ") to every request it forwards. Once the same value is set here, direct access without the header is refused with 403 (including the sign-in screen and the connection that updates the screen). For requests from the gateway, the user's IP (X-Forwarded-For) is trusted, and links, redirects and the Google sign-in redirect URI are built from the “Public URL” below."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5277
+#: lib/ask_drive_web/live/admin_live.ex:5315
 #, elixir-autogen, elixir-format
 msgid "), this completes automatically without pasting."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4985
+#: lib/ask_drive_web/live/admin_live.ex:5023
 #, elixir-autogen, elixir-format
 msgid "). Don't forget this step."
 msgstr ""
 
 #: lib/ask_drive/gateway.ex:154
 #: lib/ask_drive/network.ex:241
-#: lib/ask_drive_web/live/admin_live.ex:3274
-#: lib/ask_drive_web/live/admin_live.ex:4429
-#: lib/ask_drive_web/live/admin_live.ex:7549
+#: lib/ask_drive_web/live/admin_live.ex:3312
+#: lib/ask_drive_web/live/admin_live.ex:4467
+#: lib/ask_drive_web/live/admin_live.ex:7646
 #, elixir-autogen, elixir-format
 msgid ", "
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5223
+#: lib/ask_drive_web/live/admin_live.ex:5261
 #, elixir-autogen, elixir-format
 msgid ", paste it into the box below, and click \"Save and finish\" (pressing Enter in the box does the same)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5179
+#: lib/ask_drive_web/live/admin_live.ex:5217
 #, elixir-autogen, elixir-format
 msgid "/ Redirect URI:"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5304
+#: lib/ask_drive_web/live/admin_live.ex:5342
 #, elixir-autogen, elixir-format
 msgid ": not set"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5336
-#: lib/ask_drive_web/live/admin_live.ex:5341
+#: lib/ask_drive_web/live/admin_live.ex:5374
+#: lib/ask_drive_web/live/admin_live.ex:5379
 #, elixir-autogen, elixir-format
 msgid ": set User type to “"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5301
+#: lib/ask_drive_web/live/admin_live.ex:5339
 #, elixir-autogen, elixir-format
 msgid ": using the platform settings"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5298
+#: lib/ask_drive_web/live/admin_live.ex:5336
 #, elixir-autogen, elixir-format
 msgid ": using this desk's settings"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1047
+#: lib/ask_drive_web/live/admin_live.ex:1049
 #, elixir-autogen, elixir-format
 msgid "A batch is running. Run it again after it finishes."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5612
+#: lib/ask_drive_web/live/admin_live.ex:5650
 #, elixir-autogen, elixir-format
 msgid "A cloud API is more accurate and faster, but at night the text of every chunk is sent to the API provider and billed by usage."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1455
+#: lib/ask_drive_web/live/admin_live.ex:1466
 #, elixir-autogen, elixir-format
 msgid "A desk can't have zero administrators. Add another administrator first."
 msgstr ""
@@ -1118,32 +1118,32 @@ msgstr ""
 msgid "A new version is built in the background while the server and batches keep running, then switched to with a short restart (about 30 seconds). During the restart, open screens show “Updating” and reload automatically when it is done."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4824
+#: lib/ask_drive_web/live/admin_live.ex:4862
 #, elixir-autogen, elixir-format
 msgid "A password that limits who can use this desk's chat. When on, only users who enter the correct password can use the chat."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3606
+#: lib/ask_drive_web/live/admin_live.ex:3644
 #, elixir-autogen, elixir-format
 msgid "A record of which account elevated to admin rights and when (latest 100). Failures, revocations and expiries are recorded too. This record cannot be deleted or edited."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:687
+#: lib/ask_drive_web/live/admin_live.ex:689
 #, elixir-autogen, elixir-format
 msgid "A revoked certificate can't be downloaded."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3149
+#: lib/ask_drive_web/live/admin_live.ex:3187
 #, elixir-autogen, elixir-format
 msgid "AI settings are copied from the first desk. Set up Google Drive and API keys after creating it."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1504
+#: lib/ask_drive_web/live/admin_live.ex:1515
 #, elixir-autogen, elixir-format
 msgid "AI summary in chat"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5575
+#: lib/ask_drive_web/live/admin_live.ex:5613
 #, elixir-autogen, elixir-format
 msgid "AI, Drive and chat settings"
 msgstr ""
@@ -1153,34 +1153,34 @@ msgstr ""
 msgid "API gateway (entry point for Google sign-in)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7464
+#: lib/ask_drive_web/live/admin_live.ex:7561
 #: lib/ask_drive_web/live/gateway_panel.ex:57
 #, elixir-autogen, elixir-format
 msgid "API gateway check"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:771
+#: lib/ask_drive_web/live/admin_live.ex:773
 #, elixir-autogen, elixir-format
 msgid "API gateway settings saved (the check stays on)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:773
+#: lib/ask_drive_web/live/admin_live.ex:775
 #, elixir-autogen, elixir-format
 msgid "API gateway settings saved. Turn the check on with the \"API gateway check\" switch."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2018
+#: lib/ask_drive_web/live/admin_live.ex:2056
 #, elixir-autogen, elixir-format
 msgid "API key not registered"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5525
+#: lib/ask_drive_web/live/admin_live.ex:5563
 #, elixir-autogen, elixir-format
 msgid "API key: %{key}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:124
-#: lib/ask_drive_web/live/admin_live.ex:134
+#: lib/ask_drive_web/live/admin_live.ex:126
+#: lib/ask_drive_web/live/admin_live.ex:136
 #, elixir-autogen, elixir-format
 msgid "API usage & logs"
 msgstr ""
@@ -1190,197 +1190,197 @@ msgstr ""
 msgid "Abort"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7224
+#: lib/ask_drive_web/live/admin_live.ex:7321
 #, elixir-autogen, elixir-format
 msgid "Aborted (restart)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7564
+#: lib/ask_drive_web/live/admin_live.ex:7661
 #, elixir-autogen, elixir-format
 msgid "About %{hours} h %{min} min"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7560
+#: lib/ask_drive_web/live/admin_live.ex:7657
 #, elixir-autogen, elixir-format
 msgid "About %{min} min"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4389
+#: lib/ask_drive_web/live/admin_live.ex:4427
 #, elixir-autogen, elixir-format
 msgid "Access credentials (optional)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3622
+#: lib/ask_drive_web/live/admin_live.ex:3660
 #, elixir-autogen, elixir-format
 msgid "Account"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4491
+#: lib/ask_drive_web/live/admin_live.ex:4529
 #, elixir-autogen, elixir-format
 msgid "Account: %{email} (5 failures in 5 minutes)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3475
+#: lib/ask_drive_web/live/admin_live.ex:3513
 #, elixir-autogen, elixir-format
 msgid "Active"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2079
+#: lib/ask_drive_web/live/admin_live.ex:2117
 #, elixir-autogen, elixir-format
 msgid "Active QA pairs (Tier 1)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4775
+#: lib/ask_drive_web/live/admin_live.ex:4813
 #, elixir-autogen, elixir-format
 msgid "Add"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3337
+#: lib/ask_drive_web/live/admin_live.ex:3375
 #, elixir-autogen, elixir-format
 msgid "Add administrators (can elevate) by email (separate multiple with commas; people who have never signed in can be added too)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4764
+#: lib/ask_drive_web/live/admin_live.ex:4802
 #, elixir-autogen, elixir-format
 msgid "Add administrators (email addresses, comma-separated for several; people who have never signed in can be added too)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3063
+#: lib/ask_drive_web/live/admin_live.ex:3101
 #, elixir-autogen, elixir-format
 msgid "Add desk"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6872
+#: lib/ask_drive_web/live/admin_live.ex:6959
 #, elixir-autogen, elixir-format
 msgid "Add group"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3364
+#: lib/ask_drive_web/live/admin_live.ex:3402
 #, elixir-autogen, elixir-format
 msgid "Addresses fixed as able to elevate by environment variable:"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7401
+#: lib/ask_drive_web/live/admin_live.ex:7498
 #, elixir-autogen, elixir-format
 msgid "Addresses outside @%{domain} can't be used: %{emails}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3221
+#: lib/ask_drive_web/live/admin_live.ex:3259
 #, elixir-autogen, elixir-format
 msgid "Admin"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4682
+#: lib/ask_drive_web/live/admin_live.ex:4720
 #, elixir-autogen, elixir-format
 msgid "Admin elevation duration (minutes)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3603
+#: lib/ask_drive_web/live/admin_live.ex:3641
 #, elixir-autogen, elixir-format
 msgid "Admin elevation history"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4785
+#: lib/ask_drive_web/live/admin_live.ex:4823
 #, elixir-autogen, elixir-format
 msgid "Administrator change history"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4597
+#: lib/ask_drive_web/live/admin_live.ex:4635
 #, elixir-autogen, elixir-format
 msgid "Administrator email addresses (comma-separated for several; after turning it on, sign in with one of them and elevate)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3273
+#: lib/ask_drive_web/live/admin_live.ex:3311
 #, elixir-autogen, elixir-format
 msgid "Administrators: %{emails}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:251
+#: lib/ask_drive_web/live/admin_live.ex:253
 #, elixir-autogen, elixir-format
 msgid "Administrators: %{message}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4008
+#: lib/ask_drive_web/live/admin_live.ex:4046
 #, elixir-autogen, elixir-format
 msgid "Advice for content authors"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5219
+#: lib/ask_drive_web/live/admin_live.ex:5257
 #, elixir-autogen, elixir-format
 msgid "After you click \"Allow\" on Google, the address bar of the other window goes to"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6027
+#: lib/ask_drive_web/live/admin_live.ex:6114
 #, elixir-autogen, elixir-format
 msgid "Allow LLM generation during business hours as an exception"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3357
+#: lib/ask_drive_web/live/admin_live.ex:3395
 #, elixir-autogen, elixir-format
 msgid "Allow elevation"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4102
+#: lib/ask_drive_web/live/admin_live.ex:4140
 #, elixir-autogen, elixir-format
 msgid "Allowed domain (e.g. company.com; leave blank for no restriction)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:690
+#: lib/ask_drive_web/live/admin_live.ex:692
 #, elixir-autogen, elixir-format
 msgid "An expired certificate can't be downloaded."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5557
+#: lib/ask_drive_web/live/admin_live.ex:5595
 #, elixir-autogen, elixir-format
 msgid "An external API is in use."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:867
+#: lib/ask_drive_web/live/admin_live.ex:869
 #, elixir-autogen, elixir-format
 msgid "An update is already in progress."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3888
+#: lib/ask_drive_web/live/admin_live.ex:3926
 #, elixir-autogen, elixir-format
 msgid "Analyzes how efficiently ingested documents are tokenized (text extraction and structuring). Structured text such as Markdown has high token density and search accuracy, while scanned images and complex PDFs tend to have lower token efficiency."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5500
+#: lib/ask_drive_web/live/admin_live.ex:5538
 #, elixir-autogen, elixir-format
 msgid "Answer generation"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2774
+#: lib/ask_drive_web/live/admin_live.ex:2812
 #, elixir-autogen, elixir-format
 msgid "Answer generation (%{provider})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5492
+#: lib/ask_drive_web/live/admin_live.ex:5530
 #, elixir-autogen, elixir-format
 msgid "Answer generation and embedding can use different providers. Keeping embedding local avoids re-indexing, so we recommend switching only generation first."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5863
+#: lib/ask_drive_web/live/admin_live.ex:5950
 #, elixir-autogen, elixir-format
 msgid "Anthropic Claude API key (%{key})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5872
+#: lib/ask_drive_web/live/admin_live.ex:5959
 #, elixir-autogen, elixir-format
 msgid "Anthropic base URL"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1873
+#: lib/ask_drive_web/live/admin_live.ex:1911
 #, elixir-autogen, elixir-format
 msgid "Applies to all desks"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1877
+#: lib/ask_drive_web/live/admin_live.ex:1915
 #, elixir-autogen, elixir-format
 msgid "Applies to this desk only"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:523
+#: lib/ask_drive_web/live/admin_live.ex:525
 #, elixir-autogen, elixir-format
 msgid "Applying the certificate. The page reconnects by itself in a few seconds (reload it if it doesn't)."
 msgstr ""
@@ -1390,7 +1390,7 @@ msgstr ""
 msgid "AskDrive updates"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1610
+#: lib/ask_drive_web/live/admin_live.ex:1621
 #, elixir-autogen, elixir-format
 msgid "At least one account must be eligible for admin elevation. Allow another account to elevate first."
 msgstr ""
@@ -1400,7 +1400,7 @@ msgstr ""
 msgid "At the start of the night window. When one is found, it is shown on this screen and in the admin screen header."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2599
+#: lib/ask_drive_web/live/admin_live.ex:2637
 #, elixir-autogen, elixir-format
 msgid "At this pace, not everything will finish by the cutoff (%{deadline}). The rest will be generated by the next batch."
 msgstr ""
@@ -1410,32 +1410,32 @@ msgstr ""
 msgid "Authentication failed. Check the API key (%{detail})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7027
+#: lib/ask_drive_web/live/admin_live.ex:7124
 #, elixir-autogen, elixir-format
 msgid "Authorize with an account in the organization's domain (@%{domain})."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5247
+#: lib/ask_drive_web/live/admin_live.ex:5285
 #, elixir-autogen, elixir-format
 msgid "Authorizing…"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7251
+#: lib/ask_drive_web/live/admin_live.ex:7348
 #, elixir-autogen, elixir-format
 msgid "Auto"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3253
+#: lib/ask_drive_web/live/admin_live.ex:3291
 #, elixir-autogen, elixir-format
 msgid "Auto-run: off (being set up)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2139
+#: lib/ask_drive_web/live/admin_live.ex:2177
 #, elixir-autogen, elixir-format
 msgid "Automatic nightly runs for this desk are "
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2198
+#: lib/ask_drive_web/live/admin_live.ex:2236
 #, elixir-autogen, elixir-format
 msgid "Automatic nightly runs: on ·"
 msgstr ""
@@ -1445,63 +1445,63 @@ msgstr ""
 msgid "Automatic renewal is off"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5950
+#: lib/ask_drive_web/live/admin_live.ex:6037
 #, elixir-autogen, elixir-format
 msgid "Automatic run start hour (0–23, default 0)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1506
+#: lib/ask_drive_web/live/admin_live.ex:1517
 #, elixir-autogen, elixir-format
 msgid "Automatic updates"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2815
-#: lib/ask_drive_web/live/admin_live.ex:2824
+#: lib/ask_drive_web/live/admin_live.ex:2853
+#: lib/ask_drive_web/live/admin_live.ex:2862
 #, elixir-autogen, elixir-format
 msgid "Available"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3703
+#: lib/ask_drive_web/live/admin_live.ex:3741
 #, elixir-autogen, elixir-format
 msgid "Average response time (latency)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4345
+#: lib/ask_drive_web/live/admin_live.ex:4383
 #, elixir-autogen, elixir-format
 msgid "Base DN (blank = derived from the domain: %{dn})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5965
+#: lib/ask_drive_web/live/admin_live.ex:6052
 #, elixir-autogen, elixir-format
 msgid "Batch cut-off hour (0–23, default 8; a running batch stops QA generation at this hour)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2158
+#: lib/ask_drive_web/live/admin_live.ex:2196
 #, elixir-autogen, elixir-format
 msgid "Batch is running."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2308
+#: lib/ask_drive_web/live/admin_live.ex:2346
 #, elixir-autogen, elixir-format
 msgid "Batch run status"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6572
+#: lib/ask_drive_web/live/admin_live.ex:6659
 #, elixir-autogen, elixir-format
 msgid "Behind a reverse proxy, add the proxy under Ports and reverse proxies. Otherwise every connection appears to come from the proxy (the office LAN) and gets in without a certificate."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3966
+#: lib/ask_drive_web/live/admin_live.ex:4004
 #, elixir-autogen, elixir-format
 msgid "Best (S)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6771
+#: lib/ask_drive_web/live/admin_live.ex:6858
 #, elixir-autogen, elixir-format
 msgid "Blank: generated (16 characters)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5705
+#: lib/ask_drive_web/live/admin_live.ex:5792
 #, elixir-autogen, elixir-format
 msgid "Blank: the nightly batch model"
 msgstr ""
@@ -1516,12 +1516,12 @@ msgstr ""
 msgid "Building"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4370
+#: lib/ask_drive_web/live/admin_live.ex:4408
 #, elixir-autogen, elixir-format
 msgid "CA certificate (optional; not needed for Google)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4312
+#: lib/ask_drive_web/live/admin_live.ex:4350
 #, elixir-autogen, elixir-format
 msgid "Can be turned on after saving the settings below (including the client certificate and private key). While it is on, saving fails if settings are missing"
 msgstr ""
@@ -1536,7 +1536,7 @@ msgstr ""
 msgid "Can be turned on once the secret header value and public URL are saved. From then on, direct access without the header is refused."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:596
+#: lib/ask_drive_web/live/admin_live.ex:598
 #, elixir-autogen, elixir-format
 msgid "Can't read these as IP addresses or ranges: %{values}"
 msgstr ""
@@ -1546,7 +1546,7 @@ msgstr ""
 msgid "Can't read these as IPs allowed direct access: %{values}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7397
+#: lib/ask_drive_web/live/admin_live.ex:7494
 #, elixir-autogen, elixir-format
 msgid "Can't read these as email addresses: %{values}"
 msgstr ""
@@ -1561,27 +1561,27 @@ msgstr ""
 msgid "Cancel the build? (The running server is not affected.)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6083
+#: lib/ask_drive_web/live/admin_live.ex:6170
 #, elixir-autogen, elixir-format
 msgid "Cannot connect to Ollama: %{reason}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4541
+#: lib/ask_drive_web/live/admin_live.ex:4579
 #, elixir-autogen, elixir-format
 msgid "Cannot connect: %{message}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2414
+#: lib/ask_drive_web/live/admin_live.ex:2452
 #, elixir-autogen, elixir-format
 msgid "Cause of failure (error)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6659
+#: lib/ask_drive_web/live/admin_live.ex:6746
 #, elixir-autogen, elixir-format
 msgid "Certificate %{name} is ready to download"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6263
+#: lib/ask_drive_web/live/admin_live.ex:6350
 #, elixir-autogen, elixir-format
 msgid "Certificate (PEM, required)"
 msgstr ""
@@ -1591,52 +1591,52 @@ msgstr ""
 msgid "Certificate host name"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6208
+#: lib/ask_drive_web/live/admin_live.ex:6295
 #, elixir-autogen, elixir-format
 msgid "Certificate in use"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:693
+#: lib/ask_drive_web/live/admin_live.ex:695
 #, elixir-autogen, elixir-format
 msgid "Certificate not found."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:705
+#: lib/ask_drive_web/live/admin_live.ex:707
 #, elixir-autogen, elixir-format
 msgid "Certificate revoked."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4890
+#: lib/ask_drive_web/live/admin_live.ex:4928
 #, elixir-autogen, elixir-format
 msgid "Change password"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5565
+#: lib/ask_drive_web/live/admin_live.ex:5603
 #, elixir-autogen, elixir-format
 msgid "Change these values in the System, OAuth and batch settings form below."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6461
+#: lib/ask_drive_web/live/admin_live.ex:6548
 #, elixir-autogen, elixir-format
 msgid "Changing a port restarts AskDrive's listener (a few seconds). If it cannot start on the new port, it goes back. If you get locked out, run"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5792
+#: lib/ask_drive_web/live/admin_live.ex:5879
 #, elixir-autogen, elixir-format
 msgid "Changing the embedding model or dimensions recreates the vector table and discards all existing vectors. Tier 1 / Tier 2 do not work until the next nightly batch re-embeds every chunk."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:728
+#: lib/ask_drive_web/live/admin_live.ex:730
 #, elixir-autogen, elixir-format
 msgid "Changing the ports and restarting. In a few seconds, reopen https://<host>:%{port}/admin?tab=settings (if it can't start, the previous settings come back)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3797
+#: lib/ask_drive_web/live/admin_live.ex:3835
 #, elixir-autogen, elixir-format
 msgid "Chat AI summary"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3126
+#: lib/ask_drive_web/live/admin_live.ex:3164
 #, elixir-autogen, elixir-format
 msgid "Chat URL:"
 msgstr ""
@@ -1646,22 +1646,22 @@ msgstr ""
 msgid "Chat summary"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5732
+#: lib/ask_drive_web/live/admin_live.ex:5819
 #, elixir-autogen, elixir-format
 msgid "Chat summary answer style"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5695
+#: lib/ask_drive_web/live/admin_live.ex:5782
 #, elixir-autogen, elixir-format
 msgid "Chat summary cloud API provider"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5696
+#: lib/ask_drive_web/live/admin_live.ex:5783
 #, elixir-autogen, elixir-format
 msgid "Chat summary local LLM provider"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5704
+#: lib/ask_drive_web/live/admin_live.ex:5791
 #, elixir-autogen, elixir-format
 msgid "Chat summary model name"
 msgstr ""
@@ -1686,115 +1686,116 @@ msgstr ""
 msgid "Checking…"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5443
+#: lib/ask_drive_web/live/admin_live.ex:5481
 #, elixir-autogen, elixir-format
 msgid "Checks authentication and folder access, and lists the files that would be synced (nothing is ingested)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7639
+#: lib/ask_drive_web/live/admin_live.ex:7736
 #, elixir-autogen, elixir-format
 msgid "Choose a PEM file (.pem / .crt / .cer / .key)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:495
+#: lib/ask_drive_web/live/admin_live.ex:497
 #, elixir-autogen, elixir-format
 msgid "Choose both the certificate and the private key"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7641
+#: lib/ask_drive_web/live/admin_live.ex:7738
 #, elixir-autogen, elixir-format
 msgid "Choose only one file"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2706
+#: lib/ask_drive_web/live/admin_live.ex:2744
 #, elixir-autogen, elixir-format
 msgid "Chunks"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2642
+#: lib/ask_drive_web/live/admin_live.ex:2680
 #, elixir-autogen, elixir-format
 msgid "Chunks QA could not be generated for (failed 3 times · %{count})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2297
+#: lib/ask_drive_web/live/admin_live.ex:2335
 #, elixir-autogen, elixir-format
 msgid "Click a row to show that batch's details (phase breakdown and per-file log) in \"Batch run status\" below."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3444
+#: lib/ask_drive_web/live/admin_live.ex:3482
 #, elixir-autogen, elixir-format
 msgid "Click to grant admin rights for %{app}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3440
+#: lib/ask_drive_web/live/admin_live.ex:3478
 #, elixir-autogen, elixir-format
 msgid "Click to revoke admin rights for %{app}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5177
+#: lib/ask_drive_web/live/admin_live.ex:5215
 #, elixir-autogen, elixir-format
 msgid "Client ID in use:"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4362
+#: lib/ask_drive_web/live/admin_live.ex:4400
 #, elixir-autogen, elixir-format
 msgid "Client certificate (.crt)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4292
+#: lib/ask_drive_web/live/admin_live.ex:4330
 #, elixir-autogen, elixir-format
 msgid "Client certificate: Not registered"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5607
-#: lib/ask_drive_web/live/admin_live.ex:5686
+#: lib/ask_drive_web/live/admin_live.ex:5645
+#: lib/ask_drive_web/live/admin_live.ex:5773
 #, elixir-autogen, elixir-format
 msgid "Cloud API"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5658
+#: lib/ask_drive_web/live/admin_live.ex:5701
+#: lib/ask_drive_web/live/admin_live.ex:5716
 #, elixir-autogen, elixir-format
 msgid "Cloud API model name"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5652
+#: lib/ask_drive_web/live/admin_live.ex:5690
 #, elixir-autogen, elixir-format
 msgid "Cloud API provider"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7221
+#: lib/ask_drive_web/live/admin_live.ex:7318
 #, elixir-autogen, elixir-format
 msgid "Completed"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4879
+#: lib/ask_drive_web/live/admin_live.ex:4917
 #, elixir-autogen, elixir-format
 msgid "Confirm password"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5099
+#: lib/ask_drive_web/live/admin_live.ex:5137
 #, elixir-autogen, elixir-format
 msgid "Connect Google Drive (3 steps)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:190
-#: lib/ask_drive_web/live/admin_live.ex:7824
+#: lib/ask_drive_web/live/admin_live.ex:192
+#: lib/ask_drive_web/live/admin_live.ex:7921
 #, elixir-autogen, elixir-format
 msgid "Connected %{email}."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7143
+#: lib/ask_drive_web/live/admin_live.ex:7240
 #, elixir-autogen, elixir-format
 msgid "Connected (%{identity}). The sync folder \"%{folder}\" can be read."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2781
-#: lib/ask_drive_web/live/admin_live.ex:2799
+#: lib/ask_drive_web/live/admin_live.ex:2819
+#: lib/ask_drive_web/live/admin_live.ex:2837
 #, elixir-autogen, elixir-format
 msgid "Connected (%{info})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4536
+#: lib/ask_drive_web/live/admin_live.ex:4574
 #, elixir-autogen, elixir-format
 msgid "Connected (certificate and base DN are OK). Try a password on the sign-in screen."
 msgstr ""
@@ -1804,8 +1805,8 @@ msgstr ""
 msgid "Connected (found %{count} records for %{zone}; nothing was changed)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:193
-#: lib/ask_drive_web/live/admin_live.ex:7828
+#: lib/ask_drive_web/live/admin_live.ex:195
+#: lib/ask_drive_web/live/admin_live.ex:7925
 #, elixir-autogen, elixir-format
 msgid "Connected the Google Drive sync account (%{email}). Check it with \"Test sync\"."
 msgstr ""
@@ -1820,12 +1821,12 @@ msgstr ""
 msgid "Connected to %{provider} / %{model}."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4909
+#: lib/ask_drive_web/live/admin_live.ex:4947
 #, elixir-autogen, elixir-format
 msgid "Connected: %{identity}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1188
+#: lib/ask_drive_web/live/admin_live.ex:1199
 #, elixir-autogen, elixir-format
 msgid "Connecting needs an OAuth client. Register one in the platform settings under \"Google OAuth (login / Drive sync)\", or enter one below under \"OAuth client (first time only)\" and save."
 msgstr ""
@@ -1835,7 +1836,7 @@ msgstr ""
 msgid "Connecting to Value-Domain…"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6929
+#: lib/ask_drive_web/live/admin_live.ex:7026
 #, elixir-autogen, elixir-format
 msgid "Connection test failed: %{reason}"
 msgstr ""
@@ -1845,7 +1846,7 @@ msgstr ""
 msgid "Contact email (optional)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5223
+#: lib/ask_drive_web/live/admin_live.ex:5261
 #, elixir-autogen, elixir-format
 msgid "Copy the whole URL from that browser's address bar"
 msgstr ""
@@ -1855,97 +1856,97 @@ msgstr ""
 msgid "Could not connect. Check that the endpoint is reachable"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7774
+#: lib/ask_drive_web/live/admin_live.ex:7871
 #, elixir-autogen, elixir-format
 msgid "Could not create the desk: %{reason}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:302
+#: lib/ask_drive_web/live/admin_live.ex:304
 #, elixir-autogen, elixir-format
 msgid "Could not delete: %{reason}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7039
+#: lib/ask_drive_web/live/admin_live.ex:7136
 #, elixir-autogen, elixir-format
 msgid "Could not get a token: %{reason}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7033
+#: lib/ask_drive_web/live/admin_live.ex:7130
 #, elixir-autogen, elixir-format
 msgid "Could not get a token: %{reason} (a code can be used only once; if it has expired, authorize again)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7122
+#: lib/ask_drive_web/live/admin_live.ex:7219
 #, elixir-autogen, elixir-format
 msgid "Could not read the sync folder: %{reason}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1113
+#: lib/ask_drive_web/live/admin_live.ex:1120
 #, elixir-autogen, elixir-format
 msgid "Could not save the settings. Check your input."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:356
-#: lib/ask_drive_web/live/admin_live.ex:749
-#: lib/ask_drive_web/live/admin_live.ex:784
-#: lib/ask_drive_web/live/admin_live.ex:902
-#: lib/ask_drive_web/live/admin_live.ex:971
+#: lib/ask_drive_web/live/admin_live.ex:358
+#: lib/ask_drive_web/live/admin_live.ex:751
+#: lib/ask_drive_web/live/admin_live.ex:786
+#: lib/ask_drive_web/live/admin_live.ex:904
+#: lib/ask_drive_web/live/admin_live.ex:973
 #, elixir-autogen, elixir-format
 msgid "Could not save: %{errors}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1581
+#: lib/ask_drive_web/live/admin_live.ex:1592
 #, elixir-autogen, elixir-format
 msgid "Could not set or change the password."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1139
+#: lib/ask_drive_web/live/admin_live.ex:1150
 #, elixir-autogen, elixir-format
 msgid "Could not switch the Drive authentication method."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1617
+#: lib/ask_drive_web/live/admin_live.ex:1628
 #, elixir-autogen, elixir-format
 msgid "Could not update the user."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1358
+#: lib/ask_drive_web/live/admin_live.ex:1369
 #, elixir-autogen, elixir-format
 msgid "Could not update."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3139
+#: lib/ask_drive_web/live/admin_live.ex:3177
 #, elixir-autogen, elixir-format
 msgid "Create desk"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3163
+#: lib/ask_drive_web/live/admin_live.ex:3201
 #, elixir-autogen, elixir-format
 msgid "Created desk \"%{name}\" (/%{slug}). Next, set up the Google Drive folder and authentication, and API keys if needed."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6212
+#: lib/ask_drive_web/live/admin_live.ex:6299
 #, elixir-autogen, elixir-format
 msgid "Custom certificate"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3693
+#: lib/ask_drive_web/live/admin_live.ex:3731
 #, elixir-autogen, elixir-format
 msgid "Data sent"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3621
-#: lib/ask_drive_web/live/admin_live.ex:3847
+#: lib/ask_drive_web/live/admin_live.ex:3659
+#: lib/ask_drive_web/live/admin_live.ex:3885
 #, elixir-autogen, elixir-format
 msgid "Date and time"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3284
+#: lib/ask_drive_web/live/admin_live.ex:3322
 #, elixir-autogen, elixir-format
 msgid "Delete desk \"%{name}\"? Its chat and admin screen will stop working (the database file is kept under a new name). Continue?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6723
+#: lib/ask_drive_web/live/admin_live.ex:6810
 #, elixir-autogen, elixir-format
 msgid "Delete group %{name}?"
 msgstr ""
@@ -1955,118 +1956,118 @@ msgstr ""
 msgid "Delete the Google Chat webhook URL? (Notifications will stop arriving.)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4385
+#: lib/ask_drive_web/live/admin_live.ex:4423
 #, elixir-autogen, elixir-format
 msgid "Delete the registered CA certificate"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5039
+#: lib/ask_drive_web/live/admin_live.ex:5077
 #, elixir-autogen, elixir-format
 msgid "Delete the saved service account credentials?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7203
+#: lib/ask_drive_web/live/admin_live.ex:7300
 #, elixir-autogen, elixir-format
 msgid "Deleted"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3100
+#: lib/ask_drive_web/live/admin_live.ex:3138
 #, elixir-autogen, elixir-format
 msgid "Description (optional, shown in the desk list)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3209
+#: lib/ask_drive_web/live/admin_live.ex:3247
 #, elixir-autogen, elixir-format
 msgid "Description (shown on the portal)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1351
+#: lib/ask_drive_web/live/admin_live.ex:1362
 #, elixir-autogen, elixir-format
 msgid "Desk \"%{name}\" can't have zero administrators. Add another administrator first."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:288
+#: lib/ask_drive_web/live/admin_live.ex:290
 #, elixir-autogen, elixir-format
 msgid "Desk \"%{name}\" deleted (its database file is kept under another name)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4819
+#: lib/ask_drive_web/live/admin_live.ex:4857
 #, elixir-autogen, elixir-format
 msgid "Desk access password"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4866
+#: lib/ask_drive_web/live/admin_live.ex:4904
 #, elixir-autogen, elixir-format
 msgid "Desk access password (at least %{count} characters)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1483
+#: lib/ask_drive_web/live/admin_live.ex:1494
 #, elixir-autogen, elixir-format
 msgid "Desk access password changed."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1485
+#: lib/ask_drive_web/live/admin_live.ex:1496
 #, elixir-autogen, elixir-format
 msgid "Desk access password saved. Turn the restriction on with the \"Restrict access by password\" switch."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4703
+#: lib/ask_drive_web/live/admin_live.ex:4741
 #, elixir-autogen, elixir-format
 msgid "Desk administrators"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3120
+#: lib/ask_drive_web/live/admin_live.ex:3158
 #, elixir-autogen, elixir-format
 msgid "Desk administrators configure the desk (Drive, API keys, etc.). Platform administrators cannot open a desk's admin screen."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3087
+#: lib/ask_drive_web/live/admin_live.ex:3125
 #, elixir-autogen, elixir-format
 msgid "Desk name (e.g. HR)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3185
+#: lib/ask_drive_web/live/admin_live.ex:3223
 #, elixir-autogen, elixir-format
 msgid "Desk name / description"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:270
+#: lib/ask_drive_web/live/admin_live.ex:272
 #, elixir-autogen, elixir-format
 msgid "Desk updated."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:121
-#: lib/ask_drive_web/live/admin_live.ex:3046
+#: lib/ask_drive_web/live/admin_live.ex:123
+#: lib/ask_drive_web/live/admin_live.ex:3084
 #, elixir-autogen, elixir-format
 msgid "Desks (apps)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3383
+#: lib/ask_drive_web/live/admin_live.ex:3421
 #, elixir-autogen, elixir-format
 msgid "Desks administered (app admin)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2708
+#: lib/ask_drive_web/live/admin_live.ex:2746
 #, elixir-autogen, elixir-format
 msgid "Details"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4472
+#: lib/ask_drive_web/live/admin_live.ex:4510
 #, elixir-autogen, elixir-format
 msgid "Device"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4496
+#: lib/ask_drive_web/live/admin_live.ex:4534
 #, elixir-autogen, elixir-format
 msgid "Device (10 failures in 24 hours)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6776
+#: lib/ask_drive_web/live/admin_live.ex:6863
 #, elixir-autogen, elixir-format
 msgid "Devices and browsers show %{name} (with a note: %{with_note}). The password is 8 to 64 ASCII letters, digits and symbols."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6663
+#: lib/ask_drive_web/live/admin_live.ex:6750
 #, elixir-autogen, elixir-format
 msgid "Devices and browsers show it as %{name}. Expires: %{expires}"
 msgstr ""
@@ -2076,67 +2077,67 @@ msgstr ""
 msgid "Direct (%{ip})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3583
+#: lib/ask_drive_web/live/admin_live.ex:3621
 #, elixir-autogen, elixir-format
 msgid "Disable"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3565
+#: lib/ask_drive_web/live/admin_live.ex:3603
 #, elixir-autogen, elixir-format
 msgid "Disable %{email}? They will no longer be able to sign in."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3476
+#: lib/ask_drive_web/live/admin_live.ex:3514
 #, elixir-autogen, elixir-format
 msgid "Disabled"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2767
+#: lib/ask_drive_web/live/admin_live.ex:2805
 #, elixir-autogen, elixir-format
 msgid "Disabled: %{error}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3552
+#: lib/ask_drive_web/live/admin_live.ex:3590
 #, elixir-autogen, elixir-format
 msgid "Disallow elevation"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5087
+#: lib/ask_drive_web/live/admin_live.ex:5125
 #, elixir-autogen, elixir-format
 msgid "Disconnect"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2928
+#: lib/ask_drive_web/live/admin_live.ex:2966
 #, elixir-autogen, elixir-format
 msgid "Document name"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5557
+#: lib/ask_drive_web/live/admin_live.ex:5595
 #, elixir-autogen, elixir-format
 msgid "Document text and questions are sent to the provider."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:133
+#: lib/ask_drive_web/live/admin_live.ex:135
 #, elixir-autogen, elixir-format
 msgid "Documents"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3187
+#: lib/ask_drive_web/live/admin_live.ex:3225
 #, elixir-autogen, elixir-format
 msgid "Documents / chunks"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2456
+#: lib/ask_drive_web/live/admin_live.ex:2494
 #, elixir-autogen, elixir-format
 msgid "Documents already ingested and chunks that already have QA are not redone. Chunks that failed last time go last."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2913
+#: lib/ask_drive_web/live/admin_live.ex:2951
 #, elixir-autogen, elixir-format
 msgid "Documents for ingestion"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3895
+#: lib/ask_drive_web/live/admin_live.ex:3933
 #, elixir-autogen, elixir-format
 msgid "Documents: %{count}"
 msgstr ""
@@ -2146,129 +2147,129 @@ msgstr ""
 msgid "Domain managed at Value-Domain"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:575
+#: lib/ask_drive_web/live/admin_live.ex:577
 #, elixir-autogen, elixir-format
 msgid "Done."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:572
+#: lib/ask_drive_web/live/admin_live.ex:574
 #, elixir-autogen, elixir-format
 msgid "Done. Restarting the HTTPS listener (the page reconnects by itself in a few seconds; if asked to choose a certificate, choose the AskDrive one)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6835
+#: lib/ask_drive_web/live/admin_live.ex:6922
 #, elixir-autogen, elixir-format
 msgid "Download again"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6676
+#: lib/ask_drive_web/live/admin_live.ex:6763
 #, elixir-autogen, elixir-format
 msgid "Download the file for the recipient's device (valid for 10 minutes; each installs without admin rights on the device; you can also get it later with Download again in the list):"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4223
+#: lib/ask_drive_web/live/admin_live.ex:4261
 #, elixir-autogen, elixir-format
 msgid "Drive sync above keeps working even with Google sign-in turned off."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2226
+#: lib/ask_drive_web/live/admin_live.ex:2264
 #, elixir-autogen, elixir-format
 msgid "Duration"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3051
+#: lib/ask_drive_web/live/admin_live.ex:3089
 #, elixir-autogen, elixir-format
 msgid "Each desk has its own Google Drive folder, API keys such as Gemini (so costs can be split), search index, QA pairs, question log and nightly batch history. Each desk's data is stored in a separate database and never mixed."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3925
+#: lib/ask_drive_web/live/admin_live.ex:3963
 #, elixir-autogen, elixir-format
 msgid "Efficiency rating"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4007
+#: lib/ask_drive_web/live/admin_live.ex:4045
 #, elixir-autogen, elixir-format
 msgid "Efficiency score"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2588
+#: lib/ask_drive_web/live/admin_live.ex:2626
 #, elixir-autogen, elixir-format
 msgid "Elapsed in this step: %{time}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3486
+#: lib/ask_drive_web/live/admin_live.ex:3524
 #, elixir-autogen, elixir-format
 msgid "Elevated:"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:123
+#: lib/ask_drive_web/live/admin_live.ex:125
 #, elixir-autogen, elixir-format
 msgid "Elevation log"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3382
+#: lib/ask_drive_web/live/admin_live.ex:3420
 #, elixir-autogen, elixir-format
 msgid "Elevation to platform admin"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3105
+#: lib/ask_drive_web/live/admin_live.ex:3143
 #, elixir-autogen, elixir-format
 msgid "Email addresses of the desk administrators (required; separate multiple with commas)"
 msgstr ""
 
 #: lib/ask_drive/llm/ollama_models.ex:108
-#: lib/ask_drive_web/live/admin_live.ex:5501
+#: lib/ask_drive_web/live/admin_live.ex:5539
 #, elixir-autogen, elixir-format
 msgid "Embedding"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2794
+#: lib/ask_drive_web/live/admin_live.ex:2832
 #, elixir-autogen, elixir-format
 msgid "Embedding (%{provider})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5773
+#: lib/ask_drive_web/live/admin_live.ex:5860
 #, elixir-autogen, elixir-format
 msgid "Embedding dimensions"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5768
+#: lib/ask_drive_web/live/admin_live.ex:5855
 #, elixir-autogen, elixir-format
 msgid "Embedding model name"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5762
+#: lib/ask_drive_web/live/admin_live.ex:5849
 #, elixir-autogen, elixir-format
 msgid "Embedding provider"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3798
+#: lib/ask_drive_web/live/admin_live.ex:3836
 #, elixir-autogen, elixir-format
 msgid "Embedding vector generation"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3584
+#: lib/ask_drive_web/live/admin_live.ex:3622
 #, elixir-autogen, elixir-format
 msgid "Enable"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5324
+#: lib/ask_drive_web/live/admin_live.ex:5362
 #, elixir-autogen, elixir-format
 msgid "Enable the Google Drive API"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2765
+#: lib/ask_drive_web/live/admin_live.ex:2803
 #, elixir-autogen, elixir-format
 msgid "Enabled (v%{version})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6531
-#: lib/ask_drive_web/live/admin_live.ex:6623
+#: lib/ask_drive_web/live/admin_live.ex:6618
+#: lib/ask_drive_web/live/admin_live.ex:6710
 #, elixir-autogen, elixir-format
 msgid "Enforce"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:274
+#: lib/ask_drive_web/live/admin_live.ex:276
 #, elixir-autogen, elixir-format
 msgid "Enter a desk name."
 msgstr ""
@@ -2278,27 +2279,27 @@ msgstr ""
 msgid "Enter a name (e.g. AskDrive), save, and copy the URL shown"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5116
+#: lib/ask_drive_web/live/admin_live.ex:5154
 #, elixir-autogen, elixir-format
 msgid "Enter an account (Gmail or Workspace) that can view the Drive folder to sync."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1268
+#: lib/ask_drive_web/live/admin_live.ex:1279
 #, elixir-autogen, elixir-format
 msgid "Enter and save the ID / URL of the folder to sync."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5113
+#: lib/ask_drive_web/live/admin_live.ex:5151
 #, elixir-autogen, elixir-format
 msgid "Enter the Google account to sync"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7393
+#: lib/ask_drive_web/live/admin_live.ex:7490
 #, elixir-autogen, elixir-format
 msgid "Enter the administrators' email addresses."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5361
+#: lib/ask_drive_web/live/admin_live.ex:5399
 #, elixir-autogen, elixir-format
 msgid "Enter the client ID and secret shown below, then click \"Save\" at the bottom of the card"
 msgstr ""
@@ -2308,7 +2309,7 @@ msgstr ""
 msgid "Enter the public URL as https://app.example.com (no path)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3851
+#: lib/ask_drive_web/live/admin_live.ex:3889
 #, elixir-autogen, elixir-format
 msgid "Error details"
 msgstr ""
@@ -2318,17 +2319,17 @@ msgstr ""
 msgid "Error on the provider's side (%{detail})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3742
+#: lib/ask_drive_web/live/admin_live.ex:3780
 #, elixir-autogen, elixir-format
 msgid "Errors"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3710
+#: lib/ask_drive_web/live/admin_live.ex:3748
 #, elixir-autogen, elixir-format
 msgid "Errors: %{count}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4005
+#: lib/ask_drive_web/live/admin_live.ex:4043
 #, elixir-autogen, elixir-format
 msgid "Estimated tokens"
 msgstr ""
@@ -2338,46 +2339,46 @@ msgstr ""
 msgid "Even with automatic updates, if the build fails the running version keeps running. Switching over automatically by restarting requires AskDrive to be a resident service ("
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3623
+#: lib/ask_drive_web/live/admin_live.ex:3661
 #, elixir-autogen, elixir-format
 msgid "Event"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5751
+#: lib/ask_drive_web/live/admin_live.ex:5838
 #, elixir-autogen, elixir-format
 msgid "Every style answers only from the excerpts, adds source numbers such as [1], and says it could not confirm the answer in the documents when the excerpts do not answer the question. Small local models often ignore instructions other than Concise (tone, length), so a cloud API (Gemini etc.) is recommended."
 msgstr ""
 
 #: lib/ask_drive/accounts/admin_elevation_log.ex:42
-#: lib/ask_drive_web/live/admin_live.ex:6603
+#: lib/ask_drive_web/live/admin_live.ex:6690
 #, elixir-autogen, elixir-format
 msgid "Expired"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6353
+#: lib/ask_drive_web/live/admin_live.ex:6440
 #, elixir-autogen, elixir-format
 msgid "Expires: %{date}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6229
-#: lib/ask_drive_web/live/admin_live.ex:6751
+#: lib/ask_drive_web/live/admin_live.ex:6316
+#: lib/ask_drive_web/live/admin_live.ex:6838
 #, elixir-autogen, elixir-format
 msgid "Expiry date"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5343
+#: lib/ask_drive_web/live/admin_live.ex:5381
 #, elixir-autogen, elixir-format
 msgid "External"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5514
+#: lib/ask_drive_web/live/admin_live.ex:5552
 #, elixir-autogen, elixir-format
 msgid "External API"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2233
-#: lib/ask_drive_web/live/admin_live.ex:7207
-#: lib/ask_drive_web/live/admin_live.ex:7225
+#: lib/ask_drive_web/live/admin_live.ex:2271
+#: lib/ask_drive_web/live/admin_live.ex:7304
+#: lib/ask_drive_web/live/admin_live.ex:7322
 #, elixir-autogen, elixir-format
 msgid "Failed"
 msgstr ""
@@ -2392,107 +2393,107 @@ msgstr ""
 msgid "Failed: %{result}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2705
+#: lib/ask_drive_web/live/admin_live.ex:2743
 #, elixir-autogen, elixir-format
 msgid "File"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2930
+#: lib/ask_drive_web/live/admin_live.ex:2968
 #, elixir-autogen, elixir-format
 msgid "File type"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2361
+#: lib/ask_drive_web/live/admin_live.ex:2399
 #, elixir-autogen, elixir-format
 msgid "Finished at"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3523
+#: lib/ask_drive_web/live/admin_live.ex:3561
 #, elixir-autogen, elixir-format
 msgid "Fixed by ASK_DRIVE_ADMIN_EMAILS in .env.prod (cannot be removed here)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4584
+#: lib/ask_drive_web/live/admin_live.ex:4622
 #, elixir-autogen, elixir-format
 msgid "Fixed by the environment variable"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5420
+#: lib/ask_drive_web/live/admin_live.ex:5458
 #, elixir-autogen, elixir-format
 msgid "Folder display name (optional)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5405
+#: lib/ask_drive_web/live/admin_live.ex:5443
 #, elixir-autogen, elixir-format
 msgid "Folder to sync"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6687
+#: lib/ask_drive_web/live/admin_live.ex:6774
 #, elixir-autogen, elixir-format
 msgid "For Android (.p12)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6938
+#: lib/ask_drive_web/live/admin_live.ex:7035
 #, elixir-autogen, elixir-format
 msgid "For Drive sync only, a client of type \"Desktop app\" is recommended (no redirect URI to register). For a client of type \"Web application\", register the following under \"Authorized redirect URIs\":"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6684
+#: lib/ask_drive_web/live/admin_live.ex:6771
 #, elixir-autogen, elixir-format
 msgid "For Windows (.pfx)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4090
+#: lib/ask_drive_web/live/admin_live.ex:4128
 #, elixir-autogen, elixir-format
 msgid "For a company or organization, enter a domain (e.g."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5560
+#: lib/ask_drive_web/live/admin_live.ex:5598
 #, elixir-autogen, elixir-format
 msgid "For confidential documents, switch back to Ollama or LM Studio."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6686
+#: lib/ask_drive_web/live/admin_live.ex:6773
 #, elixir-autogen, elixir-format
 msgid "For iPhone / iPad (.mobileconfig)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6685
+#: lib/ask_drive_web/live/admin_live.ex:6772
 #, elixir-autogen, elixir-format
 msgid "For macOS (.p12)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3917
+#: lib/ask_drive_web/live/admin_live.ex:3955
 #, elixir-autogen, elixir-format
 msgid "Format / type"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2260
+#: lib/ask_drive_web/live/admin_live.ex:2298
 #, elixir-autogen, elixir-format
 msgid "Full"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2004
+#: lib/ask_drive_web/live/admin_live.ex:2042
 #, elixir-autogen, elixir-format
 msgid "Full run (with QA generation)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5898
+#: lib/ask_drive_web/live/admin_live.ex:5985
 #, elixir-autogen, elixir-format
 msgid "Gemini base URL"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2897
+#: lib/ask_drive_web/live/admin_live.ex:2935
 #, elixir-autogen, elixir-format
 msgid "Generated answer:"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5616
+#: lib/ask_drive_web/live/admin_live.ex:5654
 #, elixir-autogen, elixir-format
 msgid "Generates with Ollama or LM Studio on this server. Documents are not sent outside your organization."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7197
+#: lib/ask_drive_web/live/admin_live.ex:7294
 #, elixir-autogen, elixir-format
 msgid "Generation"
 msgstr ""
@@ -2512,134 +2513,134 @@ msgstr ""
 msgid "Gets a certificate trusted by browsers and the API gateway from Let's Encrypt for free, and renews it automatically as it nears expiry. Ownership is proven with a DNS TXT record (DNS-01), so this server can stay inside the LAN. The TXT record is added through the Value-Domain DNS API and deleted as soon as the check is done. Renewal is tried once, during the nightly batch window, on the first night when less than a third of the validity period is left (30 days for a 90-day certificate); if it fails, it is tried again on the following nights. The result is posted to Google Chat (if an update notification destination is set)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:935
+#: lib/ask_drive_web/live/admin_live.ex:937
 #, elixir-autogen, elixir-format
 msgid "Getting the certificate is already in progress."
 msgstr ""
 
 #: lib/ask_drive/metrics.ex:288
 #: lib/ask_drive/metrics.ex:297
-#: lib/ask_drive_web/live/admin_live.ex:3971
+#: lib/ask_drive_web/live/admin_live.ex:4009
 #, elixir-autogen, elixir-format
 msgid "Good (A)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1000
+#: lib/ask_drive_web/live/admin_live.ex:1002
 #, elixir-autogen, elixir-format
 msgid "Google Chat notification destination removed."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:962
+#: lib/ask_drive_web/live/admin_live.ex:964
 #, elixir-autogen, elixir-format
 msgid "Google Chat notification destination saved. Check it with \"Send test\"."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2143
+#: lib/ask_drive_web/live/admin_live.ex:2181
 #, elixir-autogen, elixir-format
 msgid "Google Drive and AI are set up. Turn on automatic runs when you are ready."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5070
+#: lib/ask_drive_web/live/admin_live.ex:5108
 #, elixir-autogen, elixir-format
 msgid "Google Drive connected"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5414
+#: lib/ask_drive_web/live/admin_live.ex:5452
 #, elixir-autogen, elixir-format
 msgid "Google Drive folder ID / URL"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4905
+#: lib/ask_drive_web/live/admin_live.ex:4943
 #, elixir-autogen, elixir-format
 msgid "Google Drive sync settings"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7885
+#: lib/ask_drive_web/live/admin_live.ex:7982
 #, elixir-autogen, elixir-format
 msgid "Google Drive sync settings saved."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5889
+#: lib/ask_drive_web/live/admin_live.ex:5976
 #, elixir-autogen, elixir-format
 msgid "Google Gemini API key (%{key})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4671
+#: lib/ask_drive_web/live/admin_live.ex:4709
 #, elixir-autogen, elixir-format
 msgid "Google Secure LDAP is off, so you get straight in if you signed in within the last %{minutes} minutes (otherwise you sign in again)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4667
+#: lib/ask_drive_web/live/admin_live.ex:4705
 #, elixir-autogen, elixir-format
 msgid "Google Secure LDAP is on, so you confirm with your own Google Workspace password (typos count toward the same lock as LDAP sign-in)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5336
+#: lib/ask_drive_web/live/admin_live.ex:5374
 #, elixir-autogen, elixir-format
 msgid "Google Workspace (organization)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4934
+#: lib/ask_drive_web/live/admin_live.ex:4972
 #, elixir-autogen, elixir-format
 msgid "Google account authorization"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7023
+#: lib/ask_drive_web/live/admin_live.ex:7120
 #, elixir-autogen, elixir-format
 msgid "Google did not allow it (%{reason})."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7425
+#: lib/ask_drive_web/live/admin_live.ex:7522
 #, elixir-autogen, elixir-format
 msgid "Google login"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4232
+#: lib/ask_drive_web/live/admin_live.ex:4270
 #, elixir-autogen, elixir-format
 msgid "Google sign-in"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7133
+#: lib/ask_drive_web/live/admin_live.ex:7230
 #, elixir-autogen, elixir-format
 msgid "Got a token (%{identity}). No sync folder is set, so reading the folder was not checked."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7161
+#: lib/ask_drive_web/live/admin_live.ex:7258
 #, elixir-autogen, elixir-format
 msgid "Got a token, but %{user} has no permission to view the sync folder. Give that user access to the folder (or the shared drive)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7153
+#: lib/ask_drive_web/live/admin_live.ex:7250
 #, elixir-autogen, elixir-format
 msgid "Got a token, but could not read the sync folder: %{reason}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7168
+#: lib/ask_drive_web/live/admin_live.ex:7265
 #, elixir-autogen, elixir-format
 msgid "Got a token, but the sync folder can't be read (Drive reports files you have no permission for as \"not found\"). Share the folder with the service account. If an organization-only shared drive doesn't let you add the service account, set the \"Access user\" below and use domain-wide delegation."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:608
+#: lib/ask_drive_web/live/admin_live.ex:610
 #, elixir-autogen, elixir-format
 msgid "Group \"%{name}\" added."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:710
+#: lib/ask_drive_web/live/admin_live.ex:712
 #, elixir-autogen, elixir-format
 msgid "Group deleted."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:616
+#: lib/ask_drive_web/live/admin_live.ex:618
 #, elixir-autogen, elixir-format
 msgid "Group name %{errors}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6865
+#: lib/ask_drive_web/live/admin_live.ex:6952
 #, elixir-autogen, elixir-format
 msgid "Group name (e.g. Accounting)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6701
+#: lib/ask_drive_web/live/admin_live.ex:6788
 #, elixir-autogen, elixir-format
 msgid "Groups and certificates"
 msgstr ""
@@ -2649,42 +2650,42 @@ msgstr ""
 msgid "HTTP and HTTPS can't use the same port"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6435
+#: lib/ask_drive_web/live/admin_live.ex:6522
 #, elixir-autogen, elixir-format
 msgid "HTTP port"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6191
+#: lib/ask_drive_web/live/admin_live.ex:6278
 #, elixir-autogen, elixir-format
 msgid "HTTPS (SSL certificate)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6393
+#: lib/ask_drive_web/live/admin_live.ex:6480
 #, elixir-autogen, elixir-format
 msgid "HTTPS is off (ASK_DRIVE_SSL=false). Listening on HTTP."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6424
+#: lib/ask_drive_web/live/admin_live.ex:6511
 #, elixir-autogen, elixir-format
 msgid "HTTPS port"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3827
+#: lib/ask_drive_web/live/admin_live.ex:3865
 #, elixir-autogen, elixir-format
 msgid "History of recent API communication errors. Use it to check for revoked API keys, rate limits (429), timeouts and so on."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6237
+#: lib/ask_drive_web/live/admin_live.ex:6324
 #, elixir-autogen, elixir-format
 msgid "Host names covered"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6350
+#: lib/ask_drive_web/live/admin_live.ex:6437
 #, elixir-autogen, elixir-format
 msgid "Host names: %{names}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4657
+#: lib/ask_drive_web/live/admin_live.ex:4695
 #, elixir-autogen, elixir-format
 msgid "How platform administrators get in"
 msgstr ""
@@ -2694,17 +2695,17 @@ msgstr ""
 msgid "IPs allowed to connect directly, bypassing the gateway (optional; comma-separated, ranges like 192.168.0.0/16; leave empty to allow none)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6447
+#: lib/ask_drive_web/live/admin_live.ex:6534
 #, elixir-autogen, elixir-format
 msgid "IPs of proxies to accept HTTP from (comma-separated; ranges like 10.0.0.0/24; blank: off)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6407
+#: lib/ask_drive_web/live/admin_live.ex:6494
 #, elixir-autogen, elixir-format
 msgid "If a reverse proxy in front terminates HTTPS, enter its IP. HTTP from that IP is accepted without redirecting, and the X-Forwarded-For / X-Forwarded-Proto / X-Forwarded-Host headers it adds (CF-Connecting-IP for Cloudflare) are trusted (the user's real IP is used for lockouts and logs). HTTP from anywhere else is redirected to HTTPS. The decision uses the connecting IP, not the headers. Add HSTS on the proxy."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5005
+#: lib/ask_drive_web/live/admin_live.ex:5043
 #, elixir-autogen, elixir-format
 msgid "If already saved, you can leave this blank (the existing key is kept)."
 msgstr ""
@@ -2714,12 +2715,12 @@ msgstr ""
 msgid "If the build finishes while a batch is running"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5016
+#: lib/ask_drive_web/live/admin_live.ex:5054
 #, elixir-autogen, elixir-format
 msgid "If the folder to sync is in a shared drive that only users in your organization can access, the service account (treated as outside the organization) cannot be added to it. In that case, enter the email address of an internal user who can view the folder, and in the Google Admin console → \"Security\" → \"API controls\" → \"Domain-wide delegation\", authorize the client ID"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5214
+#: lib/ask_drive_web/live/admin_live.ex:5252
 #, elixir-autogen, elixir-format
 msgid "If you see \"This site can't be reached\" (this is expected)"
 msgstr ""
@@ -2729,125 +2730,125 @@ msgstr ""
 msgid "In Google Chat, open the space to notify, then space name → “Apps & integrations” → “Add webhooks”"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2259
-#: lib/ask_drive_web/live/admin_live.ex:2347
+#: lib/ask_drive_web/live/admin_live.ex:2297
+#: lib/ask_drive_web/live/admin_live.ex:2385
 #, elixir-autogen, elixir-format
 msgid "Ingest only"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7204
+#: lib/ask_drive_web/live/admin_live.ex:7301
 #, elixir-autogen, elixir-format
 msgid "Ingested"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2231
+#: lib/ask_drive_web/live/admin_live.ex:2269
 #, elixir-autogen, elixir-format
 msgid "Ingested (documents / chunks)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2369
+#: lib/ask_drive_web/live/admin_live.ex:2407
 #, elixir-autogen, elixir-format
 msgid "Ingested (successful documents / chunks)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7196
+#: lib/ask_drive_web/live/admin_live.ex:7293
 #, elixir-autogen, elixir-format
 msgid "Ingestion"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3685
+#: lib/ask_drive_web/live/admin_live.ex:3723
 #, elixir-autogen, elixir-format
 msgid "Input %{prompt} / output %{completion}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6271
+#: lib/ask_drive_web/live/admin_live.ex:6358
 #, elixir-autogen, elixir-format
 msgid "Intermediate certificate (PEM, optional)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5338
+#: lib/ask_drive_web/live/admin_live.ex:5376
 #, elixir-autogen, elixir-format
 msgid "Internal"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6788
+#: lib/ask_drive_web/live/admin_live.ex:6875
 #, elixir-autogen, elixir-format
 msgid "Issue"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6717
+#: lib/ask_drive_web/live/admin_live.ex:6804
 #, elixir-autogen, elixir-format
 msgid "Issue certificate…"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6802
+#: lib/ask_drive_web/live/admin_live.ex:6889
 #, elixir-autogen, elixir-format
 msgid "Issued %{issued} · Expires %{expires}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6660
+#: lib/ask_drive_web/live/admin_live.ex:6747
 #, elixir-autogen, elixir-format
 msgid "Issued certificate %{name}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1515
+#: lib/ask_drive_web/live/admin_live.ex:1526
 #, elixir-autogen, elixir-format
 msgid "It can't be switched on this screen"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1996
+#: lib/ask_drive_web/live/admin_live.ex:2034
 #, elixir-autogen, elixir-format
 msgid "It is currently business hours. A batch with QA generation occupies the generation model for a long time, and chat falls back to source search only (mostly keywords) meanwhile. \"Run ingestion only\" is usually enough. Run it anyway?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1956
-#: lib/ask_drive_web/live/admin_live.ex:2467
+#: lib/ask_drive_web/live/admin_live.ex:1994
+#: lib/ask_drive_web/live/admin_live.ex:2505
 #, elixir-autogen, elixir-format
 msgid "It is currently business hours. A batch with QA generation occupies the generation model for a long time, and chat falls back to source search only (mostly keywords) meanwhile. Resume from where it stopped?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:376
-#: lib/ask_drive_web/live/admin_live.ex:449
+#: lib/ask_drive_web/live/admin_live.ex:378
+#: lib/ask_drive_web/live/admin_live.ex:451
 #, elixir-autogen, elixir-format
 msgid "It is fixed by the environment variable ASK_DRIVE_DISABLE_AUTH. Remove that line from .env.prod and restart."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4325
+#: lib/ask_drive_web/live/admin_live.ex:4363
 #, elixir-autogen, elixir-format
 msgid "LDAP server"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4310
+#: lib/ask_drive_web/live/admin_live.ex:4348
 #, elixir-autogen, elixir-format
 msgid "LDAP sign-in"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:349
+#: lib/ask_drive_web/live/admin_live.ex:351
 #, elixir-autogen, elixir-format
 msgid "LDAP sign-in settings saved."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1503
+#: lib/ask_drive_web/live/admin_live.ex:1514
 #, elixir-autogen, elixir-format
 msgid "LLM generation during business hours"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5487
+#: lib/ask_drive_web/live/admin_live.ex:5525
 #, elixir-autogen, elixir-format
 msgid "LLM providers"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5595
+#: lib/ask_drive_web/live/admin_live.ex:5633
 #, elixir-autogen, elixir-format
 msgid "LLM providers and models"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5846
+#: lib/ask_drive_web/live/admin_live.ex:5933
 #, elixir-autogen, elixir-format
 msgid "LM Studio endpoint"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3189
+#: lib/ask_drive_web/live/admin_live.ex:3227
 #, elixir-autogen, elixir-format
 msgid "Last batch"
 msgstr ""
@@ -2857,7 +2858,7 @@ msgstr ""
 msgid "Last checked"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2576
+#: lib/ask_drive_web/live/admin_live.ex:2614
 #, elixir-autogen, elixir-format
 msgid "Last item processed"
 msgstr ""
@@ -2867,12 +2868,12 @@ msgstr ""
 msgid "Last run"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3385
+#: lib/ask_drive_web/live/admin_live.ex:3423
 #, elixir-autogen, elixir-format
 msgid "Last sign-in / last elevation"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2932
+#: lib/ask_drive_web/live/admin_live.ex:2970
 #, elixir-autogen, elixir-format
 msgid "Last synced"
 msgstr ""
@@ -2882,12 +2883,12 @@ msgstr ""
 msgid "Last update: %{result}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6810
+#: lib/ask_drive_web/live/admin_live.ex:6897
 #, elixir-autogen, elixir-format
 msgid "Last used %{time}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3852
+#: lib/ask_drive_web/live/admin_live.ex:3890
 #, elixir-autogen, elixir-format
 msgid "Latency"
 msgstr ""
@@ -2897,22 +2898,22 @@ msgstr ""
 msgid "Latest"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5957
+#: lib/ask_drive_web/live/admin_live.ex:6044
 #, elixir-autogen, elixir-format
 msgid "Latest hour an automatic run can start (0–23, default 7)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2443
+#: lib/ask_drive_web/live/admin_live.ex:2481
 #, elixir-autogen, elixir-format
 msgid "Left: %{documents} documents to ingest · %{chunks} chunks without QA · %{questions} questions to embed"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7559
+#: lib/ask_drive_web/live/admin_live.ex:7656
 #, elixir-autogen, elixir-format
 msgid "Less than 1 min"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6218
+#: lib/ask_drive_web/live/admin_live.ex:6305
 #, elixir-autogen, elixir-format
 msgid "Let's Encrypt (auto-renewed)"
 msgstr ""
@@ -2922,12 +2923,12 @@ msgstr ""
 msgid "Let's Encrypt (automatic certificate issuance and renewal)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6217
+#: lib/ask_drive_web/live/admin_live.ex:6304
 #, elixir-autogen, elixir-format
 msgid "Let's Encrypt (staging, for testing; browsers show a warning)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7479
+#: lib/ask_drive_web/live/admin_live.ex:7576
 #, elixir-autogen, elixir-format
 msgid "Let's Encrypt automatic renewal"
 msgstr ""
@@ -2937,7 +2938,7 @@ msgstr ""
 msgid "Let's Encrypt sends expiry warnings and the like here"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:894
+#: lib/ask_drive_web/live/admin_live.ex:896
 #, elixir-autogen, elixir-format
 msgid "Let's Encrypt settings saved."
 msgstr ""
@@ -2947,111 +2948,111 @@ msgstr ""
 msgid "Lets only people who have passed Google Workspace sign-in at an API gateway (such as Sakura Cloud's) reach AskDrive. The gateway adds a secret header ("
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4221
+#: lib/ask_drive_web/live/admin_live.ex:4259
 #, elixir-autogen, elixir-format
 msgid "Lets users sign in with their Google account on the sign-in screen (uses the OAuth client above). "
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4510
+#: lib/ask_drive_web/live/admin_live.ex:4548
 #, elixir-autogen, elixir-format
 msgid "Lift this lock?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5514
+#: lib/ask_drive_web/live/admin_live.ex:5552
 #, elixir-autogen, elixir-format
 msgid "Local"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5607
-#: lib/ask_drive_web/live/admin_live.ex:5685
+#: lib/ask_drive_web/live/admin_live.ex:5645
+#: lib/ask_drive_web/live/admin_live.ex:5772
 #, elixir-autogen, elixir-format
 msgid "Local LLM"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5638
+#: lib/ask_drive_web/live/admin_live.ex:5676
 #, elixir-autogen, elixir-format
 msgid "Local LLM model name"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5632
+#: lib/ask_drive_web/live/admin_live.ex:5670
 #, elixir-autogen, elixir-format
 msgid "Local LLM provider"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6071
+#: lib/ask_drive_web/live/admin_live.ex:6158
 #, elixir-autogen, elixir-format
 msgid "Local models (Ollama)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:472
+#: lib/ask_drive_web/live/admin_live.ex:474
 #, elixir-autogen, elixir-format
 msgid "Lock lifted."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4460
+#: lib/ask_drive_web/live/admin_live.ex:4498
 #, elixir-autogen, elixir-format
 msgid "Locked sign-ins (%{count})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:461
+#: lib/ask_drive_web/live/admin_live.ex:463
 #, elixir-autogen, elixir-format
 msgid "Login turned off (anyone can use the admin screens as a guest)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:408
+#: lib/ask_drive_web/live/admin_live.ex:410
 #, elixir-autogen, elixir-format
 msgid "Login turned on. Sign in as %{emails} and verify your identity from \"Platform Admin\" to enter."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1501
-#: lib/ask_drive_web/live/admin_live.ex:6009
+#: lib/ask_drive_web/live/admin_live.ex:1512
+#: lib/ask_drive_web/live/admin_live.ex:6096
 #, elixir-autogen, elixir-format
 msgid "Maintenance mode"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6012
+#: lib/ask_drive_web/live/admin_live.ex:6099
 #, elixir-autogen, elixir-format
 msgid "Maintenance mode makes this desk's chat unavailable immediately. Continue?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5986
+#: lib/ask_drive_web/live/admin_live.ex:6073
 #, elixir-autogen, elixir-format
 msgid "Maintenance notice message"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3543
+#: lib/ask_drive_web/live/admin_live.ex:3581
 #, elixir-autogen, elixir-format
 msgid "Make %{email} a platform administrator? After verifying their identity, they will be able to change platform settings."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1885
+#: lib/ask_drive_web/live/admin_live.ex:1923
 #, elixir-autogen, elixir-format
 msgid "Manage %{name}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1912
+#: lib/ask_drive_web/live/admin_live.ex:1950
 #, elixir-autogen, elixir-format
 msgid "Manage settings for all of AskDrive: adding and managing desks (apps), users, HTTPS, local models, the nightly batch window, and more."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1908
+#: lib/ask_drive_web/live/admin_live.ex:1946
 #, elixir-autogen, elixir-format
 msgid "Manage this desk's nightly batch, documents, unanswered questions, and Google Drive and AI settings."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7252
+#: lib/ask_drive_web/live/admin_live.ex:7349
 #, elixir-autogen, elixir-format
 msgid "Manual"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5664
+#: lib/ask_drive_web/live/admin_live.ex:5751
 #, elixir-autogen, elixir-format
 msgid "Max generation tokens"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3739
-#: lib/ask_drive_web/live/admin_live.ex:3849
-#: lib/ask_drive_web/live/admin_live.ex:6093
+#: lib/ask_drive_web/live/admin_live.ex:3777
+#: lib/ask_drive_web/live/admin_live.ex:3887
+#: lib/ask_drive_web/live/admin_live.ex:6180
 #, elixir-autogen, elixir-format
 msgid "Model"
 msgstr ""
@@ -3061,28 +3062,28 @@ msgstr ""
 msgid "Model not found. Check the model name (%{detail})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6532
-#: lib/ask_drive_web/live/admin_live.ex:6622
+#: lib/ask_drive_web/live/admin_live.ex:6619
+#: lib/ask_drive_web/live/admin_live.ex:6709
 #, elixir-autogen, elixir-format
 msgid "Monitor"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3977
+#: lib/ask_drive_web/live/admin_live.ex:4015
 #, elixir-autogen, elixir-format
 msgid "Needs review (C)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7200
+#: lib/ask_drive_web/live/admin_live.ex:7297
 #, elixir-autogen, elixir-format
 msgid "New"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3075
+#: lib/ask_drive_web/live/admin_live.ex:3113
 #, elixir-autogen, elixir-format
 msgid "New desk"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4862
+#: lib/ask_drive_web/live/admin_live.ex:4900
 #, elixir-autogen, elixir-format
 msgid "New password (at least %{count} characters)"
 msgstr ""
@@ -3102,12 +3103,12 @@ msgstr ""
 msgid "Nightly automatic renewal"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5998
+#: lib/ask_drive_web/live/admin_live.ex:6085
 #, elixir-autogen, elixir-format
 msgid "Nightly automatic run"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1500
+#: lib/ask_drive_web/live/admin_live.ex:1511
 #, elixir-autogen, elixir-format
 msgid "Nightly batch"
 msgstr ""
@@ -3117,32 +3118,32 @@ msgstr ""
 msgid "Nightly batch (QA generation)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3796
+#: lib/ask_drive_web/live/admin_live.ex:3834
 #, elixir-autogen, elixir-format
 msgid "Nightly batch QA generation"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5574
+#: lib/ask_drive_web/live/admin_live.ex:5612
 #, elixir-autogen, elixir-format
 msgid "Nightly batch hours"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2099
+#: lib/ask_drive_web/live/admin_live.ex:2137
 #, elixir-autogen, elixir-format
 msgid "Nightly batch schedule and history"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:662
+#: lib/ask_drive_web/live/admin_live.ex:664
 #, elixir-autogen, elixir-format
 msgid "Nightly batch turned off (manual runs still work)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:661
+#: lib/ask_drive_web/live/admin_live.ex:663
 #, elixir-autogen, elixir-format
 msgid "Nightly batch turned on. It runs automatically from the next nightly window."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1505
+#: lib/ask_drive_web/live/admin_live.ex:1516
 #, elixir-autogen, elixir-format
 msgid "Nightly check for new versions"
 msgstr ""
@@ -3152,94 +3153,94 @@ msgstr ""
 msgid "Nightly updates"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2104
+#: lib/ask_drive_web/live/admin_live.ex:2142
 #, elixir-autogen, elixir-format
 msgid "Nightly window: daily %{start}:00 to %{finish}:00 the next day · cutoff %{deadline}:00 (local time of this PC)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3731
-#: lib/ask_drive_web/live/admin_live.ex:3779
+#: lib/ask_drive_web/live/admin_live.ex:3769
+#: lib/ask_drive_web/live/admin_live.ex:3817
 #, elixir-autogen, elixir-format
 msgid "No API calls recorded yet."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4463
+#: lib/ask_drive_web/live/admin_live.ex:4501
 #, elixir-autogen, elixir-format
 msgid "No accounts or devices are locked."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3270
+#: lib/ask_drive_web/live/admin_live.ex:3308
 #, elixir-autogen, elixir-format
 msgid "No administrator (assign one in User management)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7012
+#: lib/ask_drive_web/live/admin_live.ex:7109
 #, elixir-autogen, elixir-format
 msgid "No authorization code found. Paste the address of the page you see after allowing access, as it is."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2186
+#: lib/ask_drive_web/live/admin_live.ex:2224
 #, elixir-autogen, elixir-format
 msgid "No automatic run was recorded in the nightly window of %{date} (runs cut short by a restart are not counted, and manual runs do not replace automatic ones). Next automatic run: %{next}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1036
+#: lib/ask_drive_web/live/admin_live.ex:1038
 #, elixir-autogen, elixir-format
 msgid "No batch is running."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2215
+#: lib/ask_drive_web/live/admin_live.ex:2253
 #, elixir-autogen, elixir-format
 msgid "No batch runs yet."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4964
+#: lib/ask_drive_web/live/admin_live.ex:5002
 #, elixir-autogen, elixir-format
 msgid "No browser authorization is needed, so this avoids Google's redirect_uri restrictions (rejection of raw IP addresses and"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3614
+#: lib/ask_drive_web/live/admin_live.ex:3652
 #, elixir-autogen, elixir-format
 msgid "No elevations recorded yet."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3910
-#: lib/ask_drive_web/live/admin_live.ex:3996
+#: lib/ask_drive_web/live/admin_live.ex:3948
+#: lib/ask_drive_web/live/admin_live.ex:4034
 #, elixir-autogen, elixir-format
 msgid "No indexed documents."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2748
+#: lib/ask_drive_web/live/admin_live.ex:2786
 #, elixir-autogen, elixir-format
 msgid "No nightly batch runs yet."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2691
+#: lib/ask_drive_web/live/admin_live.ex:2729
 #, elixir-autogen, elixir-format
 msgid "No per-file log for this batch (batches run before v0.0.27 did not record one)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3840
+#: lib/ask_drive_web/live/admin_live.ex:3878
 #, elixir-autogen, elixir-format
 msgid "No recent errors. Everything is running normally."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2881
+#: lib/ask_drive_web/live/admin_live.ex:2919
 #, elixir-autogen, elixir-format
 msgid "No resolved questions yet."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2921
+#: lib/ask_drive_web/live/admin_live.ex:2959
 #, elixir-autogen, elixir-format
 msgid "No synced documents yet. Connect Google and sync Drive."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7205
+#: lib/ask_drive_web/live/admin_live.ex:7302
 #, elixir-autogen, elixir-format
 msgid "No text"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2849
+#: lib/ask_drive_web/live/admin_live.ex:2887
 #, elixir-autogen, elixir-format
 msgid "No unresolved questions right now."
 msgstr ""
@@ -3249,22 +3250,22 @@ msgstr ""
 msgid "No vector was returned."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:982
+#: lib/ask_drive_web/live/admin_live.ex:984
 #, elixir-autogen, elixir-format
 msgid "No webhook URL is set."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6596
+#: lib/ask_drive_web/live/admin_live.ex:6683
 #, elixir-autogen, elixir-format
 msgid "None"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4300
+#: lib/ask_drive_web/live/admin_live.ex:4338
 #, elixir-autogen, elixir-format
 msgid "None (verified with a public CA)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3419
+#: lib/ask_drive_web/live/admin_live.ex:3457
 #, elixir-autogen, elixir-format
 msgid "Not allowed"
 msgstr ""
@@ -3274,75 +3275,75 @@ msgstr ""
 msgid "Not checked yet"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4913
+#: lib/ask_drive_web/live/admin_live.ex:4951
 #, elixir-autogen, elixir-format
 msgid "Not connected"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5102
+#: lib/ask_drive_web/live/admin_live.ex:5140
 #, elixir-autogen, elixir-format
 msgid "Not connected yet"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2783
-#: lib/ask_drive_web/live/admin_live.ex:2801
+#: lib/ask_drive_web/live/admin_live.ex:2821
+#: lib/ask_drive_web/live/admin_live.ex:2839
 #, elixir-autogen, elixir-format
 msgid "Not connected: %{error}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7366
+#: lib/ask_drive_web/live/admin_live.ex:7463
 #, elixir-autogen, elixir-format
 msgid "Not found in the directory (Google Workspace): %{emails}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2825
+#: lib/ask_drive_web/live/admin_live.ex:2863
 #, elixir-autogen, elixir-format
 msgid "Not installed (pandoc)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2816
+#: lib/ask_drive_web/live/admin_live.ex:2854
 #, elixir-autogen, elixir-format
 msgid "Not installed (poppler)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6606
+#: lib/ask_drive_web/live/admin_live.ex:6693
 #, elixir-autogen, elixir-format
 msgid "Not issued by this AskDrive"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6127
+#: lib/ask_drive_web/live/admin_live.ex:6214
 #, elixir-autogen, elixir-format
 msgid "Not pulled"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7228
+#: lib/ask_drive_web/live/admin_live.ex:7325
 #, elixir-autogen, elixir-format
 msgid "Not run (API key not set)"
 msgstr ""
 
 #: lib/ask_drive/llm.ex:524
-#: lib/ask_drive_web/live/admin_live.ex:1625
-#: lib/ask_drive_web/live/admin_live.ex:4213
+#: lib/ask_drive_web/live/admin_live.ex:1636
+#: lib/ask_drive_web/live/admin_live.ex:4251
 #, elixir-autogen, elixir-format
 msgid "Not set"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3236
+#: lib/ask_drive_web/live/admin_live.ex:3274
 #, elixir-autogen, elixir-format
 msgid "Not set (set up)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6739
+#: lib/ask_drive_web/live/admin_live.ex:6826
 #, elixir-autogen, elixir-format
 msgid "Note (optional, up to 40 characters)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5188
+#: lib/ask_drive_web/live/admin_live.ex:5226
 #, elixir-autogen, elixir-format
 msgid "Note: If Google shows \"Error 400: redirect_uri_mismatch\", the OAuth client type is \"Web application\". In Google Cloud Console, add"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5275
+#: lib/ask_drive_web/live/admin_live.ex:5313
 #, elixir-autogen, elixir-format
 msgid "Note: If you are using a browser on the AskDrive server itself ("
 msgstr ""
@@ -3352,45 +3353,45 @@ msgstr ""
 msgid "Notifications (Google Chat)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3787
+#: lib/ask_drive_web/live/admin_live.ex:3825
 #, elixir-autogen, elixir-format
 msgid "Number of requests"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4158
-#: lib/ask_drive_web/live/admin_live.ex:5355
-#: lib/ask_drive_web/live/admin_live.ex:5370
+#: lib/ask_drive_web/live/admin_live.ex:4196
+#: lib/ask_drive_web/live/admin_live.ex:5393
+#: lib/ask_drive_web/live/admin_live.ex:5408
 #, elixir-autogen, elixir-format
 msgid "OAuth client ID"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4131
+#: lib/ask_drive_web/live/admin_live.ex:4169
 #, elixir-autogen, elixir-format
 msgid "OAuth client for Google Drive sync (shared by all desks)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4166
-#: lib/ask_drive_web/live/admin_live.ex:5378
+#: lib/ask_drive_web/live/admin_live.ex:4204
+#: lib/ask_drive_web/live/admin_live.ex:5416
 #, elixir-autogen, elixir-format
 msgid "OAuth client secret (%{state})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5294
+#: lib/ask_drive_web/live/admin_live.ex:5332
 #, elixir-autogen, elixir-format
 msgid "OAuth client settings (not needed when using the platform settings / per-desk override)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4144
+#: lib/ask_drive_web/live/admin_live.ex:4182
 #, elixir-autogen, elixir-format
 msgid "OAuth client: Not set"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4143
+#: lib/ask_drive_web/live/admin_live.ex:4181
 #, elixir-autogen, elixir-format
 msgid "OAuth client: Set"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5332
+#: lib/ask_drive_web/live/admin_live.ex:5370
 #, elixir-autogen, elixir-format
 msgid "OAuth consent screen"
 msgstr ""
@@ -3407,58 +3408,58 @@ msgid "Obtaining…"
 msgstr ""
 
 #: lib/ask_drive_web/components/feature_toggle.ex:33
-#: lib/ask_drive_web/live/admin_live.ex:4262
-#: lib/ask_drive_web/live/admin_live.ex:6533
-#: lib/ask_drive_web/live/admin_live.ex:6621
+#: lib/ask_drive_web/live/admin_live.ex:4300
+#: lib/ask_drive_web/live/admin_live.ex:6620
+#: lib/ask_drive_web/live/admin_live.ex:6708
 #: lib/ask_drive_web/live/gateway_panel.ex:34
 #, elixir-autogen, elixir-format
 msgid "Off"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4567
+#: lib/ask_drive_web/live/admin_live.ex:4605
 #, elixir-autogen, elixir-format
 msgid "Off (guest / POC)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6245
+#: lib/ask_drive_web/live/admin_live.ex:6332
 #, elixir-autogen, elixir-format
 msgid "Off (not sent while the certificate is self-signed or for testing)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6559
+#: lib/ask_drive_web/live/admin_live.ex:6646
 #, elixir-autogen, elixir-format
 msgid "Office LAN IP addresses and ranges (connections from these can open the login screen and the screens after login without a certificate; comma-separated; ranges like 192.168.0.0/16)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:588
+#: lib/ask_drive_web/live/admin_live.ex:590
 #, elixir-autogen, elixir-format
 msgid "Office LAN settings saved (effective immediately)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5832
+#: lib/ask_drive_web/live/admin_live.ex:5919
 #, elixir-autogen, elixir-format
 msgid "Ollama context length (num_ctx)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5826
+#: lib/ask_drive_web/live/admin_live.ex:5913
 #, elixir-autogen, elixir-format
 msgid "Ollama endpoint"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6074
+#: lib/ask_drive_web/live/admin_live.ex:6161
 #, elixir-autogen, elixir-format
 msgid "Ollama is dedicated to this app, so AskDrive pulls models here (or when the app starts). If a model in the settings has not been pulled, pulling starts automatically at startup and when settings are saved."
 msgstr ""
 
 #: lib/ask_drive_web/components/feature_toggle.ex:33
 #: lib/ask_drive_web/live/acme_panel.ex:52
-#: lib/ask_drive_web/live/admin_live.ex:4262
-#: lib/ask_drive_web/live/admin_live.ex:4567
+#: lib/ask_drive_web/live/admin_live.ex:4300
+#: lib/ask_drive_web/live/admin_live.ex:4605
 #, elixir-autogen, elixir-format
 msgid "On"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6243
+#: lib/ask_drive_web/live/admin_live.ex:6330
 #, elixir-autogen, elixir-format
 msgid "On (the certificate is trusted)"
 msgstr ""
@@ -3473,112 +3474,112 @@ msgstr ""
 msgid "On a night when a new version is found, AskDrive will update and restart automatically. Continue?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6538
+#: lib/ask_drive_web/live/admin_live.ex:6625
 #, elixir-autogen, elixir-format
 msgid "Only devices (browsers) with a certificate issued by AskDrive can open any screen, including the login screen. Certificates are issued per group (such as a department) and handed out as password-protected .p12 files. Who the user is is still checked by login; the certificate is an extra check that the device is one you handed it to. Roll out in the order Off, Monitor, Enforce. Monitor asks for a certificate and logs it, but refuses no one."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1981
+#: lib/ask_drive_web/live/admin_live.ex:2019
 #, elixir-autogen, elixir-format
 msgid "Only syncs Drive and runs ingestion (text extraction and embedding). No QA generation, so chat works as usual while it runs."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4708
+#: lib/ask_drive_web/live/admin_live.ex:4746
 #, elixir-autogen, elixir-format
 msgid "Only the administrators listed here can enter this desk's admin screen (including Drive settings and API keys); platform administrators cannot. Each administrator gets in by confirming their identity with their own account. You can add administrators, and remove yourself to hand over (the last one cannot be removed)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5811
+#: lib/ask_drive_web/live/admin_live.ex:5898
 #, elixir-autogen, elixir-format
 msgid "Only the providers chosen above (nightly batch, chat summary, embedding) are shown. API keys are stored encrypted. Leaving a field blank keeps the current value."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3025
+#: lib/ask_drive_web/live/admin_live.ex:3063
 #, elixir-autogen, elixir-format
 msgid "Open"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5167
+#: lib/ask_drive_web/live/admin_live.ex:5205
 #, elixir-autogen, elixir-format
 msgid "Open Google's authorization page (new window)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5138
+#: lib/ask_drive_web/live/admin_live.ex:5176
 #, elixir-autogen, elixir-format
 msgid "Open Google's authorization page and click \"Allow\""
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3174
+#: lib/ask_drive_web/live/admin_live.ex:3212
 #, elixir-autogen, elixir-format
 msgid "Open desk settings →"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5915
+#: lib/ask_drive_web/live/admin_live.ex:6002
 #, elixir-autogen, elixir-format
 msgid "OpenAI API key (%{key})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5924
+#: lib/ask_drive_web/live/admin_live.ex:6011
 #, elixir-autogen, elixir-format
 msgid "OpenAI base URL"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4087
+#: lib/ask_drive_web/live/admin_live.ex:4125
 #, elixir-autogen, elixir-format
 msgid "Organization and accounts (Google Workspace / domain restriction)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3920
+#: lib/ask_drive_web/live/admin_live.ex:3958
 #, elixir-autogen, elixir-format
 msgid "Original data total"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4006
+#: lib/ask_drive_web/live/admin_live.ex:4044
 #, elixir-autogen, elixir-format
 msgid "Original size"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7226
+#: lib/ask_drive_web/live/admin_live.ex:7323
 #, elixir-autogen, elixir-format
 msgid "Out of time"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2505
+#: lib/ask_drive_web/live/admin_live.ex:2543
 #, elixir-autogen, elixir-format
 msgid "Overall estimate"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2160
+#: lib/ask_drive_web/live/admin_live.ex:2198
 #, elixir-autogen, elixir-format
 msgid "Overall estimate %{percent}%"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:131
+#: lib/ask_drive_web/live/admin_live.ex:133
 #, elixir-autogen, elixir-format
 msgid "Overview & batch status"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4482
+#: lib/ask_drive_web/live/admin_live.ex:4520
 #, elixir-autogen, elixir-format
 msgid "Passphrase for desk \"%{desk}\" (5 failures in 5 minutes)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4402
+#: lib/ask_drive_web/live/admin_live.ex:4440
 #, elixir-autogen, elixir-format
 msgid "Password (%{state})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6763
+#: lib/ask_drive_web/live/admin_live.ex:6850
 #, elixir-autogen, elixir-format
 msgid "Password (optional)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4271
+#: lib/ask_drive_web/live/admin_live.ex:4309
 #, elixir-autogen, elixir-format
 msgid "Password checks over LDAP skip Google's 2-step verification. 5 failures for the same account within 5 minutes lock it for 15 minutes; 10 failures from the same device (browser) within 24 hours lock it for 24 hours."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6671
+#: lib/ask_drive_web/live/admin_live.ex:6758
 #, elixir-autogen, elixir-format
 msgid "Password:"
 msgstr ""
@@ -3588,7 +3589,7 @@ msgstr ""
 msgid "Paste it below, save, and check that “Send test” arrives"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5206
+#: lib/ask_drive_web/live/admin_live.ex:5244
 #, elixir-autogen, elixir-format
 msgid "Paste the browser address (URL) after authorizing"
 msgstr ""
@@ -3598,57 +3599,57 @@ msgstr ""
 msgid "Pause at a break point, restart, and resume where it left off after the restart"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2687
+#: lib/ask_drive_web/live/admin_live.ex:2725
 #, elixir-autogen, elixir-format
 msgid "Per-file log (%{count} · failures first)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3553
+#: lib/ask_drive_web/live/admin_live.ex:3591
 #, elixir-autogen, elixir-format
 msgid "Permit elevation"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5341
+#: lib/ask_drive_web/live/admin_live.ex:5379
 #, elixir-autogen, elixir-format
 msgid "Personal Gmail (@gmail.com etc.)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2703
+#: lib/ask_drive_web/live/admin_live.ex:2741
 #, elixir-autogen, elixir-format
 msgid "Phase"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2615
+#: lib/ask_drive_web/live/admin_live.ex:2653
 #, elixir-autogen, elixir-format
 msgid "Phase breakdown"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1886
+#: lib/ask_drive_web/live/admin_live.ex:1924
 #, elixir-autogen, elixir-format
 msgid "Platform admin"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4662
+#: lib/ask_drive_web/live/admin_live.ex:4700
 #, elixir-autogen, elixir-format
 msgid "Platform administrators (accounts marked \"can elevate\" in user management) get in from \"Platform admin\" in the header by confirming their identity with their own account. There is no shared password."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3418
+#: lib/ask_drive_web/live/admin_live.ex:3456
 #, elixir-autogen, elixir-format
 msgid "Platform elevation allowed"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:125
+#: lib/ask_drive_web/live/admin_live.ex:127
 #, elixir-autogen, elixir-format
 msgid "Platform settings"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4335
+#: lib/ask_drive_web/live/admin_live.ex:4373
 #, elixir-autogen, elixir-format
 msgid "Port (LDAPS)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6404
+#: lib/ask_drive_web/live/admin_live.ex:6491
 #, elixir-autogen, elixir-format
 msgid "Ports and reverse proxies"
 msgstr ""
@@ -3658,48 +3659,48 @@ msgstr ""
 msgid "Posts to a Google Chat space when an update starts and when the new version has started and is running normally (automatic and manual alike). If only the start notice arrives and no completion notice follows, AskDrive may have failed to start after the restart. A failed build, or starting on the old version, is also notified."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2865
+#: lib/ask_drive_web/live/admin_live.ex:2903
 #, elixir-autogen, elixir-format
 msgid "Priority 1"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4366
+#: lib/ask_drive_web/live/admin_live.ex:4404
 #, elixir-autogen, elixir-format
 msgid "Private key (.key)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6267
+#: lib/ask_drive_web/live/admin_live.ex:6354
 #, elixir-autogen, elixir-format
 msgid "Private key (PEM, required)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4295
+#: lib/ask_drive_web/live/admin_live.ex:4333
 #, elixir-autogen, elixir-format
 msgid "Private key: %{key} · CA certificate: %{ca}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2575
+#: lib/ask_drive_web/live/admin_live.ex:2613
 #, elixir-autogen, elixir-format
 msgid "Processing"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2491
+#: lib/ask_drive_web/live/admin_live.ex:2529
 #, elixir-autogen, elixir-format
 msgid "Progress"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2494
+#: lib/ask_drive_web/live/admin_live.ex:2532
 #, elixir-autogen, elixir-format
 msgid "Progress (QA pairs are generated once the other desks finish ingestion)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3738
-#: lib/ask_drive_web/live/admin_live.ex:3848
+#: lib/ask_drive_web/live/admin_live.ex:3776
+#: lib/ask_drive_web/live/admin_live.ex:3886
 #, elixir-autogen, elixir-format
 msgid "Provider"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5806
+#: lib/ask_drive_web/live/admin_live.ex:5893
 #, elixir-autogen, elixir-format
 msgid "Provider connections"
 msgstr ""
@@ -3709,54 +3710,54 @@ msgstr ""
 msgid "Public URL (the URL users open)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6297
+#: lib/ask_drive_web/live/admin_live.ex:6384
 #, elixir-autogen, elixir-format
 msgid "Public host name (optional; if given, checks that the certificate covers it)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6134
+#: lib/ask_drive_web/live/admin_live.ex:6221
 #, elixir-autogen, elixir-format
 msgid "Pull"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6115
+#: lib/ask_drive_web/live/admin_live.ex:6202
 #, elixir-autogen, elixir-format
 msgid "Pull failed: %{error}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6158
+#: lib/ask_drive_web/live/admin_live.ex:6245
 #, elixir-autogen, elixir-format
 msgid "Pull model"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6113
+#: lib/ask_drive_web/live/admin_live.ex:6200
 #, elixir-autogen, elixir-format
 msgid "Pulled"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6175
+#: lib/ask_drive_web/live/admin_live.ex:6262
 #, elixir-autogen, elixir-format
 msgid "Pulled models (%{count})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6110
-#: lib/ask_drive_web/live/admin_live.ex:6170
+#: lib/ask_drive_web/live/admin_live.ex:6197
+#: lib/ask_drive_web/live/admin_live.ex:6257
 #, elixir-autogen, elixir-format
 msgid "Pulling"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3786
-#: lib/ask_drive_web/live/admin_live.ex:3850
+#: lib/ask_drive_web/live/admin_live.ex:3824
+#: lib/ask_drive_web/live/admin_live.ex:3888
 #, elixir-autogen, elixir-format
 msgid "Purpose"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2234
+#: lib/ask_drive_web/live/admin_live.ex:2272
 #, elixir-autogen, elixir-format
 msgid "QA generated"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2386
+#: lib/ask_drive_web/live/admin_live.ex:2424
 #, elixir-autogen, elixir-format
 msgid "QA generation (chunks processed / QA generated)"
 msgstr ""
@@ -3766,42 +3767,42 @@ msgstr ""
 msgid "Rate limit reached (%{detail})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3569
+#: lib/ask_drive_web/live/admin_live.ex:3607
 #, elixir-autogen, elixir-format
 msgid "Re-enable %{email}?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2858
+#: lib/ask_drive_web/live/admin_live.ex:2896
 #, elixir-autogen, elixir-format
 msgid "Reached: Tier %{tier} · Asked: %{time}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3822
+#: lib/ask_drive_web/live/admin_live.ex:3860
 #, elixir-autogen, elixir-format
 msgid "Recent API communication errors (for privacy, question text and document content are neither stored nor shown)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2876
+#: lib/ask_drive_web/live/admin_live.ex:2914
 #, elixir-autogen, elixir-format
 msgid "Recently resolved questions (from last night's batch)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:799
+#: lib/ask_drive_web/live/admin_live.ex:801
 #, elixir-autogen, elixir-format
 msgid "Recreating and applying the self-signed certificate. The page reconnects by itself in a few seconds."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4299
+#: lib/ask_drive_web/live/admin_live.ex:4337
 #, elixir-autogen, elixir-format
 msgid "Registered"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4283
+#: lib/ask_drive_web/live/admin_live.ex:4321
 #, elixir-autogen, elixir-format
 msgid "Registered certificate:"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3310
+#: lib/ask_drive_web/live/admin_live.ex:3348
 #, elixir-autogen, elixir-format
 msgid "Registered users"
 msgstr ""
@@ -3811,62 +3812,62 @@ msgstr ""
 msgid "Release notes for v%{version}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4751
+#: lib/ask_drive_web/live/admin_live.ex:4789
 #, elixir-autogen, elixir-format
 msgid "Remove"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4742
+#: lib/ask_drive_web/live/admin_live.ex:4780
 #, elixir-autogen, elixir-format
 msgid "Remove %{email} from this desk's administrators?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3539
+#: lib/ask_drive_web/live/admin_live.ex:3577
 #, elixir-autogen, elixir-format
 msgid "Remove admin elevation rights from %{email}?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3516
+#: lib/ask_drive_web/live/admin_live.ex:3554
 #, elixir-autogen, elixir-format
 msgid "Remove my platform admin rights"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4750
+#: lib/ask_drive_web/live/admin_live.ex:4788
 #, elixir-autogen, elixir-format
 msgid "Remove myself"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3510
+#: lib/ask_drive_web/live/admin_live.ex:3548
 #, elixir-autogen, elixir-format
 msgid "Remove your own platform administrator rights and go back to being a regular user? You will no longer be able to enter platform administration (to undo this, ask another platform administrator)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4738
+#: lib/ask_drive_web/live/admin_live.ex:4776
 #, elixir-autogen, elixir-format
 msgid "Remove yourself from this desk's administrators? You will no longer be able to enter this desk's admin screen."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1443
+#: lib/ask_drive_web/live/admin_live.ex:1454
 #, elixir-autogen, elixir-format
 msgid "Removed %{email} from the administrators of desk \"%{name}\"."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3740
+#: lib/ask_drive_web/live/admin_live.ex:3778
 #, elixir-autogen, elixir-format
 msgid "Requests"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4556
+#: lib/ask_drive_web/live/admin_live.ex:4594
 #, elixir-autogen, elixir-format
 msgid "Required sign-in"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4615
+#: lib/ask_drive_web/live/admin_live.ex:4653
 #, elixir-autogen, elixir-format
 msgid "Requirement: a sign-in method (Google Secure LDAP or Google sign-in) is set up. Turning it on also takes this browser to the sign-in screen."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2890
+#: lib/ask_drive_web/live/admin_live.ex:2928
 #, elixir-autogen, elixir-format
 msgid "Resolved: %{time}"
 msgstr ""
@@ -3886,109 +3887,109 @@ msgstr ""
 msgid "Restarting"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7449
+#: lib/ask_drive_web/live/admin_live.ex:7546
 #, elixir-autogen, elixir-format
 msgid "Restrict access by password"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6511
+#: lib/ask_drive_web/live/admin_live.ex:6598
 #, elixir-autogen, elixir-format
 msgid "Restrict access to devices with a certificate"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4835
+#: lib/ask_drive_web/live/admin_live.ex:4873
 #, elixir-autogen, elixir-format
 msgid "Restrict access with a password"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2704
+#: lib/ask_drive_web/live/admin_live.ex:2742
 #, elixir-autogen, elixir-format
 msgid "Result"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2440
-#: lib/ask_drive_web/live/admin_live.ex:2475
+#: lib/ask_drive_web/live/admin_live.ex:2478
+#: lib/ask_drive_web/live/admin_live.ex:2513
 #, elixir-autogen, elixir-format
 msgid "Resume"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1969
+#: lib/ask_drive_web/live/admin_live.ex:2007
 #, elixir-autogen, elixir-format
 msgid "Resume (%{count} chunks left)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1959
-#: lib/ask_drive_web/live/admin_live.ex:2470
+#: lib/ask_drive_web/live/admin_live.ex:1997
+#: lib/ask_drive_web/live/admin_live.ex:2508
 #, elixir-autogen, elixir-format
 msgid "Resume from where it stopped?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6124
+#: lib/ask_drive_web/live/admin_live.ex:6211
 #, elixir-autogen, elixir-format
 msgid "Retry"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2651
+#: lib/ask_drive_web/live/admin_live.ex:2689
 #, elixir-autogen, elixir-format
 msgid "Return to generation"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:740
+#: lib/ask_drive_web/live/admin_live.ex:742
 #, elixir-autogen, elixir-format
 msgid "Reverse proxy settings saved (effective immediately)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6327
+#: lib/ask_drive_web/live/admin_live.ex:6414
 #, elixir-autogen, elixir-format
 msgid "Revert to self-signed certificate"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6848
+#: lib/ask_drive_web/live/admin_live.ex:6935
 #, elixir-autogen, elixir-format
 msgid "Revoke"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6842
+#: lib/ask_drive_web/live/admin_live.ex:6929
 #, elixir-autogen, elixir-format
 msgid "Revoke this certificate? Devices that have it installed are locked out immediately."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6600
+#: lib/ask_drive_web/live/admin_live.ex:6687
 #, elixir-autogen, elixir-format
 msgid "Revoked"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6820
+#: lib/ask_drive_web/live/admin_live.ex:6907
 #, elixir-autogen, elixir-format
 msgid "Revoked %{date}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1987
+#: lib/ask_drive_web/live/admin_live.ex:2025
 #, elixir-autogen, elixir-format
 msgid "Run ingestion only"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1999
+#: lib/ask_drive_web/live/admin_live.ex:2037
 #, elixir-autogen, elixir-format
 msgid "Run the batch (with QA generation) manually?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5682
+#: lib/ask_drive_web/live/admin_live.ex:5769
 #, elixir-autogen, elixir-format
 msgid "Run the chat summary on"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5606
+#: lib/ask_drive_web/live/admin_live.ex:5644
 #, elixir-autogen, elixir-format
 msgid "Run the nightly batch (QA generation) on"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7222
+#: lib/ask_drive_web/live/admin_live.ex:7319
 #, elixir-autogen, elixir-format
 msgid "Running"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1890
+#: lib/ask_drive_web/live/admin_live.ex:1928
 #, elixir-autogen, elixir-format
 msgid "Running AskDrive version"
 msgstr ""
@@ -3998,17 +3999,17 @@ msgstr ""
 msgid "Running the latest version."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:871
+#: lib/ask_drive_web/live/admin_live.ex:873
 #, elixir-autogen, elixir-format
 msgid "Running the latest version. No update available."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2365
+#: lib/ask_drive_web/live/admin_live.ex:2403
 #, elixir-autogen, elixir-format
 msgid "Running..."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6000
+#: lib/ask_drive_web/live/admin_live.ex:6087
 #, elixir-autogen, elixir-format
 msgid "Runs Google Drive sync, ingestion and QA generation automatically in the night window. Manual runs work even when off. New desks start off while being set up."
 msgstr ""
@@ -4018,76 +4019,76 @@ msgstr ""
 msgid "Runs before the nightly batch; the batch starts after the restart."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5684
+#: lib/ask_drive_web/live/admin_live.ex:5771
 #, elixir-autogen, elixir-format
 msgid "Same as the nightly batch"
 msgstr ""
 
 #: lib/ask_drive_web/live/acme_panel.ex:169
-#: lib/ask_drive_web/live/admin_live.ex:3213
-#: lib/ask_drive_web/live/admin_live.ex:4111
-#: lib/ask_drive_web/live/admin_live.ex:4192
-#: lib/ask_drive_web/live/admin_live.ex:4449
-#: lib/ask_drive_web/live/admin_live.ex:5429
-#: lib/ask_drive_web/live/admin_live.ex:6481
-#: lib/ask_drive_web/live/admin_live.ex:6582
+#: lib/ask_drive_web/live/admin_live.ex:3251
+#: lib/ask_drive_web/live/admin_live.ex:4149
+#: lib/ask_drive_web/live/admin_live.ex:4230
+#: lib/ask_drive_web/live/admin_live.ex:4487
+#: lib/ask_drive_web/live/admin_live.ex:5467
+#: lib/ask_drive_web/live/admin_live.ex:6568
+#: lib/ask_drive_web/live/admin_live.ex:6669
 #: lib/ask_drive_web/live/gateway_panel.ex:130
 #: lib/ask_drive_web/live/update_panel.ex:365
 #, elixir-autogen, elixir-format
 msgid "Save"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4840
+#: lib/ask_drive_web/live/admin_live.ex:4878
 #, elixir-autogen, elixir-format
 msgid "Save a password below first"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7458
+#: lib/ask_drive_web/live/admin_live.ex:7555
 #, elixir-autogen, elixir-format
 msgid "Save a password first"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6366
+#: lib/ask_drive_web/live/admin_live.ex:6453
 #, elixir-autogen, elixir-format
 msgid "Save and apply (restarts HTTPS)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5251
+#: lib/ask_drive_web/live/admin_live.ex:5289
 #, elixir-autogen, elixir-format
 msgid "Save and finish"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7893
+#: lib/ask_drive_web/live/admin_live.ex:7990
 #, elixir-autogen, elixir-format
 msgid "Save failed: %{errors}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4891
+#: lib/ask_drive_web/live/admin_live.ex:4929
 #, elixir-autogen, elixir-format
 msgid "Save password"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6055
+#: lib/ask_drive_web/live/admin_live.ex:6142
 #, elixir-autogen, elixir-format
 msgid "Save settings"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1239
+#: lib/ask_drive_web/live/admin_live.ex:1250
 #, elixir-autogen, elixir-format
 msgid "Save the JSON key first."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7428
+#: lib/ask_drive_web/live/admin_live.ex:7525
 #, elixir-autogen, elixir-format
 msgid "Save the OAuth client ID and secret first"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:939
+#: lib/ask_drive_web/live/admin_live.ex:941
 #, elixir-autogen, elixir-format
 msgid "Save the host name, domain and API key first."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6475
+#: lib/ask_drive_web/live/admin_live.ex:6562
 #, elixir-autogen, elixir-format
 msgid "Save the port and proxy settings? If you change a port, reopen the screen at the new port's URL."
 msgstr ""
@@ -4102,12 +4103,12 @@ msgstr ""
 msgid "Save the secret header value"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6049
+#: lib/ask_drive_web/live/admin_live.ex:6136
 #, elixir-autogen, elixir-format
 msgid "Save the settings? If you changed the embedding model or dimensions, the vector index is recreated and everything must be re-embedded. Continue?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6360
+#: lib/ask_drive_web/live/admin_live.ex:6447
 #, elixir-autogen, elixir-format
 msgid "Save this certificate and restart HTTPS? Connections drop for a few seconds."
 msgstr ""
@@ -4122,12 +4123,12 @@ msgstr ""
 msgid "Secret header value (set; enter only to change it; 16+ characters)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4425
+#: lib/ask_drive_web/live/admin_live.ex:4463
 #, elixir-autogen, elixir-format
 msgid "Selected, not saved yet: %{files} (registered when you press \"Save\")"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6221
+#: lib/ask_drive_web/live/admin_live.ex:6308
 #, elixir-autogen, elixir-format
 msgid "Self-signed certificate (browsers show a warning)"
 msgstr ""
@@ -4142,34 +4143,34 @@ msgstr ""
 msgid "Sending…"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6021
+#: lib/ask_drive_web/live/admin_live.ex:6108
 #, elixir-autogen, elixir-format
 msgid "Serve invalidated (stale) QA pairs with a warning"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4949
+#: lib/ask_drive_web/live/admin_live.ex:4987
 #, elixir-autogen, elixir-format
 msgid "Service account"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4995
+#: lib/ask_drive_web/live/admin_live.ex:5033
 #, elixir-autogen, elixir-format
 msgid "Service account JSON key (%{state})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1296
+#: lib/ask_drive_web/live/admin_live.ex:1307
 #, elixir-autogen, elixir-format
 msgid "Service account credentials removed."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1502
+#: lib/ask_drive_web/live/admin_live.ex:1513
 #, elixir-autogen, elixir-format
 msgid "Serving stale QA pairs"
 msgstr ""
 
 #: lib/ask_drive/llm.ex:521
-#: lib/ask_drive_web/live/admin_live.ex:1624
-#: lib/ask_drive_web/live/admin_live.ex:3230
+#: lib/ask_drive_web/live/admin_live.ex:1635
+#: lib/ask_drive_web/live/admin_live.ex:3268
 #, elixir-autogen, elixir-format
 msgid "Set"
 msgstr ""
@@ -4179,22 +4180,22 @@ msgstr ""
 msgid "Set (last 4 characters: ...%{last4})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7792
+#: lib/ask_drive_web/live/admin_live.ex:7889
 #, elixir-autogen, elixir-format
 msgid "Set up an OAuth client first, then authorize with \"Open Google's authorization screen\"."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1258
+#: lib/ask_drive_web/live/admin_live.ex:1269
 #, elixir-autogen, elixir-format
 msgid "Set up authentication first (a service account JSON key, or OAuth authorization)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5154
+#: lib/ask_drive_web/live/admin_live.ex:5192
 #, elixir-autogen, elixir-format
 msgid "Set up the OAuth client to connect"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:135
+#: lib/ask_drive_web/live/admin_live.ex:137
 #, elixir-autogen, elixir-format
 msgid "Settings"
 msgstr ""
@@ -4204,182 +4205,182 @@ msgstr ""
 msgid "Settings incomplete"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1089
+#: lib/ask_drive_web/live/admin_live.ex:1094
 #, elixir-autogen, elixir-format
 msgid "Settings saved and the vector index rebuilt. The next nightly batch re-embeds all chunks."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1095
+#: lib/ask_drive_web/live/admin_live.ex:1100
 #, elixir-autogen, elixir-format
 msgid "Settings saved, but rebuilding the vector index failed. Check the logs."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1098
+#: lib/ask_drive_web/live/admin_live.ex:1103
 #, elixir-autogen, elixir-format
 msgid "Settings saved."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2036
+#: lib/ask_drive_web/live/admin_live.ex:2074
 #, elixir-autogen, elixir-format
 msgid "Settings tab"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4234
+#: lib/ask_drive_web/live/admin_live.ex:4272
 #, elixir-autogen, elixir-format
 msgid "Show \"Sign in with Google\" on the sign-in screen (can be turned on after saving the OAuth client above)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6034
+#: lib/ask_drive_web/live/admin_live.ex:6121
 #, elixir-autogen, elixir-format
 msgid "Show an AI summary of search results in chat"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4266
+#: lib/ask_drive_web/live/admin_live.ex:4304
 #, elixir-autogen, elixir-format
 msgid "Shows email and password fields on the sign-in screen and checks the Google Workspace password with Secure LDAP (AskDrive does not store passwords). Works without a public URL. In the Google Admin console, add an LDAP client, allow \"Verify user credentials\" and \"Read user information\", and register the issued certificate (.crt) and private key (.key) here."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4118
+#: lib/ask_drive_web/live/admin_live.ex:4156
 #, elixir-autogen, elixir-format
 msgid "Sign-in methods"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4253
+#: lib/ask_drive_web/live/admin_live.ex:4291
 #, elixir-autogen, elixir-format
 msgid "Sign-in with Google Secure LDAP"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7441
-#: lib/ask_drive_web/live/admin_live.ex:7444
+#: lib/ask_drive_web/live/admin_live.ex:7538
+#: lib/ask_drive_web/live/admin_live.ex:7541
 #, elixir-autogen, elixir-format
 msgid "Sign-in with LDAP"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4202
+#: lib/ask_drive_web/live/admin_live.ex:4240
 #, elixir-autogen, elixir-format
 msgid "Sign-in with a Google account (SSO)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4215
+#: lib/ask_drive_web/live/admin_live.ex:4253
 #, elixir-autogen, elixir-format
 msgid "Sign-in: Off (Drive sync only)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4214
+#: lib/ask_drive_web/live/admin_live.ex:4252
 #, elixir-autogen, elixir-format
 msgid "Sign-in: On"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5939
+#: lib/ask_drive_web/live/admin_live.ex:6026
 #, elixir-autogen, elixir-format
 msgid "Similarity threshold for instant QA answers (Tier 1) (default 0.90; lower answers more often from generated QA pairs, higher sends more to summary and excerpts)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7206
+#: lib/ask_drive_web/live/admin_live.ex:7303
 #, elixir-autogen, elixir-format
 msgid "Skipped"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3624
+#: lib/ask_drive_web/live/admin_live.ex:3662
 #, elixir-autogen, elixir-format
 msgid "Source IP"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2087
+#: lib/ask_drive_web/live/admin_live.ex:2125
 #, elixir-autogen, elixir-format
 msgid "Stale QA pairs (awaiting regeneration)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3974
+#: lib/ask_drive_web/live/admin_live.ex:4012
 #, elixir-autogen, elixir-format
 msgid "Standard (B)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2225
+#: lib/ask_drive_web/live/admin_live.ex:2263
 #, elixir-autogen, elixir-format
 msgid "Started"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1056
+#: lib/ask_drive_web/live/admin_live.ex:1058
 #, elixir-autogen, elixir-format
 msgid "Started a batch (with QA generation)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1055
+#: lib/ask_drive_web/live/admin_live.ex:1057
 #, elixir-autogen, elixir-format
 msgid "Started an ingestion-only batch (no QA generation)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2355
+#: lib/ask_drive_web/live/admin_live.ex:2393
 #, elixir-autogen, elixir-format
 msgid "Started at"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:822
+#: lib/ask_drive_web/live/admin_live.ex:824
 #, elixir-autogen, elixir-format
 msgid "Started downloading %{name} (this can take a few minutes)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:928
+#: lib/ask_drive_web/live/admin_live.ex:930
 #, elixir-autogen, elixir-format
 msgid "Started getting the certificate. Waiting for DNS to propagate can take a few minutes. HTTPS restarts when it is applied, and the page reconnects by itself."
 msgstr ""
 
 #: lib/ask_drive_web/live/acme_panel.ex:41
-#: lib/ask_drive_web/live/admin_live.ex:2229
-#: lib/ask_drive_web/live/admin_live.ex:2929
-#: lib/ask_drive_web/live/admin_live.ex:3384
-#: lib/ask_drive_web/live/admin_live.ex:6094
+#: lib/ask_drive_web/live/admin_live.ex:2267
+#: lib/ask_drive_web/live/admin_live.ex:2967
+#: lib/ask_drive_web/live/admin_live.ex:3422
+#: lib/ask_drive_web/live/admin_live.ex:6181
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2164
+#: lib/ask_drive_web/live/admin_live.ex:2202
 #, elixir-autogen, elixir-format
 msgid "Step %{step}/%{steps} \"%{label}\""
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2543
+#: lib/ask_drive_web/live/admin_live.ex:2581
 #, elixir-autogen, elixir-format
 msgid "Step %{step}/%{steps}: %{label}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1940
+#: lib/ask_drive_web/live/admin_live.ex:1978
 #, elixir-autogen, elixir-format
 msgid "Stop batch"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1925
+#: lib/ask_drive_web/live/admin_live.ex:1963
 #, elixir-autogen, elixir-format
 msgid "Stop requested. It will stop once the current item finishes."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1032
+#: lib/ask_drive_web/live/admin_live.ex:1034
 #, elixir-autogen, elixir-format
 msgid "Stop requested. The batch stops once the current item finishes."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1934
+#: lib/ask_drive_web/live/admin_live.ex:1972
 #, elixir-autogen, elixir-format
 msgid "Stop the running batch? It stops once the current file (or chunk) finishes. What has been ingested and generated so far is kept, and the rest is picked up by the next batch."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6321
+#: lib/ask_drive_web/live/admin_live.ex:6408
 #, elixir-autogen, elixir-format
 msgid "Stop using the custom certificate and go back to a self-signed one? Browsers will show a certificate warning."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7227
+#: lib/ask_drive_web/live/admin_live.ex:7324
 #, elixir-autogen, elixir-format
 msgid "Stopped (manual)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6010
+#: lib/ask_drive_web/live/admin_live.ex:6097
 #, elixir-autogen, elixir-format
 msgid "Stops the chat screen and shows the notice message above"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6233
+#: lib/ask_drive_web/live/admin_live.ex:6320
 #, elixir-autogen, elixir-format
 msgid "Subject / issuer"
 msgstr ""
@@ -4389,73 +4390,73 @@ msgstr ""
 msgid "Succeeded: %{result}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3675
+#: lib/ask_drive_web/live/admin_live.ex:3713
 #, elixir-autogen, elixir-format
 msgid "Success rate: %{rate}%"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5711
+#: lib/ask_drive_web/live/admin_live.ex:5798
 #, elixir-autogen, elixir-format
 msgid "Summarizes with a cloud API. Questions and the retrieved excerpts are sent to the API provider."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5715
+#: lib/ask_drive_web/live/admin_live.ex:5802
 #, elixir-autogen, elixir-format
 msgid "Summarizes with a local LLM. Questions and excerpts are not sent outside your organization."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6648
+#: lib/ask_drive_web/live/admin_live.ex:6735
 #, elixir-autogen, elixir-format
 msgid "Switch to %{mode}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6633
+#: lib/ask_drive_web/live/admin_live.ex:6720
 #, elixir-autogen, elixir-format
 msgid "Switch to Enforce? Devices without a certificate can no longer open even the login screen."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6641
+#: lib/ask_drive_web/live/admin_live.ex:6728
 #, elixir-autogen, elixir-format
 msgid "Switch to Monitor? Certificates are requested and logged, but no one is refused."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6638
+#: lib/ask_drive_web/live/admin_live.ex:6725
 #, elixir-autogen, elixir-format
 msgid "Switch to Off? Devices without a certificate can get in again."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7195
+#: lib/ask_drive_web/live/admin_live.ex:7292
 #, elixir-autogen, elixir-format
 msgid "Sync"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6917
-#: lib/ask_drive_web/live/admin_live.ex:7125
+#: lib/ask_drive_web/live/admin_live.ex:7004
+#: lib/ask_drive_web/live/admin_live.ex:7222
 #, elixir-autogen, elixir-format
 msgid "Sync test failed: %{reason}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5454
+#: lib/ask_drive_web/live/admin_live.ex:5492
 #, elixir-autogen, elixir-format
 msgid "Sync works (%{identity}). Files to sync in folder \"%{folder}\": %{count}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2065
+#: lib/ask_drive_web/live/admin_live.ex:2103
 #, elixir-autogen, elixir-format
 msgid "Synced documents"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2755
+#: lib/ask_drive_web/live/admin_live.ex:2793
 #, elixir-autogen, elixir-format
 msgid "System and inference status"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4471
+#: lib/ask_drive_web/live/admin_live.ex:4509
 #, elixir-autogen, elixir-format
 msgid "Target"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5786
+#: lib/ask_drive_web/live/admin_live.ex:5873
 #, elixir-autogen, elixir-format
 msgid "Temperature (blank: provider default)"
 msgstr ""
@@ -4465,19 +4466,19 @@ msgstr ""
 msgid "Test DNS connection (changes nothing)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4183
-#: lib/ask_drive_web/live/admin_live.ex:5032
-#: lib/ask_drive_web/live/admin_live.ex:5536
+#: lib/ask_drive_web/live/admin_live.ex:4221
+#: lib/ask_drive_web/live/admin_live.ex:5070
+#: lib/ask_drive_web/live/admin_live.ex:5574
 #, elixir-autogen, elixir-format
 msgid "Test connection"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5393
+#: lib/ask_drive_web/live/admin_live.ex:5431
 #, elixir-autogen, elixir-format
 msgid "Test connection (client in use)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4440
+#: lib/ask_drive_web/live/admin_live.ex:4478
 #, elixir-autogen, elixir-format
 msgid "Test connection (with the values entered)"
 msgstr ""
@@ -4487,17 +4488,17 @@ msgstr ""
 msgid "Test notice sent. Check that it arrived in the Google Chat space."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5440
+#: lib/ask_drive_web/live/admin_live.ex:5478
 #, elixir-autogen, elixir-format
 msgid "Test sync"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5439
+#: lib/ask_drive_web/live/admin_live.ex:5477
 #, elixir-autogen, elixir-format
 msgid "Testing…"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3799
+#: lib/ask_drive_web/live/admin_live.ex:3837
 #, elixir-autogen, elixir-format
 msgid "Text generation"
 msgstr ""
@@ -4513,7 +4514,7 @@ msgstr ""
 msgid "The Claude API does not support embeddings. Choose another provider for embedding."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4149
+#: lib/ask_drive_web/live/admin_live.ex:4187
 #, elixir-autogen, elixir-format
 msgid "The Google Cloud OAuth credentials needed to sync Google Drive on every desk. Once registered here, you don't need to set a client ID on each desk. (Required for Drive sync even if you don't use Google sign-in.)"
 msgstr ""
@@ -4528,42 +4529,42 @@ msgstr ""
 msgid "The HTTPS port must be a number from 1 to 65535"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7867
+#: lib/ask_drive_web/live/admin_live.ex:7964
 #, elixir-autogen, elixir-format
 msgid "The access user must be an address in the organization's domain (@%{domain})."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2657
+#: lib/ask_drive_web/live/admin_live.ex:2695
 #, elixir-autogen, elixir-format
 msgid "The batch skips these (so it does not spend time on the same chunks every night). Return them after changing the model or fixing the cause. When a document is updated, its changed chunks return automatically."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5141
+#: lib/ask_drive_web/live/admin_live.ex:5179
 #, elixir-autogen, elixir-format
 msgid "The button opens the Google sign-in page in a new window. Sign in and \"Allow\" access to Drive."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1173
+#: lib/ask_drive_web/live/admin_live.ex:1184
 #, elixir-autogen, elixir-format
 msgid "The client ID / secret is valid (Google recognizes it)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4689
+#: lib/ask_drive_web/live/admin_live.ex:4727
 #, elixir-autogen, elixir-format
 msgid "The elevation duration takes effect with \"Save settings\" below (the same duration applies to desk admin screens)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7636
+#: lib/ask_drive_web/live/admin_live.ex:7733
 #, elixir-autogen, elixir-format
 msgid "The file is too large"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:295
+#: lib/ask_drive_web/live/admin_live.ex:297
 #, elixir-autogen, elixir-format
 msgid "The first desk can't be deleted."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1569
+#: lib/ask_drive_web/live/admin_live.ex:1580
 #, elixir-autogen, elixir-format
 msgid "The new passwords don't match."
 msgstr ""
@@ -4573,27 +4574,27 @@ msgstr ""
 msgid "The night of %{date} or later"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2172
+#: lib/ask_drive_web/live/admin_live.ex:2210
 #, elixir-autogen, elixir-format
 msgid "The nightly window of %{date} has already run (#%{id} · %{trigger} · started %{time} · %{status}). Next automatic run: %{next}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2606
+#: lib/ask_drive_web/live/admin_live.ex:2644
 #, elixir-autogen, elixir-format
 msgid "The overall % is an estimate weighted by step (ingestion and QA generation make up most of it). This screen refreshes every 5 seconds."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1573
+#: lib/ask_drive_web/live/admin_live.ex:1584
 #, elixir-autogen, elixir-format
 msgid "The password must be at least %{count} characters."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1578
+#: lib/ask_drive_web/live/admin_live.ex:1589
 #, elixir-autogen, elixir-format
 msgid "The password must not start or end with spaces."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1963
+#: lib/ask_drive_web/live/admin_live.ex:2001
 #, elixir-autogen, elixir-format
 msgid "The previous batch did not finish. Only the rest is processed (finished parts are not redone)."
 msgstr ""
@@ -4613,73 +4614,73 @@ msgstr ""
 msgid "The secret value must be at least %{count} characters"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2027
+#: lib/ask_drive_web/live/admin_live.ex:2065
 #, elixir-autogen, elixir-format
 msgid "There is no API key for answer generation (%{provider}), so the nightly batch only ingests documents and does not generate QA pairs."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2021
+#: lib/ask_drive_web/live/admin_live.ex:2059
 #, elixir-autogen, elixir-format
 msgid "There is no API key for embedding (%{provider}), so the nightly batch (document ingestion) does not run. Chat is limited to keyword search over the source text."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:381
+#: lib/ask_drive_web/live/admin_live.ex:383
 #, elixir-autogen, elixir-format
 msgid "There is no way to sign in. First set up \"Sign in with Google Secure LDAP\" or Google login (OAuth)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3370
+#: lib/ask_drive_web/live/admin_live.ex:3408
 #, elixir-autogen, elixir-format
 msgid "These get the elevation flag back on every sign-in. Removing it here is undone."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7018
+#: lib/ask_drive_web/live/admin_live.ex:7115
 #, elixir-autogen, elixir-format
 msgid "This address belongs to another authorization. Authorize again with \"Open Google's authorization page\" on this screen."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1595
+#: lib/ask_drive_web/live/admin_live.ex:1606
 #, elixir-autogen, elixir-format
 msgid "This address is fixed as a platform administrator by ASK_DRIVE_ADMIN_EMAILS in .env.prod (it is restored at the next sign-in). Remove it from .env.prod on the server, run ./app.sh restart, then try again."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6543
+#: lib/ask_drive_web/live/admin_live.ex:6630
 #, elixir-autogen, elixir-format
 msgid "This assumes clients connect over HTTPS directly (if a reverse proxy terminates TLS, certificates do not reach AskDrive through it). If you get locked out, run"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:682
+#: lib/ask_drive_web/live/admin_live.ex:684
 #, elixir-autogen, elixir-format
 msgid "This certificate was issued before re-downloads were supported, so it can't be downloaded. Issue a new one."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7672
+#: lib/ask_drive_web/live/admin_live.ex:7769
 #, elixir-autogen, elixir-format
 msgid "This connection (%{ip}) would be refused. Reopen the page through the gateway, do this from the server itself (localhost), or save this IP under \"IPs allowed direct access\""
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:550
+#: lib/ask_drive_web/live/admin_live.ex:552
 #, elixir-autogen, elixir-format
 msgid "This connection has no valid certificate and doesn't come from the office LAN. First install a certificate on this device and check, while still monitoring, that \"Certificate of this connection: valid\" is shown, or do this from the office LAN."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6588
+#: lib/ask_drive_web/live/admin_live.ex:6675
 #, elixir-autogen, elixir-format
 msgid "This connection's certificate:"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1515
-#: lib/ask_drive_web/live/admin_live.ex:7491
+#: lib/ask_drive_web/live/admin_live.ex:1526
+#: lib/ask_drive_web/live/admin_live.ex:7588
 #, elixir-autogen, elixir-format
 msgid "This feature"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:475
+#: lib/ask_drive_web/live/admin_live.ex:477
 #, elixir-autogen, elixir-format
 msgid "This lock has already been lifted."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6412
+#: lib/ask_drive_web/live/admin_live.ex:6499
 #, elixir-autogen, elixir-format
 msgid "This screen connects from:"
 msgstr ""
@@ -4689,17 +4690,17 @@ msgstr ""
 msgid "This screen's connection:"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4317
+#: lib/ask_drive_web/live/admin_live.ex:4355
 #, elixir-autogen, elixir-format
 msgid "This turns off LDAP sign-in. Users who can only sign in with LDAP will be locked out. Continue?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4843
+#: lib/ask_drive_web/live/admin_live.ex:4881
 #, elixir-autogen, elixir-format
 msgid "This turns on password restriction. Users who don't know the password will no longer be able to use this desk. Continue?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2707
+#: lib/ask_drive_web/live/admin_live.ex:2745
 #, elixir-autogen, elixir-format
 msgid "Time"
 msgstr ""
@@ -4709,113 +4710,113 @@ msgstr ""
 msgid "Timed out (%{detail})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5313
+#: lib/ask_drive_web/live/admin_live.ex:5351
 #, elixir-autogen, elixir-format
 msgid "To connect, you need a Google OAuth client (ID and secret). Register it under \"OAuth client for Google Drive sync\" in the platform settings to use it on every desk, or enter it below to set it for this desk only."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6876
+#: lib/ask_drive_web/live/admin_live.ex:6963
 #, elixir-autogen, elixir-format
 msgid "To replace certificates, issue and hand out new ones in the same group, then revoke the old ones once everyone has switched (both work in the meantime). If a certificate leaks, revoke it at once."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3922
+#: lib/ask_drive_web/live/admin_live.ex:3960
 #, elixir-autogen, elixir-format
 msgid "Token density (tokens/KB)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2931
+#: lib/ask_drive_web/live/admin_live.ex:2969
 #, elixir-autogen, elixir-format
 msgid "Token efficiency"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3992
+#: lib/ask_drive_web/live/admin_live.ex:4030
 #, elixir-autogen, elixir-format
 msgid "Token efficiency and improvement advice per document"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3885
+#: lib/ask_drive_web/live/admin_live.ex:3923
 #, elixir-autogen, elixir-format
 msgid "Token efficiency and structure analysis of indexed data"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3906
+#: lib/ask_drive_web/live/admin_live.ex:3944
 #, elixir-autogen, elixir-format
 msgid "Token efficiency by file format"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2072
+#: lib/ask_drive_web/live/admin_live.ex:2110
 #, elixir-autogen, elixir-format
 msgid "Total chunks"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3898
+#: lib/ask_drive_web/live/admin_live.ex:3936
 #, elixir-autogen, elixir-format
 msgid "Total indexed: %{count} tokens"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3668
+#: lib/ask_drive_web/live/admin_live.ex:3706
 #, elixir-autogen, elixir-format
 msgid "Total requests (last 30 days)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3788
-#: lib/ask_drive_web/live/admin_live.ex:3919
+#: lib/ask_drive_web/live/admin_live.ex:3826
+#: lib/ask_drive_web/live/admin_live.ex:3957
 #, elixir-autogen, elixir-format
 msgid "Total token count"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3741
+#: lib/ask_drive_web/live/admin_live.ex:3779
 #, elixir-autogen, elixir-format
 msgid "Total tokens"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3680
+#: lib/ask_drive_web/live/admin_live.ex:3718
 #, elixir-autogen, elixir-format
 msgid "Total tokens used"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6196
+#: lib/ask_drive_web/live/admin_live.ex:6283
 #, elixir-autogen, elixir-format
 msgid "Traffic is encrypted with HTTPS (port %{https_port}). Access over HTTP (port %{http_port}) is redirected to HTTPS (HTTP is still accepted from the proxies set under Ports and reverse proxies below)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2227
+#: lib/ask_drive_web/live/admin_live.ex:2265
 #, elixir-autogen, elixir-format
 msgid "Trigger"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2210
+#: lib/ask_drive_web/live/admin_live.ex:2248
 #, elixir-autogen, elixir-format
 msgid "Turn off"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2204
+#: lib/ask_drive_web/live/admin_live.ex:2242
 #, elixir-autogen, elixir-format
 msgid "Turn off automatic nightly runs for this desk? (Manual runs remain available.)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4644
+#: lib/ask_drive_web/live/admin_live.ex:4682
 #, elixir-autogen, elixir-format
 msgid "Turn off required sign-in (back to guest / POC)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4638
+#: lib/ask_drive_web/live/admin_live.ex:4676
 #, elixir-autogen, elixir-format
 msgid "Turn off required sign-in? Anyone will be able to use the chat and the admin screen without signing in."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2154
+#: lib/ask_drive_web/live/admin_live.ex:2192
 #, elixir-autogen, elixir-format
 msgid "Turn on automatic runs"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4629
+#: lib/ask_drive_web/live/admin_live.ex:4667
 #, elixir-autogen, elixir-format
 msgid "Turn on required sign-in"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4623
+#: lib/ask_drive_web/live/admin_live.ex:4661
 #, elixir-autogen, elixir-format
 msgid "Turn on required sign-in? Afterwards you cannot enter the admin screen without signing in and confirming your identity."
 msgstr ""
@@ -4825,33 +4826,33 @@ msgstr ""
 msgid "Turn on the API gateway check. Connections that don't go through the gateway (except from the server itself and allowed IPs) will be refused immediately. Continue?"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2228
-#: lib/ask_drive_web/live/admin_live.ex:4004
+#: lib/ask_drive_web/live/admin_live.ex:2266
+#: lib/ask_drive_web/live/admin_live.ex:4042
 #, elixir-autogen, elixir-format
 msgid "Type"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3093
+#: lib/ask_drive_web/live/admin_live.ex:3131
 #, elixir-autogen, elixir-format
 msgid "URL name (lowercase letters, digits, hyphens)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:132
+#: lib/ask_drive_web/live/admin_live.ex:134
 #, elixir-autogen, elixir-format
 msgid "Unanswered & resolved questions"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2840
+#: lib/ask_drive_web/live/admin_live.ex:2878
 #, elixir-autogen, elixir-format
 msgid "Unanswered questions (top priority in the next nightly batch)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2397
+#: lib/ask_drive_web/live/admin_live.ex:2435
 #, elixir-autogen, elixir-format
 msgid "Unanswered resolved / queue left"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7202
+#: lib/ask_drive_web/live/admin_live.ex:7299
 #, elixir-autogen, elixir-format
 msgid "Unchanged"
 msgstr ""
@@ -4862,23 +4863,23 @@ msgid "Unexpected response (%{detail})"
 msgstr ""
 
 #: lib/ask_drive/accounts/login_throttle.ex:152
-#: lib/ask_drive_web/live/admin_live.ex:6224
-#: lib/ask_drive_web/live/admin_live.ex:6413
+#: lib/ask_drive_web/live/admin_live.ex:6311
+#: lib/ask_drive_web/live/admin_live.ex:6500
 #, elixir-autogen, elixir-format
 msgid "Unknown"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7491
+#: lib/ask_drive_web/live/admin_live.ex:7588
 #, elixir-autogen, elixir-format
 msgid "Unknown feature"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4513
+#: lib/ask_drive_web/live/admin_live.ex:4551
 #, elixir-autogen, elixir-format
 msgid "Unlock"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4473
+#: lib/ask_drive_web/live/admin_live.ex:4511
 #, elixir-autogen, elixir-format
 msgid "Unlocks at"
 msgstr ""
@@ -4903,102 +4904,102 @@ msgstr ""
 msgid "Update now"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:863
+#: lib/ask_drive_web/live/admin_live.ex:865
 #, elixir-autogen, elixir-format
 msgid "Update started. AskDrive restarts when the build finishes."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7201
+#: lib/ask_drive_web/live/admin_live.ex:7298
 #, elixir-autogen, elixir-format
 msgid "Updated"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1586
+#: lib/ask_drive_web/live/admin_live.ex:1597
 #, elixir-autogen, elixir-format
 msgid "Updated %{email}."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1342
+#: lib/ask_drive_web/live/admin_live.ex:1353
 #, elixir-autogen, elixir-format
 msgid "Updated the desk administrator roles of %{email}."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:126
+#: lib/ask_drive_web/live/admin_live.ex:128
 #, elixir-autogen, elixir-format
 msgid "Updates"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3924
+#: lib/ask_drive_web/live/admin_live.ex:3962
 #, elixir-autogen, elixir-format
 msgid "Usable text ratio"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3773
+#: lib/ask_drive_web/live/admin_live.ex:3811
 #, elixir-autogen, elixir-format
 msgid "Usage by feature and purpose"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3725
+#: lib/ask_drive_web/live/admin_live.ex:3763
 #, elixir-autogen, elixir-format
 msgid "Usage by provider and model"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6092
+#: lib/ask_drive_web/live/admin_live.ex:6179
 #, elixir-autogen, elixir-format
 msgid "Used for"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3381
+#: lib/ask_drive_web/live/admin_live.ex:3419
 #, elixir-autogen, elixir-format
 msgid "User account"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1361
+#: lib/ask_drive_web/live/admin_live.ex:1372
 #, elixir-autogen, elixir-format
 msgid "User not found."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5012
+#: lib/ask_drive_web/live/admin_live.ex:5050
 #, elixir-autogen, elixir-format
 msgid "User to act as (domain-wide delegation, optional)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4393
+#: lib/ask_drive_web/live/admin_live.ex:4431
 #, elixir-autogen, elixir-format
 msgid "Username (bind DN)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:122
+#: lib/ask_drive_web/live/admin_live.ex:124
 #, elixir-autogen, elixir-format
 msgid "Users"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3315
+#: lib/ask_drive_web/live/admin_live.ex:3353
 #, elixir-autogen, elixir-format
 msgid "Users are registered automatically on first sign-in and all start as regular users. Only accounts marked"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6888
+#: lib/ask_drive_web/live/admin_live.ex:6975
 #, elixir-autogen, elixir-format
 msgid "Users who accessed without a certificate (monitoring; check before switching to Enforce)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6036
+#: lib/ask_drive_web/live/admin_live.ex:6123
 #, elixir-autogen, elixir-format
 msgid "Uses the chat summary provider above. With a cloud provider, questions and excerpts are sent outside your organization"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4415
+#: lib/ask_drive_web/live/admin_live.ex:4453
 #, elixir-autogen, elixir-format
 msgid "Usually not needed, since Google connects with the certificate alone. Enter these only if you generated \"Access credentials\" in the Admin console."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6591
+#: lib/ask_drive_web/live/admin_live.ex:6678
 #, elixir-autogen, elixir-format
 msgid "Valid (group %{group})"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:530
+#: lib/ask_drive_web/live/admin_live.ex:532
 #, elixir-autogen, elixir-format
 msgid "Validate the certificate first with \"Validate\"."
 msgstr ""
@@ -5013,17 +5014,17 @@ msgstr ""
 msgid "Value-Domain API key (set; enter only to change it)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6375
+#: lib/ask_drive_web/live/admin_live.ex:6462
 #, elixir-autogen, elixir-format
 msgid "Verification failed. The certificate was not saved."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6339
+#: lib/ask_drive_web/live/admin_live.ex:6426
 #, elixir-autogen, elixir-format
 msgid "Verification succeeded (certificate and key match, expiry, intermediate certificates, TLS connection test)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6313
+#: lib/ask_drive_web/live/admin_live.ex:6400
 #, elixir-autogen, elixir-format
 msgid "Verify"
 msgstr ""
@@ -5043,7 +5044,7 @@ msgstr ""
 msgid "Wait until the batch finishes, then restart (during the nightly batch this can take until morning)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7223
+#: lib/ask_drive_web/live/admin_live.ex:7320
 #, elixir-autogen, elixir-format
 msgid "Waiting for generation (ingested)"
 msgstr ""
@@ -5053,7 +5054,7 @@ msgstr ""
 msgid "Waiting to restart"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6028
+#: lib/ask_drive_web/live/admin_live.ex:6115
 #, elixir-autogen, elixir-format
 msgid "Watch RAM usage"
 msgstr ""
@@ -5068,68 +5069,68 @@ msgstr ""
 msgid "Webhook URL (set; enter only to change it)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4571
+#: lib/ask_drive_web/live/admin_live.ex:4609
 #, elixir-autogen, elixir-format
 msgid "When on, every screen including the desk list and chat requires sign-in, and the admin screen also requires identity confirmation (your password with Secure LDAP, otherwise a sign-in within the last 10 minutes). While off, anyone can use the chat and the admin screen without signing in. If you get locked out, run"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4839
+#: lib/ask_drive_web/live/admin_live.ex:4877
 #, elixir-autogen, elixir-format
 msgid "When on, only people who enter the password can use this desk's chat"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2033
+#: lib/ask_drive_web/live/admin_live.ex:2071
 #, elixir-autogen, elixir-format
 msgid "When the key is issued, open the "
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5720
+#: lib/ask_drive_web/live/admin_live.ex:5807
 #, elixir-autogen, elixir-format
 msgid "When using a different provider from the nightly batch, enter a model name."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2499
+#: lib/ask_drive_web/live/admin_live.ex:2537
 #, elixir-autogen, elixir-format
 msgid "Where it stopped"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6250
+#: lib/ask_drive_web/live/admin_live.ex:6337
 #, elixir-autogen, elixir-format
 msgid "While the admin screen is open without login (POC), anyone on the LAN can replace the certificate. Turn on login before exposing it to the internet."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5976
+#: lib/ask_drive_web/live/admin_live.ex:6063
 #, elixir-autogen, elixir-format
 msgid "With several desks, the nightly run goes one desk at a time in two stages. (1) Ingestion (sync, text extraction, embedding) for every desk, starting with the desk with the lowest share ingested. (2) QA pair generation, starting with the desk with the lowest share generated. The time left before the cut-off is split between desks by the number of chunks still to generate, and time left over by a desk that finishes early goes to the next one."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2182
+#: lib/ask_drive_web/live/admin_live.ex:2220
 #, elixir-autogen, elixir-format
 msgid "Within the nightly window, and this window has not run yet. It will start automatically within a minute."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1434
+#: lib/ask_drive_web/live/admin_live.ex:1445
 #, elixir-autogen, elixir-format
 msgid "You are no longer an administrator of desk \"%{name}\"."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1414
-#: lib/ask_drive_web/live/admin_live.ex:1460
+#: lib/ask_drive_web/live/admin_live.ex:1425
+#: lib/ask_drive_web/live/admin_live.ex:1471
 #, elixir-autogen, elixir-format
 msgid "You are not allowed to change the administrators."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1580
+#: lib/ask_drive_web/live/admin_live.ex:1591
 #, elixir-autogen, elixir-format
 msgid "You are not allowed to do this."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1602
+#: lib/ask_drive_web/live/admin_live.ex:1613
 #, elixir-autogen, elixir-format
 msgid "You can't change your own role or status."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1312
+#: lib/ask_drive_web/live/admin_live.ex:1323
 #, elixir-autogen, elixir-format
 msgid "Your platform administrator role was removed. You are now a regular user."
 msgstr ""
@@ -5139,27 +5140,27 @@ msgstr ""
 msgid "and after the change it is read back to confirm that nothing but the TXT record changed. The first time, make sure a “test” certificate can be obtained before switching to a production one (production has a limit on failed attempts)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5223
+#: lib/ask_drive_web/live/admin_live.ex:5261
 #, elixir-autogen, elixir-format
 msgid "and shows an error. This is normal. "
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4093
+#: lib/ask_drive_web/live/admin_live.ex:4131
 #, elixir-autogen, elixir-format
 msgid "blank"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4103
+#: lib/ask_drive_web/live/admin_live.ex:4141
 #, elixir-autogen, elixir-format
 msgid "company.com (blank for no restriction)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4349
+#: lib/ask_drive_web/live/admin_live.ex:4387
 #, elixir-autogen, elixir-format
 msgid "domain not set"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6455
+#: lib/ask_drive_web/live/admin_live.ex:6542
 #, elixir-autogen, elixir-format
 msgid "e.g. 127.0.0.1, 192.168.1.10"
 msgstr ""
@@ -5169,22 +5170,22 @@ msgstr ""
 msgid "e.g. 192.168.0.0/16 (to use it directly from the office LAN during migration)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6567
+#: lib/ask_drive_web/live/admin_live.ex:6654
 #, elixir-autogen, elixir-format
 msgid "e.g. 192.168.0.0/16, 10.0.0.0/8"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4170
+#: lib/ask_drive_web/live/admin_live.ex:4208
 #, elixir-autogen, elixir-format
 msgid "e.g. GOCSPX-xxxxxxxxxxxx"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6746
+#: lib/ask_drive_web/live/admin_live.ex:6833
 #, elixir-autogen, elixir-format
 msgid "e.g. Reception PC"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5659
+#: lib/ask_drive_web/live/admin_live.ex:5717
 #, elixir-autogen, elixir-format
 msgid "e.g. a Gemini model name"
 msgstr ""
@@ -5194,7 +5195,7 @@ msgstr ""
 msgid "e.g. ask.example.com"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6303
+#: lib/ask_drive_web/live/admin_live.ex:6390
 #, elixir-autogen, elixir-format
 msgid "e.g. askdrive.example.com"
 msgstr ""
@@ -5209,37 +5210,37 @@ msgstr ""
 msgid "e.g. https://app.example.com"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6151
+#: lib/ask_drive_web/live/admin_live.ex:6238
 #, elixir-autogen, elixir-format
 msgid "e.g. qwen3:4b-instruct-2507-q4_K_M"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5125
+#: lib/ask_drive_web/live/admin_live.ex:5163
 #, elixir-autogen, elixir-format
 msgid "e.g. sync-drive@gmail.com or sync@company.com"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4159
+#: lib/ask_drive_web/live/admin_live.ex:4197
 #, elixir-autogen, elixir-format
 msgid "e.g. xxxxxxxx.apps.googleusercontent.com"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4093
+#: lib/ask_drive_web/live/admin_live.ex:4131
 #, elixir-autogen, elixir-format
 msgid "etc.) or no domain restriction, leave it "
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5021
+#: lib/ask_drive_web/live/admin_live.ex:5059
 #, elixir-autogen, elixir-format
 msgid "for the scope"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6947
+#: lib/ask_drive_web/live/admin_live.ex:7044
 #, elixir-autogen, elixir-format
 msgid "host name"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4971
+#: lib/ask_drive_web/live/admin_live.ex:5009
 #, elixir-autogen, elixir-format
 msgid "host names). Open"
 msgstr ""
@@ -5249,12 +5250,12 @@ msgstr ""
 msgid "latest version"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6779
+#: lib/ask_drive_web/live/admin_live.ex:6866
 #, elixir-autogen, elixir-format
 msgid "note"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2139
+#: lib/ask_drive_web/live/admin_live.ex:2177
 #, elixir-autogen, elixir-format
 msgid "off"
 msgstr ""
@@ -5264,27 +5265,27 @@ msgstr ""
 msgid "on the server (takes effect without a restart). Don't send the secret value by email; receive it in a secure way."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4575
+#: lib/ask_drive_web/live/admin_live.ex:4613
 #, elixir-autogen, elixir-format
 msgid "on the server to turn it off again."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6466
+#: lib/ask_drive_web/live/admin_live.ex:6553
 #, elixir-autogen, elixir-format
 msgid "on the server to undo it. Also change the target port on the proxy (Cloudflare Tunnel etc.)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:6547
+#: lib/ask_drive_web/live/admin_live.ex:6634
 #, elixir-autogen, elixir-format
 msgid "on the server, or open the screen from the server itself (localhost)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2821
+#: lib/ask_drive_web/live/admin_live.ex:2859
 #, elixir-autogen, elixir-format
 msgid "pandoc (Office extraction)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:2812
+#: lib/ask_drive_web/live/admin_live.ex:2850
 #, elixir-autogen, elixir-format
 msgid "pdftotext (PDF extraction)"
 msgstr ""
@@ -5294,38 +5295,38 @@ msgstr ""
 msgid "started %{time}"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3672
+#: lib/ask_drive_web/live/admin_live.ex:3710
 #, elixir-autogen, elixir-format
 msgid "times"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4979
+#: lib/ask_drive_web/live/admin_live.ex:5017
 #, elixir-autogen, elixir-format
 msgid "to create a service account, then download its JSON key and paste it below. After that, share the Drive folder to sync with the service account's email address ("
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5192
+#: lib/ask_drive_web/live/admin_live.ex:5230
 #, elixir-autogen, elixir-format
 msgid "to the authorized redirect URIs, or create a client of type \"Desktop app\" (no registration needed for desktop apps)."
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7674
+#: lib/ask_drive_web/live/admin_live.ex:7771
 #: lib/ask_drive_web/live/gateway_panel.ex:49
 #, elixir-autogen, elixir-format
 msgid "unknown"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:1902
+#: lib/ask_drive_web/live/admin_live.ex:1940
 #, elixir-autogen, elixir-format
 msgid "v%{version} available"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3130
+#: lib/ask_drive_web/live/admin_live.ex:3168
 #, elixir-autogen, elixir-format
 msgid "· Admin screen:"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:7257
+#: lib/ask_drive_web/live/admin_live.ex:7354
 #, elixir-autogen, elixir-format
 msgid "— (aborted)"
 msgstr ""
@@ -5335,17 +5336,17 @@ msgstr ""
 msgid "— (shown once a Let's Encrypt certificate is obtained)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5333
+#: lib/ask_drive_web/live/admin_live.ex:5371
 #, elixir-autogen, elixir-format
 msgid "— create it:"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5356
+#: lib/ask_drive_web/live/admin_live.ex:5394
 #, elixir-autogen, elixir-format
 msgid "— create one (type \"Desktop app\"; no redirect URI registration needed)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5023
+#: lib/ask_drive_web/live/admin_live.ex:5061
 #, elixir-autogen, elixir-format
 msgid "— or leave it blank to access Drive as the service account itself."
 msgstr ""
@@ -5360,27 +5361,27 @@ msgstr ""
 msgid "“Save” only saves the values; the check is turned on and off with the switch above. It can be turned on only while this screen is opened via the gateway (with the same secret value), from the server itself (localhost) or from an IP allowed direct access (so you don't lock yourself out). The server itself can always connect directly. If you are locked out, run"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5338
+#: lib/ask_drive_web/live/admin_live.ex:5376
 #, elixir-autogen, elixir-format
 msgid "”"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5343
+#: lib/ask_drive_web/live/admin_live.ex:5381
 #, elixir-autogen, elixir-format
 msgid "” and add the Gmail address to sync under “Test users”"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:5467
+#: lib/ask_drive_web/live/admin_live.ex:5505
 #, elixir-autogen, elixir-format
 msgid "… and %{count} more"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:4722
+#: lib/ask_drive_web/live/admin_live.ex:4760
 #, elixir-autogen, elixir-format
 msgid "(this is you)"
 msgstr ""
 
-#: lib/ask_drive_web/live/admin_live.ex:3918
+#: lib/ask_drive_web/live/admin_live.ex:3956
 #, elixir-autogen, elixir-format
 msgid "Document count"
 msgstr ""
@@ -5874,4 +5875,45 @@ msgstr ""
 #: lib/ask_drive/metrics.ex:298
 #, elixir-autogen, elixir-format
 msgid "Well-structured document with stable token efficiency."
+msgstr ""
+
+#: lib/ask_drive/llm/cloud_models.ex:95
+#, elixir-autogen, elixir-format
+msgid "%{model} (not in the list)"
+msgstr ""
+
+#: lib/ask_drive/llm/cloud_models.ex:28
+#, elixir-autogen, elixir-format
+msgid "%{provider} has no model list."
+msgstr ""
+
+#: lib/ask_drive_web/live/admin_live.ex:5702
+#, elixir-autogen, elixir-format
+msgid "Choose a model"
+msgstr ""
+
+#: lib/ask_drive/llm/cloud_models.ex:52
+#: lib/ask_drive_web/live/admin_live.ex:7012
+#, elixir-autogen, elixir-format
+msgid "Could not get the model list: %{reason}"
+msgstr ""
+
+#: lib/ask_drive_web/live/admin_live.ex:5725
+#, elixir-autogen, elixir-format
+msgid "Loading the model list…"
+msgstr ""
+
+#: lib/ask_drive_web/live/admin_live.ex:5745
+#, elixir-autogen, elixir-format
+msgid "Refresh list"
+msgstr ""
+
+#: lib/ask_drive/llm/cloud_models.ex:32
+#, elixir-autogen, elixir-format
+msgid "Save the %{provider} API key to choose from its models."
+msgstr ""
+
+#: lib/ask_drive_web/live/admin_live.ex:5726
+#, elixir-autogen, elixir-format
+msgid "The provider listed no models."
 msgstr ""

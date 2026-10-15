@@ -6,6 +6,7 @@ defmodule AskDrive.StubGemini do
     * `:parts` — the parts returned (may include `%{"thought" => true, ...}`)
     * `:reject_thinking` — answer 400 when thinkingBudget is 0 (models that must think)
     * `:rate_limit_once` — answer the first request with 429 + RetryInfo "0.2s"
+    * `:models` — what `GET /models` lists (the model list, F-834)
 
   Every request body is sent to the owner as `{:stub_gemini, path, body}`.
   """
@@ -14,6 +15,12 @@ defmodule AskDrive.StubGemini do
   plug :match
   plug Plug.Parsers, parsers: [:json], json_decoder: Jason
   plug :dispatch
+
+  get "/models" do
+    send(fetch(:owner), {:stub_gemini, "models", conn.query_params})
+    body = %{models: fetch(:models) || []}
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(body))
+  end
 
   post "/models/:call" do
     send(fetch(:owner), {:stub_gemini, call, conn.body_params})
@@ -58,7 +65,7 @@ defmodule AskDrive.StubGemini do
   defp fetch(key), do: :persistent_term.get({__MODULE__, key}, nil)
 
   def start!(owner) do
-    for key <- [:parts, :reject_thinking, :rate_limit_once, :limited], do: set(key, nil)
+    for key <- [:parts, :reject_thinking, :rate_limit_once, :limited, :models], do: set(key, nil)
     set(:owner, owner)
     {:ok, pid} = Bandit.start_link(plug: __MODULE__, port: 0, ip: {127, 0, 0, 1})
     {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)

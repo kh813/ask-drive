@@ -223,6 +223,37 @@ defmodule AskDrive.LLM.Providers.Gemini do
     end
   end
 
+  # Gemini also lists embedding, image, speech and live-audio models; only text generation
+  # (generateContent) models can be the nightly batch's or the chat summary's.
+  @non_text ~w(embedding aqa imagen image tts audio live veo)
+
+  @doc """
+  The models that can generate text, as `{:ok, [{id, display_name}]}` in the API's order
+  (for the settings screen's model list, F-834).
+  """
+  def list_generation_models(opts \\ []) do
+    url = base_url(opts) <> "/models?pageSize=1000"
+
+    case HTTP.get_json(url, headers(opts), 10_000, retry: false) do
+      {:ok, %{"models" => models}} when is_list(models) ->
+        models =
+          for model <- models,
+              "generateContent" in (model["supportedGenerationMethods"] || []),
+              id = model |> Map.get("name", "") |> String.replace_prefix("models/", ""),
+              id != "",
+              not Enum.any?(@non_text, &String.contains?(id, &1)),
+              do: {id, model["displayName"] || id}
+
+        {:ok, models}
+
+      {:ok, _} ->
+        {:ok, []}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   @impl true
   def health(opts \\ []) do
     case list_models(opts) do

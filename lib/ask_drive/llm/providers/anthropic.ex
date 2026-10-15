@@ -80,6 +80,25 @@ defmodule AskDrive.LLM.Providers.Anthropic do
     end
   end
 
+  @doc """
+  The models available to the key, as `{:ok, [{id, display_name}]}`, newest first (for the
+  settings screen's model list, F-834). Every Claude model generates text.
+  """
+  def list_generation_models(opts \\ []) do
+    url = base_url(opts) <> "/v1/models?limit=1000"
+
+    case HTTP.get_json(url, headers(opts), 10_000, retry: false) do
+      {:ok, %{"data" => data}} when is_list(data) ->
+        {:ok, for(%{"id" => id} = m <- data, do: {id, m["display_name"] || id})}
+
+      {:ok, _} ->
+        {:ok, []}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   @impl true
   def health(opts \\ []) do
     case list_models(opts) do

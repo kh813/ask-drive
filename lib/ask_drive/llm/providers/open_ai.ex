@@ -96,6 +96,37 @@ defmodule AskDrive.LLM.Providers.OpenAI do
     end
   end
 
+  # /models also lists embedding, speech, image, moderation and realtime models, which the
+  # chat completions endpoint can't use.
+  @chat_prefixes ~w(gpt- o1 o3 o4 chatgpt-)
+  @non_chat ~w(embedding audio realtime tts transcribe whisper image dall-e moderation search instruct codex)
+
+  @doc """
+  The chat models available to the key, as `{:ok, [{id, id}]}`, newest first (for the
+  settings screen's model list, F-834).
+  """
+  def list_generation_models(opts \\ []) do
+    case HTTP.get_json(base_url(opts) <> "/models", headers(opts), 10_000, retry: false) do
+      {:ok, %{"data" => data}} when is_list(data) ->
+        {:ok,
+         data
+         |> Enum.filter(fn m ->
+           id = m["id"]
+
+           is_binary(id) and Enum.any?(@chat_prefixes, &String.starts_with?(id, &1)) and
+             not Enum.any?(@non_chat, &String.contains?(id, &1))
+         end)
+         |> Enum.sort_by(&{-(&1["created"] || 0), &1["id"]})
+         |> Enum.map(&{&1["id"], &1["id"]})}
+
+      {:ok, _} ->
+        {:ok, []}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   @impl true
   def health(opts \\ []) do
     case list_models(opts) do

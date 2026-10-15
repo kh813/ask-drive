@@ -106,6 +106,8 @@ defmodule AskDriveWeb.AdminLive do
      |> assign(:acme_form, acme_form(setting))
      |> assign(:acme_status, if(scope == :platform, do: AskDrive.ACME.Renewal.status()))
      |> assign(:acme_dns_test, nil)
+     |> assign(:cloud_models, %{})
+     |> maybe_load_cloud_models()
      |> load_dashboard_data()}
   end
 
@@ -1066,7 +1068,10 @@ defmodule AskDriveWeb.AdminLive do
   # Which provider fields the AI settings show follows the form as it is edited, before it is
   # saved: only the selected side's (local or cloud) fields are shown.
   def handle_event("settings_change", %{"setting" => params}, socket) do
-    {:noreply, assign(socket, :llm_view, llm_view_from_params(params, socket.assigns.llm_view))}
+    {:noreply,
+     socket
+     |> assign(:llm_view, llm_view_from_params(params, socket.assigns.llm_view))
+     |> maybe_load_cloud_models()}
   end
 
   def handle_event("settings_change", _params, socket), do: {:noreply, socket}
@@ -1102,6 +1107,8 @@ defmodule AskDriveWeb.AdminLive do
          socket
          |> assign(:setting, updated)
          |> assign_settings_form(updated)
+         |> assign(:cloud_models, %{})
+         |> maybe_load_cloud_models()
          |> put_flash(:info, message)
          |> load_dashboard_data()}
 
@@ -1112,6 +1119,10 @@ defmodule AskDriveWeb.AdminLive do
          |> assign(:llm_view, llm_view_from_params(setting_params, socket.assigns.llm_view))
          |> put_flash(:error, gettext("Could not save the settings. Check your input."))}
     end
+  end
+
+  def handle_event("refresh_cloud_models", _params, socket) do
+    {:noreply, maybe_load_cloud_models(socket, force: true)}
   end
 
   @impl true
@@ -1623,6 +1634,33 @@ defmodule AskDriveWeb.AdminLive do
   # is stored (N-610).
   defp secret_state(value) when is_binary(value) and value != "", do: gettext("Set")
   defp secret_state(_), do: gettext("Not set")
+
+  # --- The cloud API's model pull-down (F-834) ------------------------------------------
+
+  # The models of the cloud provider chosen for the nightly batch, asked in the background
+  # (the provider's API can take seconds) with the saved API key, once per provider unless
+  # forced. The task gets this viewer's locale for its messages.
+  defp maybe_load_cloud_models(socket, opts \\ []) do
+    view = socket.assigns.llm_view
+    provider = view.cloud
+    force? = Keyword.get(opts, :force, false)
+    current = Map.get(socket.assigns.cloud_models, provider)
+
+    if socket.assigns.scope == :app and connected?(socket) and view.batch == "cloud" and
+         current != :loading and (force? or is_nil(current)) do
+      setting = socket.assigns.setting
+      locale = Gettext.get_locale(AskDriveWeb.Gettext)
+
+      socket
+      |> assign(:cloud_models, Map.put(socket.assigns.cloud_models, provider, :loading))
+      |> start_async({:cloud_models, provider}, fn ->
+        Gettext.put_locale(AskDriveWeb.Gettext, locale)
+        AskDrive.LLM.CloudModels.list(provider, setting, force: force?)
+      end)
+    else
+      socket
+    end
+  end
 
   defp provider_options(providers) do
     Enum.map(providers, fn provider -> {LLM.label(provider), provider} end)
@@ -5652,12 +5690,61 @@ defmodule AskDriveWeb.AdminLive do
                         label={gettext("Cloud API provider")}
                         options={provider_options(llm_providers_for("cloud"))}
                       />
-                      <.input
-                        field={@form[:cloud_llm_model]}
-                        type="text"
-                        label={gettext("Cloud API model name")}
-                        placeholder={gettext("e.g. a Gemini model name")}
-                      />
+                      <%!-- The provider's own model list (F-834); typed by hand while it
+                            loads or when it can't be had (no API key yet, unreachable) --%>
+                      <div id="cloud-llm-model-field">
+                        <%= case Map.get(@cloud_models, @llm_view.cloud) do %>
+                          <% {:ok, [_ | _] = models} -> %>
+                            <.input
+                              field={@form[:cloud_llm_model]}
+                              type="select"
+                              label={gettext("Cloud API model name")}
+                              prompt={gettext("Choose a model")}
+                              options={
+                                AskDrive.LLM.CloudModels.options(
+                                  models,
+                                  if(to_string(@form[:cloud_llm_provider].value) == @llm_view.cloud,
+                                    do: @form[:cloud_llm_model].value
+                                  )
+                                )
+                              }
+                            />
+                          <% other -> %>
+                            <.input
+                              field={@form[:cloud_llm_model]}
+                              type="text"
+                              label={gettext("Cloud API model name")}
+                              placeholder={gettext("e.g. a Gemini model name")}
+                            />
+                            <p
+                              :if={other}
+                              id="cloud-models-status"
+                              class="-mt-1 text-[11px] text-zinc-500 leading-snug"
+                            >
+                              {case other do
+                                :loading -> gettext("Loading the model list…")
+                                {:ok, []} -> gettext("The provider listed no models.")
+                                {:error, message} -> message
+                              end}
+                            </p>
+                        <% end %>
+                        <button
+                          type="button"
+                          id="refresh-cloud-models"
+                          phx-click="refresh_cloud_models"
+                          disabled={Map.get(@cloud_models, @llm_view.cloud) == :loading}
+                          class="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 disabled:opacity-50 disabled:cursor-wait transition"
+                        >
+                          <.icon
+                            name="hero-arrow-path"
+                            class={[
+                              "w-3.5 h-3.5",
+                              Map.get(@cloud_models, @llm_view.cloud) == :loading && "animate-spin"
+                            ]}
+                          />
+                          {gettext("Refresh list")}
+                        </button>
+                      </div>
                       <.input
                         field={@form[:llm_max_tokens]}
                         type="number"
@@ -6916,6 +7003,19 @@ defmodule AskDriveWeb.AdminLive do
          :drive_sync_test,
          {:error, gettext("Sync test failed: %{reason}", reason: inspect(reason))}
        )}
+
+  def handle_async({:cloud_models, provider}, {:ok, result}, socket),
+    do:
+      {:noreply,
+       assign(socket, :cloud_models, Map.put(socket.assigns.cloud_models, provider, result))}
+
+  def handle_async({:cloud_models, provider}, {:exit, reason}, socket) do
+    result =
+      {:error, gettext("Could not get the model list: %{reason}", reason: inspect(reason))}
+
+    {:noreply,
+     assign(socket, :cloud_models, Map.put(socket.assigns.cloud_models, provider, result))}
+  end
 
   def handle_async(:acme_dns_test, {:ok, result}, socket),
     do: {:noreply, assign(socket, :acme_dns_test, result)}
