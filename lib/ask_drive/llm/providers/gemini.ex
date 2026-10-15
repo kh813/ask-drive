@@ -250,17 +250,37 @@ defmodule AskDrive.LLM.Providers.Gemini do
         {:ok, []}
 
       {:error, reason} ->
-        {:error, reason}
+        {:error, list_blocked(reason)}
     end
   end
 
   @impl true
   def health(opts \\ []) do
     case list_models(opts) do
-      {:ok, models} -> {:ok, "#{length(models)} models available"}
-      {:error, reason} -> {:error, reason}
+      {:ok, models} ->
+        {:ok, "#{length(models)} models available"}
+
+      # The key was recognised; only listing is outside what its restrictions allow, and
+      # generation (what AskDrive uses the key for) may well be allowed
+      {:error, reason} ->
+        case list_blocked(reason) do
+          {:list_blocked, _} -> {:ok, "API key accepted (listing models is not allowed for it)"}
+          reason -> {:error, reason}
+        end
     end
   end
+
+  # A key whose API restrictions leave out ListModels gets 403 "Requests to this API
+  # generativelanguage.googleapis.com method ...ModelService.ListModels are blocked."
+  # (reason API_KEY_SERVICE_BLOCKED): not a wrong key, so not reported as one.
+  defp list_blocked({:unauthorized, message} = reason) when is_binary(message) do
+    if String.contains?(message, "are blocked") or
+         String.contains?(message, "API_KEY_SERVICE_BLOCKED"),
+       do: {:list_blocked, message},
+       else: reason
+  end
+
+  defp list_blocked(reason), do: reason
 
   @doc """
   Default endpoint used when settings provide none.

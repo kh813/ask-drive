@@ -7,6 +7,8 @@ defmodule AskDrive.StubGemini do
     * `:reject_thinking` — answer 400 when thinkingBudget is 0 (models that must think)
     * `:rate_limit_once` — answer the first request with 429 + RetryInfo "0.2s"
     * `:models` — what `GET /models` lists (the model list, F-834)
+    * `:models_blocked` — answer `GET /models` with the 403 of a key whose API restrictions
+      leave out ListModels
 
   Every request body is sent to the owner as `{:stub_gemini, path, body}`.
   """
@@ -18,8 +20,23 @@ defmodule AskDrive.StubGemini do
 
   get "/models" do
     send(fetch(:owner), {:stub_gemini, "models", conn.query_params})
-    body = %{models: fetch(:models) || []}
-    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(body))
+
+    {status, body} =
+      if fetch(:models_blocked),
+        do:
+          {403,
+           %{
+             error: %{
+               code: 403,
+               message:
+                 "Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.ModelService.ListModels are blocked.",
+               status: "PERMISSION_DENIED",
+               details: [%{reason: "API_KEY_SERVICE_BLOCKED"}]
+             }
+           }},
+        else: {200, %{models: fetch(:models) || []}}
+
+    conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(body))
   end
 
   post "/models/:call" do
@@ -65,7 +82,9 @@ defmodule AskDrive.StubGemini do
   defp fetch(key), do: :persistent_term.get({__MODULE__, key}, nil)
 
   def start!(owner) do
-    for key <- [:parts, :reject_thinking, :rate_limit_once, :limited, :models], do: set(key, nil)
+    for key <- [:parts, :reject_thinking, :rate_limit_once, :limited, :models, :models_blocked],
+        do: set(key, nil)
+
     set(:owner, owner)
     {:ok, pid} = Bandit.start_link(plug: __MODULE__, port: 0, ip: {127, 0, 0, 1})
     {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)

@@ -162,6 +162,9 @@ defmodule AskDrive.LLM.HTTP do
   def describe({:invalid_response, msg}),
     do: gettext("Unexpected response (%{detail})", detail: to_string(msg))
 
+  def describe({:list_blocked, msg}),
+    do: gettext("This API key is not allowed to list models (%{detail})", detail: to_string(msg))
+
   def describe({:unsupported, msg}), do: msg
   def describe(other), do: inspect(other)
 

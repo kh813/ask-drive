@@ -47,6 +47,12 @@ defmodule AskDrive.LLM.CloudModels do
                 :persistent_term.put(key, {System.monotonic_time(:millisecond), models})
                 {:ok, models}
 
+              {:error, {:list_blocked, _}} ->
+                {:error,
+                 gettext(
+                   "This API key may generate text but is not allowed to list models (its API restrictions in the Google Cloud console). Enter the model name instead."
+                 )}
+
               {:error, reason} ->
                 {:error,
                  gettext("Could not get the model list: %{reason}",

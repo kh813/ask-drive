@@ -56,6 +56,18 @@ defmodule AskDrive.LLM.CloudModelsTest do
     assert_received {:stub_gemini, "models", _}
   end
 
+  test "a key not allowed to list models is told so, not as a wrong key", %{setting: setting} do
+    StubGemini.set(:models_blocked, true)
+
+    assert {:error, message} = CloudModels.list("gemini", setting)
+    assert message =~ "モデルの一覧の取得が許可されていません"
+    refute message =~ "認証に失敗"
+
+    # the health check doesn't count it as a failed connection
+    opts = [base_url: setting.gemini_base_url, api_key: setting.gemini_api_key]
+    assert {:ok, _} = AskDrive.LLM.Providers.Gemini.health(opts)
+  end
+
   test "without an API key nothing is asked", %{setting: setting} do
     assert {:error, message} = CloudModels.list("gemini", %{setting | gemini_api_key: nil})
     assert message =~ "API"
