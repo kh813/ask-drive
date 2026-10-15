@@ -238,12 +238,24 @@ defmodule AskDriveWeb.OllamaPanel do
             <p class="font-medium">
               {gettext("Models the desks' settings name but that aren't pulled:")}
             </p>
-            <ul class="space-y-0.5">
-              <li :for={{app, role, model} <- missing}>
+            <ul class="space-y-1">
+              <li :for={{app, role, model} <- missing} data-missing={model}>
                 {app.name}: {role} — <span class="font-mono">{model}</span>
+                <a
+                  href={"/" <> app.slug <> "/admin?tab=settings"}
+                  class="ml-1 underline text-indigo-700 dark:text-indigo-300"
+                >
+                  {gettext("Open the desk's settings")}
+                </a>
+                <span :if={not_in_library?(@pulls, model)} class="block text-[11px]">
+                  {gettext(
+                    "Ollama has no model by this name (perhaps a cloud API's model name left over): choose a pulled model in the desk's settings."
+                  )}
+                </span>
               </li>
             </ul>
             <button
+              :if={Enum.any?(missing, fn {_, _, m} -> not not_in_library?(@pulls, m) end)}
               type="button"
               id="pull-missing-models-btn"
               phx-click="pull_missing_models"
@@ -348,6 +360,18 @@ defmodule AskDriveWeb.OllamaPanel do
       </form>
     </div>
     """
+  end
+
+  @doc false
+  # a pull Ollama refused because its library has no such name: pulling it again won't help
+  def not_in_library?(pulls, model) do
+    case Map.get(pulls, model) do
+      %{status: "failed", error: error} when is_binary(error) ->
+        String.contains?(error, "file does not exist")
+
+      _ ->
+        false
+    end
   end
 
   defp kind_label(caps) do

@@ -31,12 +31,10 @@ defmodule AskDriveWeb.AdminOllamaModelsTest do
   end
 
   describe "a desk" do
-    test "sees whether its models are pulled, and can't pull one", %{conn: conn} do
+    test "has no Ollama models card, and can't pull a model (F-838)", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
 
-      assert has_element?(view, "#ollama-models")
-      assert has_element?(view, ~s(tr[data-model="qwen3:4b-instruct-2507-q4_K_M"]), "未取得")
-      refute has_element?(view, "#ollama-models button")
+      refute has_element?(view, "#ollama-models")
       refute has_element?(view, "#pull-model-form")
 
       # an event sent anyway does nothing on a desk
@@ -100,25 +98,6 @@ defmodule AskDriveWeb.AdminOllamaModelsTest do
       assert saved.embed_model == "#{setting.embed_model}:latest"
       assert saved.embedding_dim == 1024
     end
-
-    test "not in the platform settings, nor on a desk that doesn't use Ollama (F-830)", %{
-      conn: conn,
-      setting: setting
-    } do
-      {:ok, _view, html} = live(conn, ~p"/admin?tab=settings")
-      refute html =~ ~s(id="ollama-models")
-
-      {:ok, _} =
-        Settings.update_setting(setting, %{
-          llm_provider: "gemini",
-          embed_provider: "gemini",
-          chat_summary_provider: "",
-          chat_summary_model: ""
-        })
-
-      {:ok, _view, html} = live(conn, "/it-support/admin?tab=settings")
-      refute html =~ ~s(id="ollama-models")
-    end
   end
 
   describe "the platform administrator" do
@@ -152,6 +131,32 @@ defmodule AskDriveWeb.AdminOllamaModelsTest do
              )
     end
 
+    test "a name Ollama doesn't have is sent back to the desk, not pulled again", %{
+      conn: conn,
+      setting: setting
+    } do
+      {:ok, _} = Settings.update_setting(setting, %{embed_model: "gemini-embedding-001"})
+      Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.LLM.OllamaModels.topic())
+      {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
+
+      row = ~s(#ollama-missing-models li[data-missing="gemini-embedding-001"])
+      assert has_element?(view, "#{row} a[href='/it-support/admin?tab=settings']")
+
+      view |> element("#pull-missing-models-btn") |> render_click()
+      assert_receive {:ollama_pulls, %{"gemini-embedding-001" => %{status: "failed"}}}, 2_000
+      _ = :sys.get_state(view.pid)
+
+      assert has_element?(view, row, "選び直してください")
+
+      # pulling the rest again leaves it alone
+      flush_pulls()
+
+      if has_element?(view, "#pull-missing-models-btn"),
+        do: view |> element("#pull-missing-models-btn") |> render_click()
+
+      refute_receive {:stub_pull, "gemini-embedding-001"}, 300
+    end
+
     test "pulls a model by name, and deletes one no desk uses", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin?tab=settings")
 
@@ -179,6 +184,14 @@ defmodule AskDriveWeb.AdminOllamaModelsTest do
 
       render_hook(view, "delete_model", %{"model" => setting.embed_model})
       refute_receive {:stub_delete, _}, 200
+    end
+  end
+
+  defp flush_pulls do
+    receive do
+      {:stub_pull, _} -> flush_pulls()
+    after
+      0 -> :ok
     end
   end
 end

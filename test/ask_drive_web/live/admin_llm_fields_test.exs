@@ -251,6 +251,11 @@ defmodule AskDriveWeb.AdminLlmFieldsTest do
       _ = render_async(view)
 
       assert has_element?(view, "#batch-llm #connection-vertex")
+      # the saved key isn't sent to the page: the field shows it's set, by its last 4
+      key = "#connection-vertex input[name='setting[vertex_api_key]']"
+      assert has_element?(view, ~s(#{key}[value=""]))
+      assert has_element?(view, ~s(#{key}[placeholder*="1234"]))
+      refute render(view) =~ "vk-1234"
       refute has_element?(view, "#connection-gemini")
       assert has_element?(view, "#cloud-llm-model-suggestions option[value='gemini-2.5-pro']")
       # nothing is asked for a list

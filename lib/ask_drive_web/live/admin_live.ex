@@ -867,15 +867,26 @@ defmodule AskDriveWeb.AdminLive do
   def handle_event("pull_missing_models", _params, %{assigns: %{scope: :platform}} = socket) do
     case socket.assigns.ollama_overview do
       {:ok, %{missing: missing}} when missing != [] ->
-        models = missing |> Enum.map(&elem(&1, 2)) |> Enum.uniq()
+        pulls = AskDrive.LLM.OllamaModels.pulls()
+
+        # a name Ollama's library doesn't have is the desk's to fix, not to pull again
+        models =
+          missing
+          |> Enum.map(&elem(&1, 2))
+          |> Enum.uniq()
+          |> Enum.reject(&AskDriveWeb.OllamaPanel.not_in_library?(pulls, &1))
+
         Enum.each(models, &AskDrive.LLM.OllamaModels.pull_async/1)
 
-        {:noreply,
-         put_flash(
-           socket,
-           :info,
-           gettext("Started downloading %{models}.", models: join_list(models))
-         )}
+        if models == [],
+          do: {:noreply, socket},
+          else:
+            {:noreply,
+             put_flash(
+               socket,
+               :info,
+               gettext("Started downloading %{models}.", models: join_list(models))
+             )}
 
       _ ->
         {:noreply, socket}
@@ -1789,9 +1800,16 @@ defmodule AskDriveWeb.AdminLive do
   attr :label, :string, required: true
   attr :prompt, :string, default: nil, doc: "the blank choice's label (blank allowed)"
   attr :required, :boolean, default: false
+  attr :default, :string, default: nil, doc: "the model in effect when the saved one is blank"
 
   defp ollama_model_field(assigns) do
-    current = to_string(assigns.field.value || "")
+    # judged by the model actually in effect: a blank field falls back (e.g. to
+    # ASK_DRIVE_EMBED_MODEL from .env.prod), which the pull-down mustn't hide
+    current =
+      case to_string(assigns.field.value || "") do
+        "" -> to_string(assigns.default || "")
+        value -> value
+      end
 
     stale? =
       match?({:ok, _}, assigns.catalog) and current != "" and
@@ -1807,7 +1825,7 @@ defmodule AskDriveWeb.AdminLive do
             field={@field}
             type="select"
             label={@label}
-            value={if(@stale?, do: "", else: @field.value)}
+            value={if(@stale?, do: "", else: @current)}
             prompt={@prompt || gettext("Choose a pulled model")}
             options={AskDrive.LLM.OllamaModels.options(models, @kind)}
             required={@required and @prompt == nil}
@@ -1898,7 +1916,7 @@ defmodule AskDriveWeb.AdminLive do
                   key: LLM.masked_api_key("gemini", @setting)
                 )
               }
-              placeholder="AIza..."
+              placeholder={key_placeholder("gemini", @setting, "AIza...")}
             />
             <.input
               field={@form[:gemini_base_url]}
@@ -1923,6 +1941,7 @@ defmodule AskDriveWeb.AdminLive do
                   key: LLM.masked_api_key("vertex", @setting)
                 )
               }
+              placeholder={key_placeholder("vertex", @setting, "")}
             />
             <.input
               field={@form[:vertex_project]}
@@ -1959,7 +1978,7 @@ defmodule AskDriveWeb.AdminLive do
                   key: LLM.masked_api_key("anthropic", @setting)
                 )
               }
-              placeholder="sk-ant-..."
+              placeholder={key_placeholder("anthropic", @setting, "sk-ant-...")}
             />
             <.input
               field={@form[:anthropic_base_url]}
@@ -1982,7 +2001,7 @@ defmodule AskDriveWeb.AdminLive do
                   key: LLM.masked_api_key("openai", @setting)
                 )
               }
-              placeholder="sk-..."
+              placeholder={key_placeholder("openai", @setting, "sk-...")}
             />
             <.input
               field={@form[:openai_base_url]}
@@ -2098,6 +2117,24 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   defp put_ollama_embedding_dim(params, _catalog, _setting), do: params
+
+  # A saved API key isn't shown (it would sit in every page sent, in screen shares and the
+  # browser's history); the field says it's set, with its last 4 characters, and stays empty:
+  # typing replaces it, leaving it blank keeps it. The connection test tells a wrong key.
+  defp key_placeholder(provider, setting, example) do
+    case LLM.api_key(provider, setting) do
+      key when is_binary(key) and byte_size(key) >= 4 ->
+        gettext("Set: ••••••••%{last4} (type only to replace it)",
+          last4: String.slice(key, -4, 4)
+        )
+
+      key when is_binary(key) and key != "" ->
+        gettext("Set (type only to replace it)")
+
+      _ ->
+        example
+    end
+  end
 
   defp provider_options(providers) do
     Enum.map(providers, fn provider -> {LLM.label(provider), provider} end)
@@ -6375,6 +6412,7 @@ defmodule AskDriveWeb.AdminLive do
                         kind={:embedding}
                         catalog={@ollama_catalog}
                         label={gettext("Embedding model name")}
+                        default={LLM.embedding_model(@setting)}
                         required
                       />
                     <% else %>
@@ -6576,83 +6614,6 @@ defmodule AskDriveWeb.AdminLive do
               overview={@ollama_overview}
               pulls={@ollama_pulls}
             />
-
-            <%!-- Local models (Ollama): whether the models this desk's settings name are pulled.
-                  Only on a desk that runs something on Ollama (F-830); pulling them is the
-                  platform administrator's (F-838) --%>
-            <div
-              :if={@scope == :app and @ollama_required != []}
-              id="ollama-models"
-              class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4"
-            >
-              <div>
-                <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-cube" class="w-5 h-5 text-indigo-600" />
-                  {gettext("Local models (Ollama)")}
-                </h2>
-                <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  {gettext(
-                    "One Ollama serves every desk, so its models are pulled by a platform administrator (platform settings, Ollama). This desk chooses among the pulled models in the settings above."
-                  )}
-                </p>
-              </div>
-
-              <%= case @ollama_installed do %>
-                <% {:error, reason} -> %>
-                  <%!-- not installed yet (a server set up for cloud APIs only): installed from
-                        the platform settings (F-837) --%>
-                  <p
-                    :if={is_nil(System.find_executable("ollama"))}
-                    id="ollama-not-installed"
-                    class="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 text-xs leading-relaxed"
-                  >
-                    {gettext(
-                      "Ollama isn't installed on this server yet. A platform administrator can install it in the platform settings, under Ollama (local inference); the models here are pulled once it runs."
-                    )}
-                  </p>
-                  <p :if={System.find_executable("ollama")} class="text-xs text-red-600">
-                    {gettext("Cannot connect to Ollama: %{reason}", reason: inspect(reason))}
-                  </p>
-                <% _ -> %>
-              <% end %>
-
-              <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
-                  <thead class="text-[11px] text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
-                    <tr>
-                      <th class="py-2 px-2">{gettext("Used for")}</th>
-                      <th class="py-2 px-2">{gettext("Model")}</th>
-                      <th class="py-2 px-2">{gettext("Status")}</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
-                    <tr
-                      :for={{{role, model}, i} <- Enum.with_index(@ollama_required)}
-                      id={"required-model-#{i}"}
-                      data-model={model}
-                    >
-                      <td class="py-2 px-2 whitespace-nowrap">{role}</td>
-                      <td class="py-2 px-2 font-mono">{model}</td>
-                      <td class="py-2 px-2">
-                        <% pull = Map.get(@ollama_pulls, model) %>
-                        <%= cond do %>
-                          <% pull && pull.status in ["starting", "pulling"] -> %>
-                            <span class="text-blue-600">
-                              {gettext("Pulling")}{if p = pull_percent(pull), do: " #{p}%"}
-                            </span>
-                          <% model_installed?(@ollama_installed, model) -> %>
-                            <span class="text-emerald-600">{gettext("Pulled")}</span>
-                          <% true -> %>
-                            <span class="text-amber-600">
-                              {gettext("Not pulled: ask a platform administrator to pull it")}
-                            </span>
-                        <% end %>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
 
             <%!-- HTTPS / SSL certificate (spec 6.10) --%>
             <div
@@ -8115,12 +8076,12 @@ defmodule AskDriveWeb.AdminLive do
 
     setting = socket.assigns[:setting] || Settings.get_setting!()
 
-    # shown on a desk's settings only, and only when that desk uses Ollama (F-830):
+    # a desk's settings only, and only when that desk uses (or is switching to) Ollama:
     # otherwise Ollama isn't even asked (it may well not be running)
     required =
       if socket.assigns[:scope] == :platform, do: [], else: OllamaModels.required(setting)
 
-    # the pulled models, for the desk's Ollama model pull-downs (F-838) and its card
+    # the pulled models, for the desk's Ollama model pull-downs (F-838)
     uses_ollama? =
       required != [] or
         (socket.assigns[:scope] == :app and
@@ -8140,14 +8101,6 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:ollama_required, required)
     |> assign(:ollama_pulls, OllamaModels.pulls())
   end
-
-  defp model_installed?({:ok, names}, model),
-    do: AskDrive.LLM.OllamaModels.installed?(model, names)
-
-  defp model_installed?(_, _), do: false
-
-  defp pull_percent(%{completed: c, total: t}) when is_integer(t) and t > 0, do: div(c * 100, t)
-  defp pull_percent(_), do: nil
 
   defp format_cert_time(nil), do: "—"
 

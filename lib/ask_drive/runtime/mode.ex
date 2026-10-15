@@ -147,6 +147,14 @@ defmodule AskDrive.Runtime.Mode do
     new_state = follow_clock(state, "Clock tick")
     schedule_clock_tick()
     {:noreply, new_state}
+  rescue
+    # A database that can't be read for a moment (locked, or between tests' sandboxes) must
+    # not take this process down — a few such crashes in a row stop the whole application.
+    # The next tick, a minute later, tries again.
+    e ->
+      Logger.warning("Clock tick skipped: #{Exception.message(e)}")
+      schedule_clock_tick()
+      {:noreply, state}
   end
 
   # `:night_batch` belongs to a running batch: the scheduler enters it and leaves it via

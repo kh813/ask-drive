@@ -123,6 +123,18 @@ defmodule AskDrive.StubOllama do
     if pid = :persistent_term.get({__MODULE__, :owner}, nil), do: send(pid, {:stub_pull, model})
     conn = conn |> put_resp_content_type("application/x-ndjson") |> send_chunked(200)
 
+    # a name Ollama's library doesn't have (a cloud API's model name)
+    if String.starts_with?(model || "", "gemini") do
+      {:ok, conn} =
+        chunk(conn, Jason.encode!(%{error: "pull model manifest: file does not exist"}) <> "\n")
+
+      conn
+    else
+      pull_ok(conn, model)
+    end
+  end
+
+  defp pull_ok(conn, model) do
     lines = [
       %{status: "pulling manifest"},
       %{status: "downloading", total: 100, completed: 50},
