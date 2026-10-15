@@ -5709,6 +5709,34 @@ defmodule AskDriveWeb.AdminLive do
                                 )
                               }
                             />
+                          <% {:documented, models, why} -> %>
+                            <%!-- the key may not list models: the manual's as suggestions,
+                                  any name can still be typed --%>
+                            <.input
+                              field={@form[:cloud_llm_model]}
+                              type="text"
+                              label={gettext("Cloud API model name")}
+                              placeholder={gettext("Choose from the suggestions or type a name")}
+                              list="cloud-llm-model-suggestions"
+                              autocomplete="off"
+                            />
+                            <datalist id="cloud-llm-model-suggestions">
+                              <option :for={{id, label} <- models} value={id}>{label}</option>
+                            </datalist>
+                            <p
+                              id="cloud-models-status"
+                              class="-mt-1 text-[11px] text-zinc-500 leading-snug"
+                            >
+                              {if why == :no_list,
+                                do:
+                                  gettext(
+                                    "Agent Platform gives no model list for an API key, so the suggestions are the models in Gemini's manual (October 2026). A model that isn't suggested can be typed; not every model is offered in every location or in express mode."
+                                  ),
+                                else:
+                                  gettext(
+                                    "This API key may not list models (its restrictions in the Google Cloud console), so the suggestions are the models in Gemini's manual (October 2026). A model that isn't suggested can be typed."
+                                  )}
+                            </p>
                           <% other -> %>
                             <.input
                               field={@form[:cloud_llm_model]}
@@ -5985,6 +6013,47 @@ defmodule AskDriveWeb.AdminLive do
                       label={gettext("Gemini base URL")}
                       placeholder={LLM.default_base_url("gemini")}
                     />
+                  </div>
+
+                  <%!-- Agent Platform (formerly Vertex AI) with an API key (F-835): no project
+                        means the global endpoint the API key is documented with --%>
+                  <div
+                    id="connection-vertex"
+                    class={[
+                      "grid grid-cols-1 sm:grid-cols-3 gap-4",
+                      "vertex" not in @llm_view.in_use && "hidden"
+                    ]}
+                  >
+                    <.input
+                      field={@form[:vertex_api_key]}
+                      type="password"
+                      value=""
+                      label={
+                        gettext("Agent Platform (Vertex AI) API key (%{key})",
+                          key: LLM.masked_api_key("vertex", @setting)
+                        )
+                      }
+                    />
+                    <.input
+                      field={@form[:vertex_project]}
+                      type="text"
+                      label={gettext("Google Cloud project ID (optional)")}
+                      placeholder={gettext("Blank: the global endpoint")}
+                    />
+                    <.input
+                      field={@form[:vertex_location]}
+                      type="text"
+                      label={gettext("Location (optional)")}
+                      placeholder="global"
+                    />
+                    <p class="sm:col-span-3 -mt-2 text-[11px] text-zinc-500 leading-relaxed">
+                      {gettext(
+                        "Create the key in the Google Cloud console (Agent Platform › API keys, or express mode). With the project ID blank, requests go to the global endpoint (aiplatform.googleapis.com); enter a project ID and location to use that project's endpoint, e.g. asia-northeast1 (Tokyo) to keep processing in Japan."
+                      )}
+                      <span class="block font-mono text-zinc-400 mt-0.5">
+                        {LLM.base_url("vertex", @setting)}
+                      </span>
+                    </p>
                   </div>
 
                   <div

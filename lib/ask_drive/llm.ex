@@ -14,13 +14,14 @@ defmodule AskDrive.LLM do
   use Gettext, backend: AskDriveWeb.Gettext
 
   alias AskDrive.LLM.HTTP
-  alias AskDrive.LLM.Providers.{Anthropic, Gemini, LMStudio, Ollama, OpenAI}
+  alias AskDrive.LLM.Providers.{Anthropic, Gemini, LMStudio, Ollama, OpenAI, Vertex}
   alias AskDrive.Settings
 
   @providers %{
     "ollama" => Ollama,
     "lmstudio" => LMStudio,
     "gemini" => Gemini,
+    "vertex" => Vertex,
     "anthropic" => Anthropic,
     "openai" => OpenAI
   }
@@ -29,6 +30,7 @@ defmodule AskDrive.LLM do
     "ollama" => "Ollama",
     "lmstudio" => "LM Studio",
     "gemini" => "Google Gemini API",
+    "vertex" => "Google Agent Platform (Vertex AI)",
     "anthropic" => "Anthropic Claude API",
     "openai" => "OpenAI API"
   }
@@ -63,7 +65,8 @@ defmodule AskDrive.LLM do
   def local?(provider), do: module(provider).local?()
 
   @doc "Whether the provider needs an API key before it can be used."
-  def requires_api_key?(provider), do: normalize(provider) in ["gemini", "anthropic", "openai"]
+  def requires_api_key?(provider),
+    do: normalize(provider) in ["gemini", "vertex", "anthropic", "openai"]
 
   # --- Configured providers -------------------------------------------------
 
@@ -380,8 +383,14 @@ defmodule AskDrive.LLM do
     provider =
       if role == :generation, do: generation_provider(setting), else: embedding_provider(setting)
 
+    # the model in use, for a provider that can only be reached through one (Agent Platform)
+    opts =
+      if role == :generation,
+        do: Keyword.put(provider_opts(provider, setting), :model, generation_model(setting)),
+        else: provider_opts(provider, setting)
+
     case check_api_key(provider, setting) do
-      :ok -> module(provider).health(provider_opts(provider, setting))
+      :ok -> module(provider).health(opts)
       {:error, reason} -> {:error, reason}
     end
   end
@@ -477,6 +486,7 @@ defmodule AskDrive.LLM do
         "openai" -> get(setting, :openai_base_url)
         "anthropic" -> get(setting, :anthropic_base_url)
         "gemini" -> get(setting, :gemini_base_url)
+        "vertex" -> Vertex.base_url(get(setting, :vertex_project), get(setting, :vertex_location))
         _ -> nil
       end
 
@@ -491,6 +501,7 @@ defmodule AskDrive.LLM do
       "openai" -> OpenAI.default_base_url(:openai)
       "anthropic" -> Anthropic.default_base_url()
       "gemini" -> Gemini.default_base_url()
+      "vertex" -> Vertex.default_base_url()
       _ -> ""
     end
   end
@@ -505,6 +516,7 @@ defmodule AskDrive.LLM do
       "openai" -> get(setting, :openai_api_key) || System.get_env("OPENAI_API_KEY")
       "anthropic" -> get(setting, :anthropic_api_key) || System.get_env("ANTHROPIC_API_KEY")
       "gemini" -> get(setting, :gemini_api_key) || System.get_env("GEMINI_API_KEY")
+      "vertex" -> get(setting, :vertex_api_key)
       _ -> nil
     end
   end
@@ -527,7 +539,7 @@ defmodule AskDrive.LLM do
 
   # --- Internals ------------------------------------------------------------
 
-  defp order, do: ["ollama", "lmstudio", "gemini", "anthropic", "openai"]
+  defp order, do: ["ollama", "lmstudio", "gemini", "vertex", "anthropic", "openai"]
 
   defp normalize(provider) when is_atom(provider) and not is_nil(provider),
     do: Atom.to_string(provider)

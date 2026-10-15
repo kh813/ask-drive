@@ -187,6 +187,62 @@ defmodule AskDriveWeb.AdminLlmFieldsTest do
       assert Settings.get_setting!().cloud_llm_model == "gemini-2.5-flash"
     end
 
+    test "a key that may not list models gets the manual's models as suggestions", %{
+      conn: conn
+    } do
+      AskDrive.StubGemini.set(:models_blocked, true)
+
+      view = open(conn)
+      _ = render_async(view)
+
+      input = "#cloud-llm-model-field input[name='setting[cloud_llm_model]']"
+
+      assert has_element?(
+               view,
+               "#{input}[list='cloud-llm-model-suggestions'][value='gemini-old']"
+             )
+
+      assert has_element?(view, "#cloud-llm-model-suggestions option[value='gemini-2.5-flash']")
+      assert has_element?(view, "#cloud-models-status")
+
+      # a name that isn't suggested can still be saved
+      view
+      |> form("#settings-form", %{"setting" => %{"cloud_llm_model" => "gemini-next"}})
+      |> render_submit()
+
+      assert Settings.get_setting!().cloud_llm_model == "gemini-next"
+    end
+
+    test "Agent Platform: its connection fields, and the manual's models as suggestions", %{
+      conn: conn
+    } do
+      {:ok, _} =
+        Settings.update_setting(Settings.get_setting!(), %{
+          cloud_llm_provider: "vertex",
+          cloud_llm_model: "gemini-2.5-flash",
+          vertex_api_key: "vk-1234"
+        })
+
+      view = open(conn)
+      _ = render_async(view)
+
+      refute hidden?(view, "connection-vertex")
+      assert hidden?(view, "connection-gemini")
+      assert has_element?(view, "#cloud-llm-model-suggestions option[value='gemini-2.5-pro']")
+      # nothing is asked for a list
+      refute_received {:stub_gemini, "models", _}
+
+      view
+      |> form("#settings-form", %{
+        "setting" => %{"vertex_project" => "my-proj-1", "vertex_location" => "asia-northeast1"}
+      })
+      |> render_submit()
+
+      setting = Settings.get_setting!()
+      assert {setting.vertex_project, setting.vertex_location} == {"my-proj-1", "asia-northeast1"}
+      assert AskDrive.LLM.api_key("vertex", setting) == "vk-1234"
+    end
+
     test "without an API key the name is typed by hand", %{conn: conn} do
       # no Claude key saved (a blank key field keeps the saved one, so use another provider)
       {:ok, _} =

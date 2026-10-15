@@ -5,13 +5,13 @@ defmodule AskDrive.Settings.Setting do
   alias AskDrive.Drive.ServiceAccount
   alias AskDrive.Encrypted.Binary
 
-  @generation_providers ~w(ollama lmstudio gemini anthropic openai)
+  @generation_providers ~w(ollama lmstudio gemini vertex anthropic openai)
   @embedding_providers ~w(ollama lmstudio gemini openai)
   @drive_auth_modes ~w(oauth service_account)
   # how the chat summary answers (spec F-432); prompts and length budgets: AskDrive.ChatSummary
   @chat_answer_styles ~w(concise conversational detailed plain)
 
-  @api_key_fields [:openai_api_key, :anthropic_api_key, :gemini_api_key]
+  @api_key_fields [:openai_api_key, :anthropic_api_key, :gemini_api_key, :vertex_api_key]
   @base_url_fields [
     :ollama_host,
     :lmstudio_base_url,
@@ -132,6 +132,11 @@ defmodule AskDrive.Settings.Setting do
     field :anthropic_base_url, :string
     field :gemini_api_key, Binary
     field :gemini_base_url, :string
+    # Google Agent Platform (formerly Vertex AI) with an API key (spec F-835); the endpoint
+    # follows from the project and location (none: the global endpoint)
+    field :vertex_api_key, Binary
+    field :vertex_project, :string
+    field :vertex_location, :string
 
     timestamps(type: :utc_datetime)
   end
@@ -352,7 +357,9 @@ defmodule AskDrive.Settings.Setting do
         :embed_provider,
         :embedding_dim,
         :llm_max_tokens,
-        :llm_temperature
+        :llm_temperature,
+        :vertex_project,
+        :vertex_location
       ] ++ @api_key_fields ++ @base_url_fields
     )
     |> validate_required([
@@ -402,6 +409,7 @@ defmodule AskDrive.Settings.Setting do
       message: "is not a supported authentication method"
     )
     |> validate_base_urls()
+    |> validate_vertex_endpoint()
     |> validate_chat_summary_provider()
     |> validate_inclusion(:chat_answer_style, @chat_answer_styles,
       message: "is not a supported answer style"
@@ -479,7 +487,20 @@ defmodule AskDrive.Settings.Setting do
     end
   end
 
-  @cloud_providers ~w(gemini anthropic openai)
+  @cloud_providers ~w(gemini vertex anthropic openai)
+
+  # Agent Platform's project ID and location go into its endpoint's host name and path
+  defp validate_vertex_endpoint(changeset) do
+    changeset
+    |> update_change(:vertex_project, &(&1 && String.trim(&1)))
+    |> update_change(:vertex_location, &(&1 && &1 |> String.trim() |> String.downcase()))
+    |> validate_format(:vertex_project, ~r/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/,
+      message: "must be a Google Cloud project ID (e.g. my-project-123)"
+    )
+    |> validate_format(:vertex_location, ~r/^[a-z]+(-[a-z0-9]+)*$/,
+      message: "must be a location such as global, us-central1 or asia-northeast1"
+    )
+  end
 
   # Cloud mode needs a cloud provider, its API key and a model name; local mode is validated
   # by the existing llm_provider rules.

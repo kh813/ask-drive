@@ -56,12 +56,16 @@ defmodule AskDrive.LLM.CloudModelsTest do
     assert_received {:stub_gemini, "models", _}
   end
 
-  test "a key not allowed to list models is told so, not as a wrong key", %{setting: setting} do
+  test "a key not allowed to list models gets the manual's models, not a wrong-key error", %{
+    setting: setting
+  } do
     StubGemini.set(:models_blocked, true)
 
-    assert {:error, message} = CloudModels.list("gemini", setting)
-    assert message =~ "モデルの一覧の取得が許可されていません"
-    refute message =~ "認証に失敗"
+    # the manual's models are suggested instead of an error
+    assert {:documented, [{"gemini-4-argon", _} | _] = models, :blocked} =
+             CloudModels.list("gemini", setting)
+
+    assert {"gemini-2.5-flash", "Gemini 2.5 Flash"} in models
 
     # the health check doesn't count it as a failed connection
     opts = [base_url: setting.gemini_base_url, api_key: setting.gemini_api_key]

@@ -194,3 +194,9 @@ msgstr ""
 
 msgid "must use lowercase letters, digits and hyphens (starting and ending with a letter or digit, up to 32 characters)"
 msgstr ""
+
+msgid "must be a Google Cloud project ID (e.g. my-project-123)"
+msgstr ""
+
+msgid "must be a location such as global, us-central1 or asia-northeast1"
+msgstr ""

@@ -1,7 +1,8 @@
 defmodule AskDrive.StubGemini do
   @moduledoc """
-  Stand-in for the Gemini API's generateContent / streamGenerateContent (SSE), for testing
-  the adapter without a key. Behaviour is set per test with `set/2`:
+  Stand-in for the Gemini API's generateContent / streamGenerateContent (SSE) / countTokens
+  (also Agent Platform's, which takes the same requests), for testing the adapters without a
+  key. Behaviour is set per test with `set/2`:
 
     * `:parts` — the parts returned (may include `%{"thought" => true, ...}`)
     * `:reject_thinking` — answer 400 when thinkingBudget is 0 (models that must think)
@@ -62,6 +63,11 @@ defmodule AskDrive.StubGemini do
       fetch(:reject_thinking) && budget == 0 ->
         error = %{error: %{code: 400, message: "Thinking can't be disabled for this model."}}
         conn |> put_resp_content_type("application/json") |> send_resp(400, Jason.encode!(error))
+
+      String.ends_with?(call, ":countTokens") ->
+        conn
+        |> put_resp_content_type("application/json")
+        |> send_resp(200, Jason.encode!(%{totalTokens: 1}))
 
       String.ends_with?(call, ":streamGenerateContent") ->
         conn = conn |> put_resp_content_type("text/event-stream") |> send_chunked(200)

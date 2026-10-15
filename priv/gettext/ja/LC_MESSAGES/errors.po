@@ -181,3 +181,9 @@ msgstr "を保存してください（自動更新を有効にする場合）"
 
 msgid "must use lowercase letters, digits and hyphens (starting and ending with a letter or digit, up to 32 characters)"
 msgstr "は英小文字・数字・ハイフンで入力してください（先頭と末尾は英数字、32 文字まで）"
+
+msgid "must be a Google Cloud project ID (e.g. my-project-123)"
+msgstr "は Google Cloud のプロジェクト ID（例: my-project-123）で入力してください"
+
+msgid "must be a location such as global, us-central1 or asia-northeast1"
+msgstr "は global・us-central1・asia-northeast1 のようなリージョンで入力してください"
