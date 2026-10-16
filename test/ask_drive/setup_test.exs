@@ -1,0 +1,151 @@
+defmodule AskDrive.SetupTest do
+  use AskDrive.DataCase, async: false
+
+  alias AskDrive.{Apps, Settings, Setup}
+
+  setup do
+    dir = Path.join(System.tmp_dir!(), "askdrive_setup_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    Application.put_env(:ask_drive, :setup_dir, dir)
+    Application.put_env(:ask_drive, :setup_check, true)
+    Setup.reset_cache()
+    if :ets.whereis(Setup) != :undefined, do: :ets.delete_all_objects(Setup)
+
+    on_exit(fn ->
+      Application.put_env(:ask_drive, :setup_check, false)
+      Application.delete_env(:ask_drive, :setup_dir)
+      Setup.reset_cache()
+      File.rm_rf(dir)
+    end)
+
+    :ok
+  end
+
+  defp valid_params(code) do
+    %{
+      "code" => code,
+      "domain" => "@Example.COM ",
+      "app_name" => "情シス相談窓口",
+      "admin_emails" => "Owner@example.com, second@example.com"
+    }
+  end
+
+  test "a fresh install needs setup; prepare writes a setup code only the owner can read" do
+    assert Setup.required?()
+    code = Setup.prepare()
+    assert code =~ ~r/^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/
+    assert File.read!(Setup.code_path()) |> String.trim() == code
+    assert Bitwise.band(File.stat!(Setup.code_path()).mode, 0o077) == 0
+    # stable across restarts until used
+    assert Setup.ensure_code() == code
+  end
+
+  test "completing setup sets the domain, first app name and administrators, and burns the code" do
+    code = Setup.ensure_code()
+    assert :ok = Setup.complete(valid_params(String.downcase(code)))
+
+    setting = Settings.get_setting!()
+    assert setting.allowed_domain == "example.com"
+    assert setting.setup_completed_at
+    # the first desk is being set up: no nightly batch until it's switched on (F-344)
+    refute setting.auto_batch_enabled
+    assert Apps.primary().name == "情シス相談窓口"
+    # the platform administrators, also the default app's administrators (F-1116)
+    assert AskDrive.Accounts.list_app_admins(Apps.primary().slug) |> Enum.map(& &1.email) ==
+             ["owner@example.com", "second@example.com"]
+
+    assert AskDrive.Accounts.list_eligible_admins() |> Enum.map(& &1.email) ==
+             ["owner@example.com", "second@example.com"]
+
+    refute File.exists?(Setup.code_path())
+
+    Setup.reset_cache()
+    refute Setup.required?()
+  end
+
+  test "completing setup with personal account mode allows any email and leaves domain empty" do
+    code = Setup.ensure_code()
+
+    assert :ok =
+             Setup.complete(%{
+               "code" => code,
+               "account_type" => "personal",
+               "domain" => "",
+               "app_name" => "個人用相談窓口",
+               "admin_emails" => "myuser@gmail.com, helper@other.org"
+             })
+
+    setting = Settings.get_setting!()
+    assert is_nil(setting.allowed_domain)
+    assert setting.setup_completed_at
+    assert Apps.primary().name == "個人用相談窓口"
+
+    assert AskDrive.Accounts.list_app_admins(Apps.primary().slug)
+           |> Enum.map(& &1.email)
+           |> Enum.sort() ==
+             ["helper@other.org", "myuser@gmail.com"]
+
+    refute File.exists?(Setup.code_path())
+    Setup.reset_cache()
+    refute Setup.required?()
+  end
+
+  test "each invalid field is reported and nothing is saved" do
+    Setup.ensure_code()
+
+    assert {:error, errors} =
+             Setup.complete(%{
+               "code" => "WRONG",
+               "domain" => "not a domain",
+               "app_name" => "",
+               "admin_emails" => ""
+             })
+
+    assert errors.code =~ "正しくありません"
+    refute Map.has_key?(errors, :password)
+    assert errors.domain =~ "ドメイン名"
+    assert errors.app_name
+    assert errors.admin_emails =~ "全体管理者"
+    refute Settings.get_setting!().setup_completed_at
+  end
+
+  test "wrong codes are locked out after 10 attempts" do
+    code = Setup.ensure_code()
+    for _ <- 1..10, do: assert({:error, :invalid} = Setup.verify_code("NOPE-NOPE-NOPE"))
+    assert {:error, :locked} = Setup.verify_code(code)
+  end
+
+  test "an installation that already has a platform administrator and a domain is marked complete" do
+    {:ok, _} = AskDrive.Accounts.grant_admin("boss@example.com")
+    {:ok, _} = Settings.update_setting(Settings.get_setting!(), %{allowed_domain: "example.com"})
+
+    refute Setup.required?()
+    assert Settings.get_setting!().setup_completed_at
+  end
+
+  test "a code file AskDrive didn't write itself, or the one once published, isn't trusted" do
+    # unpacked from an archive: readable by others
+    File.write!(Setup.code_path(), "AAAA-BBBB-CCCC\n")
+    File.chmod!(Setup.code_path(), 0o644)
+    code = Setup.ensure_code()
+    refute code == "AAAA-BBBB-CCCC"
+    assert Bitwise.band(File.stat!(Setup.code_path()).mode, 0o077) == 0
+    assert Setup.ensure_code() == code
+
+    # the code shipped in the release ZIPs up to v0.1.12, even with the right mode
+    File.write!(Setup.code_path(), "7HXR-DVAC-UNWJ\n")
+    File.chmod!(Setup.code_path(), 0o600)
+    refute Setup.ensure_code() == "7HXR-DVAC-UNWJ"
+    assert {:error, :invalid} = Setup.verify_code("7HXR-DVAC-UNWJ")
+  end
+
+  test "once setup is done, a code file brought back (e.g. by an update) is removed at boot" do
+    code = Setup.ensure_code()
+    assert :ok = Setup.complete(valid_params(code))
+
+    File.write!(Setup.code_path(), "7HXR-DVAC-UNWJ\n")
+    Setup.reset_cache()
+    assert Setup.prepare() == nil
+    refute File.exists?(Setup.code_path())
+  end
+end

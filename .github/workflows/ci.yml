@@ -1,0 +1,218 @@
+name: CI (Linux x64)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: mix test on Ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '28'
+          elixir-version: '1.19'
+
+      - name: System packages
+        run: sudo apt-get update -y && sudo apt-get install -y poppler-utils zstd
+
+      - name: sqlite-vec (Linux .so)
+        run: |
+          RUNTIME_DIR="$(mktemp -d)"; RUNTIME_BIN="${RUNTIME_DIR}/bin"
+          source scripts/lib/platform.sh
+          install_sqlite_vec priv/sqlite_vec
+          ls -l priv/sqlite_vec
+
+      - name: Shell scripts syntax
+        run: for f in app.sh scripts/*.sh scripts/lib/*.sh; do bash -n "$f"; done
+
+      - run: mix deps.get
+      - run: mix compile --warnings-as-errors
+      - run: mix test
+
+  compile-1-20:
+    name: No compiler / type warnings on Elixir 1.20 (the servers' version)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '28'
+          elixir-version: '1.20'
+      - run: mix deps.get
+      - run: MIX_ENV=prod mix compile --warnings-as-errors
+
+  ldap:
+    name: LDAP sign-in against a real LDAPS server (client certificate demanded)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '28'
+          elixir-version: '1.19'
+
+      - name: sqlite-vec (Linux .so)
+        run: |
+          RUNTIME_DIR="$(mktemp -d)"; RUNTIME_BIN="${RUNTIME_DIR}/bin"
+          source scripts/lib/platform.sh
+          install_sqlite_vec priv/sqlite_vec
+
+      - name: OpenLDAP with LDAPS demanding a client certificate
+        run: scripts/ci/setup-openldap.sh /tmp/ldap-it
+
+      - run: mix deps.get
+      - run: mix test --only ldap_integration
+
+  runtime:
+    name: Linux runtime install + systemd unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ensure_linux_packages / install_* into .runtime
+        run: |
+          export RUNTIME_DIR="$PWD/.runtime" RUNTIME_BIN="$PWD/.runtime/bin"
+          source scripts/lib/platform.sh
+          echo "detected: ${ASKDRIVE_OS} ${ASKDRIVE_ARCH}"
+          test "${ASKDRIVE_OS}" = linux
+          ensure_linux_packages
+          install_beam_linux
+          install_pandoc
+          install_ollama_runtime
+          ollama_runtime_complete
+          install_sqlite_vec priv/sqlite_vec
+
+      - name: Installed binaries run
+        run: |
+          export PATH="$PWD/.runtime/elixir/bin:$PWD/.runtime/otp/bin:$PWD/.runtime/bin:$PATH"
+          erl -noshell -eval 'io:format("OTP ~s~n",[erlang:system_info(otp_release)]), halt().'
+          elixir --version
+          pandoc --version | head -1
+          ollama --version || true
+          test -f priv/sqlite_vec/vec0.so
+          file priv/sqlite_vec/vec0.so
+
+      - name: sed_inplace uses GNU sed
+        run: |
+          RUNTIME_DIR="$(mktemp -d)"; RUNTIME_BIN="${RUNTIME_DIR}/bin"
+          source scripts/lib/platform.sh
+          echo 'A=1' > /tmp/s.txt && sed_inplace 's/A=1/A=2/' /tmp/s.txt && grep -qx 'A=2' /tmp/s.txt
+          test ! -e "/tmp/s.txt''"
+
+      - name: systemd unit and sudoers validate
+        run: |
+          RUNTIME_DIR="$(mktemp -d)"; RUNTIME_BIN="${RUNTIME_DIR}/bin"
+          source scripts/lib/platform.sh
+          systemd_unit_content "$PWD" "$(id -un)" "$(id -gn)" "$HOME" > /tmp/askdrive.service
+          cat /tmp/askdrive.service
+          systemd-analyze verify /tmp/askdrive.service
+          systemd_sudoers_content "$(id -un)" "$(command -v systemctl)" askdrive.service > /tmp/askdrive.sudoers
+          sudo visudo -cf /tmp/askdrive.sudoers
+
+      - name: Build the prod release with the installed BEAM (same steps as deploy.sh)
+        run: |
+          export PATH="$PWD/.runtime/elixir/bin:$PWD/.runtime/otp/bin:$PWD/.runtime/bin:$PATH"
+          cat > .env.prod <<ENVEOF
+          MIX_ENV=prod
+          PHX_SERVER=true
+          PORT=4000
+          PHX_HOST=localhost
+          SECRET_KEY_BASE=$(openssl rand -base64 48 | tr -d '\n')
+          ASK_DRIVE_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr -d '\n')
+          DATABASE_PATH=$PWD/ask_drive_prod.db
+          ENVEOF
+          set -a; source .env.prod; set +a
+          mix local.hex --force && mix local.rebar --force
+          mix deps.get
+          MIX_ENV=prod mix ecto.create
+          MIX_ENV=prod mix ecto.migrate
+          MIX_ENV=prod mix assets.deploy
+          MIX_ENV=prod mix release --overwrite
+
+      - name: app.sh service install (systemd) and HTTPS answers
+        run: |
+          ./app.sh service install
+          systemctl status askdrive.service --no-pager || true
+          for i in $(seq 1 120); do
+            code="$(curl -sk -o /dev/null -w '%{http_code}' https://localhost:4443/ || true)"
+            [ "$code" != "000" ] && break
+            sleep 1
+          done
+          echo "HTTPS status: $code"
+          test "$code" != "000"
+          # HTTP is on 4000 and redirects to HTTPS; 4080 is gone (spec F-1013)
+          out="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://localhost:4000/setup)"
+          echo "HTTP 4000 -> ${out}"
+          test "${out}" = "301 https://localhost:4443/setup"
+          ! curl -s -o /dev/null --max-time 3 http://localhost:4080/
+          systemctl is-active askdrive.service
+          sudo cat /etc/sudoers.d/askdrive
+          ./app.sh status
+
+      - name: HTTP from a trusted reverse proxy is served as HTTP; proxy-off applies at once
+        run: |
+          # the admin screen writes this file; the running service re-reads it when it changes
+          printf '{"http_port": 4000, "https_port": 4443, "trusted_proxies": ["127.0.0.1", "::1"]}' > ssl/listen.json
+          code="$(curl -s -o /dev/null -w '%{http_code}' -H 'X-Forwarded-Proto: https' -H 'X-Forwarded-For: 203.0.113.9' http://127.0.0.1:4000/setup)"
+          echo "HTTP via trusted proxy -> ${code}"
+          test "${code}" = "200"
+          ./app.sh network status
+          ./app.sh network proxy-off
+          code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4000/setup)"
+          echo "after proxy-off -> ${code}"
+          test "${code}" = "301"
+
+      - name: Icons linked by the page are served by the prod build (digested assets)
+        run: |
+          html="$(curl -sk https://localhost:4443/setup)"
+          for href in $(echo "$html" | grep -oE 'rel="(icon|apple-touch-icon)" href="[^"]+"' | sed -E 's/.*href="([^"]+)"/\1/'); do
+            code="$(curl -sk -o /dev/null -w '%{http_code}' "https://localhost:4443${href}")"
+            echo "${href} -> ${code}"
+            test "$code" = "200"
+          done
+          echo "$html" | grep -q 'href="/favicon.svg'
+
+      - name: deploy.sh restarts the registered systemd service
+        run: |
+          before="$(systemctl show -p MainPID --value askdrive.service)"
+          ./scripts/deploy.sh
+          after="$(systemctl show -p MainPID --value askdrive.service)"
+          echo "MainPID $before -> $after"
+          test "$before" != "$after"
+          systemctl is-active askdrive.service
+
+      - name: Client certificates enforced over real TLS (spec 6.14)
+        run: |
+          out="$(./app.sh mtls issue CI /tmp/ci.p12)"
+          echo "$out" | sed 's/パスワード: .*/パスワード: (hidden)/'
+          pw="$(echo "$out" | sed -n 's/.*パスワード: //p')"
+          ./app.sh mtls enforce
+          ./app.sh service restart
+          for i in $(seq 1 60); do curl -sk -o /dev/null https://localhost:4443/ && break; sleep 1; done
+          ip="$(hostname -I | awk '{print $1}')"
+          echo "LAN address: ${ip}"
+          no_cert="$(curl -sk -o /dev/null -w '%{http_code}' "https://${ip}:4443/login")"
+          echo "without a certificate -> ${no_cert}"
+          test "${no_cert}" = "403"
+          openssl pkcs12 -in /tmp/ci.p12 -passin "pass:${pw}" -nodes -out /tmp/ci.pem
+          with_cert="$(curl -sk -o /dev/null -w '%{http_code}' --cert /tmp/ci.pem "https://${ip}:4443/login")"
+          echo "with the certificate -> ${with_cert}"
+          test "${with_cert}" != "403" && test "${with_cert}" != "000"
+          local_code="$(curl -sk -o /dev/null -w '%{http_code}' https://localhost:4443/login)"
+          echo "from the server itself -> ${local_code}"
+          test "${local_code}" != "403"
+          ./app.sh mtls off
+          ./app.sh mtls status
+
+      - name: Logs on failure
+        if: failure()
+        run: |
+          tail -n 100 log/*.log || true
+          sudo journalctl -u askdrive.service --no-pager -n 100 || true

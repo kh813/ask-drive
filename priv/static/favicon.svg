@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- The AskDrive app icon (header "AD" badge): indigo-600 rounded square, white bold "AD" as paths -->
+  <rect width="64" height="64" rx="14" fill="#4f46e5"/>
+  <path fill="#fff" fill-rule="evenodd" d="M13 44 19.5 20h5L31 44h-5.4l-1.3-5h-4.6l-1.3 5ZM20.9 34.6h2.2L22 30.5ZM35 20h7c6 0 9 4.5 9 12s-3 12-9 12h-7ZM40.4 25v14H42c2.6 0 3.6-2.5 3.6-7s-1-7-3.6-7Z"/>
+</svg>

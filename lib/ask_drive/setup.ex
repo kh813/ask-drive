@@ -1,0 +1,326 @@
+defmodule AskDrive.Setup do
+  @moduledoc """
+  First-access web setup (spec 6.12).
+
+  `app.sh setup` doesn't ask for the Google Workspace domain or the administrators; the
+  first visit to the web UI does, at `/setup`. Because "whoever gets there first
+  becomes the administrator" is unsafe on a shared LAN (and more so once the site is public),
+  setup requires a one-time **setup code** that only someone with access to the server can
+  read: it is printed in the server log at boot, shown by `./app.sh status`, and stored in
+  `setup_code` (mode 0600) next to the platform database. Wrong codes are rate limited;
+  completing setup deletes the code.
+
+  Setup is required while the platform has no `setup_completed_at` — unless an installation
+  from before this existed already has both a platform administrator and a domain, in which
+  case it is simply marked complete.
+  """
+  require Logger
+
+  alias AskDrive.{Apps, PlatformRepo, Settings}
+
+  @max_failures 10
+  @lockout_seconds 15 * 60
+  @table __MODULE__
+
+  # --- State --------------------------------------------------------------------
+
+  @doc "Whether the first-access setup still has to be done (cached once complete)."
+  def required? do
+    cond do
+      not Application.get_env(:ask_drive, :setup_check, true) -> false
+      :persistent_term.get({__MODULE__, :done}, false) -> false
+      true -> check_required()
+    end
+  end
+
+  defp check_required do
+    setting = Settings.platform_setting!()
+
+    cond do
+      setting.setup_completed_at ->
+        mark_done()
+        false
+
+      # configured before web setup existed: nothing to ask
+      present?(setting.allowed_domain) and AskDrive.Accounts.count_eligible_admins() > 0 ->
+        {:ok, _} = complete!(setting)
+        false
+
+      true ->
+        true
+    end
+  rescue
+    # database not ready (very early boot): don't block requests on it
+    _ -> false
+  end
+
+  defp mark_done, do: :persistent_term.put({__MODULE__, :done}, true)
+
+  @doc "Forgets the cached state (tests)."
+  def reset_cache, do: :persistent_term.erase({__MODULE__, :done})
+
+  # --- Setup code -------------------------------------------------------------------
+
+  def code_path do
+    dir =
+      Application.get_env(:ask_drive, :setup_dir) ||
+        Path.dirname(AskDrive.Repo.config()[:database] || Path.expand("ask_drive.db"))
+
+    Path.join(dir, "setup_code")
+  end
+
+  @doc """
+  At boot: if setup is required, make sure a code exists and print it. Returns the code or nil.
+  """
+  def prepare do
+    if required?() do
+      prepare_code()
+    else
+      # done: a code file left behind (or brought back by an update) is of no use
+      File.rm(code_path())
+      nil
+    end
+  end
+
+  defp prepare_code do
+    code = ensure_code()
+
+    Logger.warning("""
+    AskDrive の初回セットアップが必要です。ブラウザで AskDrive を開き、次のセットアップコードを入力してください。
+      セットアップコード: #{code}
+    （./app.sh status でも確認できます。ファイル: #{code_path()}）\
+    """)
+
+    code
+  end
+
+  # A code that was published by mistake: it was committed to the repository and shipped in
+  # the release ZIPs up to v0.1.12, so anyone could read it. Never accept it.
+  @leaked_codes ["7HXR-DVAC-UNWJ"]
+
+  @doc """
+  The current setup code, creating one if needed. A file this install didn't write itself is
+  not trusted: AskDrive creates it readable by the owner only (0600), while one unpacked from
+  an archive isn't — and the code once shipped in the release ZIPs is refused outright.
+  """
+  def ensure_code do
+    case read_own_code() do
+      {:ok, code} ->
+        code
+
+      :error ->
+        code = generate_code()
+        File.mkdir_p!(Path.dirname(code_path()))
+        File.write!(code_path(), code <> "\n")
+        File.chmod!(code_path(), 0o600)
+        code
+    end
+  end
+
+  defp read_own_code do
+    with {:ok, %File.Stat{mode: mode}} <- File.stat(code_path()),
+         0 <- Bitwise.band(mode, 0o077),
+         {:ok, code} <- File.read(code_path()),
+         code = String.trim(code),
+         true <- code != "" and code not in @leaked_codes do
+      {:ok, code}
+    else
+      _ -> :error
+    end
+  end
+
+  # 12 characters from an alphabet without look-alikes, grouped: "K7QX-M4PD-9HTA"
+  @alphabet ~c"ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+  defp generate_code do
+    for(_ <- 1..12, do: Enum.random(@alphabet))
+    |> Enum.chunk_every(4)
+    |> Enum.map_join("-", &to_string/1)
+  end
+
+  @doc """
+  Checks a submitted code (case, spaces and dashes ignored). After #{@max_failures} wrong
+  codes further attempts are refused for #{div(@lockout_seconds, 60)} minutes.
+  """
+  def verify_code(submitted) do
+    ensure_table()
+    now = System.system_time(:second)
+
+    case :ets.lookup(@table, :failures) do
+      [{:failures, n, since}] when n >= @max_failures and now - since < @lockout_seconds ->
+        {:error, :locked}
+
+      _ ->
+        expected = normalize(ensure_code())
+
+        if Plug.Crypto.secure_compare(normalize(submitted || ""), expected) do
+          :ets.delete(@table, :failures)
+          :ok
+        else
+          record_failure(now)
+          {:error, :invalid}
+        end
+    end
+  end
+
+  defp normalize(code), do: code |> String.upcase() |> String.replace(~r/[^A-Z0-9]/, "")
+
+  defp record_failure(now) do
+    case :ets.lookup(@table, :failures) do
+      [{:failures, n, since}] when now - since < @lockout_seconds ->
+        :ets.insert(@table, {:failures, n + 1, since})
+
+      _ ->
+        :ets.insert(@table, {:failures, 1, now})
+    end
+  end
+
+  defp ensure_table do
+    if :ets.whereis(@table) == :undefined do
+      :ets.new(@table, [:named_table, :public, :set])
+    end
+  rescue
+    ArgumentError -> :ok
+  end
+
+  # --- Completing -----------------------------------------------------------------
+
+  @doc """
+  Validates and applies the setup form: `%{"code", "domain", "app_name", "admin_emails", "account_type"}` (the platform administrators, who also become the
+  default app's administrators, F-1116).
+  Returns `:ok` or `{:error, %{field => message}}`.
+  """
+  def complete(params) do
+    account_type = Map.get(params, "account_type", "workspace")
+    domain = params["domain"]
+
+    errors =
+      %{}
+      |> check(:code, code_error(params["code"]))
+      |> check(:domain, domain_error(domain, account_type))
+      |> check(:app_name, if(present?(params["app_name"]), do: nil, else: "窓口名を入力してください"))
+      |> check(
+        :admin_emails,
+        admin_emails_error(
+          params["admin_emails"],
+          if(account_type == "personal", do: nil, else: domain)
+        )
+      )
+
+    if errors == %{} do
+      allowed_domain =
+        if account_type == "personal" or not present?(domain) do
+          nil
+        else
+          String.trim(domain) |> String.trim_leading("@")
+        end
+
+      {:ok, setting} =
+        Apps.platform(fn ->
+          # the first desk is being set up too: its nightly batch starts switched off (F-344)
+          Settings.update_setting(Settings.get_setting!(), %{
+            allowed_domain: allowed_domain,
+            auto_batch_enabled: false
+          })
+        end)
+
+      Apps.ensure_primary!()
+      {:ok, _} = Apps.update(Apps.primary(), %{name: String.trim(params["app_name"])})
+
+      # the platform administrators, also the default app's administrators (F-1116),
+      # named before their first sign-in
+      for email <- admin_emails(params["admin_emails"]) do
+        {:ok, user} = AskDrive.Accounts.grant_admin(email)
+        {:ok, _} = AskDrive.Accounts.add_app_admin(user, Apps.primary().slug)
+      end
+
+      {:ok, _} = complete!(setting)
+      :ok
+    else
+      {:error, errors}
+    end
+  end
+
+  defp complete!(setting) do
+    result =
+      setting
+      |> Ecto.Changeset.change(
+        setup_completed_at: DateTime.utc_now() |> DateTime.truncate(:second)
+      )
+      |> PlatformRepo.update()
+
+    File.rm(code_path())
+    mark_done()
+    Logger.info("AskDrive: first-access setup complete")
+    result
+  end
+
+  defp check(errors, _field, nil), do: errors
+  defp check(errors, field, message), do: Map.put(errors, field, message)
+
+  defp code_error(code) do
+    case verify_code(code) do
+      :ok -> nil
+      {:error, :locked} -> "入力の失敗が続いたため、しばらく受け付けません（15 分後に再試行してください）"
+      {:error, :invalid} -> "セットアップコードが正しくありません"
+    end
+  end
+
+  defp domain_error(domain, "personal") do
+    if present?(domain) do
+      cs =
+        AskDrive.Settings.Setting.changeset(%AskDrive.Settings.Setting{}, %{
+          allowed_domain: domain
+        })
+
+      if cs.errors[:allowed_domain], do: "ドメイン名（例: company.com）で入力してください", else: nil
+    else
+      nil
+    end
+  end
+
+  defp domain_error(domain, _account_type) do
+    cs =
+      AskDrive.Settings.Setting.changeset(%AskDrive.Settings.Setting{}, %{allowed_domain: domain})
+
+    cond do
+      not present?(domain) -> "組織の Google Workspace ドメインを入力してください"
+      cs.errors[:allowed_domain] -> "ドメイン名（例: company.com）で入力してください"
+      true -> nil
+    end
+  end
+
+  defp admin_emails(text),
+    do:
+      text
+      |> to_string()
+      |> String.split(~r/[\s,;、]+/, trim: true)
+      |> Enum.map(&String.downcase/1)
+      |> Enum.uniq()
+
+  defp admin_emails_error(text, domain) do
+    emails = admin_emails(text)
+
+    domain =
+      if present?(domain) do
+        domain |> to_string() |> String.trim() |> String.downcase() |> String.trim_leading("@")
+      else
+        ""
+      end
+
+    cond do
+      emails == [] ->
+        "全体管理者のメールアドレスを入力してください"
+
+      Enum.any?(emails, &(not String.match?(&1, ~r/^[^@\s]+@[^@\s]+\.[^@\s]+$/))) ->
+        "メールアドレスとして読み取れないものがあります"
+
+      domain != "" and Enum.any?(emails, &(not String.ends_with?(&1, "@" <> domain))) ->
+        "全体管理者は @#{domain} のアドレスにしてください"
+
+      true ->
+        nil
+    end
+  end
+
+  defp present?(v), do: is_binary(v) and String.trim(v) != ""
+end

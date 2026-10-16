@@ -1,0 +1,144 @@
+defmodule AskDriveWeb.AdminLiveTest do
+  use AskDriveWeb.ConnCase, async: false
+  import Phoenix.LiveViewTest
+
+  alias AskDrive.Documents.Document
+  alias AskDrive.QA.QuestionLog
+  alias AskDrive.Repo
+
+  describe "AdminLive Dashboard" do
+    setup %{conn: conn} do
+      # a platform admin who is also IT-Support's assigned administrator (F-1113)
+      admin = user_fixture(admin_eligible: true)
+      %{conn: conn |> log_in_admin(admin) |> log_in_app_admin(admin), admin: admin}
+    end
+
+    test "renders dashboard, tabs, and document list", %{conn: conn} do
+      {:ok, _doc} =
+        %Document{}
+        |> Document.changeset(%{
+          drive_file_id: "admin_test_doc",
+          name: "就業規則.pdf",
+          mime_type: "application/pdf",
+          status: "indexed"
+        })
+        |> Repo.insert()
+
+      {:ok, view, html} = live(conn, ~p"/it-support/admin")
+
+      assert html =~ "IT-Support の管理"
+      assert html =~ "概要・バッチ状況"
+      assert html =~ "未回答・解消質問"
+      assert html =~ "ドキュメント一覧"
+      assert html =~ "設定"
+
+      # Click Documents tab
+      render_click(view, "select_tab", %{"tab" => "documents"})
+      html = render(view)
+      assert html =~ "就業規則.pdf"
+      assert html =~ "application/pdf"
+    end
+
+    test "renders unanswered questions and settings tab", %{conn: conn} do
+      {:ok, _log} =
+        %QuestionLog{}
+        |> QuestionLog.changeset(%{
+          question: "育児休暇は何日間取得可能ですか？",
+          tier_reached: 3,
+          asked_at: DateTime.utc_now()
+        })
+        |> Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/it-support/admin?tab=questions")
+      html = render(view)
+
+      assert html =~ "未回答質問"
+      assert html =~ "育児休暇は何日間取得可能ですか？"
+
+      # Switch to settings tab
+      render_click(view, "select_tab", %{"tab" => "settings"})
+      html = render(view)
+
+      assert html =~ "夜間バッチ（QA 生成）の実行方法"
+      # the chosen provider's connection, right under it (F-836)
+      assert html =~ "接続情報: Ollama"
+      assert html =~ "Ollama エンドポイント"
+    end
+
+    test "an app admin gets into their app's admin screen only, not /admin", %{conn: _conn} do
+      {:ok, _app} = AskDrive.Apps.create(%{slug: "hr", name: "人事部窓口"})
+      app_user = user_fixture(email: "hr_admin@example.com", admin_eligible: false)
+
+      conn = build_conn() |> log_in_user(app_user) |> log_in_app_admin(app_user, "hr")
+
+      {:ok, _view, html} = live(conn, "/hr/admin")
+      assert html =~ "人事部窓口 の管理"
+
+      # not IT-Support's (not assigned), not the platform screen
+      assert {:error, {:redirect, %{to: "/it-support"}}} = live(conn, "/it-support/admin")
+      assert {:error, {:redirect, %{to: "/"}}} = live(conn, "/admin")
+    end
+
+    test "access password setting", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/it-support/admin?tab=settings")
+      # no shared app password any more (F-1113): the old card is gone
+      refute has_element?(view, "#app-admin-password-form")
+
+      # nothing to switch on before a password is saved
+      html = view |> element("#toggle-access-password") |> render_click()
+      assert html =~ "先にパスワードを保存してください"
+
+      html =
+        view
+        |> form("#access-password-form", %{
+          "access_password" => %{"password" => "aikotoba123", "confirmation" => "aikotoba123"}
+        })
+        |> render_submit()
+
+      # saving the password doesn't switch the restriction on (F-206)
+      assert html =~ "窓口アクセスパスワードを保存しました。"
+      assert has_element?(view, "#toggle-access-password[aria-checked=false]")
+
+      view |> element("#toggle-access-password") |> render_click()
+      assert has_element?(view, "#toggle-access-password[aria-checked=true]")
+
+      view |> element("#toggle-access-password") |> render_click()
+      assert has_element?(view, "#toggle-access-password[aria-checked=false]")
+    end
+
+    test "the platform's app list shows each app's administrators, or that there are none", %{
+      conn: conn,
+      admin: admin
+    } do
+      {:ok, _} = AskDrive.Apps.create(%{slug: "ops", name: "運用窓口"})
+      {:ok, _view, html} = live(conn, ~p"/admin?tab=apps")
+      assert html =~ "担当者: #{admin.email}"
+      assert html =~ "担当者未設定"
+    end
+
+    test "renders API usage and logs tab", %{conn: conn} do
+      AskDrive.Metrics.record(%{
+        provider: "gemini",
+        model: "gemini-2.5-flash",
+        purpose: "chat_summary",
+        prompt_tokens: 100,
+        completion_tokens: 50,
+        total_tokens: 150,
+        request_bytes: 450,
+        latency_ms: 220,
+        status: "ok"
+      })
+
+      Process.sleep(50)
+
+      {:ok, _view, html} = live(conn, ~p"/it-support/admin?tab=metrics")
+      assert html =~ "API利用量・ログ"
+      assert html =~ "総リクエスト数"
+      assert html =~ "総消費トークン数"
+      assert html =~ "平均応答時間"
+      assert html =~ "gemini-2.5-flash"
+      assert html =~ "インデックス対象データのトークン効率・構造化分析"
+      assert html =~ "ファイル形式別のトークン効率比較"
+    end
+  end
+end

@@ -1,0 +1,189 @@
+## `msgid`s in this file come from POT (.pot) files.
+msgid ""
+msgstr ""
+"Language: ja\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+## From Ecto.Changeset.cast/4
+msgid "can't be blank"
+msgstr "入力してください"
+
+## From Ecto.Changeset.unique_constraint/3
+msgid "has already been taken"
+msgstr "すでに使用されています"
+
+## From Ecto.Changeset.put_change/3
+msgid "is invalid"
+msgstr "が無効です"
+
+## From Ecto.Changeset.validate_acceptance/3
+msgid "must be accepted"
+msgstr "を承認してください"
+
+## From Ecto.Changeset.validate_format/3
+msgid "has invalid format"
+msgstr "の形式が無効です"
+
+## From Ecto.Changeset.validate_subset/3
+msgid "has an invalid entry"
+msgstr "に無効な項目があります"
+
+## From Ecto.Changeset.validate_exclusion/3
+msgid "is reserved"
+msgstr "は予約されています"
+
+## From Ecto.Changeset.validate_confirmation/3
+msgid "does not match confirmation"
+msgstr "が確認と一致しません"
+
+## From Ecto.Changeset.no_assoc_constraint/3
+msgid "is still associated with this entry"
+msgstr "がまだこの項目に関連付けられています"
+
+msgid "are still associated with this entry"
+msgstr "がまだこの項目に関連付けられています"
+
+## From Ecto.Changeset.validate_length/3
+msgid "should have %{count} item(s)"
+msgid_plural "should have %{count} item(s)"
+msgstr[0] "%{count} 個である必要があります"
+
+msgid "should be %{count} character(s)"
+msgid_plural "should be %{count} character(s)"
+msgstr[0] "%{count} 文字である必要があります"
+
+msgid "should be %{count} byte(s)"
+msgid_plural "should be %{count} byte(s)"
+msgstr[0] "%{count} バイトである必要があります"
+
+msgid "should have at least %{count} item(s)"
+msgid_plural "should have at least %{count} item(s)"
+msgstr[0] "少なくとも %{count} 個必要です"
+
+msgid "should be at least %{count} character(s)"
+msgid_plural "should be at least %{count} character(s)"
+msgstr[0] "少なくとも %{count} 文字必要です"
+
+msgid "should be at least %{count} byte(s)"
+msgid_plural "should be at least %{count} byte(s)"
+msgstr[0] "少なくとも %{count} バイト必要です"
+
+msgid "should have at most %{count} item(s)"
+msgid_plural "should have at most %{count} item(s)"
+msgstr[0] "最大で %{count} 個までです"
+
+msgid "should be at most %{count} character(s)"
+msgid_plural "should be at most %{count} character(s)"
+msgstr[0] "最大で %{count} 文字までです"
+
+msgid "should be at most %{count} byte(s)"
+msgid_plural "should be at most %{count} byte(s)"
+msgstr[0] "最大で %{count} バイトまでです"
+
+## From Ecto.Changeset.validate_number/3
+msgid "must be less than %{number}"
+msgstr "%{number} より小さい必要があります"
+
+msgid "must be greater than %{number}"
+msgstr "%{number} より大きい必要があります"
+
+msgid "must be less than or equal to %{number}"
+msgstr "%{number} 以下である必要があります"
+
+msgid "must be greater than or equal to %{number}"
+msgstr "%{number} 以上である必要があります"
+
+msgid "must be equal to %{number}"
+msgstr "%{number} と等しい必要があります"
+
+msgid "A JSON key is required because a service account is selected as the Drive authentication method"
+msgstr "Drive 認証方式にサービスアカウントを選んだため、JSON キーが必要です"
+
+msgid "A Value-Domain API key is required to turn this on"
+msgstr "有効にするにはバリュードメインの API キーが必要です"
+
+msgid "A client certificate is required to turn this on"
+msgstr "有効にするにはクライアント証明書が必要です"
+
+msgid "A private key is required to turn this on"
+msgstr "有効にするには秘密鍵が必要です"
+
+msgid "Enter a base DN or set the organization's Google Workspace domain"
+msgstr "ベース DN を入力するか、組織の Google Workspace ドメインを設定してください"
+
+msgid "Enter a group name"
+msgstr "グループ名を入力してください"
+
+msgid "Specify a model name to run in the cloud"
+msgstr "クラウドで実行する場合はモデル名を指定してください"
+
+msgid "Specify a model name when the chat summary uses a different provider from the nightly batch"
+msgstr "チャット要約のプロバイダを夜間バッチと別にする場合は、モデル名を指定してください"
+
+msgid "already exists"
+msgstr "は既にあります"
+
+msgid "contains characters that can't be used"
+msgstr "に使えない文字が含まれています"
+
+msgid "does not support embeddings (the Claude API has no embedding endpoint)"
+msgstr "は埋め込みに対応していません（Claude API には埋め込みエンドポイントがありません）"
+
+msgid "is already in use"
+msgstr "は既に使われています"
+
+msgid "is already taken"
+msgstr "は既に使われています"
+
+msgid "is not a supported answer style"
+msgstr "は対応していない回答スタイルです"
+
+msgid "is not a supported authentication method"
+msgstr "は対応していない認証方式です"
+
+msgid "is not a supported provider"
+msgstr "は対応していないプロバイダです"
+
+msgid "is not a valid email address"
+msgstr "の形式が正しくありません"
+
+msgid "is reserved for the system"
+msgstr "はシステムで使用するため利用できません"
+
+msgid "must be a Google Chat webhook URL (https://chat.googleapis.com/...)"
+msgstr "は Google Chat の Webhook URL（https://chat.googleapis.com/...）を入力してください"
+
+msgid "must be a URL starting with http:// or https://"
+msgstr "は http:// または https:// で始まる URL を指定してください"
+
+msgid "must be a cloud provider"
+msgstr "はクラウドのプロバイダを選んでください"
+
+msgid "must be a domain name (e.g. company.com)"
+msgstr "はドメイン名（例: company.com）で入力してください"
+
+msgid "must be a domain name (e.g. example.com)"
+msgstr "はドメイン名（例: example.com）で入力してください"
+
+msgid "must be a host name (e.g. ask.example.com)"
+msgstr "はホスト名（例: ask.example.com）で入力してください"
+
+msgid "must be a subdomain of the DNS domain (%{zone})"
+msgstr "は DNS のドメイン（%{zone}）のサブドメインにしてください"
+
+msgid "must be an email address"
+msgstr "はメールアドレスの形式で入力してください"
+
+msgid "must be saved (to turn on automatic renewal)"
+msgstr "を保存してください（自動更新を有効にする場合）"
+
+msgid "must use lowercase letters, digits and hyphens (starting and ending with a letter or digit, up to 32 characters)"
+msgstr "は英小文字・数字・ハイフンで入力してください（先頭と末尾は英数字、32 文字まで）"
+
+msgid "must be a Google Cloud project ID (e.g. my-project-123)"
+msgstr "は Google Cloud のプロジェクト ID（例: my-project-123）で入力してください"
+
+msgid "must be a location such as global, us-central1 or asia-northeast1"
+msgstr "は global・us-central1・asia-northeast1 のようなリージョンで入力してください"
