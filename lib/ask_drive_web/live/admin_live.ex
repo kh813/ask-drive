@@ -2303,8 +2303,12 @@ defmodule AskDriveWeb.AdminLive do
   defp pick(provider, providers), do: if(provider in providers, do: provider, else: hd(providers))
 
   # 「夜間バッチと同じ」 is stored as no chat summary provider of its own.
-  defp normalize_chat_summary_params(%{"chat_summary_mode" => "same"} = params),
-    do: params |> Map.delete("chat_summary_mode") |> Map.put("chat_summary_provider", "")
+  defp normalize_chat_summary_params(%{"chat_summary_mode" => "same"} = params) do
+    params
+    |> Map.delete("chat_summary_mode")
+    |> Map.put("chat_summary_provider", "")
+    |> Map.put("chat_summary_model", "")
+  end
 
   defp normalize_chat_summary_params(params), do: Map.delete(params, "chat_summary_mode")
 

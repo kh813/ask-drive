@@ -1174,6 +1174,14 @@ defmodule AskDriveWeb.ChatLive do
                 <span>{gettext("New question")}</span>
               </button>
             </.form>
+            <p
+              id="chat-disclaimer"
+              class="text-[10px] text-zinc-400 dark:text-zinc-500 text-center pt-0.5"
+            >
+              {gettext(
+                "AI responses may contain errors. Always verify critical information against the original Google Drive documents."
+              )}
+            </p>
           </div>
         </div>
       <% end %>

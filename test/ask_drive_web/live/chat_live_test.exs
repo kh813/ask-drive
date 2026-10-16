@@ -10,6 +10,7 @@ defmodule AskDriveWeb.ChatLiveTest do
     {:ok, view, html} = live(conn, ~p"/it-support")
     assert html =~ "AskDrive"
     assert html =~ "chat-form"
+    assert has_element?(view, "#chat-disclaimer")
 
     # Submit question
     html =
