@@ -43,7 +43,7 @@ defmodule AskDrive.LLM.HTTP do
   end
 
   defp request(method, url, req_opts, attempt, opts) do
-    case apply(Req, method, [url, req_opts]) do
+    case send_request(method, url, req_opts) do
       {:ok, %{status: status, body: body}} when status in 200..299 ->
         {:ok, body}
 
@@ -59,12 +59,32 @@ defmodule AskDrive.LLM.HTTP do
       {:ok, %{status: status, body: body}} ->
         {:error, classify(status, body)}
 
+      # `retry_timeouts: false`: a request that timed out is still being worked on by a busy
+      # local server; sending the same again only queues more work (the caller splits it)
       {:error, %{__struct__: Req.TransportError, reason: :timeout}} ->
-        retry_or_fail(method, url, req_opts, attempt, opts, {:timeout, "receive timeout"})
+        if Keyword.get(opts, :retry_timeouts, true),
+          do: retry_or_fail(method, url, req_opts, attempt, opts, {:timeout, "receive timeout"}),
+          else: {:error, {:timeout, "receive timeout"}}
 
       {:error, reason} ->
         {:error, {:network, reason}}
     end
+  end
+
+  # After a receive timeout, Finch (0.23) puts the connection back in its pool still open,
+  # with the late answer on its way: the next request on it reads that answer and crashes
+  # (CaseClauseError in Finch.HTTP1.Conn), closing the connection as it does. That request
+  # is sent again at once, on a fresh connection.
+  defp send_request(method, url, req_opts, tries \\ 2) do
+    apply(Req, method, [url, req_opts])
+  rescue
+    e in CaseClauseError ->
+      if tries > 1 do
+        Logger.info("LLM request to #{host_of(url)}: stale pooled connection; sending again")
+        send_request(method, url, req_opts, tries - 1)
+      else
+        {:error, {:network, Exception.message(e)}}
+      end
   end
 
   defp retry_or_fail(method, url, req_opts, attempt, opts, error, policy \\ []) do

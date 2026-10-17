@@ -639,7 +639,7 @@ defmodule AskDrive.LLM do
     provider
     |> provider_opts(setting)
     |> Keyword.put(:expected_dim, expected_dim)
-    |> Keyword.merge(Keyword.take(opts, [:timeout, :keep_alive, :retry]))
+    |> Keyword.merge(Keyword.take(opts, [:timeout, :keep_alive, :retry, :retry_timeouts]))
   end
 
   defp validate_dimensions(vectors, expected_dim) do

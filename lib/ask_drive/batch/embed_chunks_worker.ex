@@ -173,7 +173,24 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
   # against the provider's 30s embed timeout. Fixed-size batches keep every request well
   # inside it no matter how long the document is, and each batch takes the semaphore on its
   # own so a long document doesn't starve chat queries needing a query embedding.
-  @embed_batch_size 32
+  #
+  # On a server without a GPU, Ollama embeds on the CPU: 32 chunks took longer than 30s, and
+  # the three retries of the same batch failed each long document after ~95s (v0.2.0). So a
+  # batch is smaller, its timeout grows with its size, and a batch that still times out is
+  # split in half (down to one chunk) instead of being sent again whole.
+  @embed_batch_size 16
+  @embed_timeout_base_ms 30_000
+  @embed_timeout_per_chunk_ms 8_000
+
+  @doc false
+  def embed_timeout(count) do
+    base = Application.get_env(:ask_drive, :embed_timeout_base_ms, @embed_timeout_base_ms)
+
+    each =
+      Application.get_env(:ask_drive, :embed_timeout_per_chunk_ms, @embed_timeout_per_chunk_ms)
+
+    base + count * each
+  end
 
   defp embed_in_batches([], _setting), do: {:ok, []}
 
@@ -184,7 +201,7 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
     texts
     |> Enum.chunk_every(@embed_batch_size)
     |> Enum.reduce_while({:ok, []}, fn batch, {:ok, acc} ->
-      case Semaphore.run(fn -> LLM.embed(setting.embed_model, batch, setting: setting) end) do
+      case embed_batch(batch, setting) do
         {:ok, vectors} ->
           done = min(total, (length(acc) + 1) * @embed_batch_size)
           Progress.detail("埋め込み #{done} / #{total} チャンク")
@@ -197,6 +214,34 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
     |> case do
       {:ok, batches} -> {:ok, batches |> Enum.reverse() |> Enum.concat()}
       error -> error
+    end
+  end
+
+  # One batch; on a timeout, its halves one after the other (a slow CPU, not a broken server)
+  defp embed_batch(batch, setting) do
+    result =
+      Semaphore.run(fn ->
+        LLM.embed(setting.embed_model, batch,
+          setting: setting,
+          timeout: embed_timeout(length(batch)),
+          retry_timeouts: false
+        )
+      end)
+
+    case result do
+      {:error, {:timeout, _}} when length(batch) > 1 ->
+        {first, second} = Enum.split(batch, div(length(batch), 2))
+
+        Logger.info(
+          "EmbedChunksWorker: #{length(batch)} chunks timed out; embedding them in halves"
+        )
+
+        with {:ok, a} <- embed_batch(first, setting),
+             {:ok, b} <- embed_batch(second, setting),
+             do: {:ok, a ++ b}
+
+      other ->
+        other
     end
   end
 
