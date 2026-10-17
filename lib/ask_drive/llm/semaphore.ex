@@ -11,6 +11,15 @@ defmodule AskDrive.LLM.Semaphore do
   end
 
   @doc """
+  For text generation: in a slot when it runs on this machine (Ollama / LM Studio, whose
+  memory and CPU allow one at a time), right away when it runs on a cloud API, where
+  requests mostly wait on the network and several can be in flight (F-840).
+  """
+  def generation(fun) when is_function(fun, 0) do
+    if AskDrive.LLM.local_generation?(), do: run(fun), else: fun.()
+  end
+
+  @doc """
   Runs the given function within a concurrency-controlled slot.
   """
   def run(fun, timeout \\ 300_000) when is_function(fun, 0) do

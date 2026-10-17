@@ -31,7 +31,7 @@ defmodule AskDrive.Generate.Extraction do
         上記の文書から重要項目をJSON配列形式で抽出してください:
         """
 
-        Semaphore.run(fn ->
+        Semaphore.generation(fn ->
           case LLM.generate(model, prompt, system: @system_prompt, num_ctx: num_ctx) do
             {:ok, response} ->
               case parse_json(response) do

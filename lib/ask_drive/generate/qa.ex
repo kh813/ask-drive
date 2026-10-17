@@ -67,7 +67,7 @@ defmodule AskDrive.Generate.QA do
 
     # Call LLM with semaphore control
     llm_result =
-      Semaphore.run(fn ->
+      Semaphore.generation(fn ->
         LLM.generate(model, prompt,
           system: @system_prompt,
           num_ctx: num_ctx,
@@ -102,7 +102,7 @@ defmodule AskDrive.Generate.QA do
     """
 
     llm_result =
-      Semaphore.run(fn ->
+      Semaphore.generation(fn ->
         LLM.generate(model, retry_prompt,
           system: @system_prompt,
           num_ctx: num_ctx,

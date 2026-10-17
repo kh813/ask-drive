@@ -710,52 +710,102 @@ defmodule AskDrive.Batch.Scheduler do
     {processed, qa_count, false}
   end
 
-  defp process_generation_loop([chunk | rest], setting, deadline, processed, qa_count) do
-    # Check deadline
+  # One chunk at a time on a local LLM; on a cloud API several at once (F-840): each request
+  # mostly waits on the network, so a few in flight make the night's generation several times
+  # faster. The deadline and a stop request are checked before each group, as before each
+  # chunk.
+  defp process_generation_loop(chunks, setting, deadline, processed, qa_count) do
     now = DateTime.utc_now()
 
     if deadline && DateTime.compare(now, deadline) in [:gt, :eq] do
       Logger.warning("Batch generation deadline #{inspect(deadline)} reached. Stopping Phase 4.")
       {processed, qa_count, true}
     else
+      {group, rest} = Enum.split(chunks, generation_concurrency(setting))
+
       # progress: the chunk being generated, and the counts so far in the history table
-      Progress.item(processed, chunk_label(chunk), %{
-        chunks_processed: processed,
-        qa_generated: qa_count
-      })
-
-      outcome =
-        try do
-          generate_chunk(chunk, setting)
-        rescue
-          # one chunk the model (or the data) trips over must not fail the whole night's
-          # batch; it is logged and the chunk stays without QA for the next run
-          e ->
-            Logger.error(
-              "Batch: generation crashed on chunk #{chunk.id}: #{Exception.format(:error, e, __STACKTRACE__)}"
-            )
-
-            ItemLog.record(Progress.current_run_id(), %{
-              phase: "generate",
-              document_id: chunk.document_id,
-              name: chunk_label(chunk),
-              status: "failed",
-              message: "QA 生成で例外: " <> String.slice(Exception.message(e), 0, 300)
-            })
-
-            {:error, {:exception, Exception.message(e)}}
+      label =
+        case group do
+          [only] -> chunk_label(only)
+          [first | others] -> "#{chunk_label(first)} ほか #{length(others)} 件（同時に生成）"
         end
 
-      new_qas = record_generation_outcome(chunk, outcome)
+      Progress.item(processed, label, %{chunks_processed: processed, qa_generated: qa_count})
+
+      new_qas =
+        group
+        |> generate_group(setting)
+        |> Enum.zip(group)
+        |> Enum.map(fn {outcome, chunk} -> record_generation_outcome(chunk, outcome) end)
+        |> Enum.sum()
 
       process_generation_loop(
         rest,
         setting,
         deadline,
-        processed + 1,
+        processed + length(group),
         qa_count + new_qas
       )
     end
+  end
+
+  @doc false
+  # How many chunks are generated at once: 1 on a local LLM, a few on a cloud API
+  def generation_concurrency(setting) do
+    if LLM.local_generation?(setting),
+      do: 1,
+      else: Application.get_env(:ask_drive, :cloud_generation_concurrency, 4)
+  end
+
+  defp generate_group([chunk], setting), do: [generate_chunk_safely(chunk, setting)]
+
+  # Each chunk in a task of its own, which takes this process's context along: the desk's
+  # database, the run (for its item log) and the document names (for labels)
+  defp generate_group(group, setting) do
+    app = AskDrive.Apps.current()
+    run_id = Progress.current_run_id()
+    doc_names = Process.get({__MODULE__, :doc_names})
+
+    group
+    |> Task.async_stream(
+      fn chunk ->
+        in_context = fn ->
+          Progress.bind(run_id)
+          Process.put({__MODULE__, :doc_names}, doc_names)
+          generate_chunk_safely(chunk, setting)
+        end
+
+        if app, do: AskDrive.Apps.with_app(app, in_context), else: in_context.()
+      end,
+      max_concurrency: length(group),
+      ordered: true,
+      timeout: :infinity
+    )
+    |> Enum.map(fn
+      {:ok, outcome} -> outcome
+      {:exit, reason} -> {:error, {:exception, inspect(reason)}}
+    end)
+  end
+
+  defp generate_chunk_safely(chunk, setting) do
+    generate_chunk(chunk, setting)
+  rescue
+    # one chunk the model (or the data) trips over must not fail the whole night's batch;
+    # it is logged and the chunk stays without QA for the next run
+    e ->
+      Logger.error(
+        "Batch: generation crashed on chunk #{chunk.id}: #{Exception.format(:error, e, __STACKTRACE__)}"
+      )
+
+      ItemLog.record(Progress.current_run_id(), %{
+        phase: "generate",
+        document_id: chunk.document_id,
+        name: chunk_label(chunk),
+        status: "failed",
+        message: "QA 生成で例外: " <> String.slice(Exception.message(e), 0, 300)
+      })
+
+      {:error, {:exception, Exception.message(e)}}
   end
 
   @max_qa_attempts 3

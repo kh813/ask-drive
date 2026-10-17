@@ -7,6 +7,7 @@ defmodule AskDrive.StubGemini do
     * `:parts` — the parts returned (may include `%{"thought" => true, ...}`)
     * `:reject_thinking` — answer 400 when thinkingBudget is 0 or thinkingLevel is "minimal"
       (models that must think); `:all` rejects thinkingLevel "low" too (Pro-like)
+    * `:delay` — wait this many ms before answering a POST (a model that takes its time)
     * `:no_text` — answer with a candidate without parts and this finishReason (the output
       limit spent on thinking: "MAX_TOKENS")
     * `:rate_limit_once` — answer the first request with 429 + RetryInfo "0.2s"
@@ -45,6 +46,7 @@ defmodule AskDrive.StubGemini do
 
   post "/models/:call" do
     send(fetch(:owner), {:stub_gemini, call, conn.body_params})
+    if delay = fetch(:delay), do: Process.sleep(delay)
     thinking = get_in(conn.body_params, ["generationConfig", "thinkingConfig"]) || %{}
 
     rejected_levels =
@@ -109,6 +111,7 @@ defmodule AskDrive.StubGemini do
           :parts,
           :reject_thinking,
           :no_text,
+          :delay,
           :rate_limit_once,
           :limited,
           :models,

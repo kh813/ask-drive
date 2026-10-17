@@ -25,7 +25,7 @@ defmodule AskDrive.Generate.Summary do
         上記の要点を簡潔に要約してください:
         """
 
-        Semaphore.run(fn ->
+        Semaphore.generation(fn ->
           case LLM.generate(model, prompt, system: @system_prompt, num_ctx: num_ctx) do
             {:ok, response} ->
               {:ok, String.trim(response)}
