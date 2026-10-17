@@ -4,7 +4,7 @@ This document outlines planned improvements, future concepts, and the technical 
 
 ---
 
-## Current Version: `0.2.2` (MVP: Minimum Viable Product)
+## Current Version: `0.2.3` (MVP: Minimum Viable Product)
 - **License**: Changed to [Apache License 2.0](LICENSE) (from MIT) with [NOTICE](NOTICE) file.
 - **Prototype (v0.1.x) to MVP (v0.2.0)**: The core feature set has matured from the initial prototype phase into an operational Minimum Viable Product for enterprise internal deployments.
 - **Multi-lingual Support (i18n)**: English (default) & Japanese (`en` / `ja`) with browser `Accept-Language` auto-detection and UI switcher. The admin screens (desk and platform) are fully available in English (v0.1.41, Gettext with English source strings); text recorded by background work (batch, health check, certificate renewal, updater) stays Japanese.
@@ -20,7 +20,7 @@ This document outlines planned improvements, future concepts, and the technical 
   - Automated temporary file & OCR cache garbage collection (`AskDrive.Cleanup`).
   - CLI commands (`./app.sh backup`, `./app.sh backup status`, `./app.sh backup checkpoint`).
 - **管理画面からのアップデート**（v0.1.30〜）: 全体管理の「アップデート」タブで最新版を確認し、サーバーとバッチを動かしたまま裏でビルドして、短い再起動で切り替える。実行中のバッチは区切りで一時停止し、再起動後に続きから再開。再起動中は全画面に「アップデート中」を表示。毎晩の確認と自動アップデート（夜間枠の開始時のみ）の設定。アップデートの開始・完了（正常に稼働）・失敗を Google Chat に通知
-- **LLM プロバイダ**: Ollama / LM Studio / Gemini / Google Agent Platform（旧 Vertex AI。API キー、生成のみ。v0.1.44〜）/ Claude / OpenAI。夜間バッチ・チャット要約・埋め込みを個別に設定し、選んだ側（ローカル LLM / クラウド API）の欄と接続情報だけをそのすぐ下に表示。クラウド API のモデル名はプロバイダのモデル一覧から選ぶ（Gemini の一覧を取れないとき・Agent Platform は公式マニュアルのモデルを候補に表示）。保存済みの API キーは伏せ字で表示
+- **LLM プロバイダ & クラウドモデル選択**（v0.1.44〜、v0.2.1）: Ollama / LM Studio / Gemini / Google Agent Platform（旧 Vertex AI。API キー、生成のみ）/ Claude / OpenAI。夜間バッチ・チャット要約・埋め込みを個別に設定。Agent Platform では公式ドキュメント・Model Garden に基づくモデル一覧をプルダウンで選択可能にし（手入力への切り替えも対応）、最適な `gemini-2.5-flash` をデフォルト化。未検証クラウド API（Gemini, Claude, OpenAI）には「(実験的)」を明示。保存済みの API キーは伏せ字で表示
 - **チャット要約の回答スタイル**（v0.1.36〜）: 窓口ごとに 簡潔 / 対話調 / 詳しく / やさしく から選ぶ（抜粋だけを根拠にする規則はどれでも同じ）
 - **Ollama と外部プログラムの管理を全体管理に集約**（v0.1.45〜0.1.49）: 「インストールとアップデート」タブの「Ollama（ローカル推論）」カードでインストール（`./app.sh install-ollama`）・起動、モデルの一覧・取得・まとめて取得・削除。窓口は取得済みのモデルから選ぶだけで、自動取得はしない
 - **HTTPS の運用**: Let's Encrypt の証明書をバリュードメインの DNS API（DNS-01）でアプリ自身が取得・夜間に自動更新（v0.1.37〜）。API ゲートウェイ（さくらのクラウド + Google ログイン）を前段に置く構成に対応（秘密ヘッダー `X-Apigw-Secret`、v0.1.38〜）

@@ -75,6 +75,23 @@ defmodule AskDriveWeb.AdminLlmFieldsTest do
     refute has_element?(view, "#connection-ollama")
     refute has_element?(view, "#connection-lmstudio")
     refute has_element?(view, "#connection-openai")
+
+    # experimental providers have experimental indicator in choice labels; vertex does not
+    assert has_element?(view, "#batch-cloud-fields select option[value='gemini']", "実験的") or
+             has_element?(
+               view,
+               "#batch-cloud-fields select option[value='gemini']",
+               "Experimental"
+             )
+
+    assert has_element?(
+             view,
+             "#batch-cloud-fields select option[value='vertex']",
+             "Agent Platform"
+           )
+
+    refute has_element?(view, "#batch-cloud-fields select option[value='vertex']", "実験的")
+    refute has_element?(view, "#batch-cloud-fields select option[value='vertex']", "Experimental")
   end
 
   test "the chat summary's own side lists only that side's providers", %{conn: conn} do
@@ -211,25 +228,24 @@ defmodule AskDriveWeb.AdminLlmFieldsTest do
       assert Settings.get_setting!().cloud_llm_model == "gemini-2.5-flash"
     end
 
-    test "a key that may not list models gets the manual's models as suggestions", %{
-      conn: conn
-    } do
+    test "a key that may not list models gets the documented models in a pull-down with custom input toggle",
+         %{conn: conn} do
       AskDrive.StubGemini.set(:models_blocked, true)
 
       view = open(conn)
       _ = render_async(view)
 
+      select = "#cloud-llm-model-field select[name='setting[cloud_llm_model]']"
+      assert has_element?(view, "#{select} option[value='gemini-2.5-flash']")
+      assert has_element?(view, "#toggle-custom-cloud-model-btn")
+
+      # switch to custom input mode
+      view |> element("#toggle-custom-cloud-model-btn") |> render_click()
+
       input = "#cloud-llm-model-field input[name='setting[cloud_llm_model]']"
+      assert has_element?(view, input)
 
-      assert has_element?(
-               view,
-               "#{input}[list='cloud-llm-model-suggestions'][value='gemini-old']"
-             )
-
-      assert has_element?(view, "#cloud-llm-model-suggestions option[value='gemini-2.5-flash']")
-      assert has_element?(view, "#cloud-models-status")
-
-      # a name that isn't suggested can still be saved
+      # a custom name can be saved
       view
       |> form("#settings-form", %{"setting" => %{"cloud_llm_model" => "gemini-next"}})
       |> render_submit()
@@ -237,7 +253,7 @@ defmodule AskDriveWeb.AdminLlmFieldsTest do
       assert Settings.get_setting!().cloud_llm_model == "gemini-next"
     end
 
-    test "Agent Platform: its connection fields, and the manual's models as suggestions", %{
+    test "Agent Platform: its connection fields, and supported models in a pull-down", %{
       conn: conn
     } do
       {:ok, _} =
@@ -257,7 +273,11 @@ defmodule AskDriveWeb.AdminLlmFieldsTest do
       assert has_element?(view, ~s(#{key}[placeholder*="1234"]))
       refute render(view) =~ "vk-1234"
       refute has_element?(view, "#connection-gemini")
-      assert has_element?(view, "#cloud-llm-model-suggestions option[value='gemini-2.5-pro']")
+
+      select = "#cloud-llm-model-field select[name='setting[cloud_llm_model]']"
+      assert has_element?(view, "#{select} option[value='gemini-2.5-flash']")
+      assert has_element?(view, "#{select} option[value='gemini-2.5-pro']")
+
       # nothing is asked for a list
       refute_received {:stub_gemini, "models", _}
 
@@ -270,6 +290,13 @@ defmodule AskDriveWeb.AdminLlmFieldsTest do
       setting = Settings.get_setting!()
       assert {setting.vertex_project, setting.vertex_location} == {"my-proj-1", "asia-northeast1"}
       assert AskDrive.LLM.api_key("vertex", setting) == "vk-1234"
+
+      # saving with blank model defaults to gemini-2.5-flash
+      view
+      |> form("#settings-form", %{"setting" => %{"cloud_llm_model" => ""}})
+      |> render_submit()
+
+      assert Settings.get_setting!().cloud_llm_model == "gemini-2.5-flash"
     end
 
     test "without an API key the name is typed by hand", %{conn: conn} do

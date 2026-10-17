@@ -26,15 +26,6 @@ defmodule AskDrive.LLM do
     "openai" => OpenAI
   }
 
-  @labels %{
-    "ollama" => "Ollama",
-    "lmstudio" => "LM Studio",
-    "gemini" => "Google Gemini API",
-    "vertex" => "Google Agent Platform (Vertex AI)",
-    "anthropic" => "Anthropic Claude API",
-    "openai" => "OpenAI API"
-  }
-
   @default_provider "ollama"
 
   # --- Provider registry ----------------------------------------------------
@@ -51,11 +42,29 @@ defmodule AskDrive.LLM do
 
   @doc "Human readable name for a provider identifier."
   def label(provider) do
-    name = Map.get(@labels, normalize(provider), provider)
+    case normalize(provider) do
+      "ollama" -> gettext("Ollama (local)")
+      "lmstudio" -> gettext("LM Studio (local)")
+      "vertex" -> "Google Agent Platform (Vertex AI)"
+      "gemini" -> "Google Gemini API"
+      "anthropic" -> "Anthropic Claude API"
+      "openai" -> "OpenAI API"
+      other -> other
+    end
+  end
 
-    if normalize(provider) in ~w(ollama lmstudio),
-      do: gettext("%{name} (local)", name: name),
-      else: name
+  @doc "Label shown in selection menus, marking non-verified cloud APIs as experimental."
+  def choice_label(provider) do
+    base = label(provider)
+
+    if experimental?(provider),
+      do: gettext("%{name} (Experimental)", name: base),
+      else: base
+  end
+
+  @doc "Whether the provider integration is experimental / unverified."
+  def experimental?(provider) do
+    normalize(provider) in ~w(gemini anthropic openai)
   end
 
   @doc "Adapter module for a provider identifier."

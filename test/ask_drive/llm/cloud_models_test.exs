@@ -62,10 +62,10 @@ defmodule AskDrive.LLM.CloudModelsTest do
     StubGemini.set(:models_blocked, true)
 
     # the manual's models are suggested instead of an error
-    assert {:documented, [{"gemini-4-argon", _} | _] = models, :blocked} =
+    assert {:documented, [{"gemini-2.5-flash", _} | _] = models, :blocked} =
              CloudModels.list("gemini", setting)
 
-    assert {"gemini-2.5-flash", "Gemini 2.5 Flash"} in models
+    assert {"gemini-2.5-flash", "Gemini 2.5 Flash (推奨・最適 / Fast)"} in models
 
     # the health check doesn't count it as a failed connection
     opts = [base_url: setting.gemini_base_url, api_key: setting.gemini_api_key]
@@ -88,5 +88,15 @@ defmodule AskDrive.LLM.CloudModelsTest do
              CloudModels.options(models, "gemini-1.0-pro")
 
     assert [{_, "gemini-2.5-pro"}] = CloudModels.options(models, nil)
+  end
+
+  test "vertex provider returns documented supported models and defaults to gemini-2.5-flash", %{
+    setting: setting
+  } do
+    assert {:documented, models, :no_list} = CloudModels.list("vertex", setting)
+    assert {"gemini-2.5-flash", "Gemini 2.5 Flash (推奨・最適 / Fast)"} in models
+    assert {"gemini-2.5-pro", "Gemini 2.5 Pro (高性能・推論重視)"} in models
+    assert CloudModels.default_model("vertex") == "gemini-2.5-flash"
+    assert CloudModels.default_model("gemini") == "gemini-2.5-flash"
   end
 end

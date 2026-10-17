@@ -21,20 +21,49 @@ defmodule AskDrive.LLM.CloudModels do
   # image and embedding models left out). Only offered as suggestions when the API key may
   # not list models itself (F-834), so a stale entry costs little: any name can be typed.
   @gemini_documented [
-    {"gemini-4-argon", "Gemini 4 Argon"},
-    {"gemini-3.8-flash", "Gemini 3.8 Flash"},
-    {"gemini-3.6-flash", "Gemini 3.6 Flash"},
-    {"gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite"},
-    {"gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite"},
-    {"gemini-3.1-pro-preview", "Gemini 3.1 Pro (preview)"},
-    {"gemini-3-flash-preview", "Gemini 3 Flash (preview)"},
-    {"gemini-2.5-pro", "Gemini 2.5 Pro"},
-    {"gemini-2.5-flash", "Gemini 2.5 Flash"},
-    {"gemini-2.5-flash-lite", "Gemini 2.5 Flash-Lite"}
+    {"gemini-2.5-flash", "Gemini 2.5 Flash (推奨・最適 / Fast)"},
+    {"gemini-2.5-flash-lite", "Gemini 2.5 Flash-Lite (最安・超高速)"},
+    {"gemini-2.5-pro", "Gemini 2.5 Pro (高性能・推論重視)"},
+    {"gemini-2.0-flash", "Gemini 2.0 Flash"},
+    {"gemini-1.5-flash", "Gemini 1.5 Flash"},
+    {"gemini-1.5-flash-8b", "Gemini 1.5 Flash-8B"},
+    {"gemini-1.5-pro", "Gemini 1.5 Pro"},
+    {"gemini-3.8-flash", "Gemini 3.8 Flash (プレビュー)"},
+    {"gemini-4-argon", "Gemini 4 Argon (プレビュー)"}
   ]
 
+  # Agent Platform (Vertex AI) generation models based on the official model catalog,
+  # pricing page, and Model Garden offerings (2026-10).
+  # Optimal default: gemini-2.5-flash (fast, high grounding accuracy, very cost-effective).
+  @vertex_documented [
+    # Recommended & Fast (Gemini Flash)
+    {"gemini-2.5-flash", "Gemini 2.5 Flash (推奨・最適 / Fast)"},
+    {"gemini-2.5-flash-lite", "Gemini 2.5 Flash-Lite (最安・超高速)"},
+    {"gemini-2.0-flash", "Gemini 2.0 Flash"},
+    {"gemini-1.5-flash", "Gemini 1.5 Flash"},
+    {"gemini-1.5-flash-8b", "Gemini 1.5 Flash-8B"},
+    # High Performance (Gemini Pro)
+    {"gemini-2.5-pro", "Gemini 2.5 Pro (高性能・推論重視)"},
+    {"gemini-1.5-pro", "Gemini 1.5 Pro"},
+    # Next-gen / Preview
+    {"gemini-3.8-flash", "Gemini 3.8 Flash (プレビュー)"},
+    {"gemini-4-argon", "Gemini 4 Argon (プレビュー)"},
+    # Model Garden Partner Models
+    {"claude-3-5-sonnet-v2@20241022", "Claude 3.5 Sonnet v2 (Model Garden)"},
+    {"claude-3-5-haiku@20241022", "Claude 3.5 Haiku (Model Garden)"},
+    {"llama-3.3-70b-instruct-maas", "Llama 3.3 70B Instruct (Model Garden)"}
+  ]
+
+  @default_vertex_model "gemini-2.5-flash"
+
+  @doc "Default recommended model for the provider."
+  def default_model("vertex"), do: @default_vertex_model
+  def default_model("gemini"), do: "gemini-2.5-flash"
+  def default_model(_provider), do: nil
+
   @doc "The models of `provider`'s manual, offered when its API can't be asked (F-834)."
-  def documented(provider) when provider in ~w(gemini vertex), do: @gemini_documented
+  def documented("vertex"), do: @vertex_documented
+  def documented("gemini"), do: @gemini_documented
   def documented(_provider), do: []
 
   @doc """

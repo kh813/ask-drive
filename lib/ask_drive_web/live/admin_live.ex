@@ -111,6 +111,7 @@ defmodule AskDriveWeb.AdminLive do
      |> assign(:acme_status, if(scope == :platform, do: AskDrive.ACME.Renewal.status()))
      |> assign(:acme_dns_test, nil)
      |> assign(:cloud_models, %{})
+     |> assign(:custom_cloud_model?, false)
      |> maybe_load_cloud_models()
      |> assign(:ollama_starting, false)
      |> assign_ollama_runtime()
@@ -1262,9 +1263,14 @@ defmodule AskDriveWeb.AdminLive do
     {:noreply, maybe_load_cloud_models(socket)}
   end
 
+  def handle_event("toggle_custom_cloud_model", _params, socket) do
+    {:noreply, assign(socket, :custom_cloud_model?, !socket.assigns.custom_cloud_model?)}
+  end
+
   def handle_event("save_settings", %{"setting" => setting_params}, socket) do
     setting_params =
       setting_params
+      |> maybe_default_cloud_model()
       |> normalize_chat_summary_params()
       |> put_ollama_embedding_dim(socket.assigns.ollama_catalog, socket.assigns.setting)
 
@@ -1901,6 +1907,123 @@ defmodule AskDriveWeb.AdminLive do
     """
   end
 
+  attr :form, :any, required: true
+  attr :provider, :string, required: true
+  attr :entry, :any, default: nil
+  attr :custom?, :boolean, default: false
+
+  defp cloud_model_field(assigns) do
+    models =
+      case assigns.entry do
+        {:ok, [_ | _] = m} -> m
+        {:documented, [_ | _] = m, _why} -> m
+        _ -> nil
+      end
+
+    assigns = assign(assigns, :models, models)
+
+    ~H"""
+    <div id="cloud-llm-model-field">
+      <%= if @models do %>
+        <%= if @custom? do %>
+          <.input
+            field={@form[:cloud_llm_model]}
+            type="text"
+            label={gettext("Cloud API model name (Custom)")}
+            placeholder={gettext("Type model name (e.g. gemini-2.5-flash)")}
+            list="cloud-llm-model-suggestions"
+            autocomplete="off"
+          />
+          <datalist id="cloud-llm-model-suggestions">
+            <option :for={{id, label} <- @models} value={id}>{label}</option>
+          </datalist>
+          <div class="flex items-center justify-between text-[11px] text-zinc-500 mt-1">
+            <span :if={@provider in ["vertex", "gemini"]}>
+              {gettext("Recommended: gemini-2.5-flash (optimal cost & performance)")}
+            </span>
+            <button
+              type="button"
+              id="toggle-custom-cloud-model-btn"
+              phx-click="toggle_custom_cloud_model"
+              class="text-indigo-600 dark:text-indigo-400 hover:underline ml-auto"
+            >
+              {gettext("← Choose from supported models list")}
+            </button>
+          </div>
+        <% else %>
+          <.input
+            field={@form[:cloud_llm_model]}
+            type="select"
+            label={gettext("Cloud API model name")}
+            prompt={gettext("Choose a model")}
+            options={
+              AskDrive.LLM.CloudModels.options(
+                @models,
+                if(to_string(@form[:cloud_llm_provider].value) == @provider,
+                  do:
+                    @form[:cloud_llm_model].value || AskDrive.LLM.CloudModels.default_model(@provider)
+                )
+              )
+            }
+          />
+          <div class="flex items-center justify-between text-[11px] text-zinc-500 mt-1">
+            <span :if={@provider in ["vertex", "gemini"]}>
+              {gettext("Recommended: gemini-2.5-flash (optimal cost & performance)")}
+            </span>
+            <button
+              type="button"
+              id="toggle-custom-cloud-model-btn"
+              phx-click="toggle_custom_cloud_model"
+              class="text-indigo-600 dark:text-indigo-400 hover:underline ml-auto"
+            >
+              {gettext("Type custom model name…")}
+            </button>
+          </div>
+        <% end %>
+      <% else %>
+        <.input
+          field={@form[:cloud_llm_model]}
+          type="text"
+          label={gettext("Cloud API model name")}
+          placeholder={
+            if(@provider in ["vertex", "gemini"],
+              do: "gemini-2.5-flash",
+              else: gettext("e.g. a Gemini model name")
+            )
+          }
+        />
+        <p
+          :if={@entry}
+          id="cloud-models-status"
+          class="-mt-1 text-[11px] text-zinc-500 leading-snug"
+        >
+          {case @entry do
+            :loading -> gettext("Loading the model list…")
+            {:ok, []} -> gettext("The provider listed no models.")
+            {:error, message} -> message
+          end}
+        </p>
+      <% end %>
+      <button
+        type="button"
+        id="refresh-cloud-models"
+        phx-click="refresh_cloud_models"
+        disabled={@entry == :loading}
+        class="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 disabled:opacity-50 disabled:cursor-wait transition"
+      >
+        <.icon
+          name="hero-arrow-path"
+          class={[
+            "w-3.5 h-3.5",
+            @entry == :loading && "animate-spin"
+          ]}
+        />
+        {gettext("Refresh list")}
+      </button>
+    </div>
+    """
+  end
+
   # The endpoint and key fields of one provider (F-836), shown right under the setting that
   # uses it — the nightly batch's, the chat summary's or the embedding's provider — and only
   # once when several use the same one. API keys are stored encrypted; a blank key keeps the
@@ -2205,7 +2328,7 @@ defmodule AskDriveWeb.AdminLive do
   defp tool_ok?(_), do: false
 
   defp provider_options(providers) do
-    Enum.map(providers, fn provider -> {LLM.label(provider), provider} end)
+    Enum.map(providers, fn provider -> {LLM.choice_label(provider), provider} end)
   end
 
   defp assign_settings_form(socket, setting) do
@@ -2311,6 +2434,20 @@ defmodule AskDriveWeb.AdminLive do
   end
 
   defp normalize_chat_summary_params(params), do: Map.delete(params, "chat_summary_mode")
+
+  # Fill the recommended default model if none was specified for a cloud provider
+  defp maybe_default_cloud_model(params) do
+    if params["batch_llm_mode"] == "cloud" and
+         (is_nil(params["cloud_llm_model"]) or
+            String.trim(to_string(params["cloud_llm_model"])) == "") do
+      case AskDrive.LLM.CloudModels.default_model(params["cloud_llm_provider"]) do
+        nil -> params
+        default -> Map.put(params, "cloud_llm_model", default)
+      end
+    else
+      params
+    end
+  end
 
   defp load_dashboard_data(socket) do
     # 1. Batch history (spec F-338): recent runs, the one being inspected (latest unless the
@@ -6292,87 +6429,12 @@ defmodule AskDriveWeb.AdminLive do
                       />
                       <%!-- The provider's own model list (F-834); typed by hand while it
                             loads or when it can't be had (no API key yet, unreachable) --%>
-                      <div id="cloud-llm-model-field">
-                        <%= case Map.get(@cloud_models, @llm_view.cloud) do %>
-                          <% {:ok, [_ | _] = models} -> %>
-                            <.input
-                              field={@form[:cloud_llm_model]}
-                              type="select"
-                              label={gettext("Cloud API model name")}
-                              prompt={gettext("Choose a model")}
-                              options={
-                                AskDrive.LLM.CloudModels.options(
-                                  models,
-                                  if(to_string(@form[:cloud_llm_provider].value) == @llm_view.cloud,
-                                    do: @form[:cloud_llm_model].value
-                                  )
-                                )
-                              }
-                            />
-                          <% {:documented, models, why} -> %>
-                            <%!-- the key may not list models: the manual's as suggestions,
-                                  any name can still be typed --%>
-                            <.input
-                              field={@form[:cloud_llm_model]}
-                              type="text"
-                              label={gettext("Cloud API model name")}
-                              placeholder={gettext("Choose from the suggestions or type a name")}
-                              list="cloud-llm-model-suggestions"
-                              autocomplete="off"
-                            />
-                            <datalist id="cloud-llm-model-suggestions">
-                              <option :for={{id, label} <- models} value={id}>{label}</option>
-                            </datalist>
-                            <p
-                              id="cloud-models-status"
-                              class="-mt-1 text-[11px] text-zinc-500 leading-snug"
-                            >
-                              {if why == :no_list,
-                                do:
-                                  gettext(
-                                    "Agent Platform gives no model list for an API key, so the suggestions are the models in Gemini's manual (October 2026). A model that isn't suggested can be typed; not every model is offered in every location or in express mode."
-                                  ),
-                                else:
-                                  gettext(
-                                    "This API key may not list models (its restrictions in the Google Cloud console), so the suggestions are the models in Gemini's manual (October 2026). A model that isn't suggested can be typed."
-                                  )}
-                            </p>
-                          <% other -> %>
-                            <.input
-                              field={@form[:cloud_llm_model]}
-                              type="text"
-                              label={gettext("Cloud API model name")}
-                              placeholder={gettext("e.g. a Gemini model name")}
-                            />
-                            <p
-                              :if={other}
-                              id="cloud-models-status"
-                              class="-mt-1 text-[11px] text-zinc-500 leading-snug"
-                            >
-                              {case other do
-                                :loading -> gettext("Loading the model list…")
-                                {:ok, []} -> gettext("The provider listed no models.")
-                                {:error, message} -> message
-                              end}
-                            </p>
-                        <% end %>
-                        <button
-                          type="button"
-                          id="refresh-cloud-models"
-                          phx-click="refresh_cloud_models"
-                          disabled={Map.get(@cloud_models, @llm_view.cloud) == :loading}
-                          class="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 disabled:opacity-50 disabled:cursor-wait transition"
-                        >
-                          <.icon
-                            name="hero-arrow-path"
-                            class={[
-                              "w-3.5 h-3.5",
-                              Map.get(@cloud_models, @llm_view.cloud) == :loading && "animate-spin"
-                            ]}
-                          />
-                          {gettext("Refresh list")}
-                        </button>
-                      </div>
+                      <.cloud_model_field
+                        form={@form}
+                        provider={@llm_view.cloud}
+                        entry={Map.get(@cloud_models, @llm_view.cloud)}
+                        custom?={@custom_cloud_model?}
+                      />
                       <.input
                         field={@form[:llm_max_tokens]}
                         type="number"
@@ -6434,7 +6496,20 @@ defmodule AskDriveWeb.AdminLive do
                           type="text"
                           label={gettext("Chat summary model name")}
                           placeholder={gettext("Blank: the nightly batch model")}
+                          list="chat-summary-model-suggestions"
+                          autocomplete="off"
                         />
+                        <datalist id="chat-summary-model-suggestions">
+                          <option
+                            :for={
+                              {id, label} <-
+                                AskDrive.LLM.CloudModels.documented(@llm_view.chat_provider)
+                            }
+                            value={id}
+                          >
+                            {label}
+                          </option>
+                        </datalist>
                       <% end %>
                     </div>
                     <%= if @llm_view.chat != "same" do %>
