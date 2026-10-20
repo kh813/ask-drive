@@ -48,6 +48,10 @@ defmodule AskDriveWeb.AdminLive do
       # installing Ollama / pandoc from the platform screen (F-837, F-839)
       if socket.assigns.live_action == :platform,
         do: Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.Runtime.ToolInstaller.topic())
+
+      # the directory's users fetched for completing e-mail fields (F-1313)
+      if socket.assigns.live_action == :platform,
+        do: Phoenix.PubSub.subscribe(AskDrive.PubSub, AskDrive.Ldap.Directory.topic())
     end
 
     setting = Settings.get_setting!()
@@ -66,6 +70,7 @@ defmodule AskDriveWeb.AdminLive do
       |> allow_upload(:ldap_key, accept: :any, max_entries: 1, max_file_size: 200_000)
       |> allow_upload(:ldap_ca, accept: :any, max_entries: 1, max_file_size: 500_000)
       |> assign(:ldap_test, nil)
+      |> assign_ldap_directory()
       |> assign(:ac, %{})
       |> assign(:peer_ip, peer_ip(socket))
       |> assign(:gateway_header, gateway_header(socket))
@@ -166,6 +171,14 @@ defmodule AskDriveWeb.AdminLive do
   # --- Updating from the admin screen (F-1501–F-1506), platform scope only ---
 
   @impl true
+  # a fetch of the directory's users ended (F-1313): its result is on the setting row
+  def handle_info({:ldap_directory, _result}, socket) do
+    {:noreply,
+     socket
+     |> assign(:setting, Settings.get_setting!())
+     |> assign_ldap_directory()}
+  end
+
   def handle_info({:acme_status, status}, socket) do
     # a run that just finished has written its result on the setting row
     socket =
@@ -373,6 +386,20 @@ defmodule AskDriveWeb.AdminLive do
 
   # "保存" and "接続テスト" submit the same form (the button pressed arrives as "op"):
   # the test runs on the form's contents, saved or not, including newly chosen files.
+  def handle_event("refresh_ldap_directory", _params, %{assigns: %{scope: :platform}} = socket) do
+    socket = assign_ldap_directory(socket)
+
+    # shown as fetching at once: the fetch registers itself a moment later
+    case AskDrive.Ldap.Directory.refresh() do
+      :ok ->
+        {:noreply,
+         assign(socket, :ldap_directory, %{socket.assigns.ldap_directory | running?: true})}
+
+      {:error, :running} ->
+        {:noreply, socket}
+    end
+  end
+
   def handle_event("save_ldap", params, socket) do
     socket = take_ldap_uploads(socket)
     # whether LDAP sign-in is on is its switch's business (F-206), not the form's
@@ -2323,6 +2350,13 @@ defmodule AskDriveWeb.AdminLive do
 
   # The health check reports a found program as {:ok, its version line}, a missing one as
   # {:error, reason} (it used to be compared with :ok, so it always read "not installed")
+  defp assign_ldap_directory(socket) do
+    assign(socket, :ldap_directory, %{
+      count: AskDrive.Ldap.Directory.count(),
+      running?: AskDrive.Ldap.Directory.running?()
+    })
+  end
+
   defp tool_ok?({:ok, _}), do: true
   defp tool_ok?(:ok), do: true
   defp tool_ok?(_), do: false
@@ -5231,6 +5265,61 @@ defmodule AskDriveWeb.AdminLive do
                     </button>
                   </div>
                 </form>
+
+                <%!-- The directory's users kept for completing e-mail fields (spec F-1313) --%>
+                <div
+                  :if={AskDrive.Ldap.configured?(@setting)}
+                  id="ldap-directory"
+                  class="pt-3 border-t border-zinc-200/60 dark:border-zinc-800 space-y-2"
+                >
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h3 class="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                        {gettext("Directory users (for completing e-mail addresses)")}
+                      </h3>
+                      <p id="ldap-directory-status" class="text-xs text-zinc-500 mt-0.5">
+                        <%= cond do %>
+                          <% @ldap_directory.running? -> %>
+                            {gettext("Fetching…")}
+                          <% @setting.ldap_directory_synced_at -> %>
+                            {gettext("%{count} users (fetched %{time})",
+                              count: @ldap_directory.count,
+                              time:
+                                AskDrive.Clock.format(
+                                  @setting.ldap_directory_synced_at,
+                                  "%m/%d %H:%M"
+                                )
+                            )}
+                          <% true -> %>
+                            {gettext("Not fetched yet")}
+                        <% end %>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      id="refresh-ldap-directory-btn"
+                      phx-click="refresh_ldap_directory"
+                      disabled={@ldap_directory.running?}
+                      class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium text-xs transition disabled:opacity-50 disabled:cursor-wait"
+                    >
+                      {gettext("Refresh now")}
+                    </button>
+                  </div>
+                  <p
+                    :if={@setting.ldap_directory_error && !@ldap_directory.running?}
+                    id="ldap-directory-error"
+                    class="text-xs text-red-600"
+                  >
+                    {gettext("The last fetch failed: %{message}",
+                      message: @setting.ldap_directory_error
+                    )}
+                  </p>
+                  <p class="text-[11px] text-zinc-400 leading-relaxed">
+                    {gettext(
+                      "Fetched every night, so addresses are suggested at once as you type. Someone added to the directory since is still found (the directory is asked when the list has no match)."
+                    )}
+                  </p>
+                </div>
 
                 <%!-- Active sign-in locks (spec F-1305), liftable by an administrator --%>
                 <div

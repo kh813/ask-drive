@@ -252,8 +252,21 @@ defmodule AskDrive.Metrics do
         100.0
       end
 
+    # pages: as recorded when indexed, else the last page a chunk starts on (F-1410)
+    pages =
+      doc.page_count ||
+        chunks |> Enum.map(& &1.page) |> Enum.reject(&is_nil/1) |> Enum.max(fn -> nil end)
+
+    chars_per_page = if pages && pages > 0, do: Float.round(total_chars / pages, 1)
+
     {score_level, score_rating, advice} =
-      evaluate_efficiency(format, tokens_per_kb, effective_text_ratio, chunks_count)
+      evaluate_efficiency(format, tokens_per_kb, chunks_count, %{
+        pages: pages,
+        chars_per_page: chars_per_page,
+        textless_pages: doc.textless_pages,
+        total_chars: total_chars,
+        refers_to_images?: refers_to_images?(chunks)
+      })
 
     %{
       document: doc,
@@ -264,6 +277,8 @@ defmodule AskDrive.Metrics do
       chunks_count: chunks_count,
       tokens_per_kb: tokens_per_kb,
       effective_text_ratio: effective_text_ratio,
+      pages: pages,
+      chars_per_page: chars_per_page,
       score_level: score_level,
       score_rating: score_rating,
       advice: advice
@@ -272,7 +287,12 @@ defmodule AskDrive.Metrics do
 
   # {score_level, score_rating, advice}: score_level is the language-neutral grade the admin
   # screen picks the badge colour from; score_rating and advice are display text.
-  defp evaluate_efficiency(format, tokens_per_kb, effective_text_ratio, chunks_count) do
+  #
+  # PDFs are judged by their text per page, not by text against file size (F-1410): the
+  # screenshots that make a manual easy to follow make the file large without adding text,
+  # so a well-written manual with many of them used to be rated "Needs improvement".
+  # Only a PDF with (almost) no text on its pages — a scan, images only — is.
+  defp evaluate_efficiency(format, tokens_per_kb, chunks_count, text) do
     cond do
       chunks_count == 0 ->
         {:none, "—", gettext("No indexed chunks")}
@@ -295,20 +315,19 @@ defmodule AskDrive.Metrics do
 
       format == :docs ->
         {:good, gettext("Good (A)"),
-         gettext("Well-structured document with stable token efficiency.")}
+         with_image_note(
+           gettext("Well-structured document with stable token efficiency."),
+           text
+         )}
+
+      format == :pdf and scanned?(text) ->
+        {:poor, gettext("Needs improvement (C)"),
+         gettext(
+           "Almost no text on its pages: it looks like scanned pages or images only. Their content can't be searched; converting it to the original text or Markdown is recommended."
+         )}
 
       format == :pdf ->
-        if effective_text_ratio < 10.0 and tokens_per_kb < 10.0 do
-          {:poor, gettext("Needs improvement (C)"),
-           gettext(
-             "Little text was extracted for the file size. If it is mostly scanned images, converting it to the original text or Markdown is recommended."
-           )}
-        else
-          {:fair, gettext("Fair (B)"),
-           gettext(
-             "Text is extracted from the PDF. Converting it to Markdown or Docs with clear headings improves accuracy further."
-           )}
-        end
+        {:fair, gettext("Fair (B)"), pdf_advice(text)}
 
       format == :image ->
         {:warning, gettext("Caution (D)"),
@@ -316,10 +335,64 @@ defmodule AskDrive.Metrics do
            "Mostly image data. Transcribing it to text (Markdown) can greatly improve search accuracy and save tokens."
          )}
 
+      format == :slides ->
+        {:fair, gettext("Fair (B)"), with_image_note(gettext("Standard file format."), text)}
+
       true ->
         {:fair, gettext("Fair (B)"), gettext("Standard file format.")}
     end
   end
+
+  # fewer characters per page than a short caption: nothing but images
+  @scanned_chars_per_page 50
+
+  defp scanned?(%{chars_per_page: nil, total_chars: chars}), do: chars < @scanned_chars_per_page
+  defp scanned?(%{chars_per_page: per_page}), do: per_page < @scanned_chars_per_page
+
+  defp pdf_advice(text) do
+    base =
+      if text.refers_to_images?,
+        do:
+          gettext(
+            "Explained with screenshots or figures: the text is indexed correctly, and the images are where they belong."
+          ),
+        else:
+          gettext(
+            "Text is extracted from the PDF. Converting it to Markdown or Docs with clear headings improves accuracy further."
+          )
+
+    textless =
+      if (text.textless_pages || 0) > 0 and text.pages,
+        do:
+          gettext(
+            "%{count} of %{pages} pages have no text (images only); if what they show matters, write it in the text too.",
+            count: text.textless_pages,
+            pages: text.pages
+          )
+
+    image_note = if text.refers_to_images?, do: images_not_searchable()
+
+    [base, textless, image_note] |> Enum.reject(&is_nil/1) |> Enum.join(" ")
+  end
+
+  defp with_image_note(advice, %{refers_to_images?: true}),
+    do: advice <> " " <> images_not_searchable()
+
+  defp with_image_note(advice, _text), do: advice
+
+  defp images_not_searchable,
+    do:
+      gettext(
+        "Text inside the images (button names, values) isn't searched: writing the important ones in the text as well makes them findable."
+      )
+
+  # "click the button in the red frame of the image below": the images are part of the
+  # explanation, not a sign of a poorly converted file
+  @image_reference ~r/(以下|下記|次|上記|下|上)の(画像|図|スクリーンショット|画面|キャプチャ)|赤枠|赤い枠|赤線|スクリーンショット|スクショ|キャプチャ画像|下図|上図|図\s*[0-9０-９]|画像のよう|screenshot|(image|figure|picture) (below|above)|red (box|frame|rectangle)|\bfig(ure)?\.?\s*\d/iu
+
+  @doc false
+  def refers_to_images?(chunks),
+    do: Enum.any?(chunks, &Regex.match?(@image_reference, &1.content || ""))
 
   @doc """
   Aggregates data token efficiency metrics across all indexed documents.

@@ -107,6 +107,12 @@ defmodule AskDrive.Settings.Setting do
     field :ldap_ca_cert, :string
     field :ldap_bind_dn, :string
     field :ldap_bind_password, Binary
+    # the directory's users fetched for completing e-mail fields (spec F-1313), written by
+    # AskDrive.Ldap.Directory only
+    field :ldap_directory_checked_at, :utc_datetime
+    field :ldap_directory_synced_at, :utc_datetime
+    field :ldap_directory_error, :string
+    field :ldap_directory_fingerprint, :string
 
     # --- Administrator elevation (spec 6.2.1.1) ---
     # how long Platform Admin / a desk's admin screen stays open after confirming identity

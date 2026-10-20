@@ -33,8 +33,9 @@ defmodule AskDrive.Documents do
 
     * 1: initial
     * 2: PDF chunks carry their page number (F-411)
+    * 3: PDF page counts for the token efficiency score (F-1410)
   """
-  def current_index_version, do: 2
+  def current_index_version, do: 3
 
   @doc """
   Upserts a document from Google Drive file metadata.
@@ -200,16 +201,42 @@ defmodule AskDrive.Documents do
   @doc """
   Marks a document as indexed with content hash.
   """
-  def mark_indexed(%Document{} = doc, content_hash) do
+  def mark_indexed(%Document{} = doc, content_hash, text \\ nil) do
     doc
-    |> Document.changeset(%{
-      status: "indexed",
-      content_hash: content_hash,
-      index_version: current_index_version(),
-      error: nil,
-      synced_at: DateTime.utc_now()
-    })
+    |> Document.changeset(
+      Map.merge(
+        %{
+          status: "indexed",
+          content_hash: content_hash,
+          index_version: current_index_version(),
+          error: nil,
+          synced_at: DateTime.utc_now()
+        },
+        if(text, do: page_stats(text), else: %{})
+      )
+    )
     |> Repo.update()
+  end
+
+  # a page with fewer characters than this holds only images (a screenshot, a scan)
+  @textless_page_chars 20
+
+  @doc """
+  A PDF's pages (its text has a form feed per page break, F-411) and how many of them have
+  (almost) no text, for the token efficiency score (F-1410). Nil for text without pages.
+  """
+  def page_stats(text) when is_binary(text) do
+    if String.contains?(text, "\f") do
+      pages = String.split(text, "\f")
+
+      %{
+        page_count: length(pages),
+        textless_pages:
+          Enum.count(pages, &(&1 |> String.trim() |> String.length() < @textless_page_chars))
+      }
+    else
+      %{page_count: nil, textless_pages: nil}
+    end
   end
 
   @doc """

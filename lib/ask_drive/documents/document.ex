@@ -16,6 +16,9 @@ defmodule AskDrive.Documents.Document do
     field :status, :string, default: "pending"
     field :error, :string
     field :synced_at, :utc_datetime
+    # a PDF's pages and those with (almost) no text (F-1410); nil for other formats
+    field :page_count, :integer
+    field :textless_pages, :integer
 
     has_many :chunks, AskDrive.Documents.Chunk, on_delete: :delete_all
     has_many :qa_pairs, AskDrive.QA.QAPair, on_delete: :delete_all
@@ -41,7 +44,9 @@ defmodule AskDrive.Documents.Document do
       :size_bytes,
       :status,
       :error,
-      :synced_at
+      :synced_at,
+      :page_count,
+      :textless_pages
     ])
     |> validate_required([:drive_file_id, :name, :mime_type])
     |> unique_constraint(:drive_file_id)

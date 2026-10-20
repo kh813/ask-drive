@@ -59,6 +59,13 @@ defmodule AskDrive.FakeLdap do
       {_, :base} ->
         {:ok, [%{dn: base, attrs: %{}}]}
 
+      {_, :people} ->
+        people =
+          for {email, u} <- users(),
+              do: %{dn: u.dn, attrs: %{"mail" => [email], "displayName" => [u.name]}}
+
+        {:ok, people}
+
       {_, {:query, q}} ->
         q = String.downcase(q)
 

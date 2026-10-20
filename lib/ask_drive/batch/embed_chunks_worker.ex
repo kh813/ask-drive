@@ -115,7 +115,7 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
   """
   def index_text(%Document{} = doc, text, hash, setting) do
     if doc.content_hash == hash and has_chunks?(doc) do
-      Documents.mark_indexed(doc, hash)
+      Documents.mark_indexed(doc, hash, text)
       {:ok, :unchanged}
     else
       process_chunks_and_embed(doc, text, hash, setting)
@@ -140,7 +140,7 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
 
     case embed_in_batches(new_texts, setting) do
       {:ok, embeddings} ->
-        {:ok, stats} = save_chunks_transaction(doc, plan, removed, embeddings, hash)
+        {:ok, stats} = save_chunks_transaction(doc, plan, removed, embeddings, hash, text)
 
         if chunks_data == [],
           do: {:ok, :empty_content},
@@ -245,7 +245,7 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
     end
   end
 
-  defp save_chunks_transaction(doc, plan, removed, embeddings, hash) do
+  defp save_chunks_transaction(doc, plan, removed, embeddings, hash, text) do
     Repo.transaction(fn ->
       changed? = removed != [] or Enum.any?(plan, &match?({:new, _}, &1))
 
@@ -296,7 +296,7 @@ defmodule AskDrive.Batch.EmbedChunksWorker do
             {embs, %{counts | new: counts.new + 1}}
         end)
 
-      {:ok, _} = Documents.mark_indexed(doc, hash)
+      {:ok, _} = Documents.mark_indexed(doc, hash, text)
 
       counts
       |> Map.put(:removed, length(removed))

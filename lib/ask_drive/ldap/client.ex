@@ -13,7 +13,7 @@ defmodule AskDrive.Ldap.Client do
   @callback search(
               handle,
               base :: String.t(),
-              filter :: {:mail, String.t()} | {:query, String.t()} | :base
+              filter :: {:mail, String.t()} | {:query, String.t()} | :base | :people
             ) ::
               {:ok, [entry]} | {:error, term()}
   @callback close(handle) :: :ok
@@ -35,7 +35,29 @@ defmodule AskDrive.Ldap.Client do
     :eldap.simple_bind(handle, String.to_charlist(dn), String.to_charlist(password))
   end
 
+  @page_size 500
+
+  # every person with an address (F-1313), a page at a time: a directory caps how many
+  # entries one search returns. A server that doesn't page answers the plain search.
   @impl true
+  def search(handle, base, :people) do
+    opts = [
+      base: String.to_charlist(base),
+      filter:
+        :eldap.and([
+          :eldap.equalityMatch(~c"objectClass", ~c"person"),
+          :eldap.present(~c"mail")
+        ]),
+      scope: :eldap.wholeSubtree(),
+      attributes: [~c"mail", ~c"cn", ~c"displayName"]
+    ]
+
+    case search_pages(handle, opts, :none, []) do
+      {:error, :paging_unsupported} -> plain_search(handle, opts)
+      other -> other
+    end
+  end
+
   def search(handle, base, filter) do
     {filter, scope} =
       case filter do
@@ -64,6 +86,39 @@ defmodule AskDrive.Ldap.Client do
            # an exact lookup expects one entry; suggestions are trimmed afterwards
            size_limit: if(match?({:mail, _}, filter), do: 2, else: 0)
          ) do
+      {:ok, result} -> {:ok, result |> elem(1) |> Enum.map(&entry/1)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp search_pages(handle, opts, cookie, acc) do
+    control =
+      if cookie == :none,
+        do: :eldap.paged_result_control(@page_size),
+        else: :eldap.paged_result_control(@page_size, cookie)
+
+    case :eldap.search(handle, opts, [control]) do
+      {:ok, result} ->
+        acc = [result |> elem(1) |> Enum.map(&entry/1) | acc]
+
+        case :eldap.paged_result_cookie(result) do
+          {:ok, next} when next in [~c"", ""] -> {:ok, acc |> Enum.reverse() |> Enum.concat()}
+          {:ok, next} -> search_pages(handle, opts, next, acc)
+          # no paging control in the answer: the server returned everything at once
+          {:error, _} when cookie == :none -> {:ok, acc |> Enum.reverse() |> Enum.concat()}
+          {:error, reason} -> {:error, reason}
+        end
+
+      {:error, reason} when cookie == :none and reason in [:unavailableCriticalExtension] ->
+        {:error, :paging_unsupported}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp plain_search(handle, opts) do
+    case :eldap.search(handle, opts) do
       {:ok, result} -> {:ok, result |> elem(1) |> Enum.map(&entry/1)}
       {:error, reason} -> {:error, reason}
     end

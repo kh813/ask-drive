@@ -22,7 +22,7 @@ defmodule AskDrive.Ldap do
 
   use Gettext, backend: AskDriveWeb.Gettext
   require Logger
-  alias AskDrive.Ldap.Cache
+  alias AskDrive.Ldap.{Cache, Directory}
   alias AskDrive.Settings.Setting
 
   @timeout 10_000
@@ -146,6 +146,48 @@ defmodule AskDrive.Ldap do
     end
   end
 
+  @doc """
+  Every person in the directory with an address, for the night's list (F-1313):
+  `{:ok, [%{email:, name:}]}` or `{:error, message}`.
+  """
+  def list_people(%Setting{} = setting) do
+    if configured?(setting) do
+      with_connection(setting, fn client, handle ->
+        with :ok <- service_bind(client, handle, setting) do
+          case client.search(handle, base_dn(setting), :people) do
+            {:ok, entries} ->
+              {:ok,
+               entries
+               |> Enum.flat_map(fn e ->
+                 case Map.get(e.attrs, "mail", []) do
+                   [mail | _] -> [%{email: String.downcase(mail), name: name_of(e)}]
+                   _ -> []
+                 end
+               end)
+               |> Enum.uniq_by(& &1.email)}
+
+            {:error, :ldap_closed} ->
+              closed()
+
+            {:error, reason} ->
+              unavailable(gettext("Can't list the directory's users"), reason)
+          end
+        end
+      end)
+      |> case do
+        {:ok, people} -> {:ok, people}
+        {:error, {:unavailable, message}} -> {:error, message}
+      end
+    else
+      {:error,
+       gettext("Set the client certificate, the private key and the base DN (or the domain)")}
+    end
+  end
+
+  @doc "Which directory, as whom, as text: the night's list is tied to it (F-1313)."
+  def settings_fingerprint(%Setting{} = setting),
+    do: setting |> fingerprint() |> Base.encode16(case: :lower)
+
   # which directory, as whom: a change makes every cached entry stale
   defp fingerprint(setting) do
     [
@@ -206,33 +248,49 @@ defmodule AskDrive.Ldap do
   Directory entries matching what is being typed (spec F-1115): mail starting with `q`, or
   a name containing it. `[%{email:, name:}]`, at most `limit`, [] when LDAP is off,
   unreachable or `q` is shorter than 2 characters.
+
+  Answered from the list fetched every night (`AskDrive.Ldap.Directory`, F-1313) when there
+  is one; the directory is asked only when it has no match (someone added today) or there
+  is no list yet.
   """
   def search_users(%Setting{} = setting, q, limit \\ 8) do
     q = q |> to_string() |> String.trim()
 
-    if enabled?(setting) and String.length(q) >= 2 do
-      with_connection(setting, fn client, handle ->
-        with :ok <- service_bind(client, handle, setting),
-             {:ok, entries} <- client.search(handle, base_dn(setting), {:query, q}) do
-          {:ok,
-           entries
-           |> Enum.flat_map(fn e ->
-             case Map.get(e.attrs, "mail", []) do
-               [mail | _] -> [%{email: String.downcase(mail), name: name_of(e)}]
-               _ -> []
-             end
-           end)
-           |> Enum.uniq_by(& &1.email)
-           |> Enum.sort_by(&{not String.starts_with?(&1.email, String.downcase(q)), &1.email})
-           |> Enum.take(limit)}
+    cond do
+      not enabled?(setting) or String.length(q) < 2 ->
+        []
+
+      Directory.usable?(setting) ->
+        case Directory.suggest(q, limit) do
+          [] -> search_directory(setting, q, limit)
+          users -> users
         end
-      end)
-      |> case do
-        {:ok, users} -> users
-        _ -> []
+
+      true ->
+        search_directory(setting, q, limit)
+    end
+  end
+
+  defp search_directory(setting, q, limit) do
+    with_connection(setting, fn client, handle ->
+      with :ok <- service_bind(client, handle, setting),
+           {:ok, entries} <- client.search(handle, base_dn(setting), {:query, q}) do
+        {:ok,
+         entries
+         |> Enum.flat_map(fn e ->
+           case Map.get(e.attrs, "mail", []) do
+             [mail | _] -> [%{email: String.downcase(mail), name: name_of(e)}]
+             _ -> []
+           end
+         end)
+         |> Enum.uniq_by(& &1.email)
+         |> Enum.sort_by(&{not String.starts_with?(&1.email, String.downcase(q)), &1.email})
+         |> Enum.take(limit)}
       end
-    else
-      []
+    end)
+    |> case do
+      {:ok, users} -> users
+      _ -> []
     end
   end
 
@@ -241,6 +299,18 @@ defmodule AskDrive.Ldap do
   `:skip` when LDAP is off or can't be reached (the addresses are then taken as typed).
   """
   def unknown_emails(%Setting{} = setting, emails) do
+    # addresses on the night's list are known; only the others are asked about (F-1313)
+    emails =
+      if enabled?(setting) and Directory.usable?(setting),
+        do: Enum.reject(emails, &Directory.known?/1),
+        else: emails
+
+    if emails == [] and enabled?(setting),
+      do: {:ok, []},
+      else: unknown_in_directory(setting, emails)
+  end
+
+  defp unknown_in_directory(setting, emails) do
     if enabled?(setting) do
       with_connection(setting, fn client, handle ->
         with :ok <- service_bind(client, handle, setting) do
