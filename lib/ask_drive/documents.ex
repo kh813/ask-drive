@@ -5,6 +5,7 @@ defmodule AskDrive.Documents do
   import Ecto.Query, warn: false
   alias AskDrive.Repo
   alias AskDrive.Documents.Document
+  alias AskDrive.Ingest.FileTypes
 
   @doc """
   Lists all documents.
@@ -37,7 +38,8 @@ defmodule AskDrive.Documents do
 
   @doc """
   Upserts a document from Google Drive file metadata.
-  Returns `{:created, doc}`, `{:updated, doc}`, or `{:unchanged, doc}`.
+  Returns `{:created, doc}`, `{:updated, doc}`, `{:unchanged, doc}`, or `{:excluded, doc}`
+  for a file that isn't a document (`AskDrive.Ingest.FileTypes`, spec F-356).
 
   A file already indexed (or deliberately skipped) stays `:unchanged` — no re-extraction or
   re-embedding in the batch — when Drive reports the same `modifiedTime`, or the same
@@ -59,7 +61,15 @@ defmodule AskDrive.Documents do
       size_bytes: parse_integer(drive_file["size"])
     }
 
-    case get_document_by_drive_file_id(drive_id) do
+    existing = get_document_by_drive_file_id(drive_id)
+
+    if FileTypes.indexable?(attrs.name, attrs.mime_type),
+      do: upsert_indexable(existing, attrs),
+      else: upsert_excluded(existing, attrs)
+  end
+
+  defp upsert_indexable(existing, attrs) do
+    case existing do
       nil ->
         {:ok, doc} =
           %Document{}
@@ -69,8 +79,10 @@ defmodule AskDrive.Documents do
         {:created, doc}
 
       %Document{} = existing ->
+        # a file left out for its type that now counts (renamed .txt, a type added) is read
         if existing.status in ["indexed", "skipped"] and same_content?(existing, attrs) and
-             existing.index_version >= current_index_version() do
+             existing.index_version >= current_index_version() and
+             not FileTypes.excluded_reason?(existing.error) do
           {:ok, doc} = existing |> Document.changeset(attrs) |> Repo.update()
           {:unchanged, doc}
         else
@@ -85,6 +97,29 @@ defmodule AskDrive.Documents do
 
           {:updated, updated}
         end
+    end
+  end
+
+  # Not a document (a program, a script, source code): recorded as skipped with the reason,
+  # never downloaded. One indexed before the allowlist (F-356) loses its chunks, QA and
+  # summaries — it's removed and recorded again as left out.
+  defp upsert_excluded(existing, attrs) do
+    reason = FileTypes.excluded_reason(attrs.name, attrs.mime_type)
+
+    case existing do
+      %Document{status: "skipped", error: ^reason} = doc ->
+        {:ok, doc} = doc |> Document.changeset(attrs) |> Repo.update()
+        {:excluded, doc}
+
+      _ ->
+        if existing, do: AskDrive.Freshness.delete_document_completely(existing)
+
+        {:ok, doc} =
+          %Document{}
+          |> Document.changeset(attrs |> Map.put(:status, "skipped") |> Map.put(:error, reason))
+          |> Repo.insert()
+
+        {:excluded, doc}
     end
   end
 

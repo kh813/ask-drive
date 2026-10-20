@@ -48,7 +48,6 @@ defmodule AskDriveWeb.Layouts do
   def app(assigns) do
     assigns =
       assigns
-      |> assign(:remote_provider, remote_generation_provider())
       |> assign(:guest_mode, guest_mode())
 
     ~H"""
@@ -171,19 +170,6 @@ defmodule AskDriveWeb.Layouts do
         >
           <.icon name="hero-shield-check" class="w-3.5 h-3.5" /> {gettext("Admin login")}
         </.link>
-
-        <%!-- Document text leaves the building when generation runs on a cloud API, so say
-              so on every screen rather than burying it in settings (spec 1.2). --%>
-        <span
-          :if={@remote_provider}
-          id="external-llm-badge"
-          title={gettext("External API is used for answering. Document content is sent externally.")}
-          class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200 border border-amber-200/60 dark:border-amber-800/50"
-        >
-          <.icon name="hero-cloud" class="w-3.5 h-3.5" /> {gettext("External AI: %{provider}",
-            provider: @remote_provider
-          )}
-        </span>
 
         <%!-- Admin mode and what only it opens (Release, Platform Admin) form one group, so
               platform-wide settings read as part of the elevated session, not as a desk tab.
@@ -331,14 +317,6 @@ defmodule AskDriveWeb.Layouts do
   end
 
   # nil when generation stays on this machine, so the banner only appears when it matters.
-  defp remote_generation_provider do
-    provider = AskDrive.LLM.generation_provider()
-
-    if AskDrive.LLM.local?(provider), do: nil, else: AskDrive.LLM.label(provider)
-  rescue
-    _ -> nil
-  end
-
   @doc """
   Shows the flash group with standard titles and content.
 

@@ -7,8 +7,9 @@ defmodule AskDrive.Batch.ItemLog do
   one per file per phase, with the outcome, the chunk count, the time taken and the reason.
 
   Statuses:
-    * sync: `created` / `updated` / `unchanged` / `deleted` / `failed` (and a single
-      `failed` row without a file when the folder itself could not be listed)
+    * sync: `created` / `updated` / `unchanged` / `excluded` (not a document type, F-356) /
+      `deleted` / `failed` (and a single `failed` row without a file when the folder itself
+      could not be listed)
     * embed_chunks: `indexed` / `unchanged` / `empty` / `skipped` / `failed`
 
   Logging never breaks a batch: a failed insert is logged and swallowed.
@@ -20,7 +21,7 @@ defmodule AskDrive.Batch.ItemLog do
 
   alias AskDrive.Repo
 
-  @statuses ~w(created updated unchanged deleted indexed empty skipped failed)
+  @statuses ~w(created updated unchanged excluded deleted indexed empty skipped failed)
 
   schema "batch_item_logs" do
     belongs_to :batch_run, AskDrive.Batch.BatchRun

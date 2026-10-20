@@ -138,6 +138,8 @@ Anthropic API キー: ********
 
 - `./app.sh setup` は最初に `sudo apt-get install` で `poppler-utils`（pdftotext）・`zstd`・`unzip`・`git`・`curl`・`openssl`・`build-essential` を入れ、Erlang/OTP 28・Elixir 1.19・pandoc・Ollama・sqlite-vec（`vec0.so`）は `.runtime/` と `priv/sqlite_vec/` に配置します（Homebrew は使いません）。
 - あとから足りないものに気づいた場合は、全体管理の **「インストールとアップデート」** タブで確認できます。pandoc と Ollama はその画面からインストールでき、pdftotext（poppler-utils）や zstd のように sudo が必要なものは、サーバーで実行するコマンドが表示されます（実行後に「再確認」。再起動は不要で、プログラムがなくてスキップした文書は次の取り込みで読み直します）。
+- 古い形式の Word / Excel / PowerPoint（.doc / .xls / .ppt）を読むには LibreOffice が必要です（`./app.sh setup` では入れません。容量が大きいため任意）。Ubuntu では `sudo apt-get install -y --no-install-recommends libreoffice-writer libreoffice-calc libreoffice-impress` を実行し、「インストールとアップデート」で「再確認」を押してください。未インストールの間、これらのファイルはスキップされます。
+- インデックスの対象は文書（Google ドキュメント / スプレッドシート / スライド、PDF、Word・Excel・PowerPoint、テキスト、Markdown、CSV、HTML）だけです。同じフォルダにあるバッチファイル・プログラム（.exe）・ソースコード（.py など）・設定ファイル（JSON / YAML / XML）・画像などは、ダウンロードせずに対象外とします（文書一覧には「スキップ」として理由を表示）。
 - `./app.sh service install` は **systemd のシステムサービス** `/etc/systemd/system/askdrive.service` を作成し、`enable --now` で起動します。サービスは `service install` を実行したユーザーの権限で動き（root では動きません）、ログは `log/ask_drive.log` / `log/ask_drive_error.log` に追記されます。
 - 同時に `/etc/sudoers.d/askdrive` を作成し、そのユーザーに **`systemctl start|stop|restart askdrive.service` だけ**をパスワードなしで許可します。これにより、管理画面からの証明書の適用（再起動）や `./app.sh deploy` の再起動が sudo のパスワードなしで動きます。
 - 状態・ログ: `./app.sh status`、`systemctl status askdrive`、`journalctl -u askdrive`

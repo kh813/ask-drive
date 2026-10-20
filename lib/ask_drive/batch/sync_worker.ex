@@ -61,26 +61,35 @@ defmodule AskDrive.Batch.SyncWorker do
         stats =
           drive_files
           |> Enum.with_index()
-          |> Enum.reduce(%{created: 0, updated: 0, unchanged: 0, failed: 0}, fn {file, index},
-                                                                                acc ->
-            Progress.item(index, file["path"] || file["name"])
+          |> Enum.reduce(
+            %{created: 0, updated: 0, unchanged: 0, excluded: 0, failed: 0},
+            fn {file, index}, acc ->
+              Progress.item(index, file["path"] || file["name"])
 
-            try do
-              {outcome, doc} = Documents.upsert_document_from_drive(file)
+              try do
+                {outcome, doc} = Documents.upsert_document_from_drive(file)
 
-              Logger.info(
-                "SyncWorker: #{outcome} #{file["path"] || file["name"]} (#{file["mimeType"]})"
-              )
+                Logger.info(
+                  "SyncWorker: #{outcome} #{file["path"] || file["name"]} (#{file["mimeType"]})"
+                )
 
-              log_file(run_id, file, doc.id, Atom.to_string(outcome), nil)
-              Map.update!(acc, outcome, &(&1 + 1))
-            rescue
-              e ->
-                Logger.error("SyncWorker: Failed to upsert file #{file["id"]}: #{inspect(e)}")
-                log_file(run_id, file, nil, "failed", Exception.message(e))
-                %{acc | failed: acc.failed + 1}
+                log_file(
+                  run_id,
+                  file,
+                  doc.id,
+                  Atom.to_string(outcome),
+                  excluded_note(outcome, doc)
+                )
+
+                Map.update!(acc, outcome, &(&1 + 1))
+              rescue
+                e ->
+                  Logger.error("SyncWorker: Failed to upsert file #{file["id"]}: #{inspect(e)}")
+                  log_file(run_id, file, nil, "failed", Exception.message(e))
+                  %{acc | failed: acc.failed + 1}
+              end
             end
-          end)
+          )
 
         Progress.done(length(drive_files))
 
@@ -115,6 +124,9 @@ defmodule AskDrive.Batch.SyncWorker do
         {:error, reason}
     end
   end
+
+  defp excluded_note(:excluded, doc), do: doc.error
+  defp excluded_note(_outcome, _doc), do: nil
 
   defp log_file(run_id, file, document_id, status, message) do
     ItemLog.record(run_id, %{

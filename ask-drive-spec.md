@@ -598,19 +598,25 @@ RAM 使用量の推移（8GB / batch_model = qwen3:4b の場合）
 
 #### 6.3.4 対応ファイル形式と抽出方法
 
-| MIME タイプ | 種別 | 抽出方法 |
+インデックスの対象は**文書だけ**とする（許可リスト方式、F-356）。
+
+| 種別 | 判定 | 抽出方法 |
 |---|---|---|
-| `application/vnd.google-apps.document` | Google ドキュメント | `files.export` → `text/plain` |
-| `application/vnd.google-apps.spreadsheet` | Google スプレッドシート | `files.export` → xlsx → 全シートをテキスト化 |
-| `application/vnd.google-apps.presentation` | Google スライド | `files.export` → `text/plain` |
-| `application/pdf` | PDF | `pdftotext -layout` |
-| `...wordprocessingml.document` | docx | `pandoc -t plain` |
-| `...presentationml.presentation` | pptx | `pandoc -t plain` |
-| `...spreadsheetml.sheet` | xlsx | `XlsxReader` で全シート走査 |
-| `text/html`, `application/xhtml+xml` | HTML | `pandoc -f html -t plain`（タグを除去） |
-| `text/plain`, `text/markdown`, `text/csv`, `application/json` | テキスト系 | そのまま |
-| `application/vnd.google-apps.folder` | フォルダ | 再帰対象。本文なし |
-| 上記以外 | — | `skipped` として理由を記録 |
+| Google ドキュメント | `application/vnd.google-apps.document` | `files.export` → `text/plain` |
+| Google スプレッドシート | `application/vnd.google-apps.spreadsheet` | `files.export` → xlsx → 全シートをテキスト化 |
+| Google スライド | `application/vnd.google-apps.presentation` | `files.export` → `text/plain` |
+| PDF | `.pdf` / `application/pdf` | `pdftotext -layout` |
+| docx / pptx | `.docx` / `.pptx`（または該当 MIME） | `pandoc -t plain` |
+| xlsx | `.xlsx`（または該当 MIME） | `XlsxReader` で全シート走査 |
+| doc / xls / ppt（旧形式） | `.doc` / `.xls` / `.ppt`（または該当 MIME） | LibreOffice（`soffice --headless --convert-to docx/xlsx/pptx`）で変換し、上と同じ方法で読む。未インストールなら `skipped`（理由: LibreOffice が無い）とし、インストール後の「再確認」で再処理する |
+| HTML | `.html` / `.htm` | `pandoc -f html -t plain`（タグを除去） |
+| テキスト | `.txt` / `.md` / `.markdown` / `.csv`、拡張子のない `text/plain`・`text/markdown` | そのまま |
+| フォルダ | `application/vnd.google-apps.folder` | 再帰対象。本文なし |
+| 上記以外 | — | 対象外（下記） |
+
+| ID | 要件 |
+|---|---|
+| F-356 | **文書以外は夜間バッチの対象外**: マニュアルと同じフォルダに置かれたバッチファイル、プログラム（.exe）、ソースコード（.py）、スクリプト、設定ファイル（JSON / YAML / XML）、画像、圧縮ファイルなどは、同期の時点で対象外とし、ダウンロードしない。Google 系のファイルは MIME タイプで、それ以外は拡張子で判定する（Drive は `.py` にも `text/` の MIME タイプを付けるため。拡張子が対象外なら MIME タイプが `text/plain` でも対象外）。対象外のファイルは文書一覧に `skipped`（理由: 「Not a document type: .py …」）として記録し、ファイル別ログには「対象外」と記録する。以前にインデックスしていたものは、次の同期でチャンク・QA・要約ごと削除する。名前が変わるなどして対象になったファイルは、次の取り込みで読む |
 
 **スプレッドシートのテキスト化**：シート名を見出しとし、行ごとに `列名: 値` をタブ区切りで並べる。空行・空列は除去する。
 
@@ -876,7 +882,7 @@ document 更新
 - ヘッダにログイン中の利用者（表示名・メールアドレス）とログアウト導線を表示
 - 管理画面へのリンクは**昇格可能なアカウントの場合のみ**表示する。未昇格なら昇格画面へ誘導する
 - 昇格中はその旨と残り時間、「管理者権限を解除」の導線をヘッダに常時表示する
-- 外部 LLM API が有効な場合、送信先プロバイダ名を常時表示する（例: `外部AI: Claude API`）
+- 外部 LLM API の送信先プロバイダ名は利用者の画面には表示しない（どの API を使うかはプラットフォーム管理画面の設定で確認する）
 
 会話履歴は文脈補完にのみ使う。直前の質問を参照する代名詞（「それ」「その場合」）の解決は、履歴中の質問文を連結して検索に使う形で行い、LLM は使わない。
 
@@ -931,7 +937,7 @@ document 更新
 | F-836 | **接続情報は選んだプロバイダのすぐ下に**: プロバイダの接続情報（Ollama・LM Studio のエンドポイントと Ollama のコンテキスト長、Gemini・Agent Platform・Claude・OpenAI の API キーとベース URL・プロジェクト・リージョン）は、そのプロバイダを選んだ欄のすぐ下に、選んだプロバイダの分だけを表示する: 夜間バッチ（ローカル / クラウド）・チャット要約（「夜間バッチと同じ」以外のとき）・埋め込み。同じプロバイダを複数の欄で使う場合は最初の欄（夜間バッチ → チャット要約 → 埋め込み）にだけ表示し、ほかの欄には「上の欄で設定します」と示す。表示しない接続情報は送信しないため、保存しても保存済みの値は変わらない |
 | F-837 | **Ollama を管理画面からインストールできる**: 全体管理の「インストールとアップデート」タブ（v0.1.48 までは全体設定）に「Ollama（ローカル推論）」のカードを置き、AskDrive 専用の Ollama（`.runtime`）がインストール済みか（パス）、稼働中か（バージョン）、どの窓口がどの用途・モデルで使うかを表示する。「Ollama をインストール」（インストール済みなら「再インストール」。確認のうえ）で `./app.sh install-ollama`（`.runtime` への取得だけ。`repair-ollama` と違い再ビルド・再起動はしない。稼働中の古い `ollama serve` は止める）をバックグラウンドで実行し、出力とダウンロードの進み具合を画面に表示する（画面を閉じても続く）。成功すると Ollama を起動する（モデルは F-838 のとおり全体管理者が同じカードで取得する。v0.1.45 では窓口が使うモデルも取得していた）。インストール済みで止まっていれば「Ollama を起動」で起動できる。Ollama を使う設定の窓口があるのに未インストールなら警告する（v0.1.45〜0.1.47 は窓口の「ローカルモデル（Ollama）」にも全体設定からインストールするよう示していた。このカードは v0.1.48 でなくした）。Linux では zstd が必要で、ない場合は失敗の出力にその旨を示す。app.sh で起動していない環境ではインストールのボタンを出さない |
 | F-838 | **Ollama のモデルは全体管理者が管理し、窓口は取得済みから選ぶ**: Ollama は 1 つをすべての窓口で共用し、モデルはサーバーのディスク（数百 MB〜数 GB）とメモリを使うため、全体管理の「インストールとアップデート」タブの「Ollama（ローカル推論）」のカードで管理する: 取得済みのモデルの一覧（用途＝埋め込み / 生成（Ollama の `/api/show` の capabilities）・サイズ・使う窓口と用途）、名前を指定した取得（進み具合を表示。bge-m3 などを候補に表示）、窓口の設定にあるのに取得されていないモデルの警告と「まとめて取得」、削除（どの窓口も使っていないモデルだけ。確認のうえ）。窓口の「設定」では、Ollama を使う欄（夜間バッチのローカル LLM のモデル名・チャット要約のモデル名・埋め込みのモデル名）を取得済みのモデルのプルダウンにし、用途に合うモデル（埋め込みの欄は埋め込み用、生成の欄は生成用。用途が分からないモデルは両方）だけを示す。選択肢は取得済みのモデルだけとし、保存済みの名前が取得済みのモデルにない場合（未取得、または Gemini などクラウド API のモデル名が残っている場合）は選択肢に出さず、その旨を示して選び直させる（夜間バッチ・埋め込みの欄は選ぶまで保存できない。チャット要約は空欄＝夜間バッチと同じになる）。保存時にもサーバー側で確かめ、取得済みでない名前は保存しない。Ollama の埋め込みモデルを保存するときは、埋め込み次元をモデルの次元（`/api/show` の `<architecture>.embedding_length`。bge-m3 は 1024）に合わせる。Ollama に接続できないときは手入力にする。取得に失敗したモデルが Ollama のライブラリにない名前なら、その旨を示す。窓口からはモデルを取得できない（v0.1.48 以降、窓口の「ローカルモデル（Ollama）」のカードは置かない。取得済みかどうかはモデル名の欄に示す）。全体設定の「取得されていないモデル」には、その窓口の設定画面へのリンクを付け、Ollama のライブラリにない名前（取得に失敗した、クラウド API のモデル名など）は、窓口の設定で選び直すよう示して「まとめて取得」の対象から外す。設定の保存時・起動時にモデルを自動で取得しない（起動時と保存時は Ollama が必要かの記録と、必要なら起動だけ。取得されていないモデルはログと全体設定の警告に示す）。チャット要約のモデルが取得されていない場合は、夜間バッチのモデルで要約する |
-| F-839 | **外部プログラムのインストール状況と手順**: 全体管理の「アップデート」タブを「インストールとアップデート」とし、AskDrive のアップデート（F-1501）、Ollama（F-837 / F-838。全体設定から移動）、外部プログラムのカードを置く。外部プログラム（pdftotext＝PDF の本文、pandoc＝Word・Excel・PowerPoint の本文、zstd＝Ollama のダウンロードの展開。Linux のみ）ごとに、インストール済みか（バージョンとパス）と用途を示す。AskDrive が自分のフォルダに置けるもの（pandoc。公式のスタンドアロン版を `./app.sh install-pandoc` で `.runtime/bin` へ）は「インストール」ボタンで入れる（出力を表示）。システムのパッケージで root 権限が要るもの（pdftotext＝poppler-utils、zstd）は、OS とパッケージ管理ツールに合わせて、サーバーのターミナルで実行するコマンド（apt: `sudo apt-get update` / `sudo apt-get install -y …`、dnf、macOS は brew）を示し、実行後に「再確認」で状況を更新する。再起動は不要。インストール後（ボタンでの完了時と「再確認」時）に、そのプログラムがなくてスキップした文書（理由 `Missing external CLI tool: <名前>`）を全窓口で「pending」に戻し、次の取り込みで読み直す。窓口の概要タブで抽出用のプログラムが未インストールなら、全体管理でインストールするよう示す |
+| F-839 | **外部プログラムのインストール状況と手順**: 全体管理の「アップデート」タブを「インストールとアップデート」とし、AskDrive のアップデート（F-1501）、Ollama（F-837 / F-838。全体設定から移動）、外部プログラムのカードを置く。外部プログラム（pdftotext＝PDF の本文、pandoc＝Word・Excel・PowerPoint の本文、LibreOffice＝旧形式の .doc / .xls / .ppt の変換（F-356）、zstd＝Ollama のダウンロードの展開。Linux のみ）ごとに、インストール済みか（バージョンとパス）と用途を示す。AskDrive が自分のフォルダに置けるもの（pandoc。公式のスタンドアロン版を `./app.sh install-pandoc` で `.runtime/bin` へ）は「インストール」ボタンで入れる（出力を表示）。システムのパッケージで root 権限が要るもの（pdftotext＝poppler-utils、LibreOffice＝apt では `--no-install-recommends libreoffice-writer libreoffice-calc libreoffice-impress`、zstd）は、OS とパッケージ管理ツールに合わせて、サーバーのターミナルで実行するコマンド（apt: `sudo apt-get update` / `sudo apt-get install -y …`、dnf、macOS は brew）を示し、実行後に「再確認」で状況を更新する。再起動は不要。インストール後（ボタンでの完了時と「再確認」時）に、そのプログラムがなくてスキップした文書（理由 `Missing external CLI tool: <名前>`）を全窓口で「pending」に戻し、次の取り込みで読み直す。窓口の概要タブで抽出用のプログラムが未インストールなら、全体管理でインストールするよう示す |
 
 **アダプタの共通インターフェース**（`AskDrive.LLM.Provider` ビヘイビア）
 

@@ -24,7 +24,7 @@ defmodule AskDriveWeb.AdminToolsTest do
 
   test "each program says whether it's installed, and how to install it" do
     tools = Tools.list()
-    assert Enum.map(tools, & &1.id) == ~w(pdftotext pandoc zstd)
+    assert Enum.map(tools, & &1.id) == ~w(pdftotext pandoc libreoffice zstd)
 
     pdftotext = Enum.find(tools, &(&1.id == "pdftotext"))
     assert pdftotext.installer == nil

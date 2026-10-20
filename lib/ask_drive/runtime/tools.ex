@@ -34,6 +34,20 @@ defmodule AskDrive.Runtime.Tools do
         commands: commands(pm, %{apt: "pandoc", dnf: "pandoc", brew: "pandoc"})
       },
       %{
+        id: "libreoffice",
+        name: "LibreOffice",
+        purpose: gettext("Old Word, Excel and PowerPoint files (.doc, .xls, .ppt)"),
+        needed?: true,
+        installer: nil,
+        commands:
+          commands(pm, %{
+            apt:
+              "--no-install-recommends libreoffice-writer libreoffice-calc libreoffice-impress",
+            dnf: "libreoffice-writer libreoffice-calc libreoffice-impress",
+            brew: "--cask libreoffice"
+          })
+      },
+      %{
         id: "zstd",
         name: "zstd",
         purpose: gettext("Unpacking Ollama's download (Linux only)"),
@@ -44,7 +58,7 @@ defmodule AskDrive.Runtime.Tools do
       }
     ]
     |> Enum.map(fn tool ->
-      path = System.find_executable(tool.id)
+      path = find(tool.id)
       Map.merge(tool, %{path: path, version: path && version(tool.id, path)})
     end)
   end
@@ -54,7 +68,8 @@ defmodule AskDrive.Runtime.Tools do
   lack (`Documents.requeue_missing_tool/1`). Returns how many in all.
   """
   def requeue_skipped(tools \\ list()) do
-    installed = for tool <- tools, tool.path, tool.id in ~w(pdftotext pandoc), do: tool.id
+    installed =
+      for tool <- tools, tool.path, tool.id in ~w(pdftotext pandoc libreoffice), do: tool.id
 
     AskDrive.Apps.each(fn _app ->
       installed |> Enum.map(&AskDrive.Documents.requeue_missing_tool/1) |> Enum.sum()
@@ -62,6 +77,18 @@ defmodule AskDrive.Runtime.Tools do
     |> Enum.map(fn {_app, count} -> count end)
     |> Enum.sum()
   end
+
+  @doc """
+  LibreOffice's command (`soffice`, also installed as `libreoffice`; on macOS inside the
+  app), or nil. It converts .doc / .xls / .ppt for reading (spec F-356).
+  """
+  def libreoffice_path do
+    System.find_executable("soffice") || System.find_executable("libreoffice") ||
+      Enum.find(["/Applications/LibreOffice.app/Contents/MacOS/soffice"], &File.exists?/1)
+  end
+
+  defp find("libreoffice"), do: libreoffice_path()
+  defp find(id), do: System.find_executable(id)
 
   @doc "The system's package manager: `:apt`, `:dnf`, `:brew` (macOS) or nil."
   def package_manager do

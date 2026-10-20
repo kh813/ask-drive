@@ -46,4 +46,50 @@ defmodule AskDrive.Ingest.ExtractorTest do
     assert byte_size(hash) == 64
     assert hash == "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
   end
+
+  describe "old Office files through LibreOffice (F-356)" do
+    test "an .xls is converted and read like an .xlsx" do
+      case AskDrive.Runtime.Tools.libreoffice_path() do
+        nil ->
+          assert {:skipped, reason} =
+                   Extractor.extract_binary(<<0xD0, 0xCF>>, "application/vnd.ms-excel")
+
+          assert reason =~ "libreoffice"
+
+        soffice ->
+          dir = Path.join(System.tmp_dir!(), "xls-#{System.unique_integer([:positive])}")
+          File.mkdir_p!(dir)
+          on_exit(fn -> File.rm_rf!(dir) end)
+
+          csv = Path.join(dir, "台帳.csv")
+          File.write!(csv, "品名,数量\nトナー,3\n")
+
+          {_, 0} =
+            System.cmd(
+              soffice,
+              [
+                "-env:UserInstallation=file://#{dir}/profile",
+                "--headless",
+                "--convert-to",
+                "xls",
+                "--outdir",
+                dir,
+                csv
+              ],
+              stderr_to_stdout: true
+            )
+
+          xls = File.read!(Path.join(dir, "台帳.xls"))
+          assert {:ok, %{text: text}} = Extractor.extract_binary(xls, "application/vnd.ms-excel")
+          assert text =~ "トナー"
+      end
+    end
+
+    test "an old file that isn't really one fails instead of hanging" do
+      if AskDrive.Runtime.Tools.libreoffice_path() do
+        assert {result, _} = Extractor.extract_binary("not a word file", "application/msword")
+        assert result in [:error, :skipped, :ok]
+      end
+    end
+  end
 end

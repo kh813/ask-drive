@@ -4,7 +4,7 @@ This document outlines planned improvements, future concepts, and the technical 
 
 ---
 
-## Current Version: `0.2.3` (MVP: Minimum Viable Product)
+## Current Version: `0.2.4` (MVP: Minimum Viable Product)
 - **License**: Changed to [Apache License 2.0](LICENSE) (from MIT) with [NOTICE](NOTICE) file.
 - **Prototype (v0.1.x) to MVP (v0.2.0)**: The core feature set has matured from the initial prototype phase into an operational Minimum Viable Product for enterprise internal deployments.
 - **Multi-lingual Support (i18n)**: English (default) & Japanese (`en` / `ja`) with browser `Accept-Language` auto-detection and UI switcher. The admin screens (desk and platform) are fully available in English (v0.1.41, Gettext with English source strings); text recorded by background work (batch, health check, certificate renewal, updater) stays Japanese.
@@ -24,6 +24,7 @@ This document outlines planned improvements, future concepts, and the technical 
 - **チャット要約の回答スタイル**（v0.1.36〜）: 窓口ごとに 簡潔 / 対話調 / 詳しく / やさしく から選ぶ（抜粋だけを根拠にする規則はどれでも同じ）
 - **Ollama と外部プログラムの管理を全体管理に集約**（v0.1.45〜0.1.49）: 「インストールとアップデート」タブの「Ollama（ローカル推論）」カードでインストール（`./app.sh install-ollama`）・起動、モデルの一覧・取得・まとめて取得・削除。窓口は取得済みのモデルから選ぶだけで、自動取得はしない
 - **HTTPS の運用**: Let's Encrypt の証明書をバリュードメインの DNS API（DNS-01）でアプリ自身が取得・夜間に自動更新（v0.1.37〜）。API ゲートウェイ（さくらのクラウド + Google ログイン）を前段に置く構成に対応（秘密ヘッダー `X-Apigw-Secret`、v0.1.38〜）
+- **インデックス対象は文書だけ**（v0.2.4）: Google ドキュメント / スプレッドシート / スライド、PDF、Word・Excel・PowerPoint、テキスト、Markdown、CSV、HTML の許可リスト。バッチ・プログラム・ソースコードなどは対象外。旧形式の .doc / .xls / .ppt は LibreOffice で変換して取り込む
 - **管理画面の保存と有効化の分離**（v0.1.39〜）: 「保存」は値の保存だけ、機能ごとの有効・無効はスイッチですぐに反映
 
 ---

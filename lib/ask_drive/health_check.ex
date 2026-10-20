@@ -87,7 +87,9 @@ defmodule AskDrive.HealthCheck do
       generation_key_missing: missing_key?(:generation, setting),
       embedding_key_missing: missing_key?(:embedding, setting),
       pdftotext: check_cli("pdftotext", ["-v"]),
-      pandoc: check_cli("pandoc", ["-v"])
+      pandoc: check_cli("pandoc", ["-v"]),
+      # found, not started: LibreOffice takes a while to start just to print its version
+      libreoffice: check_libreoffice()
     }
   end
 
@@ -128,6 +130,13 @@ defmodule AskDrive.HealthCheck do
     end
   rescue
     e -> {:error, Exception.message(e)}
+  end
+
+  defp check_libreoffice do
+    case AskDrive.Runtime.Tools.libreoffice_path() do
+      nil -> {:error, "LibreOffice (soffice) not found in PATH"}
+      path -> {:ok, path}
+    end
   end
 
   defp check_cli(cmd, args) do
@@ -181,6 +190,11 @@ defmodule AskDrive.HealthCheck do
     case results.pandoc do
       {:ok, ver} -> Logger.info("  [✓] pandoc: #{ver}")
       {:error, err} -> Logger.warning("  [✗] pandoc: #{err}")
+    end
+
+    case results.libreoffice do
+      {:ok, path} -> Logger.info("  [✓] LibreOffice: #{path}")
+      {:error, err} -> Logger.info("  [-] LibreOffice: #{err} (.doc / .xls / .ppt are skipped)")
     end
 
     # Say which auth mode is live, so "is the flag in .env.prod actually reaching the

@@ -4,7 +4,10 @@ defmodule AskDrive.Ingest.Extractor do
   """
   alias AskDrive.Drive.Client, as: DriveClient
   alias AskDrive.Ingest.Extractors.Spreadsheet
-  alias AskDrive.Ingest.TextCleaner
+  alias AskDrive.Ingest.{FileTypes, TextCleaner}
+  alias AskDrive.Runtime.Tools
+
+  @xlsx_mime "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
   @doc """
   Computes SHA-256 hash of extracted text string.
@@ -16,41 +19,35 @@ defmodule AskDrive.Ingest.Extractor do
   @doc """
   Extracts text content for a given document from Google Drive.
   Returns `{:ok, %{text: text, content_hash: hash}}` or `{:skipped, reason}` or `{:error, reason}`.
-  """
-  def extract_from_drive(%{drive_file_id: file_id, mime_type: mime_type} = _doc) do
-    case mime_type do
-      # Google Docs / Slides -> Export to plain text
-      "application/vnd.google-apps.document" ->
-        case DriveClient.export(file_id, "text/plain") do
-          {:ok, binary} -> format_extracted_text(binary)
-          {:error, reason} -> {:error, reason}
-        end
 
-      "application/vnd.google-apps.presentation" ->
+  Only documents are read (`FileTypes`, spec F-356); anything else is skipped without being
+  downloaded (sync already records such files as skipped, so this is a safety net).
+  """
+  def extract_from_drive(%{drive_file_id: file_id, mime_type: mime_type} = doc) do
+    name = Map.get(doc, :name)
+
+    case FileTypes.kind(name, mime_type) do
+      nil ->
+        {:skipped, FileTypes.excluded_reason(name, mime_type)}
+
+      # Google Docs / Slides -> Export to plain text
+      kind when kind in [:google_doc, :google_slides] ->
         case DriveClient.export(file_id, "text/plain") do
           {:ok, binary} -> format_extracted_text(binary)
           {:error, reason} -> {:error, reason}
         end
 
       # Google Sheets -> Export to XLSX and parse
-      "application/vnd.google-apps.spreadsheet" ->
-        xlsx_mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-        case DriveClient.export(file_id, xlsx_mime) do
-          {:ok, binary} ->
-            case Spreadsheet.extract_xlsx(binary) do
-              {:ok, text} -> format_extracted_text(text)
-              {:error, reason} -> {:error, reason}
-            end
-
-          {:error, reason} ->
-            {:error, reason}
+      :google_sheet ->
+        case DriveClient.export(file_id, @xlsx_mime) do
+          {:ok, binary} -> extract_kind(binary, :xlsx)
+          {:error, reason} -> {:error, reason}
         end
 
       # Non-workspace files -> Download binary then extract
-      _ ->
+      kind ->
         case DriveClient.download(file_id) do
-          {:ok, binary} -> extract_binary(binary, mime_type)
+          {:ok, binary} -> extract_kind(binary, kind)
           {:error, reason} -> {:error, reason}
         end
     end
@@ -60,43 +57,99 @@ defmodule AskDrive.Ingest.Extractor do
   Extracts text content directly from a local binary and MIME type.
   """
   def extract_binary(binary, mime_type) when is_binary(binary) do
-    cond do
-      # HTML carries markup that would otherwise pollute chunk text and embeddings, so it
-      # gets the same pandoc-to-plain-text treatment as docx/pptx rather than falling into
-      # the raw-passthrough text branch below.
-      mime_type in ["text/html", "application/xhtml+xml"] ->
-        extract_pandoc(binary, "html")
+    kind =
+      cond do
+        # HTML carries markup that would otherwise pollute chunk text and embeddings, so it
+        # gets the same pandoc-to-plain-text treatment as docx/pptx rather than falling into
+        # the raw-passthrough text branch below.
+        mime_type in ["text/html", "application/xhtml+xml"] -> :html
+        # Plain Text / Markdown / CSV / JSON
+        text_mime?(mime_type) -> :text
+        true -> FileTypes.kind("", mime_type)
+      end
 
-      # Plain Text / Markdown / CSV / JSON
-      text_mime?(mime_type) ->
-        format_extracted_text(binary)
+    if kind,
+      do: extract_kind(binary, kind),
+      else: {:skipped, "Unsupported MIME type: #{mime_type}"}
+  end
 
-      # XLSX
-      mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ->
-        case Spreadsheet.extract_xlsx(binary) do
-          {:ok, text} -> format_extracted_text(text)
-          {:error, reason} -> {:error, reason}
-        end
+  defp extract_kind(binary, kind) when kind in [:text, :markdown, :csv],
+    do: format_extracted_text(binary)
 
-      # PDF
-      mime_type == "application/pdf" ->
-        extract_pdf(binary)
+  defp extract_kind(binary, :html), do: extract_pandoc(binary, "html")
+  defp extract_kind(binary, :pdf), do: extract_pdf(binary)
+  defp extract_kind(binary, :docx), do: extract_pandoc(binary, "docx")
+  defp extract_kind(binary, :pptx), do: extract_pandoc(binary, "pptx")
 
-      # DOCX / PPTX
-      mime_type in [
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/msword"
-      ] ->
-        extract_pandoc(binary, "docx")
+  defp extract_kind(binary, :xlsx) do
+    case Spreadsheet.extract_xlsx(binary) do
+      {:ok, text} -> format_extracted_text(text)
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
-      mime_type in [
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "application/vnd.ms-powerpoint"
-      ] ->
-        extract_pandoc(binary, "pptx")
+  # The old binary formats: LibreOffice turns them into their Open XML successor, which is
+  # then read like any .docx / .xlsx / .pptx (pandoc can't read .doc or .ppt at all)
+  defp extract_kind(binary, :doc), do: convert_with_libreoffice(binary, "doc", :docx)
+  defp extract_kind(binary, :xls), do: convert_with_libreoffice(binary, "xls", :xlsx)
+  defp extract_kind(binary, :ppt), do: convert_with_libreoffice(binary, "ppt", :pptx)
 
-      true ->
-        {:skipped, "Unsupported MIME type: #{mime_type}"}
+  @libreoffice_timeout_s 180
+
+  defp convert_with_libreoffice(binary, from, to) do
+    case Tools.libreoffice_path() do
+      nil ->
+        {:skipped,
+         AskDrive.Documents.missing_tool_reason("libreoffice") <>
+           " (needed for .#{from} files; see the platform admin's Install & updates tab)"}
+
+      soffice ->
+        target = Atom.to_string(to)
+
+        with_temp_file(binary, ".#{from}", fn in_path ->
+          # its own profile per run: two conversions at once would otherwise fight over one
+          out_dir = in_path <> "_out"
+          profile = in_path <> "_profile"
+
+          try do
+            args = [
+              "-env:UserInstallation=file://#{profile}",
+              "--headless",
+              "--norestore",
+              "--convert-to",
+              target,
+              "--outdir",
+              out_dir,
+              in_path
+            ]
+
+            {output, code} = run_with_timeout(soffice, args)
+            out_file = Path.join(out_dir, Path.basename(in_path, ".#{from}") <> ".#{target}")
+
+            case File.read(out_file) do
+              {:ok, converted} ->
+                extract_kind(converted, to)
+
+              {:error, _} ->
+                {:error,
+                 "LibreOffice could not convert the .#{from} file (exit #{code}): #{String.trim(output)}"}
+            end
+          after
+            File.rm_rf(out_dir)
+            File.rm_rf(profile)
+          end
+        end)
+    end
+  end
+
+  # a broken file can leave LibreOffice hanging; coreutils' timeout stops it (Linux)
+  defp run_with_timeout(cmd, args) do
+    case System.find_executable("timeout") do
+      nil ->
+        System.cmd(cmd, args, stderr_to_stdout: true)
+
+      timeout ->
+        System.cmd(timeout, ["#{@libreoffice_timeout_s}", cmd | args], stderr_to_stdout: true)
     end
   end
 

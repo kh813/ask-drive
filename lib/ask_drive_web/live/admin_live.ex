@@ -3488,7 +3488,7 @@ defmodule AskDriveWeb.AdminLive do
                   "System and inference status"
                 )}
               </h2>
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-xs">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
                 <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
                   <span class="text-zinc-400 block">SQLite sqlite-vec</span>
                   <span class="font-semibold text-emerald-600 mt-1 block">
@@ -3563,6 +3563,22 @@ defmodule AskDriveWeb.AdminLive do
                     {if tool_ok?(@health.pandoc),
                       do: gettext("Available"),
                       else: gettext("Not installed (pandoc)")}
+                  </span>
+                </div>
+
+                <%!-- only old .doc / .xls / .ppt need it, so its absence isn't in the note below --%>
+                <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800">
+                  <span class="text-zinc-400 block">
+                    {gettext("LibreOffice (.doc, .xls, .ppt)")}
+                  </span>
+                  <span
+                    id="health-libreoffice"
+                    data-state={if(tool_ok?(@health[:libreoffice]), do: "installed", else: "missing")}
+                    class="font-semibold mt-1 block"
+                  >
+                    {if tool_ok?(@health[:libreoffice]),
+                      do: gettext("Available"),
+                      else: gettext("Not installed (old Office files are skipped)")}
                   </span>
                 </div>
               </div>
@@ -7843,6 +7859,7 @@ defmodule AskDriveWeb.AdminLive do
   defp item_status_label("created"), do: gettext("New")
   defp item_status_label("updated"), do: gettext("Updated")
   defp item_status_label("unchanged"), do: gettext("Unchanged")
+  defp item_status_label("excluded"), do: gettext("Not a document")
   defp item_status_label("deleted"), do: gettext("Deleted")
   defp item_status_label("indexed"), do: gettext("Ingested")
   defp item_status_label("empty"), do: gettext("No text")
@@ -7856,7 +7873,7 @@ defmodule AskDriveWeb.AdminLive do
   defp item_status_class(status) when status in ["indexed", "created", "updated"],
     do: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
 
-  defp item_status_class(status) when status in ["empty", "skipped", "deleted"],
+  defp item_status_class(status) when status in ["empty", "skipped", "excluded", "deleted"],
     do: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
 
   defp item_status_class(_), do: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"

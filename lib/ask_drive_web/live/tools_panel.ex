@@ -1,9 +1,9 @@
 defmodule AskDriveWeb.ToolsPanel do
   @moduledoc """
   The 「インストールとアップデート」 tab's external programs card (spec F-839): pdftotext,
-  pandoc and zstd — installed or not, what for, and how to install them: from here when
-  AskDrive can place the program itself (pandoc), otherwise the commands to run on the
-  server, then 「再確認」. Events go to `AskDriveWeb.AdminLive` (`install_pandoc`,
+  pandoc, LibreOffice and zstd — installed or not, what for, and how to install them: from
+  here when AskDrive can place the program itself (pandoc), otherwise the commands to run on
+  the server, then 「再確認」. Events go to `AskDriveWeb.AdminLive` (`install_pandoc`,
   `refresh_tools`).
   """
   use AskDriveWeb, :html

@@ -199,7 +199,9 @@ defmodule AskDriveWeb.UpdatePanel do
               v{@status.from} → {if @status.to, do: "v#{@status.to}", else: gettext("latest version")}
               <span :if={@status.by}> · {@status.by}</span>
               <span :if={@status.started_at}>
-                · {gettext("started %{time}", time: AskDrive.Clock.format(@status.started_at, "%H:%M"))}
+                · {gettext("started %{time}",
+                  time: AskDrive.Clock.format(@status.started_at, "%H:%M")
+                )}
               </span>
             </span>
           </div>
