@@ -183,7 +183,8 @@ defmodule AskDriveWeb.MultiAppTest do
       })
 
     {:ok, view, _html} = live(conn, "/hr/admin?tab=settings")
-    view |> element("button[phx-value-mode='service_account']") |> render_click()
+    # a new desk starts with Google account authorization (F-357)
+    view |> element("#drive-auth-mode-service-account") |> render_click()
 
     html =
       view

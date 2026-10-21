@@ -39,6 +39,30 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
     end
   end
 
+  test "the service account is an advanced option, closed by default (F-357)", %{conn: conn} do
+    {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
+    assert has_element?(view, "#drive-google-account")
+    assert has_element?(view, "#drive-auth-mode-service-account")
+    refute has_element?(view, "#service-account-fields")
+
+    view |> element("#drive-auth-mode-service-account") |> render_click()
+    assert Settings.get_setting!().drive_auth_mode == "service_account"
+    assert has_element?(view, "#service-account-fields")
+    refute has_element?(view, "#drive-google-account")
+
+    view |> element("#drive-auth-mode-oauth") |> render_click()
+    assert Settings.get_setting!().drive_auth_mode == "oauth"
+    assert has_element?(view, "#drive-google-account")
+  end
+
+  test "a desk using a service account sees it open (F-357)", %{conn: conn} do
+    {:ok, _} =
+      Settings.update_setting(Settings.get_setting!(), %{drive_auth_mode: "service_account"})
+
+    {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
+    assert has_element?(view, "#service-account-fields")
+  end
+
   test "the sync test says what's missing before it can run", %{conn: conn} do
     {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
     view |> element("#test-drive-sync-btn") |> render_click()
@@ -49,8 +73,7 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
        %{conn: conn} do
     {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
 
-    # selectable although the platform has no OAuth client
-    view |> element("#drive-auth-mode-oauth") |> render_click()
+    # the default method, although the platform has no OAuth client
     assert Settings.get_setting!().drive_auth_mode == "oauth"
     assert has_element?(view, "#drive-settings-form #drive-oauth-client-fields")
     assert has_element?(view, "#drive-oauth-client-missing")
@@ -115,9 +138,9 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
     test "from another PC by IP address: 接続 opens Google in a new window (localhost, PKCE, the account) and the pasted address is saved",
          %{conn: conn} do
       conn = %{conn | host: "192.168.1.10"}
-      {:ok, view, html} = live(conn, "/it-support/admin?tab=settings")
+      {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
       assert has_element?(view, "#drive-connect-target", "http://localhost:")
-      assert html =~ "Google アカウント認証"
+      assert has_element?(view, "#drive-google-account")
       assert has_element?(view, "#drive-connect-btn[target='_blank']")
       assert has_element?(view, "#drive-manual-auth")
 

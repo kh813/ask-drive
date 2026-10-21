@@ -62,7 +62,7 @@ msgid "Act as administrator"
 msgstr "管理者として操作"
 
 #: lib/ask_drive_web/components/core_components.ex:375
-#: lib/ask_drive_web/live/admin_live.ex:4335
+#: lib/ask_drive_web/live/admin_live.ex:4337
 #, elixir-autogen, elixir-format
 msgid "Actions"
 msgstr "操作"
@@ -149,7 +149,7 @@ msgstr "データベースの更新またはアップデート作業を行って
 msgid "Desk list"
 msgstr "窓口一覧"
 
-#: lib/ask_drive_web/live/admin_live.ex:4889
+#: lib/ask_drive_web/live/admin_live.ex:4893
 #: lib/ask_drive_web/live/chat_live.ex:926
 #: lib/ask_drive_web/live/chat_live.ex:1048
 #, elixir-autogen, elixir-format
@@ -552,9 +552,9 @@ msgstr "回答の生成を中止しました。"
 msgid "Summary stopped. Please check the excerpts below."
 msgstr "要約を中止しました。下の抜粋をご確認ください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4240
-#: lib/ask_drive_web/live/admin_live.ex:6189
-#: lib/ask_drive_web/live/admin_live.ex:7713
+#: lib/ask_drive_web/live/admin_live.ex:4242
+#: lib/ask_drive_web/live/admin_live.ex:6178
+#: lib/ask_drive_web/live/admin_live.ex:7737
 #: lib/ask_drive_web/live/chat_live.ex:664
 #: lib/ask_drive_web/live/ollama_panel.ex:313
 #: lib/ask_drive_web/live/update_panel.ex:350
@@ -702,7 +702,7 @@ msgstr "Google Drive の文書について、新しい質問を入力してく�
 msgid "Ask more about this answer..."
 msgstr "この回答について、追加で質問してください..."
 
-#: lib/ask_drive_web/live/admin_live.ex:4095
+#: lib/ask_drive_web/live/admin_live.ex:4097
 #: lib/ask_drive_web/live/chat_live.ex:1283
 #, elixir-autogen, elixir-format
 msgid "Cancel"
@@ -733,7 +733,7 @@ msgstr "ここからは、上とは別の新しい質問になります。回答
 msgid "Click to show or hide the whole excerpt"
 msgstr "クリックで抜粋の全体を表示・折りたたみ"
 
-#: lib/ask_drive_web/live/admin_live.ex:5731
+#: lib/ask_drive_web/live/admin_live.ex:5735
 #, elixir-autogen, elixir-format
 msgid " (.env.prod). To switch it from this screen or with ./app.sh auth, remove that line from .env.prod and restart."
 msgstr "（.env.prod）で固定されています。この画面や ./app.sh auth で切り替えるには、.env.prod からその行を削除して再起動してください。"
@@ -743,8 +743,8 @@ msgstr "（.env.prod）で固定されています。この画面や ./app.sh au
 msgid " (chunk %{number})"
 msgstr "（チャンク %{number}）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5944
-#: lib/ask_drive_web/live/admin_live.ex:5950
+#: lib/ask_drive_web/live/admin_live.ex:5948
+#: lib/ask_drive_web/live/admin_live.ex:5954
 #, elixir-autogen, elixir-format
 msgid " (platform admin)"
 msgstr "（全体管理者）"
@@ -764,7 +764,7 @@ msgstr "です（設定中）。「今すぐ実行」「取り込みのみ」は
 msgid " and register it there."
 msgstr "で登録してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5185
+#: lib/ask_drive_web/live/admin_live.ex:5189
 #, elixir-autogen, elixir-format
 msgid " and save (any Google account can then sign in and connect Drive)."
 msgstr "のまま保存してください（どの Google アカウントでもログイン・Drive 連携が可能になります）。"
@@ -774,22 +774,22 @@ msgstr "のまま保存してください（どの Google アカウントでも�
 msgid " · %{eta} left (estimated from the pace so far)"
 msgstr "・残り %{eta}（ここまでのペースから推定）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5375
+#: lib/ask_drive_web/live/admin_live.ex:5379
 #, elixir-autogen, elixir-format
 msgid " · Expires"
 msgstr "・有効期限"
 
-#: lib/ask_drive_web/live/admin_live.ex:4267
+#: lib/ask_drive_web/live/admin_live.ex:4269
 #, elixir-autogen, elixir-format
 msgid "\"Can elevate\""
 msgstr "「昇格可」"
 
-#: lib/ask_drive_web/live/admin_live.ex:5942
+#: lib/ask_drive_web/live/admin_live.ex:5946
 #, elixir-autogen, elixir-format
 msgid "%{actor}%{by} added %{target}"
 msgstr "%{actor}%{by} が %{target} を追加"
 
-#: lib/ask_drive_web/live/admin_live.ex:5948
+#: lib/ask_drive_web/live/admin_live.ex:5952
 #, elixir-autogen, elixir-format
 msgid "%{actor}%{by} removed %{target}"
 msgstr "%{actor}%{by} が %{target} を削除"
@@ -804,22 +804,22 @@ msgstr "%{chunks} 件 / %{qas} 件"
 msgid "%{count} chunks are back in line for QA generation. The next batch generates them again."
 msgstr "%{count} 件のチャンクを QA 生成の対象に戻しました。次のバッチで再び生成します。"
 
-#: lib/ask_drive_web/live/admin_live.ex:3642
+#: lib/ask_drive_web/live/admin_live.ex:3644
 #, elixir-autogen, elixir-format
 msgid "%{count} dimensions"
 msgstr "%{count} 次元"
 
-#: lib/ask_drive_web/live/admin_live.ex:3793
+#: lib/ask_drive_web/live/admin_live.ex:3795
 #, elixir-autogen, elixir-format
 msgid "%{count} in total"
 msgstr "合計 %{count} 件"
 
-#: lib/ask_drive_web/live/admin_live.ex:3713
+#: lib/ask_drive_web/live/admin_live.ex:3715
 #, elixir-autogen, elixir-format
 msgid "%{count} items"
 msgstr "%{count} 件"
 
-#: lib/ask_drive_web/live/admin_live.ex:4273
+#: lib/ask_drive_web/live/admin_live.ex:4275
 #, elixir-autogen, elixir-format
 msgid "%{count} users in total"
 msgstr "合計 %{count} 名"
@@ -839,7 +839,7 @@ msgstr "%{documents} 件 / %{chunks} 件"
 msgid "%{done} / %{total} (%{percent}%)"
 msgstr "%{done} / %{total} 件（%{percent}%）"
 
-#: lib/ask_drive_web/live/admin_live.ex:8286
+#: lib/ask_drive_web/live/admin_live.ex:8310
 #, elixir-autogen, elixir-format
 msgid "%{duration} so far"
 msgstr "%{duration}〜"
@@ -879,12 +879,12 @@ msgstr "%{feature}を無効にしました。"
 msgid "%{feature} turned on."
 msgstr "%{feature}を有効にしました。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8624
+#: lib/ask_drive_web/live/admin_live.ex:8648
 #, elixir-autogen, elixir-format
 msgid "%{hours}h %{min}m"
 msgstr "%{hours}時間%{min}分"
 
-#: lib/ask_drive_web/live/admin_live.ex:8621
+#: lib/ask_drive_web/live/admin_live.ex:8645
 #, elixir-autogen, elixir-format
 msgid "%{min}m %{sec}s"
 msgstr "%{min}分%{sec}秒"
@@ -904,12 +904,12 @@ msgstr "%{provider} は埋め込みに対応していません。"
 msgid "%{resolved} resolved / %{queued} queued"
 msgstr "%{resolved} 件 / %{queued} 件"
 
-#: lib/ask_drive_web/live/admin_live.ex:8618
+#: lib/ask_drive_web/live/admin_live.ex:8642
 #, elixir-autogen, elixir-format
 msgid "%{sec}s"
 msgstr "%{sec}秒"
 
-#: lib/ask_drive_web/live/admin_live.ex:7331
+#: lib/ask_drive_web/live/admin_live.ex:7355
 #, elixir-autogen, elixir-format
 msgid "%{subject} (issuer: %{issuer})"
 msgstr "%{subject}（発行者: %{issuer}）"
@@ -934,12 +934,12 @@ msgstr "(%{count}件)"
 msgid "(%{eta} left)"
 msgstr "（残り %{eta}）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4759
+#: lib/ask_drive_web/live/admin_live.ex:4761
 #, elixir-autogen, elixir-format
 msgid "(429 rate limit: %{count})"
 msgstr "(429制限: %{count} 件)"
 
-#: lib/ask_drive_web/live/admin_live.ex:8815
+#: lib/ask_drive_web/live/admin_live.ex:8839
 #, elixir-autogen, elixir-format
 msgid "(URL name)"
 msgstr "（URL 名）"
@@ -954,62 +954,62 @@ msgstr "（想定される処理時間から。最近のバッチの各ステッ
 msgid "(based on fixed per-step ratios; switches to processing time once enough durations are recorded)"
 msgstr "（ステップごとの固定の比率から。所要時間の記録がたまると処理時間ベースになります）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4373
+#: lib/ask_drive_web/live/admin_live.ex:4375
 #, elixir-autogen, elixir-format
 msgid "(can administer all desks)"
 msgstr "（全窓口の管理が可能）"
 
-#: lib/ask_drive_web/live/admin_live.ex:6167
+#: lib/ask_drive_web/live/admin_live.ex:6156
 #, elixir-autogen, elixir-format
 msgid "(client_id from the JSON key)"
 msgstr "（JSON キーの client_id）"
 
-#: lib/ask_drive_web/live/admin_live.ex:3625
+#: lib/ask_drive_web/live/admin_live.ex:3627
 #, elixir-autogen, elixir-format
 msgid "(cloud)"
 msgstr "（クラウド）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7600
+#: lib/ask_drive_web/live/admin_live.ex:7624
 #, elixir-autogen, elixir-format
 msgid "(from the office LAN, so no certificate is needed)"
 msgstr "（社内 LAN からの接続のため、証明書なしでも入れます）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7405
+#: lib/ask_drive_web/live/admin_live.ex:7429
 #, elixir-autogen, elixir-format
 msgid "(in the trusted proxies)"
 msgstr "（信頼するプロキシに含まれています）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5872
+#: lib/ask_drive_web/live/admin_live.ex:5876
 #, elixir-autogen, elixir-format
 msgid "(never signed in)"
 msgstr "（未ログイン）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7582
+#: lib/ask_drive_web/live/admin_live.ex:7606
 #, elixir-autogen, elixir-format
 msgid "(not checked while off)"
 msgstr "（無効の間は確認しません）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4268
+#: lib/ask_drive_web/live/admin_live.ex:4270
 #, elixir-autogen, elixir-format
 msgid "(platform administrators) can verify their identity and temporarily enter platform administration."
 msgstr "に指定されたアカウント（全体管理者）だけが、本人確認をして一時的に全体管理に入れます。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7660
+#: lib/ask_drive_web/live/admin_live.ex:7684
 #, elixir-autogen, elixir-format
 msgid "(send it separately from the .p12 file)"
 msgstr "（.p12 ファイルとは別の手段で伝えてください）"
 
-#: lib/ask_drive_web/live/admin_live.ex:6221
+#: lib/ask_drive_web/live/admin_live.ex:6210
 #, elixir-autogen, elixir-format
 msgid "(syncs with this account's permissions)"
 msgstr "（このアカウントの権限で同期）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7973
+#: lib/ask_drive_web/live/admin_live.ex:7997
 #, elixir-autogen, elixir-format
 msgid "(when using Google login)"
 msgstr "（Google ログインを使う場合）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4352
+#: lib/ask_drive_web/live/admin_live.ex:4354
 #, elixir-autogen, elixir-format
 msgid "(you)"
 msgstr "(自分)"
@@ -1019,7 +1019,7 @@ msgstr "(自分)"
 msgid ") registered on the server."
 msgstr "）として登録されている必要があります。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5182
+#: lib/ask_drive_web/live/admin_live.ex:5186
 #, elixir-autogen, elixir-format
 msgid ") to allow access only from that domain. For personal use ("
 msgstr "）のみにアクセスを制限する場合はドメインを入力してください。個人利用（"
@@ -1029,52 +1029,52 @@ msgstr "）のみにアクセスを制限する場合はドメインを入力し
 msgid ") to every request it forwards. Once the same value is set here, direct access without the header is refused with 403 (including the sign-in screen and the connection that updates the screen). For requests from the gateway, the user's IP (X-Forwarded-For) is trusted, and links, redirects and the Google sign-in redirect URI are built from the “Public URL” below."
 msgstr "）を付けます。ここに同じ値を設定すると、ヘッダーのない直接アクセスは 403 で拒否します（ログイン画面も画面の更新用の接続も含みます）。ゲートウェイからのリクエストは、利用者の IP（X-Forwarded-For）を信頼し、リンク・リダイレクト・Google ログインのリダイレクト URI を下の「公開 URL」で組み立てます。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6424
+#: lib/ask_drive_web/live/admin_live.ex:6413
 #, elixir-autogen, elixir-format
 msgid "), this completes automatically without pasting."
 msgstr "）で操作している場合は、貼り付け不要で自動的に完了します。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6132
+#: lib/ask_drive_web/live/admin_live.ex:6121
 #, elixir-autogen, elixir-format
 msgid "). Don't forget this step."
 msgstr "）と共有するのを忘れないでください。"
 
 #: lib/ask_drive/gateway.ex:154
 #: lib/ask_drive/network.ex:241
-#: lib/ask_drive_web/live/admin_live.ex:4223
-#: lib/ask_drive_web/live/admin_live.ex:5521
-#: lib/ask_drive_web/live/admin_live.ex:8575
+#: lib/ask_drive_web/live/admin_live.ex:4225
+#: lib/ask_drive_web/live/admin_live.ex:5525
+#: lib/ask_drive_web/live/admin_live.ex:8599
 #, elixir-autogen, elixir-format
 msgid ", "
 msgstr "、"
 
-#: lib/ask_drive_web/live/admin_live.ex:6370
+#: lib/ask_drive_web/live/admin_live.ex:6359
 #, elixir-autogen, elixir-format
 msgid ", paste it into the box below, and click \"Save and finish\" (pressing Enter in the box does the same)."
 msgstr "して、下の枠に貼り付け、「保存して認証完了」を押してください（枠で Enter を押しても同じです）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6326
+#: lib/ask_drive_web/live/admin_live.ex:6315
 #, elixir-autogen, elixir-format
 msgid "/ Redirect URI:"
 msgstr "／ リダイレクト URI:"
 
-#: lib/ask_drive_web/live/admin_live.ex:6451
+#: lib/ask_drive_web/live/admin_live.ex:6440
 #, elixir-autogen, elixir-format
 msgid ": not set"
 msgstr "：未設定"
 
-#: lib/ask_drive_web/live/admin_live.ex:6483
-#: lib/ask_drive_web/live/admin_live.ex:6488
+#: lib/ask_drive_web/live/admin_live.ex:6472
+#: lib/ask_drive_web/live/admin_live.ex:6477
 #, elixir-autogen, elixir-format
 msgid ": set User type to “"
 msgstr ": ユーザーの種類を「"
 
-#: lib/ask_drive_web/live/admin_live.ex:6448
+#: lib/ask_drive_web/live/admin_live.ex:6437
 #, elixir-autogen, elixir-format
 msgid ": using the platform settings"
 msgstr "：全体設定の設定を使用中"
 
-#: lib/ask_drive_web/live/admin_live.ex:6445
+#: lib/ask_drive_web/live/admin_live.ex:6434
 #, elixir-autogen, elixir-format
 msgid ": using this desk's settings"
 msgstr "：この窓口の設定を使用中"
@@ -1084,7 +1084,7 @@ msgstr "：この窓口の設定を使用中"
 msgid "A batch is running. Run it again after it finishes."
 msgstr "バッチが実行中です。終了してから実行してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6759
+#: lib/ask_drive_web/live/admin_live.ex:6783
 #, elixir-autogen, elixir-format
 msgid "A cloud API is more accurate and faster, but at night the text of every chunk is sent to the API provider and billed by usage."
 msgstr "クラウド API は高精度・高速ですが、夜間に全チャンクの本文が API 提供元に送信され、従量課金になります。"
@@ -1099,12 +1099,12 @@ msgstr "担当者を 0 人にはできません。先にほかの担当者を追
 msgid "A new version is built in the background while the server and batches keep running, then switched to with a short restart (about 30 seconds). During the restart, open screens show “Updating” and reload automatically when it is done."
 msgstr "新しいバージョンは、サーバーとバッチを動かしたまま裏でビルドし、終わったら短い再起動（30 秒ほど）で切り替えます。再起動のあいだ、開いている画面には「アップデート中」と表示され、終わると自動で再読み込みします。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5971
+#: lib/ask_drive_web/live/admin_live.ex:5975
 #, elixir-autogen, elixir-format
 msgid "A password that limits who can use this desk's chat. When on, only users who enter the correct password can use the chat."
 msgstr "この窓口のチャット利用を限定するためのパスワードです。有効にすると、正しいパスワードを入力したユーザーのみがチャットを利用できるようになります。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4555
+#: lib/ask_drive_web/live/admin_live.ex:4557
 #, elixir-autogen, elixir-format
 msgid "A record of which account elevated to admin rights and when (latest 100). Failures, revocations and expiries are recorded too. This record cannot be deleted or edited."
 msgstr "どのアカウントから、いつ管理者権限へ昇格したかの記録です（直近 100 件）。失敗・解除・期限切れも残ります。この記録は削除も編集もできません。"
@@ -1114,7 +1114,7 @@ msgstr "どのアカウントから、いつ管理者権限へ昇格したかの
 msgid "A revoked certificate can't be downloaded."
 msgstr "失効した証明書はダウンロードできません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4098
+#: lib/ask_drive_web/live/admin_live.ex:4100
 #, elixir-autogen, elixir-format
 msgid "AI settings are copied from the first desk. Set up Google Drive and API keys after creating it."
 msgstr "AI の設定は最初の窓口から引き継ぎます。Google Drive と API キーは作成後に設定します。"
@@ -1124,7 +1124,7 @@ msgstr "AI の設定は最初の窓口から引き継ぎます。Google Drive �
 msgid "AI summary in chat"
 msgstr "チャットの AI 要約"
 
-#: lib/ask_drive_web/live/admin_live.ex:6722
+#: lib/ask_drive_web/live/admin_live.ex:6746
 #, elixir-autogen, elixir-format
 msgid "AI, Drive and chat settings"
 msgstr "AI・Drive・チャットの設定"
@@ -1134,7 +1134,7 @@ msgstr "AI・Drive・チャットの設定"
 msgid "API gateway (entry point for Google sign-in)"
 msgstr "API ゲートウェイ（Google ログインの入口）"
 
-#: lib/ask_drive_web/live/admin_live.ex:8490
+#: lib/ask_drive_web/live/admin_live.ex:8514
 #: lib/ask_drive_web/live/gateway_panel.ex:57
 #, elixir-autogen, elixir-format
 msgid "API gateway check"
@@ -1155,7 +1155,7 @@ msgstr "API ゲートウェイの設定を保存しました。確認は「API �
 msgid "API key not registered"
 msgstr "API キーが未登録です"
 
-#: lib/ask_drive_web/live/admin_live.ex:6672
+#: lib/ask_drive_web/live/admin_live.ex:6696
 #, elixir-autogen, elixir-format
 msgid "API key: %{key}"
 msgstr "API キー: %{key}"
@@ -1171,37 +1171,37 @@ msgstr "API利用量・ログ"
 msgid "Abort"
 msgstr "中止"
 
-#: lib/ask_drive_web/live/admin_live.ex:8250
+#: lib/ask_drive_web/live/admin_live.ex:8274
 #, elixir-autogen, elixir-format
 msgid "Aborted (restart)"
 msgstr "中断（再起動）"
 
-#: lib/ask_drive_web/live/admin_live.ex:8590
+#: lib/ask_drive_web/live/admin_live.ex:8614
 #, elixir-autogen, elixir-format
 msgid "About %{hours} h %{min} min"
 msgstr "約 %{hours} 時間 %{min} 分"
 
-#: lib/ask_drive_web/live/admin_live.ex:8586
+#: lib/ask_drive_web/live/admin_live.ex:8610
 #, elixir-autogen, elixir-format
 msgid "About %{min} min"
 msgstr "約 %{min} 分"
 
-#: lib/ask_drive_web/live/admin_live.ex:5481
+#: lib/ask_drive_web/live/admin_live.ex:5485
 #, elixir-autogen, elixir-format
 msgid "Access credentials (optional)"
 msgstr "アクセス認証情報（任意）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4571
+#: lib/ask_drive_web/live/admin_live.ex:4573
 #, elixir-autogen, elixir-format
 msgid "Account"
 msgstr "アカウント"
 
-#: lib/ask_drive_web/live/admin_live.ex:5638
+#: lib/ask_drive_web/live/admin_live.ex:5642
 #, elixir-autogen, elixir-format
 msgid "Account: %{email} (5 failures in 5 minutes)"
 msgstr "アカウント: %{email}（5 分間に 5 回失敗）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4424
+#: lib/ask_drive_web/live/admin_live.ex:4426
 #, elixir-autogen, elixir-format
 msgid "Active"
 msgstr "有効"
@@ -1211,67 +1211,67 @@ msgstr "有効"
 msgid "Active QA pairs (Tier 1)"
 msgstr "有効な想定QA数 (Tier 1)"
 
-#: lib/ask_drive_web/live/admin_live.ex:5922
+#: lib/ask_drive_web/live/admin_live.ex:5926
 #, elixir-autogen, elixir-format
 msgid "Add"
 msgstr "追加"
 
-#: lib/ask_drive_web/live/admin_live.ex:4286
+#: lib/ask_drive_web/live/admin_live.ex:4288
 #, elixir-autogen, elixir-format
 msgid "Add administrators (can elevate) by email (separate multiple with commas; people who have never signed in can be added too)"
 msgstr "メールアドレスで管理者（昇格可）を追加（複数可・カンマ区切り。まだログインしたことのない人も追加できます）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5911
+#: lib/ask_drive_web/live/admin_live.ex:5915
 #, elixir-autogen, elixir-format
 msgid "Add administrators (email addresses, comma-separated for several; people who have never signed in can be added too)"
 msgstr "担当者を追加（メールアドレス、複数可・カンマ区切り。まだログインしたことのない人も追加できます）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4012
+#: lib/ask_drive_web/live/admin_live.ex:4014
 #, elixir-autogen, elixir-format
 msgid "Add desk"
 msgstr "窓口を追加"
 
-#: lib/ask_drive_web/live/admin_live.ex:7859
+#: lib/ask_drive_web/live/admin_live.ex:7883
 #, elixir-autogen, elixir-format
 msgid "Add group"
 msgstr "グループを追加"
 
-#: lib/ask_drive_web/live/admin_live.ex:4313
+#: lib/ask_drive_web/live/admin_live.ex:4315
 #, elixir-autogen, elixir-format
 msgid "Addresses fixed as able to elevate by environment variable:"
 msgstr "環境変数で昇格可に固定されているアドレス:"
 
-#: lib/ask_drive_web/live/admin_live.ex:8427
+#: lib/ask_drive_web/live/admin_live.ex:8451
 #, elixir-autogen, elixir-format
 msgid "Addresses outside @%{domain} can't be used: %{emails}"
 msgstr "@%{domain} 以外のアドレスは指定できません: %{emails}"
 
-#: lib/ask_drive_web/live/admin_live.ex:4170
+#: lib/ask_drive_web/live/admin_live.ex:4172
 #, elixir-autogen, elixir-format
 msgid "Admin"
 msgstr "管理"
 
-#: lib/ask_drive_web/live/admin_live.ex:5829
+#: lib/ask_drive_web/live/admin_live.ex:5833
 #, elixir-autogen, elixir-format
 msgid "Admin elevation duration (minutes)"
 msgstr "昇格の有効時間 (分)"
 
-#: lib/ask_drive_web/live/admin_live.ex:4552
+#: lib/ask_drive_web/live/admin_live.ex:4554
 #, elixir-autogen, elixir-format
 msgid "Admin elevation history"
 msgstr "管理者権限の昇格履歴"
 
-#: lib/ask_drive_web/live/admin_live.ex:5932
+#: lib/ask_drive_web/live/admin_live.ex:5936
 #, elixir-autogen, elixir-format
 msgid "Administrator change history"
 msgstr "担当者の変更履歴"
 
-#: lib/ask_drive_web/live/admin_live.ex:5744
+#: lib/ask_drive_web/live/admin_live.ex:5748
 #, elixir-autogen, elixir-format
 msgid "Administrator email addresses (comma-separated for several; after turning it on, sign in with one of them and elevate)"
 msgstr "管理者のメールアドレス（複数可・カンマ区切り。有効にした後、このいずれかでログインして昇格します）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4222
+#: lib/ask_drive_web/live/admin_live.ex:4224
 #, elixir-autogen, elixir-format
 msgid "Administrators: %{emails}"
 msgstr "担当者: %{emails}"
@@ -1281,27 +1281,27 @@ msgstr "担当者: %{emails}"
 msgid "Administrators: %{message}"
 msgstr "担当者: %{message}"
 
-#: lib/ask_drive_web/live/admin_live.ex:4894
+#: lib/ask_drive_web/live/admin_live.ex:4898
 #, elixir-autogen, elixir-format
 msgid "Advice for content authors"
 msgstr "データ作成者向けアドバイス"
 
-#: lib/ask_drive_web/live/admin_live.ex:6366
+#: lib/ask_drive_web/live/admin_live.ex:6355
 #, elixir-autogen, elixir-format
 msgid "After you click \"Allow\" on Google, the address bar of the other window goes to"
 msgstr "Google で「許可」を押したあと、別ウィンドウのアドレスバーが"
 
-#: lib/ask_drive_web/live/admin_live.ex:7136
+#: lib/ask_drive_web/live/admin_live.ex:7160
 #, elixir-autogen, elixir-format
 msgid "Allow LLM generation during business hours as an exception"
 msgstr "営業時間中の LLM 生成を例外的に許可する"
 
-#: lib/ask_drive_web/live/admin_live.ex:4306
+#: lib/ask_drive_web/live/admin_live.ex:4308
 #, elixir-autogen, elixir-format
 msgid "Allow elevation"
 msgstr "昇格可にする"
 
-#: lib/ask_drive_web/live/admin_live.ex:5194
+#: lib/ask_drive_web/live/admin_live.ex:5198
 #, elixir-autogen, elixir-format
 msgid "Allowed domain (e.g. company.com; leave blank for no restriction)"
 msgstr "許可ドメイン（例: company.com / 空欄で制限なし）"
@@ -1311,7 +1311,7 @@ msgstr "許可ドメイン（例: company.com / 空欄で制限なし）"
 msgid "An expired certificate can't be downloaded."
 msgstr "有効期限が切れた証明書はダウンロードできません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6704
+#: lib/ask_drive_web/live/admin_live.ex:6728
 #, elixir-autogen, elixir-format
 msgid "An external API is in use."
 msgstr "外部 API が有効です。"
@@ -1321,22 +1321,22 @@ msgstr "外部 API が有効です。"
 msgid "An update is already in progress."
 msgstr "アップデートはすでに進行中です。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4774
+#: lib/ask_drive_web/live/admin_live.ex:4776
 #, elixir-autogen, elixir-format
 msgid "Analyzes how efficiently ingested documents are tokenized (text extraction and structuring). Structured text such as Markdown has high token density and search accuracy, while scanned images and complex PDFs tend to have lower token efficiency."
 msgstr "取り込み文書がどれだけ効率よくトークン化（テキスト抽出・構造化）されているかを分析します。Markdown等の構造化テキストはトークン密度と検索精度が高く、スキャン画像や複雑なPDFはトークン効率が低下する傾向があります。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6647
+#: lib/ask_drive_web/live/admin_live.ex:6671
 #, elixir-autogen, elixir-format
 msgid "Answer generation"
 msgstr "回答生成"
 
-#: lib/ask_drive_web/live/admin_live.ex:3611
+#: lib/ask_drive_web/live/admin_live.ex:3613
 #, elixir-autogen, elixir-format
 msgid "Answer generation (%{provider})"
 msgstr "回答生成 (%{provider})"
 
-#: lib/ask_drive_web/live/admin_live.ex:6639
+#: lib/ask_drive_web/live/admin_live.ex:6663
 #, elixir-autogen, elixir-format
 msgid "Answer generation and embedding can use different providers. Keeping embedding local avoids re-indexing, so we recommend switching only generation first."
 msgstr "回答生成と埋め込みで別々のプロバイダを選べます。埋め込みをローカルのまま据え置くと再インデックスが不要なため、まず生成だけを切り替える構成をおすすめします。"
@@ -1386,22 +1386,22 @@ msgstr "このペースでは打ち切り時刻（%{deadline}）までに全件�
 msgid "Authentication failed. Check the API key (%{detail})"
 msgstr "認証に失敗しました。API キーを確認してください (%{detail})"
 
-#: lib/ask_drive_web/live/admin_live.ex:8052
+#: lib/ask_drive_web/live/admin_live.ex:8076
 #, elixir-autogen, elixir-format
 msgid "Authorize with an account in the organization's domain (@%{domain})."
 msgstr "組織のドメイン（@%{domain}）のアカウントで認可してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6394
+#: lib/ask_drive_web/live/admin_live.ex:6383
 #, elixir-autogen, elixir-format
 msgid "Authorizing…"
 msgstr "認証しています…"
 
-#: lib/ask_drive_web/live/admin_live.ex:8277
+#: lib/ask_drive_web/live/admin_live.ex:8301
 #, elixir-autogen, elixir-format
 msgid "Auto"
 msgstr "自動"
 
-#: lib/ask_drive_web/live/admin_live.ex:4202
+#: lib/ask_drive_web/live/admin_live.ex:4204
 #, elixir-autogen, elixir-format
 msgid "Auto-run: off (being set up)"
 msgstr "自動実行: オフ（設定中）"
@@ -1421,7 +1421,7 @@ msgstr "夜間の自動実行: オン ·"
 msgid "Automatic renewal is off"
 msgstr "自動更新は無効"
 
-#: lib/ask_drive_web/live/admin_live.ex:7059
+#: lib/ask_drive_web/live/admin_live.ex:7083
 #, elixir-autogen, elixir-format
 msgid "Automatic run start hour (0–23, default 0)"
 msgstr "自動実行の開始時刻 (時: 0〜23。既定 0)"
@@ -1431,24 +1431,24 @@ msgstr "自動実行の開始時刻 (時: 0〜23。既定 0)"
 msgid "Automatic updates"
 msgstr "自動アップデート"
 
-#: lib/ask_drive_web/live/admin_live.ex:3656
-#: lib/ask_drive_web/live/admin_live.ex:3669
-#: lib/ask_drive_web/live/admin_live.ex:3685
+#: lib/ask_drive_web/live/admin_live.ex:3658
+#: lib/ask_drive_web/live/admin_live.ex:3671
+#: lib/ask_drive_web/live/admin_live.ex:3687
 #, elixir-autogen, elixir-format
 msgid "Available"
 msgstr "利用可能"
 
-#: lib/ask_drive_web/live/admin_live.ex:4747
+#: lib/ask_drive_web/live/admin_live.ex:4749
 #, elixir-autogen, elixir-format
 msgid "Average response time (latency)"
 msgstr "平均応答時間 (レイテンシ)"
 
-#: lib/ask_drive_web/live/admin_live.ex:5437
+#: lib/ask_drive_web/live/admin_live.ex:5441
 #, elixir-autogen, elixir-format
 msgid "Base DN (blank = derived from the domain: %{dn})"
 msgstr "ベース DN（空欄ならドメインから自動: %{dn}）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7074
+#: lib/ask_drive_web/live/admin_live.ex:7098
 #, elixir-autogen, elixir-format
 msgid "Batch cut-off hour (0–23, default 8; a running batch stops QA generation at this hour)"
 msgstr "バッチの打ち切り時刻 (時: 0〜23。既定 8。実行中のバッチはこの時刻で QA 生成を止める)"
@@ -1463,22 +1463,22 @@ msgstr "バッチを実行中です。"
 msgid "Batch run status"
 msgstr "バッチ実行状況"
 
-#: lib/ask_drive_web/live/admin_live.ex:7559
+#: lib/ask_drive_web/live/admin_live.ex:7583
 #, elixir-autogen, elixir-format
 msgid "Behind a reverse proxy, add the proxy under Ports and reverse proxies. Otherwise every connection appears to come from the proxy (the office LAN) and gets in without a certificate."
 msgstr "リバースプロキシ経由の構成では、「ポートとリバースプロキシ」にプロキシを登録してください。登録しないと、すべての接続がプロキシ（社内 LAN）からに見え、証明書なしで入れてしまいます。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4852
+#: lib/ask_drive_web/live/admin_live.ex:4856
 #, elixir-autogen, elixir-format
 msgid "Best (S)"
 msgstr "最高 (S)"
 
-#: lib/ask_drive_web/live/admin_live.ex:7758
+#: lib/ask_drive_web/live/admin_live.ex:7782
 #, elixir-autogen, elixir-format
 msgid "Blank: generated (16 characters)"
 msgstr "空欄なら自動生成（16 文字）"
 
-#: lib/ask_drive_web/live/admin_live.ex:6880
+#: lib/ask_drive_web/live/admin_live.ex:6904
 #, elixir-autogen, elixir-format
 msgid "Blank: the nightly batch model"
 msgstr "空欄なら夜間バッチのモデル名"
@@ -1493,12 +1493,12 @@ msgstr "ビルド完了（手動で再起動）"
 msgid "Building"
 msgstr "ビルド中"
 
-#: lib/ask_drive_web/live/admin_live.ex:5462
+#: lib/ask_drive_web/live/admin_live.ex:5466
 #, elixir-autogen, elixir-format
 msgid "CA certificate (optional; not needed for Google)"
 msgstr "CA 証明書（任意・Google では不要）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5404
+#: lib/ask_drive_web/live/admin_live.ex:5408
 #, elixir-autogen, elixir-format
 msgid "Can be turned on after saving the settings below (including the client certificate and private key). While it is on, saving fails if settings are missing"
 msgstr "下の設定（クライアント証明書と秘密鍵を含む）を保存してから有効にできます。有効の間に保存すると、設定が足りない場合は保存できません"
@@ -1523,7 +1523,7 @@ msgstr "IP アドレス・範囲として読み取れません: %{values}"
 msgid "Can't read these as IPs allowed direct access: %{values}"
 msgstr "直接アクセスを許可する IP として読み取れません: %{values}"
 
-#: lib/ask_drive_web/live/admin_live.ex:8423
+#: lib/ask_drive_web/live/admin_live.ex:8447
 #, elixir-autogen, elixir-format
 msgid "Can't read these as email addresses: %{values}"
 msgstr "メールアドレスとして読み取れません: %{values}"
@@ -1543,7 +1543,7 @@ msgstr "ビルドを中止しますか？（稼働中のサーバーは変わり
 msgid "Cannot connect to Ollama: %{reason}"
 msgstr "Ollama に接続できません: %{reason}"
 
-#: lib/ask_drive_web/live/admin_live.ex:5688
+#: lib/ask_drive_web/live/admin_live.ex:5692
 #, elixir-autogen, elixir-format
 msgid "Cannot connect: %{message}"
 msgstr "接続できません: %{message}"
@@ -1553,12 +1553,12 @@ msgstr "接続できません: %{message}"
 msgid "Cause of failure (error)"
 msgstr "失敗の原因（エラー内容）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7646
+#: lib/ask_drive_web/live/admin_live.ex:7670
 #, elixir-autogen, elixir-format
 msgid "Certificate %{name} is ready to download"
 msgstr "証明書「%{name}」をダウンロードできます"
 
-#: lib/ask_drive_web/live/admin_live.ex:7250
+#: lib/ask_drive_web/live/admin_live.ex:7274
 #, elixir-autogen, elixir-format
 msgid "Certificate (PEM, required)"
 msgstr "証明書（PEM・必須）"
@@ -1568,7 +1568,7 @@ msgstr "証明書（PEM・必須）"
 msgid "Certificate host name"
 msgstr "証明書のホスト名"
 
-#: lib/ask_drive_web/live/admin_live.ex:7195
+#: lib/ask_drive_web/live/admin_live.ex:7219
 #, elixir-autogen, elixir-format
 msgid "Certificate in use"
 msgstr "使用中の証明書"
@@ -1583,22 +1583,22 @@ msgstr "証明書が見つかりません。"
 msgid "Certificate revoked."
 msgstr "証明書を失効させました。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6037
+#: lib/ask_drive_web/live/admin_live.ex:6041
 #, elixir-autogen, elixir-format
 msgid "Change password"
 msgstr "パスワードを変更"
 
-#: lib/ask_drive_web/live/admin_live.ex:6712
+#: lib/ask_drive_web/live/admin_live.ex:6736
 #, elixir-autogen, elixir-format
 msgid "Change these values in the System, OAuth and batch settings form below."
 msgstr "値の変更は下の「システム・OAuth・バッチ設定」フォームから行います。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7448
+#: lib/ask_drive_web/live/admin_live.ex:7472
 #, elixir-autogen, elixir-format
 msgid "Changing a port restarts AskDrive's listener (a few seconds). If it cannot start on the new port, it goes back. If you get locked out, run"
 msgstr "ポートを変更すると AskDrive の待ち受けを再起動します（数秒）。新しいポートで起動できなければ元に戻します。締め出された場合はサーバー上で"
 
-#: lib/ask_drive_web/live/admin_live.ex:7033
+#: lib/ask_drive_web/live/admin_live.ex:7057
 #, elixir-autogen, elixir-format
 msgid "Changing the embedding model or dimensions recreates the vector table and discards all existing vectors. Tier 1 / Tier 2 do not work until the next nightly batch re-embeds every chunk."
 msgstr "埋め込みモデルまたは次元を変更すると、ベクトル仮想テーブルを再作成し、既存のベクトルをすべて破棄します。次回の夜間バッチで全チャンクを再ベクトル化するまで Tier 1 / Tier 2 は機能しません。"
@@ -1608,12 +1608,12 @@ msgstr "埋め込みモデルまたは次元を変更すると、ベクトル仮
 msgid "Changing the ports and restarting. In a few seconds, reopen https://<host>:%{port}/admin?tab=settings (if it can't start, the previous settings come back)."
 msgstr "ポートを変更して再起動しています。数秒後に https://<ホスト>:%{port}/admin?tab=settings を開き直してください（起動できなければ元の設定に戻ります）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5024
+#: lib/ask_drive_web/live/admin_live.ex:5028
 #, elixir-autogen, elixir-format
 msgid "Chat AI summary"
 msgstr "チャット AI要約"
 
-#: lib/ask_drive_web/live/admin_live.ex:4075
+#: lib/ask_drive_web/live/admin_live.ex:4077
 #, elixir-autogen, elixir-format
 msgid "Chat URL:"
 msgstr "チャットの URL:"
@@ -1623,23 +1623,23 @@ msgstr "チャットの URL:"
 msgid "Chat summary"
 msgstr "チャット要約"
 
-#: lib/ask_drive_web/live/admin_live.ex:6938
+#: lib/ask_drive_web/live/admin_live.ex:6962
 #, elixir-autogen, elixir-format
 msgid "Chat summary answer style"
 msgstr "チャット要約の回答スタイル"
 
-#: lib/ask_drive_web/live/admin_live.ex:6861
+#: lib/ask_drive_web/live/admin_live.ex:6885
 #, elixir-autogen, elixir-format
 msgid "Chat summary cloud API provider"
 msgstr "チャット要約のクラウド API プロバイダ"
 
-#: lib/ask_drive_web/live/admin_live.ex:6862
+#: lib/ask_drive_web/live/admin_live.ex:6886
 #, elixir-autogen, elixir-format
 msgid "Chat summary local LLM provider"
 msgstr "チャット要約のローカル LLM プロバイダ"
 
-#: lib/ask_drive_web/live/admin_live.ex:6872
-#: lib/ask_drive_web/live/admin_live.ex:6879
+#: lib/ask_drive_web/live/admin_live.ex:6896
+#: lib/ask_drive_web/live/admin_live.ex:6903
 #, elixir-autogen, elixir-format
 msgid "Chat summary model name"
 msgstr "チャット要約モデル名"
@@ -1664,12 +1664,12 @@ msgstr "今すぐ確認"
 msgid "Checking…"
 msgstr "確認しています…"
 
-#: lib/ask_drive_web/live/admin_live.ex:6590
+#: lib/ask_drive_web/live/admin_live.ex:6614
 #, elixir-autogen, elixir-format
 msgid "Checks authentication and folder access, and lists the files that would be synced (nothing is ingested)."
 msgstr "認証とフォルダの読み取りを確認し、同期の対象になるファイルを一覧します（取り込みはしません）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8670
+#: lib/ask_drive_web/live/admin_live.ex:8694
 #, elixir-autogen, elixir-format
 msgid "Choose a PEM file (.pem / .crt / .cer / .key)"
 msgstr "PEM 形式（.pem / .crt / .cer / .key）のファイルを選んでください"
@@ -1679,12 +1679,12 @@ msgstr "PEM 形式（.pem / .crt / .cer / .key）のファイルを選んでく�
 msgid "Choose both the certificate and the private key"
 msgstr "証明書と秘密鍵の両方を選択してください"
 
-#: lib/ask_drive_web/live/admin_live.ex:8672
+#: lib/ask_drive_web/live/admin_live.ex:8696
 #, elixir-autogen, elixir-format
 msgid "Choose only one file"
 msgstr "1 ファイルだけ選んでください"
 
-#: lib/ask_drive_web/live/admin_live.ex:3543
+#: lib/ask_drive_web/live/admin_live.ex:3545
 #, elixir-autogen, elixir-format
 msgid "Chunks"
 msgstr "チャンク"
@@ -1699,33 +1699,33 @@ msgstr "QA を生成できなかったチャンク（3 回失敗・%{count} 件�
 msgid "Click a row to show that batch's details (phase breakdown and per-file log) in \"Batch run status\" below."
 msgstr "行をクリックすると、下の「バッチ実行状況」にそのバッチの詳細（フェーズ別内訳・ファイル別ログ）を表示します。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4393
+#: lib/ask_drive_web/live/admin_live.ex:4395
 #, elixir-autogen, elixir-format
 msgid "Click to grant admin rights for %{app}"
 msgstr "クリックして %{app} の管理者権限を付与"
 
-#: lib/ask_drive_web/live/admin_live.ex:4389
+#: lib/ask_drive_web/live/admin_live.ex:4391
 #, elixir-autogen, elixir-format
 msgid "Click to revoke admin rights for %{app}"
 msgstr "クリックして %{app} の管理者権限を解除"
 
-#: lib/ask_drive_web/live/admin_live.ex:6324
+#: lib/ask_drive_web/live/admin_live.ex:6313
 #, elixir-autogen, elixir-format
 msgid "Client ID in use:"
 msgstr "使用クライアント ID:"
 
-#: lib/ask_drive_web/live/admin_live.ex:5454
+#: lib/ask_drive_web/live/admin_live.ex:5458
 #, elixir-autogen, elixir-format
 msgid "Client certificate (.crt)"
 msgstr "クライアント証明書（.crt）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5384
+#: lib/ask_drive_web/live/admin_live.ex:5388
 #, elixir-autogen, elixir-format
 msgid "Client certificate: Not registered"
 msgstr "クライアント証明書: 未登録"
 
-#: lib/ask_drive_web/live/admin_live.ex:6754
-#: lib/ask_drive_web/live/admin_live.ex:6852
+#: lib/ask_drive_web/live/admin_live.ex:6778
+#: lib/ask_drive_web/live/admin_live.ex:6876
 #, elixir-autogen, elixir-format
 msgid "Cloud API"
 msgstr "クラウド API"
@@ -1736,44 +1736,44 @@ msgstr "クラウド API"
 msgid "Cloud API model name"
 msgstr "クラウド API のモデル名"
 
-#: lib/ask_drive_web/live/admin_live.ex:6809
+#: lib/ask_drive_web/live/admin_live.ex:6833
 #, elixir-autogen, elixir-format
 msgid "Cloud API provider"
 msgstr "クラウド API プロバイダ"
 
-#: lib/ask_drive_web/live/admin_live.ex:8247
+#: lib/ask_drive_web/live/admin_live.ex:8271
 #, elixir-autogen, elixir-format
 msgid "Completed"
 msgstr "完了"
 
-#: lib/ask_drive_web/live/admin_live.ex:6026
+#: lib/ask_drive_web/live/admin_live.ex:6030
 #, elixir-autogen, elixir-format
 msgid "Confirm password"
 msgstr "確認"
 
-#: lib/ask_drive_web/live/admin_live.ex:6246
+#: lib/ask_drive_web/live/admin_live.ex:6235
 #, elixir-autogen, elixir-format
 msgid "Connect Google Drive (3 steps)"
 msgstr "Google Drive 連携手順（3 ステップ）"
 
 #: lib/ask_drive_web/live/admin_live.ex:259
-#: lib/ask_drive_web/live/admin_live.ex:8855
+#: lib/ask_drive_web/live/admin_live.ex:8879
 #, elixir-autogen, elixir-format
 msgid "Connected %{email}."
 msgstr "%{email} と連携しました。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8168
+#: lib/ask_drive_web/live/admin_live.ex:8192
 #, elixir-autogen, elixir-format
 msgid "Connected (%{identity}). The sync folder \"%{folder}\" can be read."
 msgstr "接続に成功しました（%{identity}）。同期フォルダ「%{folder}」を読み取れます。"
 
-#: lib/ask_drive_web/live/admin_live.ex:3618
-#: lib/ask_drive_web/live/admin_live.ex:3636
+#: lib/ask_drive_web/live/admin_live.ex:3620
+#: lib/ask_drive_web/live/admin_live.ex:3638
 #, elixir-autogen, elixir-format
 msgid "Connected (%{info})"
 msgstr "接続中 (%{info})"
 
-#: lib/ask_drive_web/live/admin_live.ex:5683
+#: lib/ask_drive_web/live/admin_live.ex:5687
 #, elixir-autogen, elixir-format
 msgid "Connected (certificate and base DN are OK). Try a password on the sign-in screen."
 msgstr "接続できました（証明書・ベース DN とも OK）。ログイン画面でパスワードを試してください。"
@@ -1784,7 +1784,7 @@ msgid "Connected (found %{count} records for %{zone}; nothing was changed)."
 msgstr "接続できました（%{zone} のレコード %{count} 件を確認。何も変更していません）。"
 
 #: lib/ask_drive_web/live/admin_live.ex:262
-#: lib/ask_drive_web/live/admin_live.ex:8859
+#: lib/ask_drive_web/live/admin_live.ex:8883
 #, elixir-autogen, elixir-format
 msgid "Connected the Google Drive sync account (%{email}). Check it with \"Test sync\"."
 msgstr "Google Drive 同期アカウント（%{email}）と連携しました。「同期テスト」で確認してください。"
@@ -1799,7 +1799,7 @@ msgstr "%{provider} / %{model} に接続できました (%{dim} 次元)。"
 msgid "Connected to %{provider} / %{model}."
 msgstr "%{provider} / %{model} に接続できました。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6056
+#: lib/ask_drive_web/live/admin_live.ex:6060
 #, elixir-autogen, elixir-format
 msgid "Connected: %{identity}"
 msgstr "連携中: %{identity}"
@@ -1814,7 +1814,7 @@ msgstr "接続するには OAuth クライアントが必要です。全体設�
 msgid "Connecting to Value-Domain…"
 msgstr "バリュードメインに接続しています…"
 
-#: lib/ask_drive_web/live/admin_live.ex:7954
+#: lib/ask_drive_web/live/admin_live.ex:7978
 #, elixir-autogen, elixir-format
 msgid "Connection test failed: %{reason}"
 msgstr "接続テストに失敗しました: %{reason}"
@@ -1824,7 +1824,7 @@ msgstr "接続テストに失敗しました: %{reason}"
 msgid "Contact email (optional)"
 msgstr "連絡先メールアドレス（任意）"
 
-#: lib/ask_drive_web/live/admin_live.ex:6370
+#: lib/ask_drive_web/live/admin_live.ex:6359
 #, elixir-autogen, elixir-format
 msgid "Copy the whole URL from that browser's address bar"
 msgstr "ブラウザのアドレスバーの URL をすべてコピー"
@@ -1834,7 +1834,7 @@ msgstr "ブラウザのアドレスバーの URL をすべてコピー"
 msgid "Could not connect. Check that the endpoint is reachable"
 msgstr "接続できませんでした。エンドポイントの疎通を確認してください"
 
-#: lib/ask_drive_web/live/admin_live.ex:8805
+#: lib/ask_drive_web/live/admin_live.ex:8829
 #, elixir-autogen, elixir-format
 msgid "Could not create the desk: %{reason}"
 msgstr "窓口を作成できませんでした: %{reason}"
@@ -1844,17 +1844,17 @@ msgstr "窓口を作成できませんでした: %{reason}"
 msgid "Could not delete: %{reason}"
 msgstr "削除できませんでした: %{reason}"
 
-#: lib/ask_drive_web/live/admin_live.ex:8064
+#: lib/ask_drive_web/live/admin_live.ex:8088
 #, elixir-autogen, elixir-format
 msgid "Could not get a token: %{reason}"
 msgstr "トークンを取得できませんでした: %{reason}"
 
-#: lib/ask_drive_web/live/admin_live.ex:8058
+#: lib/ask_drive_web/live/admin_live.ex:8082
 #, elixir-autogen, elixir-format
 msgid "Could not get a token: %{reason} (a code can be used only once; if it has expired, authorize again)"
 msgstr "トークンを取得できませんでした: %{reason}（コードは一度しか使えません。期限切れの場合は認可し直してください）"
 
-#: lib/ask_drive_web/live/admin_live.ex:8147
+#: lib/ask_drive_web/live/admin_live.ex:8171
 #, elixir-autogen, elixir-format
 msgid "Could not read the sync folder: %{reason}"
 msgstr "同期フォルダを読み取れませんでした: %{reason}"
@@ -1893,38 +1893,38 @@ msgstr "ユーザーの更新に失敗しました。"
 msgid "Could not update."
 msgstr "更新できませんでした。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4088
+#: lib/ask_drive_web/live/admin_live.ex:4090
 #, elixir-autogen, elixir-format
 msgid "Create desk"
 msgstr "窓口を作成"
 
-#: lib/ask_drive_web/live/admin_live.ex:4112
+#: lib/ask_drive_web/live/admin_live.ex:4114
 #, elixir-autogen, elixir-format
 msgid "Created desk \"%{name}\" (/%{slug}). Next, set up the Google Drive folder and authentication, and API keys if needed."
 msgstr "窓口「%{name}」（/%{slug}）を作成しました。次に Google Drive のフォルダと認証、必要なら API キーを設定してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7199
+#: lib/ask_drive_web/live/admin_live.ex:7223
 #, elixir-autogen, elixir-format
 msgid "Custom certificate"
 msgstr "独自の証明書"
 
-#: lib/ask_drive_web/live/admin_live.ex:4737
+#: lib/ask_drive_web/live/admin_live.ex:4739
 #, elixir-autogen, elixir-format
 msgid "Data sent"
 msgstr "送信データ量"
 
-#: lib/ask_drive_web/live/admin_live.ex:4570
-#: lib/ask_drive_web/live/admin_live.ex:5089
+#: lib/ask_drive_web/live/admin_live.ex:4572
+#: lib/ask_drive_web/live/admin_live.ex:5093
 #, elixir-autogen, elixir-format
 msgid "Date and time"
 msgstr "日時"
 
-#: lib/ask_drive_web/live/admin_live.ex:4233
+#: lib/ask_drive_web/live/admin_live.ex:4235
 #, elixir-autogen, elixir-format
 msgid "Delete desk \"%{name}\"? Its chat and admin screen will stop working (the database file is kept under a new name). Continue?"
 msgstr "窓口「%{name}」を削除します。チャット・管理画面が使えなくなります（データベースファイルは名前を変えて残します）。続行しますか？"
 
-#: lib/ask_drive_web/live/admin_live.ex:7710
+#: lib/ask_drive_web/live/admin_live.ex:7734
 #, elixir-autogen, elixir-format
 msgid "Delete group %{name}?"
 msgstr "グループ「%{name}」を削除しますか？"
@@ -1934,27 +1934,27 @@ msgstr "グループ「%{name}」を削除しますか？"
 msgid "Delete the Google Chat webhook URL? (Notifications will stop arriving.)"
 msgstr "Google Chat の Webhook URL を削除しますか？（通知が届かなくなります）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5477
+#: lib/ask_drive_web/live/admin_live.ex:5481
 #, elixir-autogen, elixir-format
 msgid "Delete the registered CA certificate"
 msgstr "登録済みの CA 証明書を削除する"
 
-#: lib/ask_drive_web/live/admin_live.ex:6186
+#: lib/ask_drive_web/live/admin_live.ex:6175
 #, elixir-autogen, elixir-format
 msgid "Delete the saved service account credentials?"
 msgstr "保存済みのサービスアカウント認証情報を削除しますか？"
 
-#: lib/ask_drive_web/live/admin_live.ex:8229
+#: lib/ask_drive_web/live/admin_live.ex:8253
 #, elixir-autogen, elixir-format
 msgid "Deleted"
 msgstr "削除"
 
-#: lib/ask_drive_web/live/admin_live.ex:4049
+#: lib/ask_drive_web/live/admin_live.ex:4051
 #, elixir-autogen, elixir-format
 msgid "Description (optional, shown in the desk list)"
 msgstr "説明（任意・窓口の一覧に表示）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4158
+#: lib/ask_drive_web/live/admin_live.ex:4160
 #, elixir-autogen, elixir-format
 msgid "Description (shown on the portal)"
 msgstr "説明（ポータルに表示）"
@@ -1969,12 +1969,12 @@ msgstr "窓口「%{name}」の担当者を 0 人にはできません。先に�
 msgid "Desk \"%{name}\" deleted (its database file is kept under another name)."
 msgstr "窓口「%{name}」を削除しました（データベースファイルは名前を変えて残しています）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5966
+#: lib/ask_drive_web/live/admin_live.ex:5970
 #, elixir-autogen, elixir-format
 msgid "Desk access password"
 msgstr "窓口アクセスパスワード"
 
-#: lib/ask_drive_web/live/admin_live.ex:6013
+#: lib/ask_drive_web/live/admin_live.ex:6017
 #, elixir-autogen, elixir-format
 msgid "Desk access password (at least %{count} characters)"
 msgstr "窓口アクセスパスワード（%{count} 文字以上）"
@@ -1989,22 +1989,22 @@ msgstr "窓口アクセスパスワードを変更しました。"
 msgid "Desk access password saved. Turn the restriction on with the \"Restrict access by password\" switch."
 msgstr "窓口アクセスパスワードを保存しました。利用制限は「パスワードによる利用制限」のスイッチで有効にします。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5850
+#: lib/ask_drive_web/live/admin_live.ex:5854
 #, elixir-autogen, elixir-format
 msgid "Desk administrators"
 msgstr "窓口管理者"
 
-#: lib/ask_drive_web/live/admin_live.ex:4069
+#: lib/ask_drive_web/live/admin_live.ex:4071
 #, elixir-autogen, elixir-format
 msgid "Desk administrators configure the desk (Drive, API keys, etc.). Platform administrators cannot open a desk's admin screen."
 msgstr "窓口の設定（Drive・API キー等）は担当者が行います。全体管理者は窓口の管理画面に入れません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4036
+#: lib/ask_drive_web/live/admin_live.ex:4038
 #, elixir-autogen, elixir-format
 msgid "Desk name (e.g. HR)"
 msgstr "窓口名（例: HR）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4134
+#: lib/ask_drive_web/live/admin_live.ex:4136
 #, elixir-autogen, elixir-format
 msgid "Desk name / description"
 msgstr "窓口名 / 説明"
@@ -2015,37 +2015,37 @@ msgid "Desk updated."
 msgstr "窓口を更新しました。"
 
 #: lib/ask_drive_web/live/admin_live.ex:152
-#: lib/ask_drive_web/live/admin_live.ex:3995
+#: lib/ask_drive_web/live/admin_live.ex:3997
 #, elixir-autogen, elixir-format
 msgid "Desks (apps)"
 msgstr "窓口（アプリ）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4332
+#: lib/ask_drive_web/live/admin_live.ex:4334
 #, elixir-autogen, elixir-format
 msgid "Desks administered (app admin)"
 msgstr "担当窓口（アプリ管理者）"
 
-#: lib/ask_drive_web/live/admin_live.ex:3545
+#: lib/ask_drive_web/live/admin_live.ex:3547
 #, elixir-autogen, elixir-format
 msgid "Details"
 msgstr "詳細"
 
-#: lib/ask_drive_web/live/admin_live.ex:5619
+#: lib/ask_drive_web/live/admin_live.ex:5623
 #, elixir-autogen, elixir-format
 msgid "Device"
 msgstr "接続環境"
 
-#: lib/ask_drive_web/live/admin_live.ex:5643
+#: lib/ask_drive_web/live/admin_live.ex:5647
 #, elixir-autogen, elixir-format
 msgid "Device (10 failures in 24 hours)"
 msgstr "接続環境（24 時間に 10 回失敗）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7763
+#: lib/ask_drive_web/live/admin_live.ex:7787
 #, elixir-autogen, elixir-format
 msgid "Devices and browsers show %{name} (with a note: %{with_note}). The password is 8 to 64 ASCII letters, digits and symbols."
 msgstr "端末やブラウザでは「%{name}」（メモを入れると「%{with_note}」）と表示されます。パスワードは 8〜64 文字の半角英数字・記号です。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7650
+#: lib/ask_drive_web/live/admin_live.ex:7674
 #, elixir-autogen, elixir-format
 msgid "Devices and browsers show it as %{name}. Expires: %{expires}"
 msgstr "端末やブラウザでは「%{name}」という名前で表示されます。有効期限: %{expires}"
@@ -2055,43 +2055,43 @@ msgstr "端末やブラウザでは「%{name}」という名前で表示され�
 msgid "Direct (%{ip})"
 msgstr "直接（%{ip}）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4532
+#: lib/ask_drive_web/live/admin_live.ex:4534
 #, elixir-autogen, elixir-format
 msgid "Disable"
 msgstr "無効化"
 
-#: lib/ask_drive_web/live/admin_live.ex:4514
+#: lib/ask_drive_web/live/admin_live.ex:4516
 #, elixir-autogen, elixir-format
 msgid "Disable %{email}? They will no longer be able to sign in."
 msgstr "%{email} を無効化しますか？ログインできなくなります。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4425
+#: lib/ask_drive_web/live/admin_live.ex:4427
 #, elixir-autogen, elixir-format
 msgid "Disabled"
 msgstr "無効"
 
-#: lib/ask_drive_web/live/admin_live.ex:3604
+#: lib/ask_drive_web/live/admin_live.ex:3606
 #, elixir-autogen, elixir-format
 msgid "Disabled: %{error}"
 msgstr "無効: %{error}"
 
-#: lib/ask_drive_web/live/admin_live.ex:4501
+#: lib/ask_drive_web/live/admin_live.ex:4503
 #, elixir-autogen, elixir-format
 msgid "Disallow elevation"
 msgstr "昇格を禁止"
 
-#: lib/ask_drive_web/live/admin_live.ex:6234
+#: lib/ask_drive_web/live/admin_live.ex:6223
 #, elixir-autogen, elixir-format
 msgid "Disconnect"
 msgstr "連携解除"
 
-#: lib/ask_drive_web/live/admin_live.ex:3808
-#: lib/ask_drive_web/live/admin_live.ex:3883
+#: lib/ask_drive_web/live/admin_live.ex:3810
+#: lib/ask_drive_web/live/admin_live.ex:3885
 #, elixir-autogen, elixir-format
 msgid "Document name"
 msgstr "ドキュメント名"
 
-#: lib/ask_drive_web/live/admin_live.ex:6704
+#: lib/ask_drive_web/live/admin_live.ex:6728
 #, elixir-autogen, elixir-format
 msgid "Document text and questions are sent to the provider."
 msgstr "文書本文と質問がプロバイダに送信されます。"
@@ -2101,7 +2101,7 @@ msgstr "文書本文と質問がプロバイダに送信されます。"
 msgid "Documents"
 msgstr "ドキュメント一覧"
 
-#: lib/ask_drive_web/live/admin_live.ex:4136
+#: lib/ask_drive_web/live/admin_live.ex:4138
 #, elixir-autogen, elixir-format
 msgid "Documents / chunks"
 msgstr "文書 / チャンク"
@@ -2111,12 +2111,12 @@ msgstr "文書 / チャンク"
 msgid "Documents already ingested and chunks that already have QA are not redone. Chunks that failed last time go last."
 msgstr "取り込み済みの文書と、QA を生成済みのチャンクは再実行しません。前回失敗したチャンクは後回しにします。"
 
-#: lib/ask_drive_web/live/admin_live.ex:3791
+#: lib/ask_drive_web/live/admin_live.ex:3793
 #, elixir-autogen, elixir-format
 msgid "Documents for ingestion"
 msgstr "取り込み対象ドキュメント一覧"
 
-#: lib/ask_drive_web/live/admin_live.ex:4781
+#: lib/ask_drive_web/live/admin_live.ex:4783
 #, elixir-autogen, elixir-format
 msgid "Documents: %{count}"
 msgstr "対象文書: %{count} 件"
@@ -2136,17 +2136,17 @@ msgstr "設定しました。"
 msgid "Done. Restarting the HTTPS listener (the page reconnects by itself in a few seconds; if asked to choose a certificate, choose the AskDrive one)."
 msgstr "設定しました。HTTPS の待ち受けを再起動しています（数秒後に自動で再接続します。証明書の選択を求められたら AskDrive の証明書を選んでください）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7822
+#: lib/ask_drive_web/live/admin_live.ex:7846
 #, elixir-autogen, elixir-format
 msgid "Download again"
 msgstr "再ダウンロード"
 
-#: lib/ask_drive_web/live/admin_live.ex:7663
+#: lib/ask_drive_web/live/admin_live.ex:7687
 #, elixir-autogen, elixir-format
 msgid "Download the file for the recipient's device (valid for 10 minutes; each installs without admin rights on the device; you can also get it later with Download again in the list):"
 msgstr "配る相手の端末に合わせてダウンロードしてください（10 分間有効。いずれも端末の管理者権限なしでインストールできます。あとから一覧の「再ダウンロード」でも取得できます）:"
 
-#: lib/ask_drive_web/live/admin_live.ex:5315
+#: lib/ask_drive_web/live/admin_live.ex:5319
 #, elixir-autogen, elixir-format
 msgid "Drive sync above keeps working even with Google sign-in turned off."
 msgstr "Google ログインを無効にしていても、上記の Drive 同期は問題なく利用できます。"
@@ -2156,17 +2156,17 @@ msgstr "Google ログインを無効にしていても、上記の Drive 同期�
 msgid "Duration"
 msgstr "所要時間"
 
-#: lib/ask_drive_web/live/admin_live.ex:4000
+#: lib/ask_drive_web/live/admin_live.ex:4002
 #, elixir-autogen, elixir-format
 msgid "Each desk has its own Google Drive folder, API keys such as Gemini (so costs can be split), search index, QA pairs, question log and nightly batch history. Each desk's data is stored in a separate database and never mixed."
 msgstr "窓口ごとに Google Drive のフォルダ、Gemini などの API キー（費用負担を分けられます）、検索インデックス、QA、質問ログ、夜間バッチの履歴が分かれます。データは窓口ごとに別のデータベースに保存され、混ざりません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4811
+#: lib/ask_drive_web/live/admin_live.ex:4815
 #, elixir-autogen, elixir-format
 msgid "Efficiency rating"
 msgstr "効率評価"
 
-#: lib/ask_drive_web/live/admin_live.ex:4893
+#: lib/ask_drive_web/live/admin_live.ex:4897
 #, elixir-autogen, elixir-format
 msgid "Efficiency score"
 msgstr "効率スコア"
@@ -2176,7 +2176,7 @@ msgstr "効率スコア"
 msgid "Elapsed in this step: %{time}"
 msgstr "このステップの経過 %{time}"
 
-#: lib/ask_drive_web/live/admin_live.ex:4435
+#: lib/ask_drive_web/live/admin_live.ex:4437
 #, elixir-autogen, elixir-format
 msgid "Elevated:"
 msgstr "昇格:"
@@ -2186,61 +2186,61 @@ msgstr "昇格:"
 msgid "Elevation log"
 msgstr "昇格ログ"
 
-#: lib/ask_drive_web/live/admin_live.ex:4331
+#: lib/ask_drive_web/live/admin_live.ex:4333
 #, elixir-autogen, elixir-format
 msgid "Elevation to platform admin"
 msgstr "全体管理者への昇格"
 
-#: lib/ask_drive_web/live/admin_live.ex:4054
+#: lib/ask_drive_web/live/admin_live.ex:4056
 #, elixir-autogen, elixir-format
 msgid "Email addresses of the desk administrators (required; separate multiple with commas)"
 msgstr "担当者（窓口管理者）のメールアドレス（必須・複数可・カンマ区切り）"
 
 #: lib/ask_drive/llm/ollama_models.ex:185
-#: lib/ask_drive_web/live/admin_live.ex:6648
+#: lib/ask_drive_web/live/admin_live.ex:6672
 #: lib/ask_drive_web/live/ollama_panel.ex:381
 #, elixir-autogen, elixir-format
 msgid "Embedding"
 msgstr "埋め込み"
 
-#: lib/ask_drive_web/live/admin_live.ex:3631
+#: lib/ask_drive_web/live/admin_live.ex:3633
 #, elixir-autogen, elixir-format
 msgid "Embedding (%{provider})"
 msgstr "埋め込み (%{provider})"
 
-#: lib/ask_drive_web/live/admin_live.ex:6990
+#: lib/ask_drive_web/live/admin_live.ex:7014
 #, elixir-autogen, elixir-format
 msgid "Embedding dimensions"
 msgstr "埋め込み次元"
 
-#: lib/ask_drive_web/live/admin_live.ex:6976
-#: lib/ask_drive_web/live/admin_live.ex:6984
+#: lib/ask_drive_web/live/admin_live.ex:7000
+#: lib/ask_drive_web/live/admin_live.ex:7008
 #, elixir-autogen, elixir-format
 msgid "Embedding model name"
 msgstr "埋め込みモデル名"
 
-#: lib/ask_drive_web/live/admin_live.ex:6968
+#: lib/ask_drive_web/live/admin_live.ex:6992
 #, elixir-autogen, elixir-format
 msgid "Embedding provider"
 msgstr "埋め込みプロバイダ"
 
-#: lib/ask_drive_web/live/admin_live.ex:4533
+#: lib/ask_drive_web/live/admin_live.ex:4535
 #, elixir-autogen, elixir-format
 msgid "Enable"
 msgstr "有効化"
 
-#: lib/ask_drive_web/live/admin_live.ex:6471
+#: lib/ask_drive_web/live/admin_live.ex:6460
 #, elixir-autogen, elixir-format
 msgid "Enable the Google Drive API"
 msgstr "Google Drive API を有効にする"
 
-#: lib/ask_drive_web/live/admin_live.ex:3602
+#: lib/ask_drive_web/live/admin_live.ex:3604
 #, elixir-autogen, elixir-format
 msgid "Enabled (v%{version})"
 msgstr "有効 (v%{version})"
 
-#: lib/ask_drive_web/live/admin_live.ex:7518
-#: lib/ask_drive_web/live/admin_live.ex:7610
+#: lib/ask_drive_web/live/admin_live.ex:7542
+#: lib/ask_drive_web/live/admin_live.ex:7634
 #, elixir-autogen, elixir-format
 msgid "Enforce"
 msgstr "強制"
@@ -2255,7 +2255,7 @@ msgstr "窓口名を入力してください。"
 msgid "Enter a name (e.g. AskDrive), save, and copy the URL shown"
 msgstr "名前（例: AskDrive）を入れて保存し、表示された URL をコピー"
 
-#: lib/ask_drive_web/live/admin_live.ex:6263
+#: lib/ask_drive_web/live/admin_live.ex:6252
 #, elixir-autogen, elixir-format
 msgid "Enter an account (Gmail or Workspace) that can view the Drive folder to sync."
 msgstr "同期対象の Drive フォルダを閲覧できるアカウント（Gmail または Workspace アカウント）を入力します。"
@@ -2265,17 +2265,17 @@ msgstr "同期対象の Drive フォルダを閲覧できるアカウント（Gm
 msgid "Enter and save the ID / URL of the folder to sync."
 msgstr "同期するフォルダの ID / URL を入力して保存してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6260
+#: lib/ask_drive_web/live/admin_live.ex:6249
 #, elixir-autogen, elixir-format
 msgid "Enter the Google account to sync"
 msgstr "同期する Google アカウントを入力"
 
-#: lib/ask_drive_web/live/admin_live.ex:8419
+#: lib/ask_drive_web/live/admin_live.ex:8443
 #, elixir-autogen, elixir-format
 msgid "Enter the administrators' email addresses."
 msgstr "管理者のメールアドレスを入力してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6508
+#: lib/ask_drive_web/live/admin_live.ex:6497
 #, elixir-autogen, elixir-format
 msgid "Enter the client ID and secret shown below, then click \"Save\" at the bottom of the card"
 msgstr "表示されたクライアント ID とシークレットを下に入力し、カードの一番下の「保存」を押す"
@@ -2285,7 +2285,7 @@ msgstr "表示されたクライアント ID とシークレットを下に入�
 msgid "Enter the public URL as https://app.example.com (no path)"
 msgstr "公開 URL は https://app.example.com の形（パスなし）で入力してください"
 
-#: lib/ask_drive_web/live/admin_live.ex:5093
+#: lib/ask_drive_web/live/admin_live.ex:5097
 #, elixir-autogen, elixir-format
 msgid "Error details"
 msgstr "エラー内容"
@@ -2295,17 +2295,17 @@ msgstr "エラー内容"
 msgid "Error on the provider's side (%{detail})"
 msgstr "プロバイダ側のエラーです (%{detail})"
 
-#: lib/ask_drive_web/live/admin_live.ex:4969
+#: lib/ask_drive_web/live/admin_live.ex:4973
 #, elixir-autogen, elixir-format
 msgid "Errors"
 msgstr "エラー"
 
-#: lib/ask_drive_web/live/admin_live.ex:4754
+#: lib/ask_drive_web/live/admin_live.ex:4756
 #, elixir-autogen, elixir-format
 msgid "Errors: %{count}"
 msgstr "エラー: %{count} 件"
 
-#: lib/ask_drive_web/live/admin_live.ex:4891
+#: lib/ask_drive_web/live/admin_live.ex:4895
 #, elixir-autogen, elixir-format
 msgid "Estimated tokens"
 msgstr "推定トークン"
@@ -2315,46 +2315,46 @@ msgstr "推定トークン"
 msgid "Even with automatic updates, if the build fails the running version keeps running. Switching over automatically by restarting requires AskDrive to be a resident service ("
 msgstr "自動アップデートでも、ビルドに失敗した場合は稼働中のバージョンのまま動き続けます。再起動による自動の切り替えには、AskDrive が常駐サービス（"
 
-#: lib/ask_drive_web/live/admin_live.ex:4572
+#: lib/ask_drive_web/live/admin_live.ex:4574
 #, elixir-autogen, elixir-format
 msgid "Event"
 msgstr "イベント"
 
-#: lib/ask_drive_web/live/admin_live.ex:6957
+#: lib/ask_drive_web/live/admin_live.ex:6981
 #, elixir-autogen, elixir-format
 msgid "Every style answers only from the excerpts, adds source numbers such as [1], and says it could not confirm the answer in the documents when the excerpts do not answer the question. Small local models often ignore instructions other than Concise (tone, length), so a cloud API (Gemini etc.) is recommended."
 msgstr "どのスタイルでも、抜粋だけを根拠にし、引用元の番号 [1] を付け、抜粋から答えられないときは「資料からは確認できませんでした。」と答えます。小さなローカルモデルでは「簡潔」以外の指示（口調・字数）が守られにくいため、クラウド API（Gemini 等）での利用をおすすめします。"
 
 #: lib/ask_drive/accounts/admin_elevation_log.ex:42
-#: lib/ask_drive_web/live/admin_live.ex:7590
+#: lib/ask_drive_web/live/admin_live.ex:7614
 #, elixir-autogen, elixir-format
 msgid "Expired"
 msgstr "期限切れ"
 
-#: lib/ask_drive_web/live/admin_live.ex:7340
+#: lib/ask_drive_web/live/admin_live.ex:7364
 #, elixir-autogen, elixir-format
 msgid "Expires: %{date}"
 msgstr "有効期限: %{date}"
 
-#: lib/ask_drive_web/live/admin_live.ex:7216
-#: lib/ask_drive_web/live/admin_live.ex:7738
+#: lib/ask_drive_web/live/admin_live.ex:7240
+#: lib/ask_drive_web/live/admin_live.ex:7762
 #, elixir-autogen, elixir-format
 msgid "Expiry date"
 msgstr "有効期限"
 
-#: lib/ask_drive_web/live/admin_live.ex:6490
+#: lib/ask_drive_web/live/admin_live.ex:6479
 #, elixir-autogen, elixir-format
 msgid "External"
 msgstr "外部"
 
-#: lib/ask_drive_web/live/admin_live.ex:6661
+#: lib/ask_drive_web/live/admin_live.ex:6685
 #, elixir-autogen, elixir-format
 msgid "External API"
 msgstr "外部 API"
 
 #: lib/ask_drive_web/live/admin_live.ex:3070
-#: lib/ask_drive_web/live/admin_live.ex:8233
-#: lib/ask_drive_web/live/admin_live.ex:8251
+#: lib/ask_drive_web/live/admin_live.ex:8257
+#: lib/ask_drive_web/live/admin_live.ex:8275
 #, elixir-autogen, elixir-format
 msgid "Failed"
 msgstr "失敗"
@@ -2369,13 +2369,13 @@ msgstr "失敗・中止"
 msgid "Failed: %{result}"
 msgstr "失敗: %{result}"
 
-#: lib/ask_drive_web/live/admin_live.ex:3542
+#: lib/ask_drive_web/live/admin_live.ex:3544
 #, elixir-autogen, elixir-format
 msgid "File"
 msgstr "ファイル"
 
-#: lib/ask_drive_web/live/admin_live.ex:3821
-#: lib/ask_drive_web/live/admin_live.ex:3885
+#: lib/ask_drive_web/live/admin_live.ex:3823
+#: lib/ask_drive_web/live/admin_live.ex:3887
 #, elixir-autogen, elixir-format
 msgid "File type"
 msgstr "ファイル形式"
@@ -2385,62 +2385,62 @@ msgstr "ファイル形式"
 msgid "Finished at"
 msgstr "終了日時"
 
-#: lib/ask_drive_web/live/admin_live.ex:4472
+#: lib/ask_drive_web/live/admin_live.ex:4474
 #, elixir-autogen, elixir-format
 msgid "Fixed by ASK_DRIVE_ADMIN_EMAILS in .env.prod (cannot be removed here)"
 msgstr ".env.prod の ASK_DRIVE_ADMIN_EMAILS で固定（画面からは外せません）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5731
+#: lib/ask_drive_web/live/admin_live.ex:5735
 #, elixir-autogen, elixir-format
 msgid "Fixed by the environment variable"
 msgstr "環境変数"
 
-#: lib/ask_drive_web/live/admin_live.ex:6567
+#: lib/ask_drive_web/live/admin_live.ex:6591
 #, elixir-autogen, elixir-format
 msgid "Folder display name (optional)"
 msgstr "フォルダの表示名（任意）"
 
-#: lib/ask_drive_web/live/admin_live.ex:6552
+#: lib/ask_drive_web/live/admin_live.ex:6576
 #, elixir-autogen, elixir-format
 msgid "Folder to sync"
 msgstr "同期するフォルダ"
 
-#: lib/ask_drive_web/live/admin_live.ex:7674
+#: lib/ask_drive_web/live/admin_live.ex:7698
 #, elixir-autogen, elixir-format
 msgid "For Android (.p12)"
 msgstr "Android 用（.p12）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7963
+#: lib/ask_drive_web/live/admin_live.ex:7987
 #, elixir-autogen, elixir-format
 msgid "For Drive sync only, a client of type \"Desktop app\" is recommended (no redirect URI to register). For a client of type \"Web application\", register the following under \"Authorized redirect URIs\":"
 msgstr "Drive 同期だけなら、種類「デスクトップ アプリ」のクライアントがおすすめです（リダイレクト URI の登録は不要）。種類が「ウェブ アプリケーション」の場合は、「承認済みのリダイレクト URI」に次を登録してください:"
 
-#: lib/ask_drive_web/live/admin_live.ex:7671
+#: lib/ask_drive_web/live/admin_live.ex:7695
 #, elixir-autogen, elixir-format
 msgid "For Windows (.pfx)"
 msgstr "Windows 用（.pfx）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5182
+#: lib/ask_drive_web/live/admin_live.ex:5186
 #, elixir-autogen, elixir-format
 msgid "For a company or organization, enter a domain (e.g."
 msgstr "会社・組織で特定ドメイン（例:"
 
-#: lib/ask_drive_web/live/admin_live.ex:6707
+#: lib/ask_drive_web/live/admin_live.ex:6731
 #, elixir-autogen, elixir-format
 msgid "For confidential documents, switch back to Ollama or LM Studio."
 msgstr "機密文書を扱う場合は Ollama または LM Studio に戻してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7673
+#: lib/ask_drive_web/live/admin_live.ex:7697
 #, elixir-autogen, elixir-format
 msgid "For iPhone / iPad (.mobileconfig)"
 msgstr "iPhone / iPad 用（.mobileconfig）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7672
+#: lib/ask_drive_web/live/admin_live.ex:7696
 #, elixir-autogen, elixir-format
 msgid "For macOS (.p12)"
 msgstr "macOS 用（.p12）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4803
+#: lib/ask_drive_web/live/admin_live.ex:4807
 #, elixir-autogen, elixir-format
 msgid "Format / type"
 msgstr "形式・種別"
@@ -2460,17 +2460,17 @@ msgstr "フル実行（QA 生成あり）"
 msgid "Gemini base URL"
 msgstr "Gemini ベース URL"
 
-#: lib/ask_drive_web/live/admin_live.ex:3775
+#: lib/ask_drive_web/live/admin_live.ex:3777
 #, elixir-autogen, elixir-format
 msgid "Generated answer:"
 msgstr "生成された回答:"
 
-#: lib/ask_drive_web/live/admin_live.ex:6763
+#: lib/ask_drive_web/live/admin_live.ex:6787
 #, elixir-autogen, elixir-format
 msgid "Generates with Ollama or LM Studio on this server. Documents are not sent outside your organization."
 msgstr "このサーバー上の Ollama または LM Studio で生成します。文書は社外に送信されません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8222
+#: lib/ask_drive_web/live/admin_live.ex:8246
 #: lib/ask_drive_web/live/ollama_panel.ex:382
 #, elixir-autogen, elixir-format
 msgid "Generation"
@@ -2499,7 +2499,7 @@ msgstr "証明書の取得はすでに実行中です。"
 #: lib/ask_drive/metrics.ex:440
 #: lib/ask_drive/metrics.ex:449
 #: lib/ask_drive_web/live/admin_live.ex:2638
-#: lib/ask_drive_web/live/admin_live.ex:4857
+#: lib/ask_drive_web/live/admin_live.ex:4861
 #, elixir-autogen, elixir-format
 msgid "Good (A)"
 msgstr "良好 (A)"
@@ -2519,77 +2519,72 @@ msgstr "Google Chat の通知先を保存しました。「テスト送信」で
 msgid "Google Drive and AI are set up. Turn on automatic runs when you are ready."
 msgstr "Google Drive と AI の設定は済んでいます。準備ができたら自動実行をオンにしてください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6217
+#: lib/ask_drive_web/live/admin_live.ex:6206
 #, elixir-autogen, elixir-format
 msgid "Google Drive connected"
 msgstr "Google Drive 接続済み"
 
-#: lib/ask_drive_web/live/admin_live.ex:6561
+#: lib/ask_drive_web/live/admin_live.ex:6585
 #, elixir-autogen, elixir-format
 msgid "Google Drive folder ID / URL"
 msgstr "Google Drive フォルダ ID / URL"
 
-#: lib/ask_drive_web/live/admin_live.ex:6052
+#: lib/ask_drive_web/live/admin_live.ex:6056
 #, elixir-autogen, elixir-format
 msgid "Google Drive sync settings"
 msgstr "Google Drive 同期設定"
 
-#: lib/ask_drive_web/live/admin_live.ex:8916
+#: lib/ask_drive_web/live/admin_live.ex:8940
 #, elixir-autogen, elixir-format
 msgid "Google Drive sync settings saved."
 msgstr "Google Drive 同期設定を保存しました。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5818
+#: lib/ask_drive_web/live/admin_live.ex:5822
 #, elixir-autogen, elixir-format
 msgid "Google Secure LDAP is off, so you get straight in if you signed in within the last %{minutes} minutes (otherwise you sign in again)."
 msgstr "現在は Google Secure LDAP が無効なので、%{minutes} 分以内にログインしていればそのまま入れます（古い場合はログインし直します）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5814
+#: lib/ask_drive_web/live/admin_live.ex:5818
 #, elixir-autogen, elixir-format
 msgid "Google Secure LDAP is on, so you confirm with your own Google Workspace password (typos count toward the same lock as LDAP sign-in)."
 msgstr "現在は Google Secure LDAP が有効なので、本人の Google Workspace のパスワードで確認します（入力ミスは LDAP ログインと同じロックの対象です）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6483
+#: lib/ask_drive_web/live/admin_live.ex:6472
 #, elixir-autogen, elixir-format
 msgid "Google Workspace (organization)"
 msgstr "Google Workspace（組織）"
 
-#: lib/ask_drive_web/live/admin_live.ex:6081
-#, elixir-autogen, elixir-format
-msgid "Google account authorization"
-msgstr "Google アカウント認証"
-
-#: lib/ask_drive_web/live/admin_live.ex:8048
+#: lib/ask_drive_web/live/admin_live.ex:8072
 #, elixir-autogen, elixir-format
 msgid "Google did not allow it (%{reason})."
 msgstr "Google で許可されませんでした（%{reason}）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8451
+#: lib/ask_drive_web/live/admin_live.ex:8475
 #, elixir-autogen, elixir-format
 msgid "Google login"
 msgstr "Google ログイン"
 
-#: lib/ask_drive_web/live/admin_live.ex:5324
+#: lib/ask_drive_web/live/admin_live.ex:5328
 #, elixir-autogen, elixir-format
 msgid "Google sign-in"
 msgstr "Google ログイン"
 
-#: lib/ask_drive_web/live/admin_live.ex:8158
+#: lib/ask_drive_web/live/admin_live.ex:8182
 #, elixir-autogen, elixir-format
 msgid "Got a token (%{identity}). No sync folder is set, so reading the folder was not checked."
 msgstr "トークンの取得に成功しました（%{identity}）。同期フォルダが未設定のため、フォルダの読み取りは確認していません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8186
+#: lib/ask_drive_web/live/admin_live.ex:8210
 #, elixir-autogen, elixir-format
 msgid "Got a token, but %{user} has no permission to view the sync folder. Give that user access to the folder (or the shared drive)."
 msgstr "トークンは取得できましたが、%{user} には同期フォルダの閲覧権限がありません。そのユーザーにフォルダ（または共有ドライブ）へのアクセス権を付与してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8178
+#: lib/ask_drive_web/live/admin_live.ex:8202
 #, elixir-autogen, elixir-format
 msgid "Got a token, but could not read the sync folder: %{reason}"
 msgstr "トークンは取得できましたが、同期フォルダを読み取れませんでした: %{reason}"
 
-#: lib/ask_drive_web/live/admin_live.ex:8193
+#: lib/ask_drive_web/live/admin_live.ex:8217
 #, elixir-autogen, elixir-format
 msgid "Got a token, but the sync folder can't be read (Drive reports files you have no permission for as \"not found\"). Share the folder with the service account. If an organization-only shared drive doesn't let you add the service account, set the \"Access user\" below and use domain-wide delegation."
 msgstr "トークンは取得できましたが、同期フォルダを読み取れません（Drive は権限のないファイルを「見つからない」と返します）。フォルダをサービスアカウントに共有してください。社内限定の共有ドライブでサービスアカウントを追加できない場合は、下の「アクセスユーザー」を設定してドメイン全体の委任を使ってください。"
@@ -2609,12 +2604,12 @@ msgstr "グループを削除しました。"
 msgid "Group name %{errors}"
 msgstr "グループ名%{errors}"
 
-#: lib/ask_drive_web/live/admin_live.ex:7852
+#: lib/ask_drive_web/live/admin_live.ex:7876
 #, elixir-autogen, elixir-format
 msgid "Group name (e.g. Accounting)"
 msgstr "グループ名（例: 経理部）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7688
+#: lib/ask_drive_web/live/admin_live.ex:7712
 #, elixir-autogen, elixir-format
 msgid "Groups and certificates"
 msgstr "グループと証明書"
@@ -2624,42 +2619,42 @@ msgstr "グループと証明書"
 msgid "HTTP and HTTPS can't use the same port"
 msgstr "HTTP と HTTPS に同じポートは使えません"
 
-#: lib/ask_drive_web/live/admin_live.ex:7422
+#: lib/ask_drive_web/live/admin_live.ex:7446
 #, elixir-autogen, elixir-format
 msgid "HTTP port"
 msgstr "HTTP のポート"
 
-#: lib/ask_drive_web/live/admin_live.ex:7178
+#: lib/ask_drive_web/live/admin_live.ex:7202
 #, elixir-autogen, elixir-format
 msgid "HTTPS (SSL certificate)"
 msgstr "HTTPS（SSL 証明書）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7380
+#: lib/ask_drive_web/live/admin_live.ex:7404
 #, elixir-autogen, elixir-format
 msgid "HTTPS is off (ASK_DRIVE_SSL=false). Listening on HTTP."
 msgstr "HTTPS は無効です（ASK_DRIVE_SSL=false）。HTTP で待ち受けています。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7411
+#: lib/ask_drive_web/live/admin_live.ex:7435
 #, elixir-autogen, elixir-format
 msgid "HTTPS port"
 msgstr "HTTPS のポート"
 
-#: lib/ask_drive_web/live/admin_live.ex:5055
+#: lib/ask_drive_web/live/admin_live.ex:5059
 #, elixir-autogen, elixir-format
 msgid "History of recent API communication errors. Use it to check for revoked API keys, rate limits (429), timeouts and so on."
 msgstr "直近発生した API 通信エラーの履歴です。API キーの失効やレート制限（429）、タイムアウトなどを確認できます。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7224
+#: lib/ask_drive_web/live/admin_live.ex:7248
 #, elixir-autogen, elixir-format
 msgid "Host names covered"
 msgstr "対象のホスト名"
 
-#: lib/ask_drive_web/live/admin_live.ex:7337
+#: lib/ask_drive_web/live/admin_live.ex:7361
 #, elixir-autogen, elixir-format
 msgid "Host names: %{names}"
 msgstr "ホスト名: %{names}"
 
-#: lib/ask_drive_web/live/admin_live.ex:5804
+#: lib/ask_drive_web/live/admin_live.ex:5808
 #, elixir-autogen, elixir-format
 msgid "How platform administrators get in"
 msgstr "全体管理への入り方"
@@ -2669,17 +2664,17 @@ msgstr "全体管理への入り方"
 msgid "IPs allowed to connect directly, bypassing the gateway (optional; comma-separated, ranges like 192.168.0.0/16; leave empty to allow none)"
 msgstr "ゲートウェイを通さずに直接アクセスを許可する IP（任意・カンマ区切り、範囲は 192.168.0.0/16 の形。空欄なら許可しない）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7434
+#: lib/ask_drive_web/live/admin_live.ex:7458
 #, elixir-autogen, elixir-format
 msgid "IPs of proxies to accept HTTP from (comma-separated; ranges like 10.0.0.0/24; blank: off)"
 msgstr "HTTP を受け付けるプロキシの IP（複数可・カンマ区切り、範囲は 10.0.0.0/24 の形。空欄なら無効）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7394
+#: lib/ask_drive_web/live/admin_live.ex:7418
 #, elixir-autogen, elixir-format
 msgid "If a reverse proxy in front terminates HTTPS, enter its IP. HTTP from that IP is accepted without redirecting, and the X-Forwarded-For / X-Forwarded-Proto / X-Forwarded-Host headers it adds (CF-Connecting-IP for Cloudflare) are trusted (the user's real IP is used for lockouts and logs). HTTP from anywhere else is redirected to HTTPS. The decision uses the connecting IP, not the headers. Add HSTS on the proxy."
 msgstr "前段のリバースプロキシで HTTPS を終端する場合は、そのプロキシの IP を指定してください。指定した IP からの HTTP は転送せずに受け付け、プロキシが付ける X-Forwarded-For / X-Forwarded-Proto / X-Forwarded-Host（Cloudflare の CF-Connecting-IP）を信頼します（利用者の実際の IP をロックや記録に使います）。それ以外からの HTTP は HTTPS に転送します。判定は接続元の IP で行い、ヘッダーは信頼しません。HSTS はプロキシ側で付けてください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6152
+#: lib/ask_drive_web/live/admin_live.ex:6141
 #, elixir-autogen, elixir-format
 msgid "If already saved, you can leave this blank (the existing key is kept)."
 msgstr "保存済みの場合は空欄のままで構いません（既存のキーを維持します）。"
@@ -2689,12 +2684,12 @@ msgstr "保存済みの場合は空欄のままで構いません（既存のキ
 msgid "If the build finishes while a batch is running"
 msgstr "バッチの実行中にビルドが終わったら"
 
-#: lib/ask_drive_web/live/admin_live.ex:6163
+#: lib/ask_drive_web/live/admin_live.ex:6152
 #, elixir-autogen, elixir-format
 msgid "If the folder to sync is in a shared drive that only users in your organization can access, the service account (treated as outside the organization) cannot be added to it. In that case, enter the email address of an internal user who can view the folder, and in the Google Admin console → \"Security\" → \"API controls\" → \"Domain-wide delegation\", authorize the client ID"
 msgstr "同期対象が「組織内のユーザーのみアクセス可」の共有ドライブにある場合、サービスアカウント（組織外扱い）は共有に追加できません。 その場合はフォルダを閲覧できる社内ユーザーのメールアドレスを入力し、Google 管理コンソール →「セキュリティ」→「API の制御」→「ドメイン全体の委任」で クライアント ID"
 
-#: lib/ask_drive_web/live/admin_live.ex:6361
+#: lib/ask_drive_web/live/admin_live.ex:6350
 #, elixir-autogen, elixir-format
 msgid "If you see \"This site can't be reached\" (this is expected)"
 msgstr "「このサイトにアクセスできません」と表示された場合（正常動作）"
@@ -2710,7 +2705,7 @@ msgstr "Google Chat で通知先のスペースを開き、スペース名 →�
 msgid "Ingest only"
 msgstr "取り込みのみ"
 
-#: lib/ask_drive_web/live/admin_live.ex:8230
+#: lib/ask_drive_web/live/admin_live.ex:8254
 #, elixir-autogen, elixir-format
 msgid "Ingested"
 msgstr "取り込み完了"
@@ -2725,42 +2720,42 @@ msgstr "取り込み（文書 / チャンク）"
 msgid "Ingested (successful documents / chunks)"
 msgstr "取り込み（成功文書 / チャンク）"
 
-#: lib/ask_drive_web/live/admin_live.ex:8221
+#: lib/ask_drive_web/live/admin_live.ex:8245
 #, elixir-autogen, elixir-format
 msgid "Ingestion"
 msgstr "取り込み"
 
-#: lib/ask_drive_web/live/admin_live.ex:4729
+#: lib/ask_drive_web/live/admin_live.ex:4731
 #, elixir-autogen, elixir-format
 msgid "Input %{prompt} / output %{completion}"
 msgstr "入力 %{prompt} / 出力 %{completion}"
 
-#: lib/ask_drive_web/live/admin_live.ex:7258
+#: lib/ask_drive_web/live/admin_live.ex:7282
 #, elixir-autogen, elixir-format
 msgid "Intermediate certificate (PEM, optional)"
 msgstr "中間証明書（PEM・任意）"
 
-#: lib/ask_drive_web/live/admin_live.ex:6485
+#: lib/ask_drive_web/live/admin_live.ex:6474
 #, elixir-autogen, elixir-format
 msgid "Internal"
 msgstr "内部"
 
-#: lib/ask_drive_web/live/admin_live.ex:7775
+#: lib/ask_drive_web/live/admin_live.ex:7799
 #, elixir-autogen, elixir-format
 msgid "Issue"
 msgstr "発行する"
 
-#: lib/ask_drive_web/live/admin_live.ex:7704
+#: lib/ask_drive_web/live/admin_live.ex:7728
 #, elixir-autogen, elixir-format
 msgid "Issue certificate…"
 msgstr "証明書を発行…"
 
-#: lib/ask_drive_web/live/admin_live.ex:7789
+#: lib/ask_drive_web/live/admin_live.ex:7813
 #, elixir-autogen, elixir-format
 msgid "Issued %{issued} · Expires %{expires}"
 msgstr "発行 %{issued}・期限 %{expires}"
 
-#: lib/ask_drive_web/live/admin_live.ex:7647
+#: lib/ask_drive_web/live/admin_live.ex:7671
 #, elixir-autogen, elixir-format
 msgid "Issued certificate %{name}"
 msgstr "証明書「%{name}」を発行しました"
@@ -2787,12 +2782,12 @@ msgstr "現在は営業時間相です。QA 生成ありのバッチは生成モ
 msgid "It is fixed by the environment variable ASK_DRIVE_DISABLE_AUTH. Remove that line from .env.prod and restart."
 msgstr "環境変数 ASK_DRIVE_DISABLE_AUTH で固定されています。.env.prod からこの行を削除して再起動してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5417
+#: lib/ask_drive_web/live/admin_live.ex:5421
 #, elixir-autogen, elixir-format
 msgid "LDAP server"
 msgstr "LDAP サーバー"
 
-#: lib/ask_drive_web/live/admin_live.ex:5402
+#: lib/ask_drive_web/live/admin_live.ex:5406
 #, elixir-autogen, elixir-format
 msgid "LDAP sign-in"
 msgstr "LDAP でのログイン"
@@ -2807,12 +2802,12 @@ msgstr "LDAP ログインの設定を保存しました。"
 msgid "LLM generation during business hours"
 msgstr "営業時間中の LLM 生成"
 
-#: lib/ask_drive_web/live/admin_live.ex:6634
+#: lib/ask_drive_web/live/admin_live.ex:6658
 #, elixir-autogen, elixir-format
 msgid "LLM providers"
 msgstr "LLM プロバイダ"
 
-#: lib/ask_drive_web/live/admin_live.ex:6742
+#: lib/ask_drive_web/live/admin_live.ex:6766
 #, elixir-autogen, elixir-format
 msgid "LLM providers and models"
 msgstr "LLM プロバイダとモデル"
@@ -2822,7 +2817,7 @@ msgstr "LLM プロバイダとモデル"
 msgid "LM Studio endpoint"
 msgstr "LM Studio エンドポイント"
 
-#: lib/ask_drive_web/live/admin_live.ex:4138
+#: lib/ask_drive_web/live/admin_live.ex:4140
 #, elixir-autogen, elixir-format
 msgid "Last batch"
 msgstr "直近のバッチ"
@@ -2842,12 +2837,12 @@ msgstr "最後に処理していたもの"
 msgid "Last run"
 msgstr "前回の実行"
 
-#: lib/ask_drive_web/live/admin_live.ex:4334
+#: lib/ask_drive_web/live/admin_live.ex:4336
 #, elixir-autogen, elixir-format
 msgid "Last sign-in / last elevation"
 msgstr "最終ログイン / 最終昇格"
 
-#: lib/ask_drive_web/live/admin_live.ex:3887
+#: lib/ask_drive_web/live/admin_live.ex:3889
 #, elixir-autogen, elixir-format
 msgid "Last synced"
 msgstr "最終同期"
@@ -2857,12 +2852,12 @@ msgstr "最終同期"
 msgid "Last update: %{result}"
 msgstr "前回のアップデート: %{result}"
 
-#: lib/ask_drive_web/live/admin_live.ex:7797
+#: lib/ask_drive_web/live/admin_live.ex:7821
 #, elixir-autogen, elixir-format
 msgid "Last used %{time}"
 msgstr "最終利用 %{time}"
 
-#: lib/ask_drive_web/live/admin_live.ex:5094
+#: lib/ask_drive_web/live/admin_live.ex:5098
 #, elixir-autogen, elixir-format
 msgid "Latency"
 msgstr "遅延"
@@ -2872,7 +2867,7 @@ msgstr "遅延"
 msgid "Latest"
 msgstr "最新"
 
-#: lib/ask_drive_web/live/admin_live.ex:7066
+#: lib/ask_drive_web/live/admin_live.ex:7090
 #, elixir-autogen, elixir-format
 msgid "Latest hour an automatic run can start (0–23, default 7)"
 msgstr "自動実行を開始できる最終時刻 (時: 0〜23。既定 7)"
@@ -2882,12 +2877,12 @@ msgstr "自動実行を開始できる最終時刻 (時: 0〜23。既定 7)"
 msgid "Left: %{documents} documents to ingest · %{chunks} chunks without QA · %{questions} questions to embed"
 msgstr "残り: 取り込み待ち %{documents} 文書・QA 未生成 %{chunks} チャンク・質問の埋め込み待ち %{questions} 件"
 
-#: lib/ask_drive_web/live/admin_live.ex:8585
+#: lib/ask_drive_web/live/admin_live.ex:8609
 #, elixir-autogen, elixir-format
 msgid "Less than 1 min"
 msgstr "1 分未満"
 
-#: lib/ask_drive_web/live/admin_live.ex:7205
+#: lib/ask_drive_web/live/admin_live.ex:7229
 #, elixir-autogen, elixir-format
 msgid "Let's Encrypt (auto-renewed)"
 msgstr "Let's Encrypt（自動更新）"
@@ -2897,12 +2892,12 @@ msgstr "Let's Encrypt（自動更新）"
 msgid "Let's Encrypt (automatic certificate issuance and renewal)"
 msgstr "Let's Encrypt（証明書の自動取得・自動更新）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7204
+#: lib/ask_drive_web/live/admin_live.ex:7228
 #, elixir-autogen, elixir-format
 msgid "Let's Encrypt (staging, for testing; browsers show a warning)"
 msgstr "Let's Encrypt（テスト用 staging。ブラウザに警告が出ます）"
 
-#: lib/ask_drive_web/live/admin_live.ex:8505
+#: lib/ask_drive_web/live/admin_live.ex:8529
 #, elixir-autogen, elixir-format
 msgid "Let's Encrypt automatic renewal"
 msgstr "Let's Encrypt の自動更新"
@@ -2922,34 +2917,34 @@ msgstr "Let's Encrypt の設定を保存しました。"
 msgid "Lets only people who have passed Google Workspace sign-in at an API gateway (such as Sakura Cloud's) reach AskDrive. The gateway adds a secret header ("
 msgstr "さくらのクラウドの API ゲートウェイなどで Google Workspace のログインを通った人だけが AskDrive に届くようにします。ゲートウェイは転送するすべてのリクエストに秘密のヘッダー（"
 
-#: lib/ask_drive_web/live/admin_live.ex:5313
+#: lib/ask_drive_web/live/admin_live.ex:5317
 #, elixir-autogen, elixir-format
 msgid "Lets users sign in with their Google account on the sign-in screen (uses the OAuth client above). "
 msgstr "利用者がログイン画面から Google アカウントでサインインできるようにします（上記の OAuth クライアントを使用します）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5657
+#: lib/ask_drive_web/live/admin_live.ex:5661
 #, elixir-autogen, elixir-format
 msgid "Lift this lock?"
 msgstr "このロックを解除しますか？"
 
-#: lib/ask_drive_web/live/admin_live.ex:6661
+#: lib/ask_drive_web/live/admin_live.ex:6685
 #, elixir-autogen, elixir-format
 msgid "Local"
 msgstr "ローカル"
 
-#: lib/ask_drive_web/live/admin_live.ex:6754
-#: lib/ask_drive_web/live/admin_live.ex:6851
+#: lib/ask_drive_web/live/admin_live.ex:6778
+#: lib/ask_drive_web/live/admin_live.ex:6875
 #, elixir-autogen, elixir-format
 msgid "Local LLM"
 msgstr "ローカル LLM"
 
-#: lib/ask_drive_web/live/admin_live.ex:6787
-#: lib/ask_drive_web/live/admin_live.ex:6794
+#: lib/ask_drive_web/live/admin_live.ex:6811
+#: lib/ask_drive_web/live/admin_live.ex:6818
 #, elixir-autogen, elixir-format
 msgid "Local LLM model name"
 msgstr "ローカル LLM のモデル名"
 
-#: lib/ask_drive_web/live/admin_live.ex:6779
+#: lib/ask_drive_web/live/admin_live.ex:6803
 #, elixir-autogen, elixir-format
 msgid "Local LLM provider"
 msgstr "ローカル LLM プロバイダ"
@@ -2959,7 +2954,7 @@ msgstr "ローカル LLM プロバイダ"
 msgid "Lock lifted."
 msgstr "ロックを解除しました。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5607
+#: lib/ask_drive_web/live/admin_live.ex:5611
 #, elixir-autogen, elixir-format
 msgid "Locked sign-ins (%{count})"
 msgstr "ロック中のログイン（%{count} 件）"
@@ -2975,22 +2970,22 @@ msgid "Login turned on. Sign in as %{emails} and verify your identity from \"Pla
 msgstr "ログイン認証を有効にしました。%{emails} のいずれかでログインし、「全体管理」から本人確認して入ってください。"
 
 #: lib/ask_drive_web/live/admin_live.ex:1735
-#: lib/ask_drive_web/live/admin_live.ex:7118
+#: lib/ask_drive_web/live/admin_live.ex:7142
 #, elixir-autogen, elixir-format
 msgid "Maintenance mode"
 msgstr "メンテナンスモード"
 
-#: lib/ask_drive_web/live/admin_live.ex:7121
+#: lib/ask_drive_web/live/admin_live.ex:7145
 #, elixir-autogen, elixir-format
 msgid "Maintenance mode makes this desk's chat unavailable immediately. Continue?"
 msgstr "メンテナンスモードにすると、この窓口のチャットはすぐに使えなくなります。続行しますか？"
 
-#: lib/ask_drive_web/live/admin_live.ex:7095
+#: lib/ask_drive_web/live/admin_live.ex:7119
 #, elixir-autogen, elixir-format
 msgid "Maintenance notice message"
 msgstr "メンテナンス告知メッセージ"
 
-#: lib/ask_drive_web/live/admin_live.ex:4492
+#: lib/ask_drive_web/live/admin_live.ex:4494
 #, elixir-autogen, elixir-format
 msgid "Make %{email} a platform administrator? After verifying their identity, they will be able to change platform settings."
 msgstr "%{email} を全体管理者にしますか？本人確認をすれば、全体の設定を変更できるようになります。"
@@ -3010,18 +3005,18 @@ msgstr "窓口（アプリ）の追加・管理、ユーザー、HTTPS、ロー�
 msgid "Manage this desk's nightly batch, documents, unanswered questions, and Google Drive and AI settings."
 msgstr "この窓口の夜間バッチ、ドキュメント、未回答質問、Google Drive と AI の設定を管理します。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8278
+#: lib/ask_drive_web/live/admin_live.ex:8302
 #, elixir-autogen, elixir-format
 msgid "Manual"
 msgstr "手動"
 
-#: lib/ask_drive_web/live/admin_live.ex:6823
+#: lib/ask_drive_web/live/admin_live.ex:6847
 #, elixir-autogen, elixir-format
 msgid "Max generation tokens"
 msgstr "生成トークン上限"
 
-#: lib/ask_drive_web/live/admin_live.ex:4966
-#: lib/ask_drive_web/live/admin_live.ex:5091
+#: lib/ask_drive_web/live/admin_live.ex:4970
+#: lib/ask_drive_web/live/admin_live.ex:5095
 #: lib/ask_drive_web/live/ollama_panel.ex:275
 #, elixir-autogen, elixir-format
 msgid "Model"
@@ -3032,28 +3027,28 @@ msgstr "モデル"
 msgid "Model not found. Check the model name (%{detail})"
 msgstr "モデルが見つかりません。モデル名を確認してください (%{detail})"
 
-#: lib/ask_drive_web/live/admin_live.ex:7519
-#: lib/ask_drive_web/live/admin_live.ex:7609
+#: lib/ask_drive_web/live/admin_live.ex:7543
+#: lib/ask_drive_web/live/admin_live.ex:7633
 #, elixir-autogen, elixir-format
 msgid "Monitor"
 msgstr "監視"
 
-#: lib/ask_drive_web/live/admin_live.ex:4863
+#: lib/ask_drive_web/live/admin_live.ex:4867
 #, elixir-autogen, elixir-format
 msgid "Needs review (C)"
 msgstr "要確認 (C)"
 
-#: lib/ask_drive_web/live/admin_live.ex:8225
+#: lib/ask_drive_web/live/admin_live.ex:8249
 #, elixir-autogen, elixir-format
 msgid "New"
 msgstr "新規"
 
-#: lib/ask_drive_web/live/admin_live.ex:4024
+#: lib/ask_drive_web/live/admin_live.ex:4026
 #, elixir-autogen, elixir-format
 msgid "New desk"
 msgstr "新しい窓口"
 
-#: lib/ask_drive_web/live/admin_live.ex:6009
+#: lib/ask_drive_web/live/admin_live.ex:6013
 #, elixir-autogen, elixir-format
 msgid "New password (at least %{count} characters)"
 msgstr "新しいパスワード（%{count} 文字以上）"
@@ -3073,7 +3068,7 @@ msgstr "次の更新"
 msgid "Nightly automatic renewal"
 msgstr "夜間の自動更新"
 
-#: lib/ask_drive_web/live/admin_live.ex:7107
+#: lib/ask_drive_web/live/admin_live.ex:7131
 #, elixir-autogen, elixir-format
 msgid "Nightly automatic run"
 msgstr "夜間の自動実行"
@@ -3088,13 +3083,13 @@ msgstr "夜間の自動実行"
 msgid "Nightly batch (QA generation)"
 msgstr "夜間バッチ（QA 生成）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5023
 #: lib/ask_drive_web/live/admin_live.ex:5027
+#: lib/ask_drive_web/live/admin_live.ex:5031
 #, elixir-autogen, elixir-format
 msgid "Nightly batch QA generation"
 msgstr "夜間バッチ QA生成"
 
-#: lib/ask_drive_web/live/admin_live.ex:6721
+#: lib/ask_drive_web/live/admin_live.ex:6745
 #, elixir-autogen, elixir-format
 msgid "Nightly batch hours"
 msgstr "夜間バッチの時間帯"
@@ -3129,23 +3124,23 @@ msgstr "夜間のアップデート"
 msgid "Nightly window: daily %{start}:00 to %{finish}:00 the next day · cutoff %{deadline}:00 (local time of this PC)"
 msgstr "夜間枠: 毎日 %{start}:00〜翌 %{finish}:00・打ち切り %{deadline}:00（この PC のローカル時刻）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4958
-#: lib/ask_drive_web/live/admin_live.ex:5006
+#: lib/ask_drive_web/live/admin_live.ex:4962
+#: lib/ask_drive_web/live/admin_live.ex:5010
 #, elixir-autogen, elixir-format
 msgid "No API calls recorded yet."
 msgstr "API呼び出しの記録はまだありません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5610
+#: lib/ask_drive_web/live/admin_live.ex:5614
 #, elixir-autogen, elixir-format
 msgid "No accounts or devices are locked."
 msgstr "ロック中のアカウント・接続環境はありません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4219
+#: lib/ask_drive_web/live/admin_live.ex:4221
 #, elixir-autogen, elixir-format
 msgid "No administrator (assign one in User management)"
 msgstr "担当者未設定（ユーザー管理で割り当ててください）"
 
-#: lib/ask_drive_web/live/admin_live.ex:8037
+#: lib/ask_drive_web/live/admin_live.ex:8061
 #, elixir-autogen, elixir-format
 msgid "No authorization code found. Paste the address of the page you see after allowing access, as it is."
 msgstr "認可コードが見つかりません。許可したあとのページのアドレスを、そのまま貼り付けてください。"
@@ -3165,53 +3160,53 @@ msgstr "実行中のバッチはありません。"
 msgid "No batch runs yet."
 msgstr "バッチの実行履歴はまだありません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6111
+#: lib/ask_drive_web/live/admin_live.ex:6100
 #, elixir-autogen, elixir-format
 msgid "No browser authorization is needed, so this avoids Google's redirect_uri restrictions (rejection of raw IP addresses and"
 msgstr "ブラウザでの認可が不要なため、Google の redirect_uri 制限（生の IP アドレスや"
 
-#: lib/ask_drive_web/live/admin_live.ex:4563
+#: lib/ask_drive_web/live/admin_live.ex:4565
 #, elixir-autogen, elixir-format
 msgid "No elevations recorded yet."
 msgstr "昇格の記録はまだありません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4796
-#: lib/ask_drive_web/live/admin_live.ex:4882
+#: lib/ask_drive_web/live/admin_live.ex:4800
+#: lib/ask_drive_web/live/admin_live.ex:4886
 #, elixir-autogen, elixir-format
 msgid "No indexed documents."
 msgstr "インデックス済みの文書がありません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:3585
+#: lib/ask_drive_web/live/admin_live.ex:3587
 #, elixir-autogen, elixir-format
 msgid "No nightly batch runs yet."
 msgstr "夜間バッチの実行履歴はまだありません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:3528
+#: lib/ask_drive_web/live/admin_live.ex:3530
 #, elixir-autogen, elixir-format
 msgid "No per-file log for this batch (batches run before v0.0.27 did not record one)."
 msgstr "このバッチのファイル別ログはありません（v0.0.27 より前に実行したバッチには記録されていません）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5082
+#: lib/ask_drive_web/live/admin_live.ex:5086
 #, elixir-autogen, elixir-format
 msgid "No recent errors. Everything is running normally."
 msgstr "直近のエラーは発生していません。正常に稼働しています。"
 
-#: lib/ask_drive_web/live/admin_live.ex:3759
+#: lib/ask_drive_web/live/admin_live.ex:3761
 #, elixir-autogen, elixir-format
 msgid "No resolved questions yet."
 msgstr "解消済みの質問ログはありません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:3876
+#: lib/ask_drive_web/live/admin_live.ex:3878
 #, elixir-autogen, elixir-format
 msgid "No synced documents yet. Connect Google and sync Drive."
 msgstr "同期されたドキュメントはまだありません。Google 連携および Drive 同期を行ってください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8231
+#: lib/ask_drive_web/live/admin_live.ex:8255
 #, elixir-autogen, elixir-format
 msgid "No text"
 msgstr "本文なし"
 
-#: lib/ask_drive_web/live/admin_live.ex:3719
+#: lib/ask_drive_web/live/admin_live.ex:3721
 #, elixir-autogen, elixir-format
 msgid "No unresolved questions right now."
 msgstr "現在、未解決の質問はありません。"
@@ -3226,17 +3221,17 @@ msgstr "ベクトルが返りませんでした。"
 msgid "No webhook URL is set."
 msgstr "Webhook URL が設定されていません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7583
+#: lib/ask_drive_web/live/admin_live.ex:7607
 #, elixir-autogen, elixir-format
 msgid "None"
 msgstr "なし"
 
-#: lib/ask_drive_web/live/admin_live.ex:5392
+#: lib/ask_drive_web/live/admin_live.ex:5396
 #, elixir-autogen, elixir-format
 msgid "None (verified with a public CA)"
 msgstr "なし（公的な CA で検証）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4368
+#: lib/ask_drive_web/live/admin_live.ex:4370
 #, elixir-autogen, elixir-format
 msgid "Not allowed"
 msgstr "不可"
@@ -3246,70 +3241,70 @@ msgstr "不可"
 msgid "Not checked yet"
 msgstr "まだ確認していません"
 
-#: lib/ask_drive_web/live/admin_live.ex:6060
+#: lib/ask_drive_web/live/admin_live.ex:6064
 #, elixir-autogen, elixir-format
 msgid "Not connected"
 msgstr "未連携"
 
-#: lib/ask_drive_web/live/admin_live.ex:6249
+#: lib/ask_drive_web/live/admin_live.ex:6238
 #, elixir-autogen, elixir-format
 msgid "Not connected yet"
 msgstr "未接続"
 
-#: lib/ask_drive_web/live/admin_live.ex:3620
-#: lib/ask_drive_web/live/admin_live.ex:3638
+#: lib/ask_drive_web/live/admin_live.ex:3622
+#: lib/ask_drive_web/live/admin_live.ex:3640
 #, elixir-autogen, elixir-format
 msgid "Not connected: %{error}"
 msgstr "未接続: %{error}"
 
-#: lib/ask_drive_web/live/admin_live.ex:8392
+#: lib/ask_drive_web/live/admin_live.ex:8416
 #, elixir-autogen, elixir-format
 msgid "Not found in the directory (Google Workspace): %{emails}"
 msgstr "ディレクトリ（Google Workspace）に見つかりません: %{emails}"
 
-#: lib/ask_drive_web/live/admin_live.ex:3670
+#: lib/ask_drive_web/live/admin_live.ex:3672
 #, elixir-autogen, elixir-format
 msgid "Not installed (pandoc)"
 msgstr "未インストール (pandoc)"
 
-#: lib/ask_drive_web/live/admin_live.ex:3657
+#: lib/ask_drive_web/live/admin_live.ex:3659
 #, elixir-autogen, elixir-format
 msgid "Not installed (poppler)"
 msgstr "未インストール (poppler)"
 
-#: lib/ask_drive_web/live/admin_live.ex:7593
+#: lib/ask_drive_web/live/admin_live.ex:7617
 #, elixir-autogen, elixir-format
 msgid "Not issued by this AskDrive"
 msgstr "この AskDrive が発行したものではありません"
 
-#: lib/ask_drive_web/live/admin_live.ex:8254
+#: lib/ask_drive_web/live/admin_live.ex:8278
 #, elixir-autogen, elixir-format
 msgid "Not run (API key not set)"
 msgstr "未実行（API キー未設定）"
 
 #: lib/ask_drive/llm.ex:551
 #: lib/ask_drive_web/live/admin_live.ex:1859
-#: lib/ask_drive_web/live/admin_live.ex:5305
+#: lib/ask_drive_web/live/admin_live.ex:5309
 #, elixir-autogen, elixir-format
 msgid "Not set"
 msgstr "未設定"
 
-#: lib/ask_drive_web/live/admin_live.ex:4185
+#: lib/ask_drive_web/live/admin_live.ex:4187
 #, elixir-autogen, elixir-format
 msgid "Not set (set up)"
 msgstr "未設定（設定する）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7726
+#: lib/ask_drive_web/live/admin_live.ex:7750
 #, elixir-autogen, elixir-format
 msgid "Note (optional, up to 40 characters)"
 msgstr "メモ（任意・40 文字まで）"
 
-#: lib/ask_drive_web/live/admin_live.ex:6335
+#: lib/ask_drive_web/live/admin_live.ex:6324
 #, elixir-autogen, elixir-format
 msgid "Note: If Google shows \"Error 400: redirect_uri_mismatch\", the OAuth client type is \"Web application\". In Google Cloud Console, add"
 msgstr "※ Google に「エラー 400: redirect_uri_mismatch」と表示された場合は、OAuth クライアントの種類が「ウェブ アプリケーション」です。Google Cloud Console で承認済みのリダイレクト URI に"
 
-#: lib/ask_drive_web/live/admin_live.ex:6422
+#: lib/ask_drive_web/live/admin_live.ex:6411
 #, elixir-autogen, elixir-format
 msgid "Note: If you are using a browser on the AskDrive server itself ("
 msgstr "※ AskDrive サーバー上のブラウザ（"
@@ -3319,40 +3314,40 @@ msgstr "※ AskDrive サーバー上のブラウザ（"
 msgid "Notifications (Google Chat)"
 msgstr "通知（Google Chat）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5250
-#: lib/ask_drive_web/live/admin_live.ex:6502
-#: lib/ask_drive_web/live/admin_live.ex:6517
+#: lib/ask_drive_web/live/admin_live.ex:5254
+#: lib/ask_drive_web/live/admin_live.ex:6491
+#: lib/ask_drive_web/live/admin_live.ex:6506
 #, elixir-autogen, elixir-format
 msgid "OAuth client ID"
 msgstr "OAuth クライアント ID"
 
-#: lib/ask_drive_web/live/admin_live.ex:5223
+#: lib/ask_drive_web/live/admin_live.ex:5227
 #, elixir-autogen, elixir-format
 msgid "OAuth client for Google Drive sync (shared by all desks)"
 msgstr "Google Drive 同期用 OAuth クライアント（全体共通）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5258
-#: lib/ask_drive_web/live/admin_live.ex:6525
+#: lib/ask_drive_web/live/admin_live.ex:5262
+#: lib/ask_drive_web/live/admin_live.ex:6514
 #, elixir-autogen, elixir-format
 msgid "OAuth client secret (%{state})"
 msgstr "OAuth クライアント シークレット（%{state}）"
 
-#: lib/ask_drive_web/live/admin_live.ex:6441
+#: lib/ask_drive_web/live/admin_live.ex:6430
 #, elixir-autogen, elixir-format
 msgid "OAuth client settings (not needed when using the platform settings / per-desk override)"
 msgstr "OAuth クライアント設定（全体設定を使う場合は不要 / 個別指定）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5236
+#: lib/ask_drive_web/live/admin_live.ex:5240
 #, elixir-autogen, elixir-format
 msgid "OAuth client: Not set"
 msgstr "OAuth クライアント: 未設定"
 
-#: lib/ask_drive_web/live/admin_live.ex:5235
+#: lib/ask_drive_web/live/admin_live.ex:5239
 #, elixir-autogen, elixir-format
 msgid "OAuth client: Set"
 msgstr "OAuth クライアント: 設定済み"
 
-#: lib/ask_drive_web/live/admin_live.ex:6479
+#: lib/ask_drive_web/live/admin_live.ex:6468
 #, elixir-autogen, elixir-format
 msgid "OAuth consent screen"
 msgstr "OAuth 同意画面"
@@ -3369,25 +3364,25 @@ msgid "Obtaining…"
 msgstr "取得中…"
 
 #: lib/ask_drive_web/components/feature_toggle.ex:33
-#: lib/ask_drive_web/live/admin_live.ex:5354
-#: lib/ask_drive_web/live/admin_live.ex:7520
-#: lib/ask_drive_web/live/admin_live.ex:7608
+#: lib/ask_drive_web/live/admin_live.ex:5358
+#: lib/ask_drive_web/live/admin_live.ex:7544
+#: lib/ask_drive_web/live/admin_live.ex:7632
 #: lib/ask_drive_web/live/gateway_panel.ex:34
 #, elixir-autogen, elixir-format
 msgid "Off"
 msgstr "無効"
 
-#: lib/ask_drive_web/live/admin_live.ex:5714
+#: lib/ask_drive_web/live/admin_live.ex:5718
 #, elixir-autogen, elixir-format
 msgid "Off (guest / POC)"
 msgstr "無効（ゲスト・POC）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7232
+#: lib/ask_drive_web/live/admin_live.ex:7256
 #, elixir-autogen, elixir-format
 msgid "Off (not sent while the certificate is self-signed or for testing)"
 msgstr "無効（自己署名・テスト用の証明書の間は送りません）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7546
+#: lib/ask_drive_web/live/admin_live.ex:7570
 #, elixir-autogen, elixir-format
 msgid "Office LAN IP addresses and ranges (connections from these can open the login screen and the screens after login without a certificate; comma-separated; ranges like 192.168.0.0/16)"
 msgstr "社内 LAN の IP アドレス・範囲（ここからの接続は、証明書がなくてもログイン画面とログイン後の画面に入れます。複数可・カンマ区切り、範囲は 192.168.0.0/16 の形）"
@@ -3409,13 +3404,13 @@ msgstr "Ollama エンドポイント"
 
 #: lib/ask_drive_web/components/feature_toggle.ex:33
 #: lib/ask_drive_web/live/acme_panel.ex:52
-#: lib/ask_drive_web/live/admin_live.ex:5354
-#: lib/ask_drive_web/live/admin_live.ex:5714
+#: lib/ask_drive_web/live/admin_live.ex:5358
+#: lib/ask_drive_web/live/admin_live.ex:5718
 #, elixir-autogen, elixir-format
 msgid "On"
 msgstr "有効"
 
-#: lib/ask_drive_web/live/admin_live.ex:7230
+#: lib/ask_drive_web/live/admin_live.ex:7254
 #, elixir-autogen, elixir-format
 msgid "On (the certificate is trusted)"
 msgstr "有効（信頼された証明書のため）"
@@ -3430,7 +3425,7 @@ msgstr "有効（ゲートウェイ経由のみ）"
 msgid "On a night when a new version is found, AskDrive will update and restart automatically. Continue?"
 msgstr "新しいバージョンが見つかった夜に、自動でアップデートして再起動するようにします。続行しますか？"
 
-#: lib/ask_drive_web/live/admin_live.ex:7525
+#: lib/ask_drive_web/live/admin_live.ex:7549
 #, elixir-autogen, elixir-format
 msgid "Only devices (browsers) with a certificate issued by AskDrive can open any screen, including the login screen. Certificates are issued per group (such as a department) and handed out as password-protected .p12 files. Who the user is is still checked by login; the certificate is an extra check that the device is one you handed it to. Roll out in the order Off, Monitor, Enforce. Monitor asks for a certificate and logs it, but refuses no one."
 msgstr "AskDrive が発行した電子証明書をインストールした端末（ブラウザ）だけが、ログイン画面を含むすべての画面に入れるようにします。証明書はグループ（部署など）ごとに発行し、パスワード付きの .p12 ファイルで配布します。誰であるかは従来どおりログインで確認し、証明書は「配布した端末であること」を確かめる追加の対策です。導入は「無効 → 監視 → 強制」の順に進めてください。監視では証明書を求めて記録するだけで、誰も拒否しません。"
@@ -3440,27 +3435,27 @@ msgstr "AskDrive が発行した電子証明書をインストールした端末
 msgid "Only syncs Drive and runs ingestion (text extraction and embedding). No QA generation, so chat works as usual while it runs."
 msgstr "Drive の同期と取り込み（本文抽出・埋め込み）だけを行います。QA 生成は行わないため、実行中もチャットは通常どおり使えます。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5855
+#: lib/ask_drive_web/live/admin_live.ex:5859
 #, elixir-autogen, elixir-format
 msgid "Only the administrators listed here can enter this desk's admin screen (including Drive settings and API keys); platform administrators cannot. Each administrator gets in by confirming their identity with their own account. You can add administrators, and remove yourself to hand over (the last one cannot be removed)."
 msgstr "この窓口の管理画面（Drive の設定・API キーを含む）に入れるのは、ここに載っている担当者だけです（全体管理者は入れません）。担当者は各自のアカウントで本人確認して入ります。担当者を追加し、自分を外して引き継ぐこともできます（最後の 1 人は外せません）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:3974
+#: lib/ask_drive_web/live/admin_live.ex:3976
 #, elixir-autogen, elixir-format
 msgid "Open"
 msgstr "開く"
 
-#: lib/ask_drive_web/live/admin_live.ex:6314
+#: lib/ask_drive_web/live/admin_live.ex:6303
 #, elixir-autogen, elixir-format
 msgid "Open Google's authorization page (new window)"
 msgstr "Google の認可画面を開く（別ウィンドウ）"
 
-#: lib/ask_drive_web/live/admin_live.ex:6285
+#: lib/ask_drive_web/live/admin_live.ex:6274
 #, elixir-autogen, elixir-format
 msgid "Open Google's authorization page and click \"Allow\""
 msgstr "Google の認可ページを開いて「許可」"
 
-#: lib/ask_drive_web/live/admin_live.ex:4123
+#: lib/ask_drive_web/live/admin_live.ex:4125
 #, elixir-autogen, elixir-format
 msgid "Open desk settings →"
 msgstr "窓口の設定を開く →"
@@ -3470,22 +3465,22 @@ msgstr "窓口の設定を開く →"
 msgid "OpenAI base URL"
 msgstr "OpenAI ベース URL"
 
-#: lib/ask_drive_web/live/admin_live.ex:5179
+#: lib/ask_drive_web/live/admin_live.ex:5183
 #, elixir-autogen, elixir-format
 msgid "Organization and accounts (Google Workspace / domain restriction)"
 msgstr "組織・アカウント（Google Workspace / ドメイン制限）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4806
+#: lib/ask_drive_web/live/admin_live.ex:4810
 #, elixir-autogen, elixir-format
 msgid "Original data total"
 msgstr "元データ合計"
 
-#: lib/ask_drive_web/live/admin_live.ex:4892
+#: lib/ask_drive_web/live/admin_live.ex:4896
 #, elixir-autogen, elixir-format
 msgid "Original size"
 msgstr "元サイズ"
 
-#: lib/ask_drive_web/live/admin_live.ex:8252
+#: lib/ask_drive_web/live/admin_live.ex:8276
 #, elixir-autogen, elixir-format
 msgid "Out of time"
 msgstr "時間切れ"
@@ -3505,27 +3500,27 @@ msgstr "全体の目安 %{percent}%"
 msgid "Overview & batch status"
 msgstr "概要・バッチ状況"
 
-#: lib/ask_drive_web/live/admin_live.ex:5629
+#: lib/ask_drive_web/live/admin_live.ex:5633
 #, elixir-autogen, elixir-format
 msgid "Passphrase for desk \"%{desk}\" (5 failures in 5 minutes)"
 msgstr "窓口「%{desk}」の合言葉（5 分間に 5 回失敗）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5494
+#: lib/ask_drive_web/live/admin_live.ex:5498
 #, elixir-autogen, elixir-format
 msgid "Password (%{state})"
 msgstr "パスワード（%{state}）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7750
+#: lib/ask_drive_web/live/admin_live.ex:7774
 #, elixir-autogen, elixir-format
 msgid "Password (optional)"
 msgstr "パスワード（任意）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5363
+#: lib/ask_drive_web/live/admin_live.ex:5367
 #, elixir-autogen, elixir-format
 msgid "Password checks over LDAP skip Google's 2-step verification. 5 failures for the same account within 5 minutes lock it for 15 minutes; 10 failures from the same device (browser) within 24 hours lock it for 24 hours."
 msgstr "LDAP でのパスワード確認には Google の 2 段階認証がかかりません。同じアカウントで 5 分間に 5 回失敗すると 15 分、同じ接続環境（ブラウザ）から 24 時間に 10 回失敗すると 24 時間ロックします。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7658
+#: lib/ask_drive_web/live/admin_live.ex:7682
 #, elixir-autogen, elixir-format
 msgid "Password:"
 msgstr "パスワード:"
@@ -3535,7 +3530,7 @@ msgstr "パスワード:"
 msgid "Paste it below, save, and check that “Send test” arrives"
 msgstr "下に貼り付けて保存し、「テスト送信」で届くか確認"
 
-#: lib/ask_drive_web/live/admin_live.ex:6353
+#: lib/ask_drive_web/live/admin_live.ex:6342
 #, elixir-autogen, elixir-format
 msgid "Paste the browser address (URL) after authorizing"
 msgstr "認可後のブラウザのアドレス（URL）を貼り付け"
@@ -3550,17 +3545,17 @@ msgstr "区切りで一時停止して再起動し、再起動後に続きから
 msgid "Per-file log (%{count} · failures first)"
 msgstr "ファイル別ログ（%{count} 件・失敗を先頭に表示）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4502
+#: lib/ask_drive_web/live/admin_live.ex:4504
 #, elixir-autogen, elixir-format
 msgid "Permit elevation"
 msgstr "昇格を許可"
 
-#: lib/ask_drive_web/live/admin_live.ex:6488
+#: lib/ask_drive_web/live/admin_live.ex:6477
 #, elixir-autogen, elixir-format
 msgid "Personal Gmail (@gmail.com etc.)"
 msgstr "個人 Gmail（@gmail.com 等）"
 
-#: lib/ask_drive_web/live/admin_live.ex:3540
+#: lib/ask_drive_web/live/admin_live.ex:3542
 #, elixir-autogen, elixir-format
 msgid "Phase"
 msgstr "フェーズ"
@@ -3575,12 +3570,12 @@ msgstr "フェーズ別内訳"
 msgid "Platform admin"
 msgstr "全体管理"
 
-#: lib/ask_drive_web/live/admin_live.ex:5809
+#: lib/ask_drive_web/live/admin_live.ex:5813
 #, elixir-autogen, elixir-format
 msgid "Platform administrators (accounts marked \"can elevate\" in user management) get in from \"Platform admin\" in the header by confirming their identity with their own account. There is no shared password."
 msgstr "全体管理者（ユーザー管理で「昇格可」のアカウント）は、ヘッダーの「全体管理」から、各自のアカウントで本人確認して入ります。共有のパスワードはありません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4367
+#: lib/ask_drive_web/live/admin_live.ex:4369
 #, elixir-autogen, elixir-format
 msgid "Platform elevation allowed"
 msgstr "全体昇格可"
@@ -3590,12 +3585,12 @@ msgstr "全体昇格可"
 msgid "Platform settings"
 msgstr "全体設定"
 
-#: lib/ask_drive_web/live/admin_live.ex:5427
+#: lib/ask_drive_web/live/admin_live.ex:5431
 #, elixir-autogen, elixir-format
 msgid "Port (LDAPS)"
 msgstr "ポート（LDAPS）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7391
+#: lib/ask_drive_web/live/admin_live.ex:7415
 #, elixir-autogen, elixir-format
 msgid "Ports and reverse proxies"
 msgstr "ポートとリバースプロキシ"
@@ -3605,22 +3600,22 @@ msgstr "ポートとリバースプロキシ"
 msgid "Posts to a Google Chat space when an update starts and when the new version has started and is running normally (automatic and manual alike). If only the start notice arrives and no completion notice follows, AskDrive may have failed to start after the restart. A failed build, or starting on the old version, is also notified."
 msgstr "アップデートの開始時と、新しいバージョンが起動して正常に稼働したときに、Google Chat のスペースへ通知します（自動・手動とも）。開始の通知だけが届いて完了の通知が来なければ、再起動後に起動できていない可能性があります。ビルドの失敗や、古いバージョンのまま起動した場合も通知します。"
 
-#: lib/ask_drive_web/live/admin_live.ex:3743
+#: lib/ask_drive_web/live/admin_live.ex:3745
 #, elixir-autogen, elixir-format
 msgid "Priority 1"
 msgstr "優先度1"
 
-#: lib/ask_drive_web/live/admin_live.ex:5458
+#: lib/ask_drive_web/live/admin_live.ex:5462
 #, elixir-autogen, elixir-format
 msgid "Private key (.key)"
 msgstr "秘密鍵（.key）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7254
+#: lib/ask_drive_web/live/admin_live.ex:7278
 #, elixir-autogen, elixir-format
 msgid "Private key (PEM, required)"
 msgstr "秘密鍵（PEM・必須）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5387
+#: lib/ask_drive_web/live/admin_live.ex:5391
 #, elixir-autogen, elixir-format
 msgid "Private key: %{key} · CA certificate: %{ca}"
 msgstr "秘密鍵: %{key}・CA 証明書: %{ca}"
@@ -3640,8 +3635,8 @@ msgstr "進捗"
 msgid "Progress (QA pairs are generated once the other desks finish ingestion)"
 msgstr "進捗（ほかの窓口の取り込みが終わったら想定QAを生成します）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4965
-#: lib/ask_drive_web/live/admin_live.ex:5090
+#: lib/ask_drive_web/live/admin_live.ex:4969
+#: lib/ask_drive_web/live/admin_live.ex:5094
 #, elixir-autogen, elixir-format
 msgid "Provider"
 msgstr "プロバイダ"
@@ -3651,7 +3646,7 @@ msgstr "プロバイダ"
 msgid "Public URL (the URL users open)"
 msgstr "公開 URL（利用者が開く URL）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7284
+#: lib/ask_drive_web/live/admin_live.ex:7308
 #, elixir-autogen, elixir-format
 msgid "Public host name (optional; if given, checks that the certificate covers it)"
 msgstr "公開するホスト名（任意。指定すると証明書に含まれているか検証します）"
@@ -3676,8 +3671,8 @@ msgstr "取得済み"
 msgid "Pulling"
 msgstr "取得中"
 
-#: lib/ask_drive_web/live/admin_live.ex:5013
-#: lib/ask_drive_web/live/admin_live.ex:5092
+#: lib/ask_drive_web/live/admin_live.ex:5017
+#: lib/ask_drive_web/live/admin_live.ex:5096
 #, elixir-autogen, elixir-format
 msgid "Purpose"
 msgstr "用途"
@@ -3697,22 +3692,22 @@ msgstr "QA 生成（対象チャンク / 生成QA）"
 msgid "Rate limit reached (%{detail})"
 msgstr "レート制限に達しました (%{detail})"
 
-#: lib/ask_drive_web/live/admin_live.ex:4518
+#: lib/ask_drive_web/live/admin_live.ex:4520
 #, elixir-autogen, elixir-format
 msgid "Re-enable %{email}?"
 msgstr "%{email} を再度有効化しますか？"
 
-#: lib/ask_drive_web/live/admin_live.ex:3728
+#: lib/ask_drive_web/live/admin_live.ex:3730
 #, elixir-autogen, elixir-format
 msgid "Reached: Tier %{tier} · Asked: %{time}"
 msgstr "到達: Tier %{tier} ・ 質問日時: %{time}"
 
-#: lib/ask_drive_web/live/admin_live.ex:5050
+#: lib/ask_drive_web/live/admin_live.ex:5054
 #, elixir-autogen, elixir-format
 msgid "Recent API communication errors (for privacy, question text and document content are neither stored nor shown)"
 msgstr "直近の API 通信エラーログ（プライバシー配慮: 質問本文や文書内容は保存・表示しません）"
 
-#: lib/ask_drive_web/live/admin_live.ex:3754
+#: lib/ask_drive_web/live/admin_live.ex:3756
 #, elixir-autogen, elixir-format
 msgid "Recently resolved questions (from last night's batch)"
 msgstr "最近解消された質問 (前夜バッチによる成果)"
@@ -3722,17 +3717,17 @@ msgstr "最近解消された質問 (前夜バッチによる成果)"
 msgid "Recreating and applying the self-signed certificate. The page reconnects by itself in a few seconds."
 msgstr "自己署名証明書を作り直して適用しています。数秒後にページが自動で再接続します。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5391
+#: lib/ask_drive_web/live/admin_live.ex:5395
 #, elixir-autogen, elixir-format
 msgid "Registered"
 msgstr "登録済み"
 
-#: lib/ask_drive_web/live/admin_live.ex:5375
+#: lib/ask_drive_web/live/admin_live.ex:5379
 #, elixir-autogen, elixir-format
 msgid "Registered certificate:"
 msgstr "登録済みの証明書:"
 
-#: lib/ask_drive_web/live/admin_live.ex:4259
+#: lib/ask_drive_web/live/admin_live.ex:4261
 #, elixir-autogen, elixir-format
 msgid "Registered users"
 msgstr "登録ユーザー"
@@ -3742,37 +3737,37 @@ msgstr "登録ユーザー"
 msgid "Release notes for v%{version}"
 msgstr "v%{version} のリリースノート"
 
-#: lib/ask_drive_web/live/admin_live.ex:5898
+#: lib/ask_drive_web/live/admin_live.ex:5902
 #, elixir-autogen, elixir-format
 msgid "Remove"
 msgstr "外す"
 
-#: lib/ask_drive_web/live/admin_live.ex:5889
+#: lib/ask_drive_web/live/admin_live.ex:5893
 #, elixir-autogen, elixir-format
 msgid "Remove %{email} from this desk's administrators?"
 msgstr "%{email} をこの窓口の担当者から外しますか？"
 
-#: lib/ask_drive_web/live/admin_live.ex:4488
+#: lib/ask_drive_web/live/admin_live.ex:4490
 #, elixir-autogen, elixir-format
 msgid "Remove admin elevation rights from %{email}?"
 msgstr "%{email} から管理者への昇格資格を外しますか？"
 
-#: lib/ask_drive_web/live/admin_live.ex:4465
+#: lib/ask_drive_web/live/admin_live.ex:4467
 #, elixir-autogen, elixir-format
 msgid "Remove my platform admin rights"
 msgstr "自分の全体管理者権限を外す"
 
-#: lib/ask_drive_web/live/admin_live.ex:5897
+#: lib/ask_drive_web/live/admin_live.ex:5901
 #, elixir-autogen, elixir-format
 msgid "Remove myself"
 msgstr "自分を外す"
 
-#: lib/ask_drive_web/live/admin_live.ex:4459
+#: lib/ask_drive_web/live/admin_live.ex:4461
 #, elixir-autogen, elixir-format
 msgid "Remove your own platform administrator rights and go back to being a regular user? You will no longer be able to enter platform administration (to undo this, ask another platform administrator)."
 msgstr "あなたの全体管理者の権限を外して、一般ユーザーに戻りますか？以後は全体管理の画面に入れなくなります（元に戻すには、ほかの全体管理者に依頼してください）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5885
+#: lib/ask_drive_web/live/admin_live.ex:5889
 #, elixir-autogen, elixir-format
 msgid "Remove yourself from this desk's administrators? You will no longer be able to enter this desk's admin screen."
 msgstr "あなたをこの窓口の担当者から外しますか？以後、この窓口の管理画面には入れなくなります。"
@@ -3782,17 +3777,17 @@ msgstr "あなたをこの窓口の担当者から外しますか？以後、こ
 msgid "Removed %{email} from the administrators of desk \"%{name}\"."
 msgstr "%{email} を窓口「%{name}」の担当者から外しました。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5703
+#: lib/ask_drive_web/live/admin_live.ex:5707
 #, elixir-autogen, elixir-format
 msgid "Required sign-in"
 msgstr "ログイン認証"
 
-#: lib/ask_drive_web/live/admin_live.ex:5762
+#: lib/ask_drive_web/live/admin_live.ex:5766
 #, elixir-autogen, elixir-format
 msgid "Requirement: a sign-in method (Google Secure LDAP or Google sign-in) is set up. Turning it on also takes this browser to the sign-in screen."
 msgstr "必要なもの: ログインの方法（Google Secure LDAP または Google ログイン）が設定済みであること。有効にすると、このブラウザもログイン画面に移ります。"
 
-#: lib/ask_drive_web/live/admin_live.ex:3768
+#: lib/ask_drive_web/live/admin_live.ex:3770
 #, elixir-autogen, elixir-format
 msgid "Resolved: %{time}"
 msgstr "解消: %{time}"
@@ -3812,22 +3807,22 @@ msgstr "バッチを待たずに今すぐ再起動しますか？処理中のフ
 msgid "Restarting"
 msgstr "再起動中"
 
-#: lib/ask_drive_web/live/admin_live.ex:8475
+#: lib/ask_drive_web/live/admin_live.ex:8499
 #, elixir-autogen, elixir-format
 msgid "Restrict access by password"
 msgstr "パスワードによる利用制限"
 
-#: lib/ask_drive_web/live/admin_live.ex:7498
+#: lib/ask_drive_web/live/admin_live.ex:7522
 #, elixir-autogen, elixir-format
 msgid "Restrict access to devices with a certificate"
 msgstr "端末の電子証明書によるアクセス制限"
 
-#: lib/ask_drive_web/live/admin_live.ex:5982
+#: lib/ask_drive_web/live/admin_live.ex:5986
 #, elixir-autogen, elixir-format
 msgid "Restrict access with a password"
 msgstr "パスワードによる利用制限"
 
-#: lib/ask_drive_web/live/admin_live.ex:3541
+#: lib/ask_drive_web/live/admin_live.ex:3543
 #, elixir-autogen, elixir-format
 msgid "Result"
 msgstr "結果"
@@ -3859,27 +3854,27 @@ msgstr "生成の対象に戻す"
 msgid "Reverse proxy settings saved (effective immediately)."
 msgstr "リバースプロキシの設定を保存しました（すぐに反映されます）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7314
+#: lib/ask_drive_web/live/admin_live.ex:7338
 #, elixir-autogen, elixir-format
 msgid "Revert to self-signed certificate"
 msgstr "自己署名証明書に戻す"
 
-#: lib/ask_drive_web/live/admin_live.ex:7835
+#: lib/ask_drive_web/live/admin_live.ex:7859
 #, elixir-autogen, elixir-format
 msgid "Revoke"
 msgstr "失効"
 
-#: lib/ask_drive_web/live/admin_live.ex:7829
+#: lib/ask_drive_web/live/admin_live.ex:7853
 #, elixir-autogen, elixir-format
 msgid "Revoke this certificate? Devices that have it installed are locked out immediately."
 msgstr "この証明書を失効させますか？インストール済みの端末からはすぐに入れなくなります。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7587
+#: lib/ask_drive_web/live/admin_live.ex:7611
 #, elixir-autogen, elixir-format
 msgid "Revoked"
 msgstr "失効済み"
 
-#: lib/ask_drive_web/live/admin_live.ex:7807
+#: lib/ask_drive_web/live/admin_live.ex:7831
 #, elixir-autogen, elixir-format
 msgid "Revoked %{date}"
 msgstr "失効 %{date}"
@@ -3894,17 +3889,17 @@ msgstr "取り込みのみ実行"
 msgid "Run the batch (with QA generation) manually?"
 msgstr "バッチ（QA 生成あり）を手動実行しますか？"
 
-#: lib/ask_drive_web/live/admin_live.ex:6848
+#: lib/ask_drive_web/live/admin_live.ex:6872
 #, elixir-autogen, elixir-format
 msgid "Run the chat summary on"
 msgstr "チャット要約の実行方法"
 
-#: lib/ask_drive_web/live/admin_live.ex:6753
+#: lib/ask_drive_web/live/admin_live.ex:6777
 #, elixir-autogen, elixir-format
 msgid "Run the nightly batch (QA generation) on"
 msgstr "夜間バッチ（QA 生成）の実行方法"
 
-#: lib/ask_drive_web/live/admin_live.ex:8248
+#: lib/ask_drive_web/live/admin_live.ex:8272
 #: lib/ask_drive_web/live/ollama_panel.ex:74
 #, elixir-autogen, elixir-format
 msgid "Running"
@@ -3930,7 +3925,7 @@ msgstr "最新版で稼働しています。アップデートはありません
 msgid "Running..."
 msgstr "実行中..."
 
-#: lib/ask_drive_web/live/admin_live.ex:7109
+#: lib/ask_drive_web/live/admin_live.ex:7133
 #, elixir-autogen, elixir-format
 msgid "Runs Google Drive sync, ingestion and QA generation automatically in the night window. Manual runs work even when off. New desks start off while being set up."
 msgstr "Google Drive の同期・取り込み・QA 生成を夜間枠に自動で行う。オフでも手動実行はできる。新しい窓口は設定中のためオフで始まる"
@@ -3940,56 +3935,56 @@ msgstr "Google Drive の同期・取り込み・QA 生成を夜間枠に自動�
 msgid "Runs before the nightly batch; the batch starts after the restart."
 msgstr "夜間バッチより先に行い、バッチは再起動後に始まります"
 
-#: lib/ask_drive_web/live/admin_live.ex:6850
+#: lib/ask_drive_web/live/admin_live.ex:6874
 #, elixir-autogen, elixir-format
 msgid "Same as the nightly batch"
 msgstr "夜間バッチと同じ"
 
 #: lib/ask_drive_web/live/acme_panel.ex:169
-#: lib/ask_drive_web/live/admin_live.ex:4162
-#: lib/ask_drive_web/live/admin_live.ex:5203
-#: lib/ask_drive_web/live/admin_live.ex:5284
-#: lib/ask_drive_web/live/admin_live.ex:5541
-#: lib/ask_drive_web/live/admin_live.ex:6576
-#: lib/ask_drive_web/live/admin_live.ex:7468
-#: lib/ask_drive_web/live/admin_live.ex:7569
+#: lib/ask_drive_web/live/admin_live.ex:4164
+#: lib/ask_drive_web/live/admin_live.ex:5207
+#: lib/ask_drive_web/live/admin_live.ex:5288
+#: lib/ask_drive_web/live/admin_live.ex:5545
+#: lib/ask_drive_web/live/admin_live.ex:6600
+#: lib/ask_drive_web/live/admin_live.ex:7492
+#: lib/ask_drive_web/live/admin_live.ex:7593
 #: lib/ask_drive_web/live/gateway_panel.ex:130
 #: lib/ask_drive_web/live/update_panel.ex:367
 #, elixir-autogen, elixir-format
 msgid "Save"
 msgstr "保存"
 
-#: lib/ask_drive_web/live/admin_live.ex:5987
+#: lib/ask_drive_web/live/admin_live.ex:5991
 #, elixir-autogen, elixir-format
 msgid "Save a password below first"
 msgstr "先に下でパスワードを保存してください"
 
-#: lib/ask_drive_web/live/admin_live.ex:8484
+#: lib/ask_drive_web/live/admin_live.ex:8508
 #, elixir-autogen, elixir-format
 msgid "Save a password first"
 msgstr "先にパスワードを保存してください"
 
-#: lib/ask_drive_web/live/admin_live.ex:7353
+#: lib/ask_drive_web/live/admin_live.ex:7377
 #, elixir-autogen, elixir-format
 msgid "Save and apply (restarts HTTPS)"
 msgstr "保存して適用（HTTPS を再起動）"
 
-#: lib/ask_drive_web/live/admin_live.ex:6398
+#: lib/ask_drive_web/live/admin_live.ex:6387
 #, elixir-autogen, elixir-format
 msgid "Save and finish"
 msgstr "保存して認証完了"
 
-#: lib/ask_drive_web/live/admin_live.ex:8924
+#: lib/ask_drive_web/live/admin_live.ex:8948
 #, elixir-autogen, elixir-format
 msgid "Save failed: %{errors}"
 msgstr "保存に失敗しました: %{errors}"
 
-#: lib/ask_drive_web/live/admin_live.ex:6038
+#: lib/ask_drive_web/live/admin_live.ex:6042
 #, elixir-autogen, elixir-format
 msgid "Save password"
 msgstr "パスワードを保存"
 
-#: lib/ask_drive_web/live/admin_live.ex:7164
+#: lib/ask_drive_web/live/admin_live.ex:7188
 #, elixir-autogen, elixir-format
 msgid "Save settings"
 msgstr "設定を保存"
@@ -3999,7 +3994,7 @@ msgstr "設定を保存"
 msgid "Save the JSON key first."
 msgstr "先に JSON キーを保存してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8454
+#: lib/ask_drive_web/live/admin_live.ex:8478
 #, elixir-autogen, elixir-format
 msgid "Save the OAuth client ID and secret first"
 msgstr "先に OAuth クライアント ID とシークレットを保存してください"
@@ -4009,7 +4004,7 @@ msgstr "先に OAuth クライアント ID とシークレットを保存して�
 msgid "Save the host name, domain and API key first."
 msgstr "先にホスト名・ドメイン・API キーを保存してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7462
+#: lib/ask_drive_web/live/admin_live.ex:7486
 #, elixir-autogen, elixir-format
 msgid "Save the port and proxy settings? If you change a port, reopen the screen at the new port's URL."
 msgstr "ポート・プロキシの設定を保存しますか？ポートを変えた場合は、新しいポートの URL で開き直す必要があります。"
@@ -4024,12 +4019,12 @@ msgstr "公開 URL を保存してください"
 msgid "Save the secret header value"
 msgstr "秘密のヘッダーの値を保存してください"
 
-#: lib/ask_drive_web/live/admin_live.ex:7158
+#: lib/ask_drive_web/live/admin_live.ex:7182
 #, elixir-autogen, elixir-format
 msgid "Save the settings? If you changed the embedding model or dimensions, the vector index is recreated and everything must be re-embedded. Continue?"
 msgstr "設定を保存します。埋め込みモデルまたは次元を変更した場合、ベクトルインデックスを再作成し全件の再ベクトル化が必要になります。続行しますか？"
 
-#: lib/ask_drive_web/live/admin_live.ex:7347
+#: lib/ask_drive_web/live/admin_live.ex:7371
 #, elixir-autogen, elixir-format
 msgid "Save this certificate and restart HTTPS? Connections drop for a few seconds."
 msgstr "この証明書を保存し、HTTPS を再起動します。接続が数秒途切れます。続行しますか？"
@@ -4044,12 +4039,12 @@ msgstr "秘密のヘッダーの値（未設定・16 文字以上）"
 msgid "Secret header value (set; enter only to change it; 16+ characters)"
 msgstr "秘密のヘッダーの値（設定済み。変更するときだけ入力・16 文字以上）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5517
+#: lib/ask_drive_web/live/admin_live.ex:5521
 #, elixir-autogen, elixir-format
 msgid "Selected, not saved yet: %{files} (registered when you press \"Save\")"
 msgstr "選択済み・未保存: %{files}（「保存」で登録されます）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7208
+#: lib/ask_drive_web/live/admin_live.ex:7232
 #, elixir-autogen, elixir-format
 msgid "Self-signed certificate (browsers show a warning)"
 msgstr "自己署名証明書（ブラウザに警告が出ます）"
@@ -4064,17 +4059,12 @@ msgstr "テスト送信"
 msgid "Sending…"
 msgstr "送信しています…"
 
-#: lib/ask_drive_web/live/admin_live.ex:7130
+#: lib/ask_drive_web/live/admin_live.ex:7154
 #, elixir-autogen, elixir-format
 msgid "Serve invalidated (stale) QA pairs with a warning"
 msgstr "無効化（Stale）された QA を警告付きで配信する"
 
-#: lib/ask_drive_web/live/admin_live.ex:6096
-#, elixir-autogen, elixir-format
-msgid "Service account"
-msgstr "サービスアカウント"
-
-#: lib/ask_drive_web/live/admin_live.ex:6142
+#: lib/ask_drive_web/live/admin_live.ex:6131
 #, elixir-autogen, elixir-format
 msgid "Service account JSON key (%{state})"
 msgstr "サービスアカウントの JSON キー（%{state}）"
@@ -4091,7 +4081,7 @@ msgstr "Stale な QA の配信"
 
 #: lib/ask_drive/llm.ex:548
 #: lib/ask_drive_web/live/admin_live.ex:1858
-#: lib/ask_drive_web/live/admin_live.ex:4179
+#: lib/ask_drive_web/live/admin_live.ex:4181
 #, elixir-autogen, elixir-format
 msgid "Set"
 msgstr "設定済み"
@@ -4101,7 +4091,7 @@ msgstr "設定済み"
 msgid "Set (last 4 characters: ...%{last4})"
 msgstr "設定済み（末尾4文字: ...%{last4}）"
 
-#: lib/ask_drive_web/live/admin_live.ex:8823
+#: lib/ask_drive_web/live/admin_live.ex:8847
 #, elixir-autogen, elixir-format
 msgid "Set up an OAuth client first, then authorize with \"Open Google's authorization screen\"."
 msgstr "先に OAuth クライアントを設定し、「Google の認可画面を開く」から認可してください。"
@@ -4111,7 +4101,7 @@ msgstr "先に OAuth クライアントを設定し、「Google の認可画面�
 msgid "Set up authentication first (a service account JSON key, or OAuth authorization)."
 msgstr "先に認証（サービスアカウントの JSON キー、または OAuth の認可）を設定してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6301
+#: lib/ask_drive_web/live/admin_live.ex:6290
 #, elixir-autogen, elixir-format
 msgid "Set up the OAuth client to connect"
 msgstr "OAuth クライアントを設定して接続"
@@ -4146,63 +4136,63 @@ msgstr "設定を保存しました。"
 msgid "Settings tab"
 msgstr "「設定」タブ"
 
-#: lib/ask_drive_web/live/admin_live.ex:5326
+#: lib/ask_drive_web/live/admin_live.ex:5330
 #, elixir-autogen, elixir-format
 msgid "Show \"Sign in with Google\" on the sign-in screen (can be turned on after saving the OAuth client above)"
 msgstr "ログイン画面に「Google でログイン」を表示する（上の OAuth クライアントを保存してから有効にできます）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7143
+#: lib/ask_drive_web/live/admin_live.ex:7167
 #, elixir-autogen, elixir-format
 msgid "Show an AI summary of search results in chat"
 msgstr "チャットで検索結果の AI 要約を表示する"
 
-#: lib/ask_drive_web/live/admin_live.ex:5358
+#: lib/ask_drive_web/live/admin_live.ex:5362
 #, elixir-autogen, elixir-format
 msgid "Shows email and password fields on the sign-in screen and checks the Google Workspace password with Secure LDAP (AskDrive does not store passwords). Works without a public URL. In the Google Admin console, add an LDAP client, allow \"Verify user credentials\" and \"Read user information\", and register the issued certificate (.crt) and private key (.key) here."
 msgstr "ログイン画面に「メールアドレスとパスワード」の欄を出し、Google Workspace のパスワードを Secure LDAP で確認します（パスワードは AskDrive に保存しません）。外部公開の URL がなくても使えます。Google 管理コンソールで LDAP クライアントを追加し、「ユーザー認証情報の確認」と「ユーザー情報の読み取り」を許可して、発行された証明書（.crt）と秘密鍵（.key）をここに登録してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5210
+#: lib/ask_drive_web/live/admin_live.ex:5214
 #, elixir-autogen, elixir-format
 msgid "Sign-in methods"
 msgstr "ログインの方法"
 
-#: lib/ask_drive_web/live/admin_live.ex:5345
+#: lib/ask_drive_web/live/admin_live.ex:5349
 #, elixir-autogen, elixir-format
 msgid "Sign-in with Google Secure LDAP"
 msgstr "Google Secure LDAP でのログイン"
 
-#: lib/ask_drive_web/live/admin_live.ex:8467
-#: lib/ask_drive_web/live/admin_live.ex:8470
+#: lib/ask_drive_web/live/admin_live.ex:8491
+#: lib/ask_drive_web/live/admin_live.ex:8494
 #, elixir-autogen, elixir-format
 msgid "Sign-in with LDAP"
 msgstr "LDAP でのログイン"
 
-#: lib/ask_drive_web/live/admin_live.ex:5294
+#: lib/ask_drive_web/live/admin_live.ex:5298
 #, elixir-autogen, elixir-format
 msgid "Sign-in with a Google account (SSO)"
 msgstr "Google アカウントでのログイン (SSO)"
 
-#: lib/ask_drive_web/live/admin_live.ex:5307
+#: lib/ask_drive_web/live/admin_live.ex:5311
 #, elixir-autogen, elixir-format
 msgid "Sign-in: Off (Drive sync only)"
 msgstr "ログイン: 無効（Drive 同期のみ）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5306
+#: lib/ask_drive_web/live/admin_live.ex:5310
 #, elixir-autogen, elixir-format
 msgid "Sign-in: On"
 msgstr "ログイン: 有効"
 
-#: lib/ask_drive_web/live/admin_live.ex:7048
+#: lib/ask_drive_web/live/admin_live.ex:7072
 #, elixir-autogen, elixir-format
 msgid "Similarity threshold for instant QA answers (Tier 1) (default 0.90; lower answers more often from generated QA pairs, higher sends more to summary and excerpts)"
 msgstr "QA 即答（Tier 1）の類似度しきい値（既定 0.90。下げるほど生成済み QA で即答しやすく、上げるほど要約・抜粋に回る）"
 
-#: lib/ask_drive_web/live/admin_live.ex:8232
+#: lib/ask_drive_web/live/admin_live.ex:8256
 #, elixir-autogen, elixir-format
 msgid "Skipped"
 msgstr "対象外"
 
-#: lib/ask_drive_web/live/admin_live.ex:4573
+#: lib/ask_drive_web/live/admin_live.ex:4575
 #, elixir-autogen, elixir-format
 msgid "Source IP"
 msgstr "送信元 IP"
@@ -4212,7 +4202,7 @@ msgstr "送信元 IP"
 msgid "Stale QA pairs (awaiting regeneration)"
 msgstr "Stale QA数 (再生成待ち)"
 
-#: lib/ask_drive_web/live/admin_live.ex:4860
+#: lib/ask_drive_web/live/admin_live.ex:4864
 #, elixir-autogen, elixir-format
 msgid "Standard (B)"
 msgstr "標準 (B)"
@@ -4249,9 +4239,9 @@ msgstr "証明書の取得を始めました。DNS の反映待ちに数分か�
 
 #: lib/ask_drive_web/live/acme_panel.ex:41
 #: lib/ask_drive_web/live/admin_live.ex:3066
-#: lib/ask_drive_web/live/admin_live.ex:3815
-#: lib/ask_drive_web/live/admin_live.ex:3884
-#: lib/ask_drive_web/live/admin_live.ex:4333
+#: lib/ask_drive_web/live/admin_live.ex:3817
+#: lib/ask_drive_web/live/admin_live.ex:3886
+#: lib/ask_drive_web/live/admin_live.ex:4335
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "状態"
@@ -4286,22 +4276,22 @@ msgstr "バッチの停止を要求しました。処理中の項目が終わり
 msgid "Stop the running batch? It stops once the current file (or chunk) finishes. What has been ingested and generated so far is kept, and the rest is picked up by the next batch."
 msgstr "実行中のバッチを停止しますか？処理中のファイル（またはチャンク）が終わった時点で止まります。ここまでの取り込み・生成結果は残り、残りは次回のバッチで続きから処理します。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7308
+#: lib/ask_drive_web/live/admin_live.ex:7332
 #, elixir-autogen, elixir-format
 msgid "Stop using the custom certificate and go back to a self-signed one? Browsers will show a certificate warning."
 msgstr "独自の証明書をやめ、自己署名証明書に戻します。ブラウザに証明書の警告が出るようになります。続行しますか？"
 
-#: lib/ask_drive_web/live/admin_live.ex:8253
+#: lib/ask_drive_web/live/admin_live.ex:8277
 #, elixir-autogen, elixir-format
 msgid "Stopped (manual)"
 msgstr "停止（手動）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7119
+#: lib/ask_drive_web/live/admin_live.ex:7143
 #, elixir-autogen, elixir-format
 msgid "Stops the chat screen and shows the notice message above"
 msgstr "チャット画面を停止し、上の告知メッセージを表示する"
 
-#: lib/ask_drive_web/live/admin_live.ex:7220
+#: lib/ask_drive_web/live/admin_live.ex:7244
 #, elixir-autogen, elixir-format
 msgid "Subject / issuer"
 msgstr "サブジェクト / 発行者"
@@ -4311,53 +4301,53 @@ msgstr "サブジェクト / 発行者"
 msgid "Succeeded: %{result}"
 msgstr "成功: %{result}"
 
-#: lib/ask_drive_web/live/admin_live.ex:4719
+#: lib/ask_drive_web/live/admin_live.ex:4721
 #, elixir-autogen, elixir-format
 msgid "Success rate: %{rate}%"
 msgstr "成功率: %{rate}%"
 
-#: lib/ask_drive_web/live/admin_live.ex:6917
+#: lib/ask_drive_web/live/admin_live.ex:6941
 #, elixir-autogen, elixir-format
 msgid "Summarizes with a cloud API. Questions and the retrieved excerpts are sent to the API provider."
 msgstr "クラウド API で要約します。質問と検索された抜粋が API 提供元に送信されます。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6921
+#: lib/ask_drive_web/live/admin_live.ex:6945
 #, elixir-autogen, elixir-format
 msgid "Summarizes with a local LLM. Questions and excerpts are not sent outside your organization."
 msgstr "ローカル LLM で要約します。質問と抜粋は社外に送信されません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7635
+#: lib/ask_drive_web/live/admin_live.ex:7659
 #, elixir-autogen, elixir-format
 msgid "Switch to %{mode}"
 msgstr "%{mode}にする"
 
-#: lib/ask_drive_web/live/admin_live.ex:7620
+#: lib/ask_drive_web/live/admin_live.ex:7644
 #, elixir-autogen, elixir-format
 msgid "Switch to Enforce? Devices without a certificate can no longer open even the login screen."
 msgstr "強制にしますか？証明書のない端末は、ログイン画面にも入れなくなります。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7628
+#: lib/ask_drive_web/live/admin_live.ex:7652
 #, elixir-autogen, elixir-format
 msgid "Switch to Monitor? Certificates are requested and logged, but no one is refused."
 msgstr "監視にしますか？証明書を求めて記録しますが、誰も拒否しません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7625
+#: lib/ask_drive_web/live/admin_live.ex:7649
 #, elixir-autogen, elixir-format
 msgid "Switch to Off? Devices without a certificate can get in again."
 msgstr "無効にしますか？証明書のない端末からも入れるようになります。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8220
+#: lib/ask_drive_web/live/admin_live.ex:8244
 #, elixir-autogen, elixir-format
 msgid "Sync"
 msgstr "同期"
 
-#: lib/ask_drive_web/live/admin_live.ex:7929
-#: lib/ask_drive_web/live/admin_live.ex:8150
+#: lib/ask_drive_web/live/admin_live.ex:7953
+#: lib/ask_drive_web/live/admin_live.ex:8174
 #, elixir-autogen, elixir-format
 msgid "Sync test failed: %{reason}"
 msgstr "同期テストに失敗しました: %{reason}"
 
-#: lib/ask_drive_web/live/admin_live.ex:6601
+#: lib/ask_drive_web/live/admin_live.ex:6625
 #, elixir-autogen, elixir-format
 msgid "Sync works (%{identity}). Files to sync in folder \"%{folder}\": %{count}"
 msgstr "同期できます（%{identity}）。フォルダ「%{folder}」の対象ファイル: %{count} 件"
@@ -4367,17 +4357,17 @@ msgstr "同期できます（%{identity}）。フォルダ「%{folder}」の対�
 msgid "Synced documents"
 msgstr "同期ドキュメント数"
 
-#: lib/ask_drive_web/live/admin_live.ex:3592
+#: lib/ask_drive_web/live/admin_live.ex:3594
 #, elixir-autogen, elixir-format
 msgid "System and inference status"
 msgstr "システム・推論基盤ステータス"
 
-#: lib/ask_drive_web/live/admin_live.ex:5618
+#: lib/ask_drive_web/live/admin_live.ex:5622
 #, elixir-autogen, elixir-format
 msgid "Target"
 msgstr "対象"
 
-#: lib/ask_drive_web/live/admin_live.ex:7017
+#: lib/ask_drive_web/live/admin_live.ex:7041
 #, elixir-autogen, elixir-format
 msgid "Temperature (blank: provider default)"
 msgstr "temperature (空欄でプロバイダ既定値)"
@@ -4387,19 +4377,19 @@ msgstr "temperature (空欄でプロバイダ既定値)"
 msgid "Test DNS connection (changes nothing)"
 msgstr "DNS 接続テスト（変更しません）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5275
-#: lib/ask_drive_web/live/admin_live.ex:6179
-#: lib/ask_drive_web/live/admin_live.ex:6683
+#: lib/ask_drive_web/live/admin_live.ex:5279
+#: lib/ask_drive_web/live/admin_live.ex:6168
+#: lib/ask_drive_web/live/admin_live.ex:6707
 #, elixir-autogen, elixir-format
 msgid "Test connection"
 msgstr "接続テスト"
 
-#: lib/ask_drive_web/live/admin_live.ex:6540
+#: lib/ask_drive_web/live/admin_live.ex:6529
 #, elixir-autogen, elixir-format
 msgid "Test connection (client in use)"
 msgstr "接続テスト（使用中のクライアント）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5532
+#: lib/ask_drive_web/live/admin_live.ex:5536
 #, elixir-autogen, elixir-format
 msgid "Test connection (with the values entered)"
 msgstr "接続テスト（入力中の内容で）"
@@ -4409,12 +4399,12 @@ msgstr "接続テスト（入力中の内容で）"
 msgid "Test notice sent. Check that it arrived in the Google Chat space."
 msgstr "テスト通知を送信しました。Google Chat のスペースに届いているか確認してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6587
+#: lib/ask_drive_web/live/admin_live.ex:6611
 #, elixir-autogen, elixir-format
 msgid "Test sync"
 msgstr "同期テスト"
 
-#: lib/ask_drive_web/live/admin_live.ex:6586
+#: lib/ask_drive_web/live/admin_live.ex:6610
 #, elixir-autogen, elixir-format
 msgid "Testing…"
 msgstr "テスト中…"
@@ -4430,7 +4420,7 @@ msgstr "%{provider} の API キーが未設定です。"
 msgid "The Claude API does not support embeddings. Choose another provider for embedding."
 msgstr "Claude API は埋め込みに対応していません。埋め込みには別のプロバイダを選択してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5241
+#: lib/ask_drive_web/live/admin_live.ex:5245
 #, elixir-autogen, elixir-format
 msgid "The Google Cloud OAuth credentials needed to sync Google Drive on every desk. Once registered here, you don't need to set a client ID on each desk. (Required for Drive sync even if you don't use Google sign-in.)"
 msgstr "すべての窓口で Google Drive を同期するために必要な Google Cloud の OAuth 認証情報です。ここで登録しておくと、各窓口で個別にクライアント ID を設定する必要がなくなります（※ Google ログインを使わない場合でも、Drive 同期のために設定が必要です）。"
@@ -4445,7 +4435,7 @@ msgstr "HTTP のポートは 1〜65535 の数字にしてください"
 msgid "The HTTPS port must be a number from 1 to 65535"
 msgstr "HTTPS のポートは 1〜65535 の数字にしてください"
 
-#: lib/ask_drive_web/live/admin_live.ex:8898
+#: lib/ask_drive_web/live/admin_live.ex:8922
 #, elixir-autogen, elixir-format
 msgid "The access user must be an address in the organization's domain (@%{domain})."
 msgstr "アクセスユーザーは組織のドメイン（@%{domain}）のアドレスを指定してください。"
@@ -4455,7 +4445,7 @@ msgstr "アクセスユーザーは組織のドメイン（@%{domain}）のア�
 msgid "The batch skips these (so it does not spend time on the same chunks every night). Return them after changing the model or fixing the cause. When a document is updated, its changed chunks return automatically."
 msgstr "バッチはこれらを飛ばします（毎晩同じチャンクで時間を使わないため）。モデルを変えたときや、原因を直したあとに対象へ戻してください。文書を更新すると、変わったチャンクは自動で対象に戻ります。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6288
+#: lib/ask_drive_web/live/admin_live.ex:6277
 #, elixir-autogen, elixir-format
 msgid "The button opens the Google sign-in page in a new window. Sign in and \"Allow\" access to Drive."
 msgstr "ボタンを押すと別ウィンドウで Google ログイン画面が開きます。ログインして Drive へのアクセスを「許可」してください。"
@@ -4465,12 +4455,12 @@ msgstr "ボタンを押すと別ウィンドウで Google ログイン画面が�
 msgid "The client ID / secret is valid (Google recognizes it)."
 msgstr "クライアント ID / シークレットは有効です（Google が認識しています）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5836
+#: lib/ask_drive_web/live/admin_live.ex:5840
 #, elixir-autogen, elixir-format
 msgid "The elevation duration takes effect with \"Save settings\" below (the same duration applies to desk admin screens)."
 msgstr "昇格の有効時間は下の「設定を保存」で反映されます（窓口の管理画面にも同じ時間が適用されます）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8667
+#: lib/ask_drive_web/live/admin_live.ex:8691
 #, elixir-autogen, elixir-format
 msgid "The file is too large"
 msgstr "ファイルが大きすぎます"
@@ -4545,12 +4535,12 @@ msgstr "埋め込み（%{provider}）の API キーがないため、夜間バ�
 msgid "There is no way to sign in. First set up \"Sign in with Google Secure LDAP\" or Google login (OAuth)."
 msgstr "ログインの方法がありません。先に「Google Secure LDAP でのログイン」または Google ログイン（OAuth）を設定してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4319
+#: lib/ask_drive_web/live/admin_live.ex:4321
 #, elixir-autogen, elixir-format
 msgid "These get the elevation flag back on every sign-in. Removing it here is undone."
 msgstr "これらはログインのたびに昇格可フラグが再付与されます。画面から外しても元に戻ります。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8043
+#: lib/ask_drive_web/live/admin_live.ex:8067
 #, elixir-autogen, elixir-format
 msgid "This address belongs to another authorization. Authorize again with \"Open Google's authorization page\" on this screen."
 msgstr "別の認可のアドレスです。この画面の「Google の認可ページを開く」から認可し直してください。"
@@ -4560,7 +4550,7 @@ msgstr "別の認可のアドレスです。この画面の「Google の認可�
 msgid "This address is fixed as a platform administrator by ASK_DRIVE_ADMIN_EMAILS in .env.prod (it is restored at the next sign-in). Remove it from .env.prod on the server, run ./app.sh restart, then try again."
 msgstr "このアドレスは .env.prod の ASK_DRIVE_ADMIN_EMAILS で全体管理者に固定されています（次のログインで元に戻ります）。サーバーの .env.prod からこのアドレスを削除して ./app.sh restart したあと、もう一度操作してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7530
+#: lib/ask_drive_web/live/admin_live.ex:7554
 #, elixir-autogen, elixir-format
 msgid "This assumes clients connect over HTTPS directly (if a reverse proxy terminates TLS, certificates do not reach AskDrive through it). If you get locked out, run"
 msgstr "HTTPS で直接つなぐ構成が前提です（リバースプロキシで TLS を終端する場合は、プロキシ経由のアクセスには証明書が届きません）。締め出された場合は、サーバー上で"
@@ -4570,7 +4560,7 @@ msgstr "HTTPS で直接つなぐ構成が前提です（リバースプロキシ
 msgid "This certificate was issued before re-downloads were supported, so it can't be downloaded. Issue a new one."
 msgstr "この証明書は再ダウンロードに対応する前に発行したため、ダウンロードできません。新しく発行してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8703
+#: lib/ask_drive_web/live/admin_live.ex:8727
 #, elixir-autogen, elixir-format
 msgid "This connection (%{ip}) would be refused. Reopen the page through the gateway, do this from the server itself (localhost), or save this IP under \"IPs allowed direct access\""
 msgstr "この接続（%{ip}）が拒否されるようになります。ゲートウェイ経由で開き直すか、サーバー自身（localhost）から操作するか、この IP を「直接アクセスを許可する IP」に保存してください"
@@ -4580,13 +4570,13 @@ msgstr "この接続（%{ip}）が拒否されるようになります。ゲー�
 msgid "This connection has no valid certificate and doesn't come from the office LAN. First install a certificate on this device and check, while still monitoring, that \"Certificate of this connection: valid\" is shown, or do this from the office LAN."
 msgstr "この接続には有効な証明書がなく、社内 LAN からの接続でもありません。先にこの端末に証明書をインストールし、監視のまま「この接続の証明書: 有効」と表示されることを確認するか、社内 LAN から操作してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7575
+#: lib/ask_drive_web/live/admin_live.ex:7599
 #, elixir-autogen, elixir-format
 msgid "This connection's certificate:"
 msgstr "この接続の証明書:"
 
 #: lib/ask_drive_web/live/admin_live.ex:1749
-#: lib/ask_drive_web/live/admin_live.ex:8517
+#: lib/ask_drive_web/live/admin_live.ex:8541
 #, elixir-autogen, elixir-format
 msgid "This feature"
 msgstr "この機能"
@@ -4596,7 +4586,7 @@ msgstr "この機能"
 msgid "This lock has already been lifted."
 msgstr "このロックはすでに解除されています。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7399
+#: lib/ask_drive_web/live/admin_live.ex:7423
 #, elixir-autogen, elixir-format
 msgid "This screen connects from:"
 msgstr "この画面の接続元:"
@@ -4606,17 +4596,17 @@ msgstr "この画面の接続元:"
 msgid "This screen's connection:"
 msgstr "この画面の接続:"
 
-#: lib/ask_drive_web/live/admin_live.ex:5409
+#: lib/ask_drive_web/live/admin_live.ex:5413
 #, elixir-autogen, elixir-format
 msgid "This turns off LDAP sign-in. Users who can only sign in with LDAP will be locked out. Continue?"
 msgstr "LDAP でのログインを無効にします。LDAP でしかログインできない利用者は入れなくなります。続行しますか？"
 
-#: lib/ask_drive_web/live/admin_live.ex:5990
+#: lib/ask_drive_web/live/admin_live.ex:5994
 #, elixir-autogen, elixir-format
 msgid "This turns on password restriction. Users who don't know the password will no longer be able to use this desk. Continue?"
 msgstr "パスワードによる利用制限を有効にします。パスワードを知らない利用者はこの窓口を使えなくなります。続行しますか？"
 
-#: lib/ask_drive_web/live/admin_live.ex:3544
+#: lib/ask_drive_web/live/admin_live.ex:3546
 #, elixir-autogen, elixir-format
 msgid "Time"
 msgstr "時間"
@@ -4626,38 +4616,38 @@ msgstr "時間"
 msgid "Timed out (%{detail})"
 msgstr "タイムアウトしました (%{detail})"
 
-#: lib/ask_drive_web/live/admin_live.ex:6460
+#: lib/ask_drive_web/live/admin_live.ex:6449
 #, elixir-autogen, elixir-format
 msgid "To connect, you need a Google OAuth client (ID and secret). Register it under \"OAuth client for Google Drive sync\" in the platform settings to use it on every desk, or enter it below to set it for this desk only."
 msgstr "「接続」するには、Google の OAuth クライアント（ID とシークレット）が必要です。全体設定の「Google Drive 同期用 OAuth クライアント」に登録すればすべての窓口で使えます。この窓口だけで個別設定する場合は、下に入力してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7863
+#: lib/ask_drive_web/live/admin_live.ex:7887
 #, elixir-autogen, elixir-format
 msgid "To replace certificates, issue and hand out new ones in the same group, then revoke the old ones once everyone has switched (both work in the meantime). If a certificate leaks, revoke it at once."
 msgstr "交換するときは、同じグループで新しい証明書を発行して配り、入れ替えが済んだら古い証明書を失効させます（その間は新旧どちらでも入れます）。漏洩した場合はすぐに失効させてください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4808
+#: lib/ask_drive_web/live/admin_live.ex:4812
 #, elixir-autogen, elixir-format
 msgid "Token density (tokens/KB)"
 msgstr "トークン密度 (Tokens/KB)"
 
-#: lib/ask_drive_web/live/admin_live.ex:3827
-#: lib/ask_drive_web/live/admin_live.ex:3886
+#: lib/ask_drive_web/live/admin_live.ex:3829
+#: lib/ask_drive_web/live/admin_live.ex:3888
 #, elixir-autogen, elixir-format
 msgid "Token efficiency"
 msgstr "トークン効率"
 
-#: lib/ask_drive_web/live/admin_live.ex:4878
+#: lib/ask_drive_web/live/admin_live.ex:4882
 #, elixir-autogen, elixir-format
 msgid "Token efficiency and improvement advice per document"
 msgstr "文書ごとのトークン効率と改善アドバイス"
 
-#: lib/ask_drive_web/live/admin_live.ex:4771
+#: lib/ask_drive_web/live/admin_live.ex:4773
 #, elixir-autogen, elixir-format
 msgid "Token efficiency and structure analysis of indexed data"
 msgstr "インデックス対象データのトークン効率・構造化分析"
 
-#: lib/ask_drive_web/live/admin_live.ex:4792
+#: lib/ask_drive_web/live/admin_live.ex:4796
 #, elixir-autogen, elixir-format
 msgid "Token efficiency by file format"
 msgstr "ファイル形式別のトークン効率比較"
@@ -4667,33 +4657,33 @@ msgstr "ファイル形式別のトークン効率比較"
 msgid "Total chunks"
 msgstr "総チャンク数"
 
-#: lib/ask_drive_web/live/admin_live.ex:4784
+#: lib/ask_drive_web/live/admin_live.ex:4786
 #, elixir-autogen, elixir-format
 msgid "Total indexed: %{count} tokens"
 msgstr "総インデックス: %{count} トークン"
 
-#: lib/ask_drive_web/live/admin_live.ex:4712
+#: lib/ask_drive_web/live/admin_live.ex:4714
 #, elixir-autogen, elixir-format
 msgid "Total requests (last 30 days)"
 msgstr "総リクエスト数 (過去30日)"
 
-#: lib/ask_drive_web/live/admin_live.ex:4805
-#: lib/ask_drive_web/live/admin_live.ex:5015
+#: lib/ask_drive_web/live/admin_live.ex:4809
+#: lib/ask_drive_web/live/admin_live.ex:5019
 #, elixir-autogen, elixir-format
 msgid "Total token count"
 msgstr "総トークン数"
 
-#: lib/ask_drive_web/live/admin_live.ex:4968
+#: lib/ask_drive_web/live/admin_live.ex:4972
 #, elixir-autogen, elixir-format
 msgid "Total tokens"
 msgstr "総トークン"
 
-#: lib/ask_drive_web/live/admin_live.ex:4724
+#: lib/ask_drive_web/live/admin_live.ex:4726
 #, elixir-autogen, elixir-format
 msgid "Total tokens used"
 msgstr "総消費トークン数"
 
-#: lib/ask_drive_web/live/admin_live.ex:7183
+#: lib/ask_drive_web/live/admin_live.ex:7207
 #, elixir-autogen, elixir-format
 msgid "Traffic is encrypted with HTTPS (port %{https_port}). Access over HTTP (port %{http_port}) is redirected to HTTPS (HTTP is still accepted from the proxies set under Ports and reverse proxies below)."
 msgstr "通信は HTTPS（ポート %{https_port}）で暗号化されます。HTTP（ポート %{http_port}）へのアクセスは HTTPS に転送されます（下の「ポートとリバースプロキシ」で指定したプロキシからは、HTTP のまま受け付けます）。"
@@ -4713,12 +4703,12 @@ msgstr "オフにする"
 msgid "Turn off automatic nightly runs for this desk? (Manual runs remain available.)"
 msgstr "この窓口の夜間の自動実行をオフにしますか？（手動実行はできます）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5791
+#: lib/ask_drive_web/live/admin_live.ex:5795
 #, elixir-autogen, elixir-format
 msgid "Turn off required sign-in (back to guest / POC)"
 msgstr "ログイン認証を無効にする（ゲスト・POC に戻す）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5785
+#: lib/ask_drive_web/live/admin_live.ex:5789
 #, elixir-autogen, elixir-format
 msgid "Turn off required sign-in? Anyone will be able to use the chat and the admin screen without signing in."
 msgstr "ログイン認証を無効にしますか？誰でもログインなしでチャットと管理画面を使えるようになります。"
@@ -4728,12 +4718,12 @@ msgstr "ログイン認証を無効にしますか？誰でもログインなし
 msgid "Turn on automatic runs"
 msgstr "自動実行をオンにする"
 
-#: lib/ask_drive_web/live/admin_live.ex:5776
+#: lib/ask_drive_web/live/admin_live.ex:5780
 #, elixir-autogen, elixir-format
 msgid "Turn on required sign-in"
 msgstr "ログイン認証を有効にする"
 
-#: lib/ask_drive_web/live/admin_live.ex:5770
+#: lib/ask_drive_web/live/admin_live.ex:5774
 #, elixir-autogen, elixir-format
 msgid "Turn on required sign-in? Afterwards you cannot enter the admin screen without signing in and confirming your identity."
 msgstr "ログイン認証を有効にしますか？有効にした後は、ログインと本人確認をしないと管理画面に入れません。"
@@ -4744,12 +4734,12 @@ msgid "Turn on the API gateway check. Connections that don't go through the gate
 msgstr "API ゲートウェイの確認を有効にします。ゲートウェイを通らない接続（サーバー自身と許可した IP を除く）は、すぐに拒否されます。続行しますか？"
 
 #: lib/ask_drive_web/live/admin_live.ex:3065
-#: lib/ask_drive_web/live/admin_live.ex:4890
+#: lib/ask_drive_web/live/admin_live.ex:4894
 #, elixir-autogen, elixir-format
 msgid "Type"
 msgstr "種別"
 
-#: lib/ask_drive_web/live/admin_live.ex:4042
+#: lib/ask_drive_web/live/admin_live.ex:4044
 #, elixir-autogen, elixir-format
 msgid "URL name (lowercase letters, digits, hyphens)"
 msgstr "URL 名（英小文字・数字・ハイフン）"
@@ -4759,7 +4749,7 @@ msgstr "URL 名（英小文字・数字・ハイフン）"
 msgid "Unanswered & resolved questions"
 msgstr "未回答・解消質問"
 
-#: lib/ask_drive_web/live/admin_live.ex:3710
+#: lib/ask_drive_web/live/admin_live.ex:3712
 #, elixir-autogen, elixir-format
 msgid "Unanswered questions (top priority in the next nightly batch)"
 msgstr "未回答質問（次回夜間バッチで最優先生成）"
@@ -4769,7 +4759,7 @@ msgstr "未回答質問（次回夜間バッチで最優先生成）"
 msgid "Unanswered resolved / queue left"
 msgstr "未回答解消 / 残キュー"
 
-#: lib/ask_drive_web/live/admin_live.ex:8227
+#: lib/ask_drive_web/live/admin_live.ex:8251
 #, elixir-autogen, elixir-format
 msgid "Unchanged"
 msgstr "変更なし"
@@ -4780,24 +4770,24 @@ msgid "Unexpected response (%{detail})"
 msgstr "想定外の応答です (%{detail})"
 
 #: lib/ask_drive/accounts/login_throttle.ex:152
-#: lib/ask_drive_web/live/admin_live.ex:7211
-#: lib/ask_drive_web/live/admin_live.ex:7400
+#: lib/ask_drive_web/live/admin_live.ex:7235
+#: lib/ask_drive_web/live/admin_live.ex:7424
 #: lib/ask_drive_web/live/ollama_panel.ex:379
 #, elixir-autogen, elixir-format
 msgid "Unknown"
 msgstr "不明"
 
-#: lib/ask_drive_web/live/admin_live.ex:8517
+#: lib/ask_drive_web/live/admin_live.ex:8541
 #, elixir-autogen, elixir-format
 msgid "Unknown feature"
 msgstr "不明な機能です"
 
-#: lib/ask_drive_web/live/admin_live.ex:5660
+#: lib/ask_drive_web/live/admin_live.ex:5664
 #, elixir-autogen, elixir-format
 msgid "Unlock"
 msgstr "解除"
 
-#: lib/ask_drive_web/live/admin_live.ex:5620
+#: lib/ask_drive_web/live/admin_live.ex:5624
 #, elixir-autogen, elixir-format
 msgid "Unlocks at"
 msgstr "解除予定"
@@ -4827,7 +4817,7 @@ msgstr "今すぐアップデート"
 msgid "Update started. AskDrive restarts when the build finishes."
 msgstr "アップデートを開始しました。ビルドが終わると再起動します。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8226
+#: lib/ask_drive_web/live/admin_live.ex:8250
 #, elixir-autogen, elixir-format
 msgid "Updated"
 msgstr "更新"
@@ -4842,17 +4832,17 @@ msgstr "%{email} を更新しました。"
 msgid "Updated the desk administrator roles of %{email}."
 msgstr "%{email} の窓口管理者権限を更新しました。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4810
+#: lib/ask_drive_web/live/admin_live.ex:4814
 #, elixir-autogen, elixir-format
 msgid "Usable text ratio"
 msgstr "有効テキスト比率"
 
-#: lib/ask_drive_web/live/admin_live.ex:5000
+#: lib/ask_drive_web/live/admin_live.ex:5004
 #, elixir-autogen, elixir-format
 msgid "Usage by feature and purpose"
 msgstr "機能・用途別内訳"
 
-#: lib/ask_drive_web/live/admin_live.ex:4952
+#: lib/ask_drive_web/live/admin_live.ex:4956
 #, elixir-autogen, elixir-format
 msgid "Usage by provider and model"
 msgstr "プロバイダ・モデル別利用内訳"
@@ -4862,7 +4852,7 @@ msgstr "プロバイダ・モデル別利用内訳"
 msgid "Used for"
 msgstr "用途"
 
-#: lib/ask_drive_web/live/admin_live.ex:4330
+#: lib/ask_drive_web/live/admin_live.ex:4332
 #, elixir-autogen, elixir-format
 msgid "User account"
 msgstr "ユーザー"
@@ -4872,12 +4862,12 @@ msgstr "ユーザー"
 msgid "User not found."
 msgstr "ユーザーが見つかりません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6159
+#: lib/ask_drive_web/live/admin_live.ex:6148
 #, elixir-autogen, elixir-format
 msgid "User to act as (domain-wide delegation, optional)"
 msgstr "アクセスユーザー（ドメイン全体の委任・任意）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5485
+#: lib/ask_drive_web/live/admin_live.ex:5489
 #, elixir-autogen, elixir-format
 msgid "Username (bind DN)"
 msgstr "ユーザー名（バインド DN）"
@@ -4887,27 +4877,27 @@ msgstr "ユーザー名（バインド DN）"
 msgid "Users"
 msgstr "ユーザー管理"
 
-#: lib/ask_drive_web/live/admin_live.ex:4264
+#: lib/ask_drive_web/live/admin_live.ex:4266
 #, elixir-autogen, elixir-format
 msgid "Users are registered automatically on first sign-in and all start as regular users. Only accounts marked"
 msgstr "利用者は初回ログイン時に自動登録され、全員が一般ユーザーとして開始します。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7875
+#: lib/ask_drive_web/live/admin_live.ex:7899
 #, elixir-autogen, elixir-format
 msgid "Users who accessed without a certificate (monitoring; check before switching to Enforce)"
 msgstr "証明書なしでアクセスしたユーザー（監視中・強制にする前に確認）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7145
+#: lib/ask_drive_web/live/admin_live.ex:7169
 #, elixir-autogen, elixir-format
 msgid "Uses the chat summary provider above. With a cloud provider, questions and excerpts are sent outside your organization"
 msgstr "上のチャット要約プロバイダを使用。クラウドの場合は質問と抜粋が社外に送信されます"
 
-#: lib/ask_drive_web/live/admin_live.ex:5507
+#: lib/ask_drive_web/live/admin_live.ex:5511
 #, elixir-autogen, elixir-format
 msgid "Usually not needed, since Google connects with the certificate alone. Enter these only if you generated \"Access credentials\" in the Admin console."
 msgstr "Google では証明書だけで接続できるため通常は不要です。管理コンソールで「アクセス認証情報」を生成した場合に入力します。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7578
+#: lib/ask_drive_web/live/admin_live.ex:7602
 #, elixir-autogen, elixir-format
 msgid "Valid (group %{group})"
 msgstr "有効（グループ「%{group}」）"
@@ -4927,17 +4917,17 @@ msgstr "バリュードメインの API キー（未設定）"
 msgid "Value-Domain API key (set; enter only to change it)"
 msgstr "バリュードメインの API キー（設定済み。変更するときだけ入力）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7362
+#: lib/ask_drive_web/live/admin_live.ex:7386
 #, elixir-autogen, elixir-format
 msgid "Verification failed. The certificate was not saved."
 msgstr "検証に失敗しました。証明書は保存していません。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7326
+#: lib/ask_drive_web/live/admin_live.ex:7350
 #, elixir-autogen, elixir-format
 msgid "Verification succeeded (certificate and key match, expiry, intermediate certificates, TLS connection test)."
 msgstr "検証に成功しました（証明書と鍵の対応・有効期限・中間証明書・TLS 接続テスト）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7300
+#: lib/ask_drive_web/live/admin_live.ex:7324
 #, elixir-autogen, elixir-format
 msgid "Verify"
 msgstr "検証する"
@@ -4957,7 +4947,7 @@ msgstr "GitHub で見る"
 msgid "Wait until the batch finishes, then restart (during the nightly batch this can take until morning)"
 msgstr "バッチが終わるまで待ってから再起動する（夜間バッチ中だと朝までかかることがあります）"
 
-#: lib/ask_drive_web/live/admin_live.ex:8249
+#: lib/ask_drive_web/live/admin_live.ex:8273
 #, elixir-autogen, elixir-format
 msgid "Waiting for generation (ingested)"
 msgstr "生成待ち（取り込み済み）"
@@ -4967,7 +4957,7 @@ msgstr "生成待ち（取り込み済み）"
 msgid "Waiting to restart"
 msgstr "再起動待ち"
 
-#: lib/ask_drive_web/live/admin_live.ex:7137
+#: lib/ask_drive_web/live/admin_live.ex:7161
 #, elixir-autogen, elixir-format
 msgid "Watch RAM usage"
 msgstr "RAM の消費に注意"
@@ -4982,12 +4972,12 @@ msgstr "Webhook URL（未設定）"
 msgid "Webhook URL (set; enter only to change it)"
 msgstr "Webhook URL（設定済み。変更するときだけ入力）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5718
+#: lib/ask_drive_web/live/admin_live.ex:5722
 #, elixir-autogen, elixir-format
 msgid "When on, every screen including the desk list and chat requires sign-in, and the admin screen also requires identity confirmation (your password with Secure LDAP, otherwise a sign-in within the last 10 minutes). While off, anyone can use the chat and the admin screen without signing in. If you get locked out, run"
 msgstr "有効にすると、窓口一覧・チャットを含むすべての画面でログインが必要になり、管理画面はさらに本人確認が必要になります（Secure LDAP なら本人のパスワード、それ以外は 10 分以内のログイン）。無効の間は、誰でもログインなしでチャットと管理画面を使えます。締め出された場合は、サーバー上で"
 
-#: lib/ask_drive_web/live/admin_live.ex:5986
+#: lib/ask_drive_web/live/admin_live.ex:5990
 #, elixir-autogen, elixir-format
 msgid "When on, only people who enter the password can use this desk's chat"
 msgstr "有効にすると、パスワードを入力した人だけがこの窓口のチャットを使えます"
@@ -4997,7 +4987,7 @@ msgstr "有効にすると、パスワードを入力した人だけがこの窓
 msgid "When the key is issued, open the "
 msgstr "キーが発行されたら、"
 
-#: lib/ask_drive_web/live/admin_live.ex:6926
+#: lib/ask_drive_web/live/admin_live.ex:6950
 #, elixir-autogen, elixir-format
 msgid "When using a different provider from the nightly batch, enter a model name."
 msgstr "夜間バッチと別のプロバイダにする場合は、モデル名を指定してください。"
@@ -5007,12 +4997,12 @@ msgstr "夜間バッチと別のプロバイダにする場合は、モデル名
 msgid "Where it stopped"
 msgstr "停止した位置"
 
-#: lib/ask_drive_web/live/admin_live.ex:7237
+#: lib/ask_drive_web/live/admin_live.ex:7261
 #, elixir-autogen, elixir-format
 msgid "While the admin screen is open without login (POC), anyone on the LAN can replace the certificate. Turn on login before exposing it to the internet."
 msgstr "管理画面が認証なしで開放されている間（POC）は、LAN 内の誰でも証明書を差し替えられます。外部公開の前に認証を有効にしてください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7085
+#: lib/ask_drive_web/live/admin_live.ex:7109
 #, elixir-autogen, elixir-format
 msgid "With several desks, the nightly run goes one desk at a time in two stages. (1) Ingestion (sync, text extraction, embedding) for every desk, starting with the desk with the lowest share ingested. (2) QA pair generation, starting with the desk with the lowest share generated. The time left before the cut-off is split between desks by the number of chunks still to generate, and time left over by a desk that finishes early goes to the next one."
 msgstr "窓口が複数あるときの夜間の自動実行は、1 つずつ順に 2 段階で行います。(1) すべての窓口の取り込み（同期・本文抽出・埋め込み）を、取り込み済みの割合が低い窓口から。(2) 想定QAの生成を、生成が済んでいる割合が低い窓口から。打ち切り時刻までの残り時間は、生成が残っているチャンク数に応じて窓口ごとに分け、早く終わった窓口の余りは次の窓口に回します。"
@@ -5053,27 +5043,27 @@ msgstr "あなたの全体管理者の権限を外しました。一般ユーザ
 msgid "and after the change it is read back to confirm that nothing but the TXT record changed. The first time, make sure a “test” certificate can be obtained before switching to a production one (production has a limit on failed attempts)."
 msgstr "に保存し、変更後に読み直して TXT レコード以外が変わっていないことを確かめます。初めて使うときは「テスト用」で取得できることを確かめてから、本番の証明書に切り替えてください（本番には失敗回数の制限があります）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:6370
+#: lib/ask_drive_web/live/admin_live.ex:6359
 #, elixir-autogen, elixir-format
 msgid "and shows an error. This is normal. "
 msgstr "に遷移してエラー表示になるのは正常です。 その"
 
-#: lib/ask_drive_web/live/admin_live.ex:5185
+#: lib/ask_drive_web/live/admin_live.ex:5189
 #, elixir-autogen, elixir-format
 msgid "blank"
 msgstr "空欄"
 
-#: lib/ask_drive_web/live/admin_live.ex:5195
+#: lib/ask_drive_web/live/admin_live.ex:5199
 #, elixir-autogen, elixir-format
 msgid "company.com (blank for no restriction)"
 msgstr "company.com (空欄で制限なし)"
 
-#: lib/ask_drive_web/live/admin_live.ex:5441
+#: lib/ask_drive_web/live/admin_live.ex:5445
 #, elixir-autogen, elixir-format
 msgid "domain not set"
 msgstr "ドメイン未設定"
 
-#: lib/ask_drive_web/live/admin_live.ex:7442
+#: lib/ask_drive_web/live/admin_live.ex:7466
 #, elixir-autogen, elixir-format
 msgid "e.g. 127.0.0.1, 192.168.1.10"
 msgstr "例: 127.0.0.1, 192.168.1.10"
@@ -5083,17 +5073,17 @@ msgstr "例: 127.0.0.1, 192.168.1.10"
 msgid "e.g. 192.168.0.0/16 (to use it directly from the office LAN during migration)"
 msgstr "例: 192.168.0.0/16（移行期間中に社内 LAN から直接使う場合）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7554
+#: lib/ask_drive_web/live/admin_live.ex:7578
 #, elixir-autogen, elixir-format
 msgid "e.g. 192.168.0.0/16, 10.0.0.0/8"
 msgstr "例: 192.168.0.0/16, 10.0.0.0/8"
 
-#: lib/ask_drive_web/live/admin_live.ex:5262
+#: lib/ask_drive_web/live/admin_live.ex:5266
 #, elixir-autogen, elixir-format
 msgid "e.g. GOCSPX-xxxxxxxxxxxx"
 msgstr "例: GOCSPX-xxxxxxxxxxxx"
 
-#: lib/ask_drive_web/live/admin_live.ex:7733
+#: lib/ask_drive_web/live/admin_live.ex:7757
 #, elixir-autogen, elixir-format
 msgid "e.g. Reception PC"
 msgstr "例: 受付の PC"
@@ -5108,7 +5098,7 @@ msgstr "例: Gemini のモデル名"
 msgid "e.g. ask.example.com"
 msgstr "例: ask.example.com"
 
-#: lib/ask_drive_web/live/admin_live.ex:7290
+#: lib/ask_drive_web/live/admin_live.ex:7314
 #, elixir-autogen, elixir-format
 msgid "e.g. askdrive.example.com"
 msgstr "例: askdrive.example.com"
@@ -5123,32 +5113,32 @@ msgstr "例: example.com"
 msgid "e.g. https://app.example.com"
 msgstr "例: https://app.example.com"
 
-#: lib/ask_drive_web/live/admin_live.ex:6272
+#: lib/ask_drive_web/live/admin_live.ex:6261
 #, elixir-autogen, elixir-format
 msgid "e.g. sync-drive@gmail.com or sync@company.com"
 msgstr "例: sync-drive@gmail.com または sync@company.com"
 
-#: lib/ask_drive_web/live/admin_live.ex:5251
+#: lib/ask_drive_web/live/admin_live.ex:5255
 #, elixir-autogen, elixir-format
 msgid "e.g. xxxxxxxx.apps.googleusercontent.com"
 msgstr "例: xxxxxxxx.apps.googleusercontent.com"
 
-#: lib/ask_drive_web/live/admin_live.ex:5185
+#: lib/ask_drive_web/live/admin_live.ex:5189
 #, elixir-autogen, elixir-format
 msgid "etc.) or no domain restriction, leave it "
 msgstr "等）やドメイン制限を行わない場合は、"
 
-#: lib/ask_drive_web/live/admin_live.ex:6168
+#: lib/ask_drive_web/live/admin_live.ex:6157
 #, elixir-autogen, elixir-format
 msgid "for the scope"
 msgstr "にスコープ"
 
-#: lib/ask_drive_web/live/admin_live.ex:7972
+#: lib/ask_drive_web/live/admin_live.ex:7996
 #, elixir-autogen, elixir-format
 msgid "host name"
 msgstr "ホスト名"
 
-#: lib/ask_drive_web/live/admin_live.ex:6118
+#: lib/ask_drive_web/live/admin_live.ex:6107
 #, elixir-autogen, elixir-format
 msgid "host names). Open"
 msgstr "ホスト名の拒否）を回避できます。"
@@ -5158,7 +5148,7 @@ msgstr "ホスト名の拒否）を回避できます。"
 msgid "latest version"
 msgstr "最新版"
 
-#: lib/ask_drive_web/live/admin_live.ex:7766
+#: lib/ask_drive_web/live/admin_live.ex:7790
 #, elixir-autogen, elixir-format
 msgid "note"
 msgstr "メモ"
@@ -5173,27 +5163,27 @@ msgstr "オフ"
 msgid "on the server (takes effect without a restart). Don't send the secret value by email; receive it in a secure way."
 msgstr "を実行してください（再起動なしで反映）。秘密の値はメールに書かず、安全な方法で受け取ってください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5722
+#: lib/ask_drive_web/live/admin_live.ex:5726
 #, elixir-autogen, elixir-format
 msgid "on the server to turn it off again."
 msgstr "を実行すると無効に戻せます。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7453
+#: lib/ask_drive_web/live/admin_live.ex:7477
 #, elixir-autogen, elixir-format
 msgid "on the server to undo it. Also change the target port on the proxy (Cloudflare Tunnel etc.)."
 msgstr "で戻せます。プロキシ（Cloudflare Tunnel 等）の中継先ポートも合わせて変更してください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7534
+#: lib/ask_drive_web/live/admin_live.ex:7558
 #, elixir-autogen, elixir-format
 msgid "on the server, or open the screen from the server itself (localhost)."
 msgstr "を実行するか、サーバー自身（localhost）から開いてください。"
 
-#: lib/ask_drive_web/live/admin_live.ex:3662
+#: lib/ask_drive_web/live/admin_live.ex:3664
 #, elixir-autogen, elixir-format
 msgid "pandoc (Office extraction)"
 msgstr "pandoc (Office抽出)"
 
-#: lib/ask_drive_web/live/admin_live.ex:3649
+#: lib/ask_drive_web/live/admin_live.ex:3651
 #, elixir-autogen, elixir-format
 msgid "pdftotext (PDF extraction)"
 msgstr "pdftotext (PDF抽出)"
@@ -5203,23 +5193,23 @@ msgstr "pdftotext (PDF抽出)"
 msgid "started %{time}"
 msgstr "%{time} 開始"
 
-#: lib/ask_drive_web/live/admin_live.ex:4627
-#: lib/ask_drive_web/live/admin_live.ex:4716
+#: lib/ask_drive_web/live/admin_live.ex:4629
+#: lib/ask_drive_web/live/admin_live.ex:4718
 #, elixir-autogen, elixir-format
 msgid "times"
 msgstr "回"
 
-#: lib/ask_drive_web/live/admin_live.ex:6126
+#: lib/ask_drive_web/live/admin_live.ex:6115
 #, elixir-autogen, elixir-format
 msgid "to create a service account, then download its JSON key and paste it below. After that, share the Drive folder to sync with the service account's email address ("
 msgstr "でサービスアカウントを作成し、JSON キーをダウンロードして貼り付けてください。作成後、同期対象の Drive フォルダをそのサービスアカウントのメールアドレス（"
 
-#: lib/ask_drive_web/live/admin_live.ex:6339
+#: lib/ask_drive_web/live/admin_live.ex:6328
 #, elixir-autogen, elixir-format
 msgid "to the authorized redirect URIs, or create a client of type \"Desktop app\" (no registration needed for desktop apps)."
 msgstr "を追加するか、種類「デスクトップ アプリ」のクライアントを作成してください（デスクトップ アプリなら登録不要）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:8705
+#: lib/ask_drive_web/live/admin_live.ex:8729
 #: lib/ask_drive_web/live/gateway_panel.ex:49
 #, elixir-autogen, elixir-format
 msgid "unknown"
@@ -5230,12 +5220,12 @@ msgstr "不明"
 msgid "v%{version} available"
 msgstr "v%{version} があります"
 
-#: lib/ask_drive_web/live/admin_live.ex:4079
+#: lib/ask_drive_web/live/admin_live.ex:4081
 #, elixir-autogen, elixir-format
 msgid "· Admin screen:"
 msgstr "・管理画面:"
 
-#: lib/ask_drive_web/live/admin_live.ex:8283
+#: lib/ask_drive_web/live/admin_live.ex:8307
 #, elixir-autogen, elixir-format
 msgid "— (aborted)"
 msgstr "—（中断）"
@@ -5245,17 +5235,17 @@ msgstr "—（中断）"
 msgid "— (shown once a Let's Encrypt certificate is obtained)"
 msgstr "—（Let's Encrypt の証明書の取得後に表示）"
 
-#: lib/ask_drive_web/live/admin_live.ex:6480
+#: lib/ask_drive_web/live/admin_live.ex:6469
 #, elixir-autogen, elixir-format
 msgid "— create it:"
 msgstr "を作成する:"
 
-#: lib/ask_drive_web/live/admin_live.ex:6503
+#: lib/ask_drive_web/live/admin_live.ex:6492
 #, elixir-autogen, elixir-format
 msgid "— create one (type \"Desktop app\"; no redirect URI registration needed)"
 msgstr "を作る（種類は「デスクトップ アプリ」。リダイレクト URI の登録は不要）"
 
-#: lib/ask_drive_web/live/admin_live.ex:6170
+#: lib/ask_drive_web/live/admin_live.ex:6159
 #, elixir-autogen, elixir-format
 msgid "— or leave it blank to access Drive as the service account itself."
 msgstr "を許可してください。空欄ならサービスアカウント自身としてアクセスします。"
@@ -5270,27 +5260,27 @@ msgstr "「保存」は値を保存するだけで、自動更新の有効・無
 msgid "“Save” only saves the values; the check is turned on and off with the switch above. It can be turned on only while this screen is opened via the gateway (with the same secret value), from the server itself (localhost) or from an IP allowed direct access (so you don't lock yourself out). The server itself can always connect directly. If you are locked out, run"
 msgstr "「保存」は値を保存するだけで、確認の有効・無効は上のスイッチで切り替えます。有効にできるのは、この画面がゲートウェイ経由（同じ秘密の値）・サーバー自身（localhost）・直接アクセスを許可する IP のいずれかから開かれているときだけです（自分を締め出さないため）。サーバー自身からは常に直接アクセスできます。締め出された場合はサーバー上で"
 
-#: lib/ask_drive_web/live/admin_live.ex:6485
+#: lib/ask_drive_web/live/admin_live.ex:6474
 #, elixir-autogen, elixir-format
 msgid "”"
 msgstr "」にする"
 
-#: lib/ask_drive_web/live/admin_live.ex:6490
+#: lib/ask_drive_web/live/admin_live.ex:6479
 #, elixir-autogen, elixir-format
 msgid "” and add the Gmail address to sync under “Test users”"
 msgstr "」にし、「テストユーザー」に同期する Gmail アドレスを追加する"
 
-#: lib/ask_drive_web/live/admin_live.ex:6614
+#: lib/ask_drive_web/live/admin_live.ex:6638
 #, elixir-autogen, elixir-format
 msgid "… and %{count} more"
 msgstr "… ほか %{count} 件"
 
-#: lib/ask_drive_web/live/admin_live.ex:5869
+#: lib/ask_drive_web/live/admin_live.ex:5873
 #, elixir-autogen, elixir-format
 msgid "(this is you)"
 msgstr "（あなた）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4804
+#: lib/ask_drive_web/live/admin_live.ex:4808
 #, elixir-autogen, elixir-format
 msgid "Document count"
 msgstr "文書数"
@@ -5804,7 +5794,7 @@ msgid "Choose a model"
 msgstr "モデルを選択"
 
 #: lib/ask_drive/llm/cloud_models.ex:113
-#: lib/ask_drive_web/live/admin_live.ex:7939
+#: lib/ask_drive_web/live/admin_live.ex:7963
 #, elixir-autogen, elixir-format
 msgid "Could not get the model list: %{reason}"
 msgstr "モデルの一覧を取得できませんでした: %{reason}"
@@ -5869,12 +5859,12 @@ msgstr "リージョン（任意）"
 msgid "Connection: %{provider}"
 msgstr "接続情報: %{provider}"
 
-#: lib/ask_drive_web/live/admin_live.ex:6908
+#: lib/ask_drive_web/live/admin_live.ex:6932
 #, elixir-autogen, elixir-format
 msgid "The connection for %{provider} is set above, under the nightly batch."
 msgstr "%{provider} の接続情報は、上の「夜間バッチ」の欄で設定します。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7005
+#: lib/ask_drive_web/live/admin_live.ex:7029
 #, elixir-autogen, elixir-format
 msgid "The connection for %{provider} is set above."
 msgstr "%{provider} の接続情報は、上の欄で設定します。"
@@ -5947,8 +5937,8 @@ msgstr "Ollama（ローカル推論）"
 msgid "Ollama can't be installed from here: AskDrive wasn't started with app.sh."
 msgstr "この画面からは Ollama をインストールできません（AskDrive が app.sh で起動されていません）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7907
-#: lib/ask_drive_web/live/admin_live.ex:7915
+#: lib/ask_drive_web/live/admin_live.ex:7931
+#: lib/ask_drive_web/live/admin_live.ex:7939
 #, elixir-autogen, elixir-format
 msgid "Ollama didn't start: %{reason}"
 msgstr "Ollama を起動できませんでした: %{reason}"
@@ -5963,7 +5953,7 @@ msgstr "Ollama はすでにインストール中です。"
 msgid "Ollama is installed. AskDrive is starting it and pulling the models the desks need (see each desk's Settings, Local models)."
 msgstr "Ollama をインストールしました。AskDrive が起動し、窓口が使うモデルの取得を始めます（各窓口の「設定」の「ローカルモデル（Ollama）」で確認できます）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:7900
+#: lib/ask_drive_web/live/admin_live.ex:7924
 #, elixir-autogen, elixir-format
 msgid "Ollama is running."
 msgstr "Ollama は稼働中です。"
@@ -6079,7 +6069,7 @@ msgstr "Ollama に接続できないため、取得済みのモデルを一覧�
 msgid "Pull them all"
 msgstr "まとめて取得"
 
-#: lib/ask_drive_web/live/admin_live.ex:6873
+#: lib/ask_drive_web/live/admin_live.ex:6897
 #, elixir-autogen, elixir-format
 msgid "Same as the nightly batch model"
 msgstr "夜間バッチと同じモデル"
@@ -6124,7 +6114,7 @@ msgstr "保存済みのモデル %{model} は、取得済みのモデルにあ�
 msgid "There's no such model in Ollama's library: check the name (%{detail})"
 msgstr "Ollama のライブラリにこのモデルはありません。名前を確認してください（%{detail}）"
 
-#: lib/ask_drive_web/live/admin_live.ex:7026
+#: lib/ask_drive_web/live/admin_live.ex:7050
 #, elixir-autogen, elixir-format
 msgid "With an Ollama model, the dimensions are set to the model's own when saving (e.g. bge-m3: 1024)."
 msgstr "Ollama のモデルでは、保存時に埋め込み次元をモデルの次元に合わせます（例: bge-m3 は 1024）。"
@@ -6154,7 +6144,7 @@ msgstr "設定済み: ••••••••%{last4}（変更するときだ�
 msgid "%{count} documents skipped for lack of the program will be read in the next ingestion."
 msgstr "プログラムがなくてスキップした文書 %{count} 件を、次の取り込みで読み直します。"
 
-#: lib/ask_drive_web/live/admin_live.ex:3695
+#: lib/ask_drive_web/live/admin_live.ex:3697
 #, elixir-autogen, elixir-format
 msgid "A program that reads documents is missing, so such files are skipped. A platform administrator installs it under Platform admin, Install & updates (some need a command on the server)."
 msgstr "文書を読むためのプログラムが入っていないため、その種類のファイルはスキップされています。全体管理者が、全体管理の「インストールとアップデート」でインストールします（サーバーでコマンドの実行が必要なものもあります）。"
@@ -6300,17 +6290,17 @@ msgstr "← サポートされているモデル一覧から選ぶ"
 msgid "%{name} (Experimental)"
 msgstr "%{name} (実験的)"
 
-#: lib/ask_drive_web/live/admin_live.ex:3677
+#: lib/ask_drive_web/live/admin_live.ex:3679
 #, elixir-autogen, elixir-format
 msgid "LibreOffice (.doc, .xls, .ppt)"
 msgstr "LibreOffice（.doc / .xls / .ppt）"
 
-#: lib/ask_drive_web/live/admin_live.ex:8228
+#: lib/ask_drive_web/live/admin_live.ex:8252
 #, elixir-autogen, elixir-format
 msgid "Not a document"
 msgstr "対象外"
 
-#: lib/ask_drive_web/live/admin_live.ex:3686
+#: lib/ask_drive_web/live/admin_live.ex:3688
 #, elixir-autogen, elixir-format
 msgid "Not installed (old Office files are skipped)"
 msgstr "未インストール（古い Office ファイルはスキップ）"
@@ -6320,7 +6310,7 @@ msgstr "未インストール（古い Office ファイルはスキップ）"
 msgid "Old Word, Excel and PowerPoint files (.doc, .xls, .ppt)"
 msgstr "古い形式の Word・Excel・PowerPoint（.doc / .xls / .ppt）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5562
+#: lib/ask_drive_web/live/admin_live.ex:5566
 #, elixir-autogen, elixir-format
 msgid "%{count} users (fetched %{time})"
 msgstr "%{count} 人（%{time} 取得）"
@@ -6330,32 +6320,32 @@ msgstr "%{count} 人（%{time} 取得）"
 msgid "Can't list the directory's users"
 msgstr "ディレクトリのユーザー一覧を取得できません"
 
-#: lib/ask_drive_web/live/admin_live.ex:5555
+#: lib/ask_drive_web/live/admin_live.ex:5559
 #, elixir-autogen, elixir-format
 msgid "Directory users (for completing e-mail addresses)"
 msgstr "ユーザー一覧（メールアドレスの補完用）"
 
-#: lib/ask_drive_web/live/admin_live.ex:5595
+#: lib/ask_drive_web/live/admin_live.ex:5599
 #, elixir-autogen, elixir-format
 msgid "Fetched every night, so addresses are suggested at once as you type. Someone added to the directory since is still found (the directory is asked when the list has no match)."
 msgstr "毎晩取得しておき、入力するとすぐに候補を表示します。取得後にディレクトリに追加された人も見つかります（一覧に該当がないときはディレクトリに問い合わせます）。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5560
+#: lib/ask_drive_web/live/admin_live.ex:5564
 #, elixir-autogen, elixir-format
 msgid "Fetching…"
 msgstr "取得中…"
 
-#: lib/ask_drive_web/live/admin_live.ex:5571
+#: lib/ask_drive_web/live/admin_live.ex:5575
 #, elixir-autogen, elixir-format
 msgid "Not fetched yet"
 msgstr "未取得"
 
-#: lib/ask_drive_web/live/admin_live.ex:5582
+#: lib/ask_drive_web/live/admin_live.ex:5586
 #, elixir-autogen, elixir-format
 msgid "Refresh now"
 msgstr "今すぐ更新"
 
-#: lib/ask_drive_web/live/admin_live.ex:5590
+#: lib/ask_drive_web/live/admin_live.ex:5594
 #, elixir-autogen, elixir-format
 msgid "The last fetch failed: %{message}"
 msgstr "前回の取得に失敗しました: %{message}"
@@ -6380,17 +6370,17 @@ msgstr "スクリーンショットや図を使った説明として、本文は
 msgid "Text inside the images (button names, values) isn't searched: writing the important ones in the text as well makes them findable."
 msgstr "画像の中の文字（ボタン名や設定値）は検索の対象外です。重要なものは本文にも書くと、検索で見つかるようになります。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5058
+#: lib/ask_drive_web/live/admin_live.ex:5062
 #, elixir-autogen, elixir-format
 msgid "Errors from the last %{days} days are shown; mark the ones you know about as seen to hide them."
 msgstr "直近 %{days} 日間のエラーを表示します。把握済みのエラーは「確認済み」にすると一覧から消えます。"
 
-#: lib/ask_drive_web/live/admin_live.ex:5072
+#: lib/ask_drive_web/live/admin_live.ex:5076
 #, elixir-autogen, elixir-format
 msgid "Mark all as seen"
 msgstr "すべて確認済みにする"
 
-#: lib/ask_drive_web/live/admin_live.ex:5124
+#: lib/ask_drive_web/live/admin_live.ex:5128
 #, elixir-autogen, elixir-format
 msgid "Mark as seen"
 msgstr "確認済みにする"
@@ -6400,7 +6390,7 @@ msgstr "確認済みにする"
 msgid "Agent Platform (Vertex AI) API key"
 msgstr "Agent Platform（Vertex AI）の API キー"
 
-#: lib/ask_drive_web/live/admin_live.ex:3822
+#: lib/ask_drive_web/live/admin_live.ex:3824
 #, elixir-autogen, elixir-format
 msgid "All file types"
 msgstr "すべてのファイル形式"
@@ -6410,7 +6400,7 @@ msgstr "すべてのファイル形式"
 msgid "All grades"
 msgstr "すべての評価"
 
-#: lib/ask_drive_web/live/admin_live.ex:3816
+#: lib/ask_drive_web/live/admin_live.ex:3818
 #, elixir-autogen, elixir-format
 msgid "All statuses"
 msgstr "すべての状態"
@@ -6420,12 +6410,12 @@ msgstr "すべての状態"
 msgid "Anthropic Claude API key"
 msgstr "Anthropic Claude API キー"
 
-#: lib/ask_drive_web/live/admin_live.ex:3853
+#: lib/ask_drive_web/live/admin_live.ex:3855
 #, elixir-autogen, elixir-format
 msgid "Average: %{value} tokens/KB"
 msgstr "平均: %{value} トークン/KB"
 
-#: lib/ask_drive_web/live/admin_live.ex:3870
+#: lib/ask_drive_web/live/admin_live.ex:3872
 #, elixir-autogen, elixir-format
 msgid "Clear filters"
 msgstr "絞り込みを解除"
@@ -6465,7 +6455,7 @@ msgstr "名前順"
 msgid "No chunks"
 msgstr "チャンクなし"
 
-#: lib/ask_drive_web/live/admin_live.ex:3894
+#: lib/ask_drive_web/live/admin_live.ex:3896
 #, elixir-autogen, elixir-format
 msgid "No documents match the filters."
 msgstr "条件に一致するドキュメントはありません。"
@@ -6480,27 +6470,27 @@ msgstr "評価なし（未取り込み）"
 msgid "OpenAI API key"
 msgstr "OpenAI API キー"
 
-#: lib/ask_drive_web/live/admin_live.ex:3809
+#: lib/ask_drive_web/live/admin_live.ex:3811
 #, elixir-autogen, elixir-format
 msgid "Part of the name"
 msgstr "名前の一部"
 
-#: lib/ask_drive_web/live/admin_live.ex:3844
+#: lib/ask_drive_web/live/admin_live.ex:3846
 #, elixir-autogen, elixir-format
 msgid "Showing %{shown} of %{total}"
 msgstr "%{total} 件中 %{shown} 件を表示"
 
-#: lib/ask_drive_web/live/admin_live.ex:3833
+#: lib/ask_drive_web/live/admin_live.ex:3835
 #, elixir-autogen, elixir-format
 msgid "Sort by"
 msgstr "並び順"
 
-#: lib/ask_drive_web/live/admin_live.ex:3850
+#: lib/ask_drive_web/live/admin_live.ex:3852
 #, elixir-autogen, elixir-format
 msgid "Tokens: %{count}"
 msgstr "トークン: %{count}"
 
-#: lib/ask_drive_web/live/admin_live.ex:4692
+#: lib/ask_drive_web/live/admin_live.ex:4694
 #, elixir-autogen, elixir-format
 msgid "%{rate}% of questions were answered at once from the QA the nightly batch prepared"
 msgstr "質問の %{rate}% は夜間バッチで準備した QA から即答しました"
@@ -6510,18 +6500,18 @@ msgstr "質問の %{rate}% は夜間バッチで準備した QA から即答し�
 msgid "A little slow"
 msgstr "やや遅い"
 
-#: lib/ask_drive_web/live/admin_live.ex:4967
-#: lib/ask_drive_web/live/admin_live.ex:5014
+#: lib/ask_drive_web/live/admin_live.ex:4971
+#: lib/ask_drive_web/live/admin_live.ex:5018
 #, elixir-autogen, elixir-format
 msgid "API calls"
 msgstr "API 呼び出し回数"
 
-#: lib/ask_drive_web/live/admin_live.ex:4699
+#: lib/ask_drive_web/live/admin_live.ex:4701
 #, elixir-autogen, elixir-format
 msgid "Answered with the AI summary each time"
 msgstr "毎回 AI 要約で回答しています"
 
-#: lib/ask_drive_web/live/admin_live.ex:5025
+#: lib/ask_drive_web/live/admin_live.ex:5029
 #, elixir-autogen, elixir-format
 msgid "Chat question search (embedding)"
 msgstr "チャットの質問の検索（埋め込み）"
@@ -6531,12 +6521,12 @@ msgstr "チャットの質問の検索（埋め込み）"
 msgid "Good"
 msgstr "良好"
 
-#: lib/ask_drive_web/live/admin_live.ex:4669
+#: lib/ask_drive_web/live/admin_live.ex:4671
 #, elixir-autogen, elixir-format
 msgid "Importing documents and preparing QA"
 msgstr "ドキュメントの取り込みと QA の準備"
 
-#: lib/ask_drive_web/live/admin_live.ex:5026
+#: lib/ask_drive_web/live/admin_live.ex:5030
 #, elixir-autogen, elixir-format
 msgid "Nightly batch embedding"
 msgstr "夜間バッチの埋め込み（取り込み）"
@@ -6551,47 +6541,47 @@ msgstr "データなし"
 msgid "Normal"
 msgstr "ふつう"
 
-#: lib/ask_drive_web/live/admin_live.ex:4623
+#: lib/ask_drive_web/live/admin_live.ex:4625
 #, elixir-autogen, elixir-format
 msgid "Questions (last %{days} days)"
 msgstr "質問数（直近 %{days} 日）"
 
-#: lib/ask_drive_web/live/admin_live.ex:4677
+#: lib/ask_drive_web/live/admin_live.ex:4679
 #, elixir-autogen, elixir-format
 msgid "Response speed"
 msgstr "返答速度"
 
-#: lib/ask_drive_web/live/admin_live.ex:4657
+#: lib/ask_drive_web/live/admin_live.ex:4659
 #, elixir-autogen, elixir-format
 msgid "Search and AI summaries of the chat"
 msgstr "チャットの検索と AI 要約"
 
-#: lib/ask_drive_web/live/admin_live.ex:4697
+#: lib/ask_drive_web/live/admin_live.ex:4699
 #, elixir-autogen, elixir-format
 msgid "Shown once questions are asked"
 msgstr "質問があると表示されます"
 
-#: lib/ask_drive_web/live/admin_live.ex:4630
+#: lib/ask_drive_web/live/admin_live.ex:4632
 #, elixir-autogen, elixir-format
 msgid "Solved: %{solved} · not yet: %{unsolved}"
 msgstr "解決 %{solved} 回・未解決 %{unsolved} 回"
 
-#: lib/ask_drive_web/live/admin_live.ex:4651
+#: lib/ask_drive_web/live/admin_live.ex:4653
 #, elixir-autogen, elixir-format
 msgid "Tokens for answering questions"
 msgstr "質問の処理に使ったトークン"
 
-#: lib/ask_drive_web/live/admin_live.ex:4663
+#: lib/ask_drive_web/live/admin_live.ex:4665
 #, elixir-autogen, elixir-format
 msgid "Tokens processed by the nightly batch"
 msgstr "夜間バッチで処理したトークン"
 
-#: lib/ask_drive_web/live/admin_live.ex:3737
+#: lib/ask_drive_web/live/admin_live.ex:3739
 #, elixir-autogen, elixir-format
 msgid "Answered from a QA pair, but the asker asked a follow-up: the answer may be out of date or off the point."
 msgstr "QA で回答しましたが、質問者が追加で質問しています。回答の内容が古いか、的外れの可能性があります。"
 
-#: lib/ask_drive_web/live/admin_live.ex:4642
+#: lib/ask_drive_web/live/admin_live.ex:4644
 #, elixir-autogen, elixir-format
 msgid "Marked solved by askers: %{solved} · followed up: %{followed}"
 msgstr "利用者の「解決した」: %{solved} 回・追加の質問: %{followed} 回"
@@ -6605,3 +6595,24 @@ msgstr "解決した"
 #, elixir-autogen, elixir-format
 msgid "Solved. Thank you!"
 msgstr "解決しました。ありがとうございます"
+
+#: lib/ask_drive_web/live/admin_live.ex:6087
+#: lib/ask_drive_web/live/admin_live.ex:6562
+#, elixir-autogen, elixir-format
+msgid "Advanced: use a service account"
+msgstr "詳細設定：サービスアカウントを使う"
+
+#: lib/ask_drive_web/live/admin_live.ex:6550
+#, elixir-autogen, elixir-format
+msgid "Drive sync with %{email} stops until the service account is set up. Switch to a service account?"
+msgstr "サービスアカウントの設定が終わるまで、%{email} での Drive の同期は止まります。サービスアカウントに切り替えますか？"
+
+#: lib/ask_drive_web/live/admin_live.ex:6564
+#, elixir-autogen, elixir-format
+msgid "For sync that keeps going whoever is in charge: a person's authorization stops when they change jobs or leave. Needs a service account created in Google Cloud."
+msgstr "担当者の異動・退職に左右されずに同期を続けたい場合に使います（個人の Google アカウントでの認証は、その人が異動・退職すると止まります）。Google Cloud でのサービスアカウントの作成が必要です。"
+
+#: lib/ask_drive_web/live/admin_live.ex:6096
+#, elixir-autogen, elixir-format
+msgid "Use Google account authorization instead"
+msgstr "Google アカウント認証に戻す"

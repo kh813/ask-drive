@@ -183,7 +183,9 @@ defmodule AskDrive.Apps do
       |> Map.from_struct()
       |> Map.drop([:__meta__, :id, :inserted_at, :updated_at])
       |> Map.merge(Map.new(@per_app_blank, &{&1, nil}))
-      |> Map.put(:drive_auth_mode, "service_account")
+      # Google account authorization, the simple way: the service account is the advanced
+      # option (F-357)
+      |> Map.put(:drive_auth_mode, "oauth")
       # a new desk is being set up: no nightly batch until its administrators switch it on
       |> Map.put(:auto_batch_enabled, false)
 

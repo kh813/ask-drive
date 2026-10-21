@@ -2901,21 +2901,21 @@ defmodule AskDriveWeb.AdminLive do
               <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
                 <p class="text-xs font-medium text-zinc-500">{gettext("Synced documents")}</p>
                 <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
-                  {@total_docs}
+                  <.big_number value={@total_docs} />
                 </p>
               </div>
 
               <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
                 <p class="text-xs font-medium text-zinc-500">{gettext("Total chunks")}</p>
                 <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
-                  {@total_chunks}
+                  <.big_number value={@total_chunks} />
                 </p>
               </div>
 
               <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
                 <p class="text-xs font-medium text-zinc-500">{gettext("Active QA pairs (Tier 1)")}</p>
                 <p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                  {@active_qas}
+                  <.big_number value={@active_qas} />
                 </p>
               </div>
 
@@ -2924,7 +2924,7 @@ defmodule AskDriveWeb.AdminLive do
                   {gettext("Stale QA pairs (awaiting regeneration)")}
                 </p>
                 <p class="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
-                  {@stale_qas}
+                  <.big_number value={@stale_qas} />
                 </p>
               </div>
             </div>
@@ -3496,7 +3496,7 @@ defmodule AskDriveWeb.AdminLive do
                     )}
                   </p>
                   <div class="overflow-x-auto max-h-60 overflow-y-auto">
-                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400 tabular-nums">
                       <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
                         <tr :for={chunk <- @given_up_chunks}>
                           <td class="py-1.5 px-2 break-all">
@@ -3521,7 +3521,9 @@ defmodule AskDriveWeb.AdminLive do
                 <%!-- Per-file log (spec 6.3.5): what happened to each Drive file, and why --%>
                 <div class="pt-4 border-t border-zinc-200/60 dark:border-zinc-800 space-y-2">
                   <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                    {gettext("Per-file log (%{count} · failures first)", count: length(@item_logs))}
+                    {gettext("Per-file log (%{count} · failures first)",
+                      count: num(length(@item_logs))
+                    )}
                   </h3>
                   <%= if @item_logs == [] do %>
                     <p class="text-xs text-zinc-500">
@@ -3710,7 +3712,7 @@ defmodule AskDriveWeb.AdminLive do
                   {gettext("Unanswered questions (top priority in the next nightly batch)")}
                 </span>
                 <span class="text-xs font-normal text-zinc-500">
-                  {gettext("%{count} items", count: length(@unresolved_questions))}
+                  {gettext("%{count} items", count: num(length(@unresolved_questions)))}
                 </span>
               </h2>
 
@@ -3790,7 +3792,7 @@ defmodule AskDriveWeb.AdminLive do
             <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
               <span>{gettext("Documents for ingestion")}</span>
               <span class="text-xs font-normal text-zinc-500">
-                {gettext("%{count} in total", count: length(@documents))}
+                {gettext("%{count} in total", count: num(length(@documents)))}
               </span>
             </h2>
 
@@ -3842,12 +3844,12 @@ defmodule AskDriveWeb.AdminLive do
             >
               <span class="font-semibold text-zinc-900 dark:text-zinc-100">
                 {gettext("Showing %{shown} of %{total}",
-                  shown: @shown_docs_summary.count,
-                  total: length(@documents)
+                  shown: num(@shown_docs_summary.count),
+                  total: num(length(@documents))
                 )}
               </span>
               <span>
-                {gettext("Tokens: %{count}", count: @shown_docs_summary.total_tokens)}
+                {gettext("Tokens: %{count}", count: num(@shown_docs_summary.total_tokens))}
               </span>
               <span :if={@shown_docs_summary.tokens_per_kb}>
                 {gettext("Average: %{value} tokens/KB", value: @shown_docs_summary.tokens_per_kb)}
@@ -3855,7 +3857,7 @@ defmodule AskDriveWeb.AdminLive do
               <span class="flex flex-wrap gap-1.5">
                 <%= for g <- Listing.grades() ++ ["unrated"], Map.has_key?(@shown_docs_summary.by_grade, g) do %>
                   <span class={["px-2 py-0.5 rounded-full text-[10px] font-medium", grade_class(g)]}>
-                    {grade_label(g)}: {@shown_docs_summary.by_grade[g]}
+                    {grade_label(g)}: {num(@shown_docs_summary.by_grade[g])}
                   </span>
                 <% end %>
               </span>
@@ -3877,7 +3879,7 @@ defmodule AskDriveWeb.AdminLive do
               </p>
             <% else %>
               <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400 tabular-nums">
                   <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                     <tr>
                       <th class="py-3 px-2">{gettext("Document name")}</th>
@@ -3953,7 +3955,7 @@ defmodule AskDriveWeb.AdminLive do
                               {eff.score_rating}
                             </span>
                             <span class="text-[10px] text-zinc-400 block mt-0.5">
-                              {eff.total_tokens} tokens · {eff.tokens_per_kb} tokens/KB
+                              {num(eff.total_tokens)} tokens · {eff.tokens_per_kb} tokens/KB
                             </span>
                           <% else %>
                             <span class="text-zinc-400">—</span>
@@ -4324,7 +4326,7 @@ defmodule AskDriveWeb.AdminLive do
               <% end %>
 
               <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400 tabular-nums">
                   <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                     <tr>
                       <th class="py-3 px-2">{gettext("User account")}</th>
@@ -4564,7 +4566,7 @@ defmodule AskDriveWeb.AdminLive do
               </p>
             <% else %>
               <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400 tabular-nums">
                   <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                     <tr>
                       <th class="py-3 px-2">{gettext("Date and time")}</th>
@@ -4623,13 +4625,13 @@ defmodule AskDriveWeb.AdminLive do
                   {gettext("Questions (last %{days} days)", days: @desk_usage.days)}
                 </p>
                 <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
-                  {@desk_usage.questions}
+                  <.big_number value={@desk_usage.questions} />
                   <span class="text-xs font-normal text-zinc-500">{gettext("times")}</span>
                 </p>
                 <p class="text-[11px] text-zinc-400 mt-1">
                   {gettext("Solved: %{solved} · not yet: %{unsolved}",
-                    solved: @desk_usage.solved,
-                    unsolved: @desk_usage.unsolved
+                    solved: num(@desk_usage.solved),
+                    unsolved: num(@desk_usage.unsolved)
                   )}
                   <span
                     :if={@desk_usage.solved_rate}
@@ -4640,8 +4642,8 @@ defmodule AskDriveWeb.AdminLive do
                 </p>
                 <p :if={@desk_usage.questions > 0} class="text-[11px] text-zinc-400">
                   {gettext("Marked solved by askers: %{solved} · followed up: %{followed}",
-                    solved: @desk_usage.user_solved,
-                    followed: @desk_usage.followed_up
+                    solved: num(@desk_usage.user_solved),
+                    followed: num(@desk_usage.followed_up)
                   )}
                 </p>
               </div>
@@ -4651,7 +4653,7 @@ defmodule AskDriveWeb.AdminLive do
                   {gettext("Tokens for answering questions")}
                 </p>
                 <p class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
-                  {@desk_usage.chat.tokens}
+                  <.big_number value={@desk_usage.chat.tokens} />
                 </p>
                 <p class="text-[11px] text-zinc-400 mt-1">
                   {gettext("Search and AI summaries of the chat")}
@@ -4663,7 +4665,7 @@ defmodule AskDriveWeb.AdminLive do
                   {gettext("Tokens processed by the nightly batch")}
                 </p>
                 <p class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
-                  {@desk_usage.batch.tokens}
+                  <.big_number value={@desk_usage.batch.tokens} />
                 </p>
                 <p class="text-[11px] text-zinc-400 mt-1">
                   {gettext("Importing documents and preparing QA")}
@@ -4712,7 +4714,7 @@ defmodule AskDriveWeb.AdminLive do
                   {gettext("Total requests (last 30 days)")}
                 </p>
                 <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
-                  {@metrics_summary.total_requests}
+                  <.big_number value={@metrics_summary.total_requests} />
                   <span class="text-xs font-normal text-zinc-500">{gettext("times")}</span>
                 </p>
                 <p class="text-[11px] text-zinc-400 mt-1">
@@ -4723,12 +4725,12 @@ defmodule AskDriveWeb.AdminLive do
               <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
                 <p class="text-xs font-medium text-zinc-500">{gettext("Total tokens used")}</p>
                 <p class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
-                  {@metrics_summary.total_tokens}
+                  <.big_number value={@metrics_summary.total_tokens} />
                 </p>
                 <p class="text-[11px] text-zinc-400 mt-1">
                   {gettext("Input %{prompt} / output %{completion}",
-                    prompt: @metrics_summary.prompt_tokens,
-                    completion: @metrics_summary.completion_tokens
+                    prompt: num(@metrics_summary.prompt_tokens),
+                    completion: num(@metrics_summary.completion_tokens)
                   )}
                 </p>
               </div>
@@ -4778,10 +4780,12 @@ defmodule AskDriveWeb.AdminLive do
                 </div>
                 <div class="text-right shrink-0">
                   <span class="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
-                    {gettext("Documents: %{count}", count: @data_efficiency.total_indexed_docs)}
+                    {gettext("Documents: %{count}", count: num(@data_efficiency.total_indexed_docs))}
                   </span>
                   <span class="text-[11px] text-zinc-400 block">
-                    {gettext("Total indexed: %{count} tokens", count: @data_efficiency.total_tokens)}
+                    {gettext("Total indexed: %{count} tokens",
+                      count: num(@data_efficiency.total_tokens)
+                    )}
                   </span>
                 </div>
               </div>
@@ -4797,7 +4801,7 @@ defmodule AskDriveWeb.AdminLive do
                   </p>
                 <% else %>
                   <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400 tabular-nums">
                       <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                         <tr>
                           <th class="py-2.5 px-2">{gettext("Format / type")}</th>
@@ -4817,9 +4821,9 @@ defmodule AskDriveWeb.AdminLive do
                             <td class="py-2.5 px-2 font-medium text-zinc-900 dark:text-zinc-100">
                               {fmt.category}
                             </td>
-                            <td class="py-2.5 px-2 text-right">{fmt.docs_count}</td>
+                            <td class="py-2.5 px-2 text-right">{num(fmt.docs_count)}</td>
                             <td class="py-2.5 px-2 text-right font-mono text-indigo-600 dark:text-indigo-400">
-                              {fmt.total_tokens}
+                              {num(fmt.total_tokens)}
                             </td>
                             <td class="py-2.5 px-2 text-right font-mono text-[11px]">
                               {div(fmt.total_bytes, 1024)} KB
@@ -4883,7 +4887,7 @@ defmodule AskDriveWeb.AdminLive do
                   </p>
                 <% else %>
                   <div class="overflow-x-auto max-h-80 overflow-y-auto">
-                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400 tabular-nums">
                       <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 bg-white dark:bg-zinc-900">
                         <tr>
                           <th class="py-2.5 px-2">{gettext("Document")}</th>
@@ -4905,7 +4909,7 @@ defmodule AskDriveWeb.AdminLive do
                             </td>
                             <td class="py-2.5 px-2 text-[11px] text-zinc-500">{stat.category}</td>
                             <td class="py-2.5 px-2 text-right font-mono text-indigo-600 dark:text-indigo-400">
-                              {stat.total_tokens}
+                              {num(stat.total_tokens)}
                             </td>
                             <td class="py-2.5 px-2 text-right font-mono text-[11px]">
                               {div(stat.raw_size_bytes, 1024)} KB
@@ -4959,7 +4963,7 @@ defmodule AskDriveWeb.AdminLive do
                   </p>
                 <% else %>
                   <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400 tabular-nums">
                       <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                         <tr>
                           <th class="py-2.5 px-2">{gettext("Provider")}</th>
@@ -4976,9 +4980,9 @@ defmodule AskDriveWeb.AdminLive do
                               {row.provider}
                             </td>
                             <td class="py-2.5 px-2 font-mono text-[11px]">{row.model}</td>
-                            <td class="py-2.5 px-2 text-right">{row.requests}</td>
+                            <td class="py-2.5 px-2 text-right">{num(row.requests)}</td>
                             <td class="py-2.5 px-2 text-right font-mono text-indigo-600 dark:text-indigo-400">
-                              {row.total_tokens}
+                              {num(row.total_tokens)}
                             </td>
                             <td class="py-2.5 px-2 text-right">
                               <%= if row.errors > 0 do %>
@@ -5007,7 +5011,7 @@ defmodule AskDriveWeb.AdminLive do
                   </p>
                 <% else %>
                   <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400 tabular-nums">
                       <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                         <tr>
                           <th class="py-2.5 px-2">{gettext("Purpose")}</th>
@@ -5028,9 +5032,9 @@ defmodule AskDriveWeb.AdminLive do
                                 other -> other
                               end}
                             </td>
-                            <td class="py-2.5 px-2 text-right">{row.requests}</td>
+                            <td class="py-2.5 px-2 text-right">{num(row.requests)}</td>
                             <td class="py-2.5 px-2 text-right font-mono text-indigo-600 dark:text-indigo-400">
-                              {row.total_tokens}
+                              {num(row.total_tokens)}
                             </td>
                           </tr>
                         <% end %>
@@ -5083,7 +5087,7 @@ defmodule AskDriveWeb.AdminLive do
                 </div>
               <% else %>
                 <div class="overflow-x-auto">
-                  <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                  <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400 tabular-nums">
                     <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                       <tr>
                         <th class="py-2.5 px-2">{gettext("Date and time")}</th>
@@ -6062,41 +6066,6 @@ defmodule AskDriveWeb.AdminLive do
                 <% end %>
               </div>
 
-              <div class="flex gap-2 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 w-fit text-xs font-medium">
-                <%!-- OAuth: a real Google account authorizes Drive sync, with this desk's own OAuth
-                      client or the platform's (F-346) --%>
-                <button
-                  type="button"
-                  id="drive-auth-mode-oauth"
-                  phx-click="set_drive_auth_mode"
-                  phx-value-mode="oauth"
-                  class={[
-                    "px-3 py-1.5 rounded-lg transition",
-                    if(@drive_mode == "oauth",
-                      do: "bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-100",
-                      else: "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-                    )
-                  ]}
-                >
-                  {gettext("Google account authorization")}
-                </button>
-                <button
-                  type="button"
-                  id="drive-auth-mode-service-account"
-                  phx-click="set_drive_auth_mode"
-                  phx-value-mode="service_account"
-                  class={[
-                    "px-3 py-1.5 rounded-lg transition",
-                    if(@drive_mode == "service_account",
-                      do: "bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-100",
-                      else: "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-                    )
-                  ]}
-                >
-                  {gettext("Service account")}
-                </button>
-              </div>
-
               <%!-- One form for the whole card — the authentication of the chosen mode and the
                     folder — saved by the single button at its bottom --%>
               <.form
@@ -6107,6 +6076,26 @@ defmodule AskDriveWeb.AdminLive do
                 class="space-y-4"
               >
                 <%= if @drive_mode == "service_account" do %>
+                  <%!-- Advanced (F-357): a service account, for sync that outlives whoever
+                        authorized it. Shown open while it's the method in use. --%>
+                  <div
+                    id="drive-advanced"
+                    class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-zinc-200/60 dark:border-zinc-800"
+                  >
+                    <span class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                      <.icon name="hero-chevron-down" class="w-4 h-4 text-zinc-400" />
+                      {gettext("Advanced: use a service account")}
+                    </span>
+                    <button
+                      type="button"
+                      id="drive-auth-mode-oauth"
+                      phx-click="set_drive_auth_mode"
+                      phx-value-mode="oauth"
+                      class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                    >
+                      {gettext("Use Google account authorization instead")}
+                    </button>
+                  </div>
                   <p class="text-xs text-zinc-500 leading-relaxed">
                     {gettext(
                       "No browser authorization is needed, so this avoids Google's redirect_uri restrictions (rejection of raw IP addresses and"
@@ -6543,6 +6532,41 @@ defmodule AskDriveWeb.AdminLive do
                         </div>
                       </div>
                     </details>
+                  </div>
+
+                  <%!-- Advanced (F-357): the service account, closed by default — Google
+                        account authorization is all a desk usually needs --%>
+                  <div
+                    id="drive-advanced"
+                    class="pt-3 border-t border-zinc-200/60 dark:border-zinc-800"
+                  >
+                    <button
+                      type="button"
+                      id="drive-auth-mode-service-account"
+                      phx-click="set_drive_auth_mode"
+                      phx-value-mode="service_account"
+                      data-confirm={
+                        @account &&
+                          gettext(
+                            "Drive sync with %{email} stops until the service account is set up. Switch to a service account?",
+                            email: @account.email
+                          )
+                      }
+                      class="group text-left text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-start gap-1.5 transition"
+                    >
+                      <.icon
+                        name="hero-chevron-right"
+                        class="w-4 h-4 text-zinc-400 mt-px transition group-hover:translate-x-0.5"
+                      />
+                      <span>
+                        {gettext("Advanced: use a service account")}
+                        <span class="block font-normal text-[11px] text-zinc-500 mt-0.5">
+                          {gettext(
+                            "For sync that keeps going whoever is in charge: a person's authorization stops when they change jobs or leave. Needs a service account created in Google Cloud."
+                          )}
+                        </span>
+                      </span>
+                    </button>
                   </div>
                 <% end %>
 
@@ -8590,7 +8614,7 @@ defmodule AskDriveWeb.AdminLive do
       gettext("About %{hours} h %{min} min", hours: div(sec, 3600), min: div(rem(sec, 3600), 60))
 
   # Progress.overview plus, while generating, whether the pace reaches the cut-off time.
-  # The overall percentage is by expected time, from earlier runs' phase times (F-354).
+  # The overall percentage is by expected time, from earlier runs' phase times (F-357).
   defp progress_view(run) do
     now = DateTime.utc_now()
 

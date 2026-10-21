@@ -87,6 +87,8 @@ defmodule AskDriveWeb do
       import Phoenix.HTML
       # Core UI components
       import AskDriveWeb.CoreComponents
+      # numbers with separators, and short ones on cards (F-1414)
+      import AskDriveWeb.NumberFormat, only: [num: 1, big_number: 1]
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS

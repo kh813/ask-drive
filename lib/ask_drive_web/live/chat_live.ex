@@ -531,7 +531,7 @@ defmodule AskDriveWeb.ChatLive do
               <%= if @drive_connected? do %>
                 <span class="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
                   <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
-                  {gettext("%{count} chunks indexed for search", count: format_number(@chunk_count))}
+                  {gettext("%{count} chunks indexed for search", count: num(@chunk_count))}
                 </span>
               <% else %>
                 <span class="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
@@ -1354,17 +1354,6 @@ defmodule AskDriveWeb.ChatLive do
   end
 
   defp format_time(_), do: ""
-
-  defp format_number(num) when is_integer(num) do
-    num
-    |> Integer.to_charlist()
-    |> Enum.reverse()
-    |> Enum.chunk_every(3)
-    |> Enum.join(",")
-    |> String.reverse()
-  end
-
-  defp format_number(_), do: "0"
 
   # Excerpt HTML is built here rather than in the template: the text keeps its line breaks
   # (as <br>) without relying on whitespace-pre-wrap, which would also render the

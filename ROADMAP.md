@@ -4,7 +4,7 @@ This document outlines planned improvements, future concepts, and the technical 
 
 ---
 
-## Current Version: `0.2.6` (MVP: Minimum Viable Product)
+## Current Version: `0.2.7` (MVP: Minimum Viable Product)
 - **License**: Changed to [Apache License 2.0](LICENSE) (from MIT) with [NOTICE](NOTICE) file.
 - **Prototype (v0.1.x) to MVP (v0.2.0)**: The core feature set has matured from the initial prototype phase into an operational Minimum Viable Product for enterprise internal deployments.
 - **Multi-lingual Support (i18n)**: English (default) & Japanese (`en` / `ja`) with browser `Accept-Language` auto-detection and UI switcher. The admin screens (desk and platform) are fully available in English (v0.1.41, Gettext with English source strings); text recorded by background work (batch, health check, certificate renewal, updater) stays Japanese.
@@ -30,6 +30,8 @@ This document outlines planned improvements, future concepts, and the technical 
 - **窓口管理者向けの「API利用量・ログ」**（v0.2.6）: 質問数と解決数、質問の処理と夜間バッチのトークン、返答速度（良好／ふつう／やや遅い）。API エラーは直近 7 日間を表示し「確認済み」で非表示に、利用ログは 90 日で削除
 - **チャットの「解決した」ボタン**（v0.2.6）: 押すと解決として記録（取り消し可）。「この回答に追加で質問」は前の回答を未解決として扱い、QA で答えた質問でも管理画面の未解決の一覧に載せる
 - **ドキュメント一覧の絞り込み**（v0.2.6）: 名前・状態・ファイル形式（拡張子）・トークン効率で絞り込み、効率順などで並べ替え、表示中の平均トークン/KB と評価ごとの件数
+- **Drive の認証は Google アカウント認証が基本**（v0.2.7）: 新しい窓口の初期値を Google アカウント認証にし、サービスアカウントは「詳細設定」に（担当者の異動・退職に左右されない運用向け）
+- **数の表示と FAQ**（v0.2.7）: 3 桁ごとの区切り、カードの大きな数は「12.3 万」「1.2 億」に短縮。窓口管理者向けのよくある質問 [docs/FAQ.md](docs/FAQ.md)
 - **管理画面の保存と有効化の分離**（v0.1.39〜）: 「保存」は値の保存だけ、機能ごとの有効・無効はスイッチですぐに反映
 
 ---
