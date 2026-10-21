@@ -377,21 +377,13 @@ defmodule AskDrive.Batch.Scheduler do
     Logger.info("Starting Night Batch ##{batch_run.id}. Deadline: #{inspect(deadline)}")
 
     # Start caffeinate process to prevent macOS sleep during nightly batch (12-6)
-    caffeinate_port =
-      if System.find_executable("caffeinate") do
-        Port.open({:spawn_executable, System.find_executable("caffeinate")}, [
-          :binary,
-          args: ["-s"]
-        ])
-      else
-        nil
-      end
+    caffeinate_port = start_caffeinate()
 
     cleanup = fn ->
       # Leave night_batch for whatever mode the clock calls for (daytime or standby)
       Mode.end_batch()
       if ingest_only?, do: rewarm_embedding(setting)
-      if caffeinate_port, do: Port.close(caffeinate_port)
+      stop_caffeinate(caffeinate_port)
       Progress.unbind()
     end
 
@@ -576,11 +568,7 @@ defmodule AskDrive.Batch.Scheduler do
 
     # Embed model already unloaded. Now generation model will be loaded by Ollama on first request.
     # Collect candidate chunk IDs from unresolved Tier 2 / 3 question logs (Priority 1)
-    unresolved_logs =
-      Repo.all(
-        from q in AskDrive.QA.QuestionLog,
-          where: is_nil(q.resolved_at) and q.tier_reached in [2, 3]
-      )
+    unresolved_logs = Repo.all(AskDrive.QA.unresolved_query())
 
     unresolved_chunk_ids =
       unresolved_logs
@@ -1030,6 +1018,37 @@ defmodule AskDrive.Batch.Scheduler do
   # Phase 6: Verify & Finish
   # =========================================================================
 
+  # Closing the port doesn't end caffeinate (it never reads its stdin): every batch left one
+  # running, until the user's process limit was reached and nothing could start. It is
+  # killed by its OS pid, and `-w` ends it with this VM should the VM go first.
+  defp start_caffeinate do
+    with true <- Application.get_env(:ask_drive, :caffeinate, true),
+         path when is_binary(path) <- System.find_executable("caffeinate") do
+      Port.open({:spawn_executable, path}, [:binary, args: ["-s", "-w", System.pid()]])
+    else
+      _ -> nil
+    end
+  end
+
+  defp stop_caffeinate(nil), do: :ok
+
+  defp stop_caffeinate(port) do
+    case Port.info(port, :os_pid) do
+      {:os_pid, os_pid} -> System.cmd("kill", [Integer.to_string(os_pid)], stderr_to_stdout: true)
+      nil -> :ok
+    end
+
+    Port.close(port)
+    :ok
+  rescue
+    ArgumentError -> :ok
+  end
+
+  # A question the asker followed up on was answered from these chunks' QA pair already, and
+  # it didn't settle it (F-433): only a QA pair made after the follow-up resolves it.
+  defp answered_after_follow_up(%{followed_up_at: nil}), do: dynamic(true)
+  defp answered_after_follow_up(%{followed_up_at: at}), do: dynamic([q], q.inserted_at > ^at)
+
   defp run_phase_6_verify(batch_run, _setting, deadline_reached?) do
     start_time = DateTime.utc_now()
     Logger.info("Batch ##{batch_run.id} - [Phase 6: Verify] starting...")
@@ -1051,6 +1070,7 @@ defmodule AskDrive.Batch.Scheduler do
             Repo.one(
               from q in QAPair,
                 where: q.chunk_id in ^candidate_ids and q.status == "active",
+                where: ^answered_after_follow_up(log),
                 order_by: [desc: q.id],
                 limit: 1
             )

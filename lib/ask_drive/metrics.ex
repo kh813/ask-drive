@@ -10,6 +10,10 @@ defmodule AskDrive.Metrics do
   alias AskDrive.Metrics.ApiUsageLog
   alias AskDrive.Repo
 
+  # the dashboard's error list shows the last week, and the logs are kept 90 days (F-1411)
+  @error_display_days 7
+  @retention_days 90
+
   @doc """
   Records an API usage log entry safely. Does not raise or fail callers if logging encounters an issue.
   """
@@ -132,17 +136,145 @@ defmodule AskDrive.Metrics do
     }
   end
 
+  # what a desk's API calls were for (F-1413): answering questions in the chat, or the
+  # nightly batch's import and QA generation
+  @chat_purposes ~w(chat_summary query_embedding)
+  @batch_purposes ~w(generation batch_generation embedding)
+
+  @doc "The API usage purposes that answer a chat question (F-1413)."
+  def chat_purposes, do: @chat_purposes
+
+  # the AI summary's average time, under which answers feel quick, or still acceptable
+  @speed_good_ms 15_000
+  @speed_fair_ms 40_000
+
   @doc """
-  Lists recent API error logs (for debugging failures).
+  The desk admin's view of the last `days` (F-1413): how many questions were asked and how
+  many were solved (answered from a QA pair and not followed up, given one later, or marked
+  「解決した」 by the asker, F-433), the tokens answering them
+  used against the tokens the nightly batch used, and how quickly answers come, as a rating
+  rather than milliseconds.
   """
-  def list_recent_errors(limit \\ 20) do
+  def desk_summary(days \\ 30, now \\ DateTime.utc_now()) do
+    since = DateTime.add(now, -days * 86_400, :second)
+
+    questions =
+      Repo.one(
+        from q in AskDrive.QA.QuestionLog,
+          where: q.asked_at >= ^since,
+          select: %{
+            total: count(q.id),
+            instant: count(fragment("CASE WHEN ? IN (0, 1) THEN 1 END", q.tier_reached)),
+            # answered from a QA pair and not followed up, given one later, or marked
+            # 「解決した」 by the asker (F-433)
+            solved:
+              count(
+                fragment(
+                  "CASE WHEN (? IN (0, 1) AND ? IS NULL) OR ? IS NOT NULL OR ? IS NOT NULL THEN 1 END",
+                  q.tier_reached,
+                  q.followed_up_at,
+                  q.resolved_at,
+                  q.user_solved_at
+                )
+              ),
+            user_solved: count(q.user_solved_at),
+            followed_up: count(q.followed_up_at)
+          }
+      )
+
+    usage = fn purposes ->
+      Repo.one(
+        from l in ApiUsageLog,
+          where: l.inserted_at >= ^since and l.purpose in ^purposes,
+          select: %{calls: count(l.id), tokens: coalesce(sum(l.total_tokens), 0)}
+      )
+    end
+
+    summary_latency =
+      Repo.one(
+        from l in ApiUsageLog,
+          where: l.inserted_at >= ^since and l.purpose == "chat_summary" and l.status == "ok",
+          select: avg(l.latency_ms)
+      )
+
+    summary_latency = summary_latency && round(summary_latency)
+    total = questions.total
+
+    %{
+      days: days,
+      questions: total,
+      solved: questions.solved,
+      user_solved: questions.user_solved,
+      followed_up: questions.followed_up,
+      unsolved: total - questions.solved,
+      solved_rate: if(total > 0, do: round(questions.solved / total * 100)),
+      instant_rate: if(total > 0, do: round(questions.instant / total * 100)),
+      chat: usage.(@chat_purposes),
+      batch: usage.(@batch_purposes),
+      summary_latency_ms: summary_latency,
+      speed: speed(summary_latency, total)
+    }
+  end
+
+  defp speed(nil, 0), do: :unknown
+  # every question was answered without the AI summary: from prepared answers, at once
+  defp speed(nil, _questions), do: :good
+  defp speed(ms, _questions) when ms <= @speed_good_ms, do: :good
+  defp speed(ms, _questions) when ms <= @speed_fair_ms, do: :fair
+  defp speed(_ms, _questions), do: :slow
+
+  @doc """
+  Lists recent API error logs (for debugging failures): the last #{@error_display_days} days',
+  without those an admin has dismissed (F-1411).
+  """
+  def list_recent_errors(limit \\ 20, now \\ DateTime.utc_now()) do
+    since = DateTime.add(now, -@error_display_days * 86_400, :second)
+
     Repo.all(
       from l in ApiUsageLog,
-        where: l.status == "error",
-        order_by: [desc: l.inserted_at],
+        where: l.status == "error" and is_nil(l.dismissed_at) and l.inserted_at >= ^since,
+        order_by: [desc: l.inserted_at, desc: l.id],
         limit: ^limit
     )
   end
+
+  @doc "How many days an error stays in the dashboard's list (F-1411)."
+  def error_display_days, do: @error_display_days
+
+  @doc "Marks one error as seen: it leaves the list, and the log is kept (F-1411)."
+  def dismiss_error(id) do
+    {count, _} =
+      Repo.update_all(
+        from(l in ApiUsageLog, where: l.id == ^id and l.status == "error"),
+        set: [dismissed_at: now()]
+      )
+
+    count
+  end
+
+  @doc "Marks every error still in the list as seen (F-1411)."
+  def dismiss_all_errors do
+    {count, _} =
+      Repo.update_all(
+        from(l in ApiUsageLog, where: l.status == "error" and is_nil(l.dismissed_at)),
+        set: [dismissed_at: now()]
+      )
+
+    count
+  end
+
+  @doc """
+  Deletes usage logs older than `days` (default #{@retention_days}) from the current Repo; the
+  nightly batch calls it for each desk (F-1411). The dashboard reads at most the last 30
+  days, so nothing older is ever shown.
+  """
+  def prune_old_logs(days \\ @retention_days, now \\ DateTime.utc_now()) do
+    before = DateTime.add(now, -days * 86_400, :second)
+    {count, _} = Repo.delete_all(from l in ApiUsageLog, where: l.inserted_at < ^before)
+    count
+  end
+
+  defp now, do: DateTime.utc_now() |> DateTime.truncate(:second)
 
   @doc """
   Lists recent API usage logs.

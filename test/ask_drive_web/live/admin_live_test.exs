@@ -133,9 +133,15 @@ defmodule AskDriveWeb.AdminLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/it-support/admin?tab=metrics")
       assert html =~ "API利用量・ログ"
-      assert html =~ "総リクエスト数"
-      assert html =~ "総消費トークン数"
-      assert html =~ "平均応答時間"
+      assert html =~ "質問数（直近 30 日）"
+      assert html =~ "夜間バッチで処理したトークン"
+      assert html =~ "返答速度"
+      refute html =~ "送信データ量"
+
+      # the documents' efficiency comes before the API usage breakdown (F-1413)
+      {efficiency, _} = :binary.match(html, "インデックス対象データのトークン効率")
+      {breakdown, _} = :binary.match(html, "プロバイダ・モデル別利用内訳")
+      assert efficiency < breakdown
       assert html =~ "gemini-2.5-flash"
       assert html =~ "インデックス対象データのトークン効率・構造化分析"
       assert html =~ "ファイル形式別のトークン効率比較"

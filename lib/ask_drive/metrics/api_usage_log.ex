@@ -18,6 +18,8 @@ defmodule AskDrive.Metrics.ApiUsageLog do
     field :latency_ms, :integer, default: 0
     field :status, :string, default: "ok"
     field :error_message, :string
+    # set when an admin marks the error as seen (F-1411); never cast
+    field :dismissed_at, :utc_datetime
 
     timestamps(type: :utc_datetime, updated_at: false)
   end

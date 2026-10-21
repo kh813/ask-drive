@@ -38,6 +38,15 @@ defmodule AskDrive.Batch.Night do
   """
   def current, do: if(running?(), do: :persistent_term.get({__MODULE__, :current}, nil))
 
+  defp prune_usage_logs do
+    case AskDrive.Metrics.prune_old_logs() do
+      0 -> :ok
+      n -> Logger.info("Nightly batch: deleted #{n} API usage log(s) older than 90 days")
+    end
+  rescue
+    e -> Logger.warning("Could not prune the API usage logs: #{Exception.message(e)}")
+  end
+
   @doc "Runs the nightly batch for `apps` (in this process, which it registers)."
   def run(apps, opts \\ []) do
     Process.register(self(), __MODULE__)
@@ -56,6 +65,9 @@ defmodule AskDrive.Batch.Night do
       cutoff: cutoff,
       started_at: DateTime.utc_now() |> DateTime.truncate(:second)
     })
+
+    # the API usage logs are kept for 90 days (F-1411)
+    Enum.each(apps, fn app -> Apps.with_app(app, &prune_usage_logs/0) end)
 
     # An update about to restart refuses new runs and pauses the waiting ones (F-1503), so
     # both passes then just run out; the night is continued after the restart.

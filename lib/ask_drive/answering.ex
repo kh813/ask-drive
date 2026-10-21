@@ -58,9 +58,10 @@ defmodule AskDrive.Answering do
     if tier0_result &&
          (tier0_result.status == "active" ||
             (tier0_result.status == "stale" && setting.serve_stale_qa)) do
-      record_question_log(trimmed, nil, 0, [tier0_result.chunk_id], now)
+      log_id = record_question_log(trimmed, nil, 0, [tier0_result.chunk_id], now)
 
       %{
+        question_log_id: log_id,
         tier: 0,
         question: trimmed,
         search_query: trimmed,
@@ -79,6 +80,7 @@ defmodule AskDrive.Answering do
       embedding =
         case LLM.embed(setting.embed_model, [query],
                setting: setting,
+               purpose: "query_embedding",
                timeout: @query_embed_timeout,
                retry: false
              ) do
@@ -128,9 +130,10 @@ defmodule AskDrive.Answering do
       if tier1_match do
         {matched_qa, _sim} = tier1_match
         candidate_ids = if matched_qa.chunk_id, do: [matched_qa.chunk_id], else: []
-        record_question_log(logged, embedding, 1, candidate_ids, now)
+        log_id = record_question_log(logged, embedding, 1, candidate_ids, now)
 
         %{
+          question_log_id: log_id,
           tier: 1,
           question: trimmed,
           search_query: query,
@@ -161,9 +164,10 @@ defmodule AskDrive.Answering do
 
         # --- Tier 2 / 3: Record question in question_log table ---
         candidate_ids = Enum.map(matched_chunks, & &1.id)
-        record_question_log(logged, embedding, tier, candidate_ids, now)
+        log_id = record_question_log(logged, embedding, tier, candidate_ids, now)
 
         %{
+          question_log_id: log_id,
           tier: tier,
           question: trimmed,
           search_query: query,
@@ -209,6 +213,7 @@ defmodule AskDrive.Answering do
     |> List.to_string()
   end
 
+  # the log's id: the chat marks it when the asker presses 「解決した」 or follows up (F-433)
   defp record_question_log(question, embedding, tier, candidate_ids, now) do
     embedding_blob = if embedding, do: Vector.encode(embedding), else: nil
 
@@ -221,5 +226,9 @@ defmodule AskDrive.Answering do
       asked_at: now
     })
     |> Repo.insert()
+    |> case do
+      {:ok, log} -> log.id
+      _ -> nil
+    end
   end
 end

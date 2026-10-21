@@ -19,7 +19,7 @@ defmodule AskDriveWeb.AdminLive do
 
   alias AskDrive.Accounts.{AdminAccess, AdminElevationLog, AppAdminAccess}
   alias AskDrive.Batch.{ItemLog, Progress, Scheduler}
-  alias AskDrive.Documents.{Chunk, Document}
+  alias AskDrive.Documents.{Chunk, Document, Listing}
   alias AskDrive.Drive.{Client, ServiceAccount}
   alias AskDrive.LLM
   alias AskDrive.QA.QAPair
@@ -1166,6 +1166,26 @@ defmodule AskDriveWeb.AdminLive do
      |> load_dashboard_data()}
   end
 
+  # a known API error leaves the list; the log is kept (F-1411)
+  def handle_event("dismiss_api_error", %{"id" => id}, socket) do
+    with {id, ""} <- Integer.parse(to_string(id)), do: AskDrive.Metrics.dismiss_error(id)
+    {:noreply, assign(socket, :recent_api_errors, AskDrive.Metrics.list_recent_errors(20))}
+  end
+
+  def handle_event("dismiss_all_api_errors", _params, socket) do
+    AskDrive.Metrics.dismiss_all_errors()
+    {:noreply, assign(socket, :recent_api_errors, AskDrive.Metrics.list_recent_errors(20))}
+  end
+
+  def handle_event("filter_documents", %{"filter" => params}, socket) do
+    params = Map.take(params, Map.keys(Listing.default_params()))
+    {:noreply, socket |> assign(:doc_filter, params) |> assign_document_list()}
+  end
+
+  def handle_event("reset_document_filter", _params, socket) do
+    {:noreply, socket |> assign(:doc_filter, Listing.default_params()) |> assign_document_list()}
+  end
+
   def handle_event("stop_batch", _params, socket) do
     socket =
       case Scheduler.request_stop() do
@@ -2105,11 +2125,7 @@ defmodule AskDriveWeb.AdminLive do
               field={@form[:gemini_api_key]}
               type="password"
               value=""
-              label={
-                gettext("Google Gemini API key (%{key})",
-                  key: LLM.masked_api_key("gemini", @setting)
-                )
-              }
+              label={gettext("Google Gemini API key")}
               placeholder={key_placeholder("gemini", @setting, "AIza...")}
             />
             <.input
@@ -2130,11 +2146,7 @@ defmodule AskDriveWeb.AdminLive do
               field={@form[:vertex_api_key]}
               type="password"
               value=""
-              label={
-                gettext("Agent Platform (Vertex AI) API key (%{key})",
-                  key: LLM.masked_api_key("vertex", @setting)
-                )
-              }
+              label={gettext("Agent Platform (Vertex AI) API key")}
               placeholder={key_placeholder("vertex", @setting, "")}
             />
             <.input
@@ -2167,11 +2179,7 @@ defmodule AskDriveWeb.AdminLive do
               field={@form[:anthropic_api_key]}
               type="password"
               value=""
-              label={
-                gettext("Anthropic Claude API key (%{key})",
-                  key: LLM.masked_api_key("anthropic", @setting)
-                )
-              }
+              label={gettext("Anthropic Claude API key")}
               placeholder={key_placeholder("anthropic", @setting, "sk-ant-...")}
             />
             <.input
@@ -2190,11 +2198,7 @@ defmodule AskDriveWeb.AdminLive do
               field={@form[:openai_api_key]}
               type="password"
               value=""
-              label={
-                gettext("OpenAI API key (%{key})",
-                  key: LLM.masked_api_key("openai", @setting)
-                )
-              }
+              label={gettext("OpenAI API key")}
               placeholder={key_placeholder("openai", @setting, "sk-...")}
             />
             <.input
@@ -2594,10 +2598,77 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:resolved_questions, resolved_questions)
     |> assign(:metrics_summary, metrics_summary)
     |> assign(:recent_api_errors, recent_api_errors)
+    |> assign(:desk_usage, AskDrive.Metrics.desk_summary(30))
     |> assign(:data_efficiency, data_efficiency)
     |> assign(:health, health)
     |> assign(:current_mode, current_mode)
     |> assign(:account, account)
+    |> assign_document_rows(docs, data_efficiency)
+  end
+
+  # --- The documents tab's filter (F-1412) ---
+
+  defp assign_document_rows(socket, docs, data_efficiency) do
+    eff_by_id = Map.new(data_efficiency.doc_stats, &{&1.document.id, &1})
+    rows = Enum.map(docs, &%{document: &1, efficiency: Map.get(eff_by_id, &1.id)})
+
+    socket
+    |> assign(:doc_rows, rows)
+    |> assign(:doc_choices, Listing.choices(rows))
+    |> assign_document_list()
+  end
+
+  defp assign_document_list(socket) do
+    params = socket.assigns[:doc_filter] || Listing.default_params()
+    shown = Listing.filter(socket.assigns.doc_rows, params)
+
+    socket
+    |> assign(:doc_filter, params)
+    |> assign(:doc_filter_form, to_form(params, as: :filter))
+    |> assign(:shown_docs, shown)
+    |> assign(:shown_docs_summary, Listing.summary(shown))
+  end
+
+  defp speed_label(:good), do: gettext("Good")
+  defp speed_label(:fair), do: gettext("Normal")
+  defp speed_label(:slow), do: gettext("A little slow")
+  defp speed_label(_unknown), do: gettext("No data yet")
+
+  defp grade_label("excellent"), do: gettext("Excellent (S)")
+  defp grade_label("good"), do: gettext("Good (A)")
+  defp grade_label("fair"), do: gettext("Fair (B)")
+  defp grade_label("poor"), do: gettext("Needs improvement (C)")
+  defp grade_label("warning"), do: gettext("Caution (D)")
+  defp grade_label("none"), do: gettext("No chunks")
+  defp grade_label(_unrated), do: gettext("Not rated (not indexed)")
+
+  defp grade_class("excellent"),
+    do: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+
+  defp grade_class("good"), do: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
+  defp grade_class("fair"), do: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+
+  defp grade_class("poor"),
+    do: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+
+  defp grade_class("unrated"),
+    do: "bg-white text-zinc-500 border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-700"
+
+  defp grade_class(_other), do: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+
+  defp grade_options do
+    [{gettext("All grades"), ""}] ++
+      Enum.map(Listing.grades() ++ ["unrated"], &{grade_label(&1), &1})
+  end
+
+  defp sort_options do
+    [
+      {gettext("Name"), "name"},
+      {gettext("Efficiency: worst first"), "efficiency_asc"},
+      {gettext("Efficiency: best first"), "efficiency_desc"},
+      {gettext("Most tokens first"), "tokens_desc"},
+      {gettext("Last synced: newest first"), "synced_desc"}
+    ]
   end
 
   @impl true
@@ -3659,6 +3730,14 @@ defmodule AskDriveWeb.AdminLive do
                             time: AskDrive.Clock.format(q.asked_at, "%Y-%m-%d %H:%M")
                           )}
                         </p>
+                        <p
+                          :if={q.followed_up_at}
+                          class="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5"
+                        >
+                          {gettext(
+                            "Answered from a QA pair, but the asker asked a follow-up: the answer may be out of date or off the point."
+                          )}
+                        </p>
                       </div>
                       <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/50">
                         {gettext("Priority 1")}
@@ -3715,6 +3794,83 @@ defmodule AskDriveWeb.AdminLive do
               </span>
             </h2>
 
+            <.form
+              :if={@documents != []}
+              for={@doc_filter_form}
+              id="document-filter-form"
+              phx-change="filter_documents"
+              phx-submit="filter_documents"
+              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end"
+            >
+              <.input
+                field={@doc_filter_form[:q]}
+                type="search"
+                label={gettext("Document name")}
+                placeholder={gettext("Part of the name")}
+                phx-debounce="250"
+              />
+              <.input
+                field={@doc_filter_form[:status]}
+                type="select"
+                label={gettext("Status")}
+                options={[{gettext("All statuses"), ""} | @doc_choices.statuses]}
+              />
+              <.input
+                field={@doc_filter_form[:type]}
+                type="select"
+                label={gettext("File type")}
+                options={[{gettext("All file types"), ""} | @doc_choices.types]}
+              />
+              <.input
+                field={@doc_filter_form[:grade]}
+                type="select"
+                label={gettext("Token efficiency")}
+                options={grade_options()}
+              />
+              <.input
+                field={@doc_filter_form[:sort]}
+                type="select"
+                label={gettext("Sort by")}
+                options={sort_options()}
+              />
+            </.form>
+
+            <div
+              :if={@documents != []}
+              id="document-filter-summary"
+              class="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200/60 dark:border-zinc-800 text-xs text-zinc-600 dark:text-zinc-400"
+            >
+              <span class="font-semibold text-zinc-900 dark:text-zinc-100">
+                {gettext("Showing %{shown} of %{total}",
+                  shown: @shown_docs_summary.count,
+                  total: length(@documents)
+                )}
+              </span>
+              <span>
+                {gettext("Tokens: %{count}", count: @shown_docs_summary.total_tokens)}
+              </span>
+              <span :if={@shown_docs_summary.tokens_per_kb}>
+                {gettext("Average: %{value} tokens/KB", value: @shown_docs_summary.tokens_per_kb)}
+              </span>
+              <span class="flex flex-wrap gap-1.5">
+                <%= for g <- Listing.grades() ++ ["unrated"], Map.has_key?(@shown_docs_summary.by_grade, g) do %>
+                  <span class={["px-2 py-0.5 rounded-full text-[10px] font-medium", grade_class(g)]}>
+                    {grade_label(g)}: {@shown_docs_summary.by_grade[g]}
+                  </span>
+                <% end %>
+              </span>
+              <button
+                :if={@doc_filter != Listing.default_params()}
+                id="reset-document-filter-btn"
+                type="button"
+                phx-click="reset_document_filter"
+                class="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200/70 dark:hover:bg-zinc-800 transition"
+              >
+                <.icon name="hero-x-mark" class="w-3.5 h-3.5" />
+                {gettext("Clear filters")}
+              </button>
+            </div>
+
             <%= if @documents == [] do %>
               <p class="text-xs text-zinc-500 py-8 text-center">
                 {gettext("No synced documents yet. Connect Google and sync Drive.")}
@@ -3732,11 +3888,17 @@ defmodule AskDriveWeb.AdminLive do
                       <th class="py-3 px-2 text-right">Drive</th>
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
-                    <%= for doc <- @documents do %>
-                      <% eff =
-                        Enum.find(@data_efficiency.doc_stats, fn s -> s.document.id == doc.id end) %>
-                      <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
+                  <tbody id="document-rows" class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                    <tr :if={@shown_docs == []} id="no-matching-documents">
+                      <td colspan="6" class="py-8 text-center text-zinc-500">
+                        {gettext("No documents match the filters.")}
+                      </td>
+                    </tr>
+                    <%= for %{document: doc, efficiency: eff} <- @shown_docs do %>
+                      <tr
+                        id={"document-#{doc.id}"}
+                        class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition"
+                      >
                         <td class="py-3 px-2 font-medium text-zinc-900 dark:text-zinc-100">
                           {doc.name}
                           <%!-- Why a document didn't make it into the index (extraction or
@@ -3776,34 +3938,22 @@ defmodule AskDriveWeb.AdminLive do
                             {doc.status}
                           </span>
                         </td>
-                        <td class="py-3 px-2 font-mono text-[11px] text-zinc-500">
-                          {doc.mime_type}
+                        <td
+                          class="py-3 px-2 font-mono text-[11px] text-zinc-500"
+                          title={doc.mime_type}
+                        >
+                          {Listing.file_type(doc)}
                         </td>
                         <td class="py-3 px-2 text-right">
                           <%= if eff do %>
                             <span class={[
                               "px-2 py-0.5 rounded-full text-[10px] font-medium inline-block",
-                              cond do
-                                eff.score_level == :excellent ->
-                                  "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-
-                                eff.score_level == :good ->
-                                  "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
-
-                                eff.score_level == :fair ->
-                                  "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-
-                                eff.score_level == :poor ->
-                                  "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
-
-                                true ->
-                                  "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
-                              end
+                              grade_class(Atom.to_string(eff.score_level))
                             ]}>
                               {eff.score_rating}
                             </span>
                             <span class="text-[10px] text-zinc-400 block mt-0.5">
-                              {eff.total_tokens} tokens
+                              {eff.total_tokens} tokens · {eff.tokens_per_kb} tokens/KB
                             </span>
                           <% else %>
                             <span class="text-zinc-400">—</span>
@@ -4460,8 +4610,103 @@ defmodule AskDriveWeb.AdminLive do
         <%!-- Tab: API Usage Metrics & Logs --%>
         <%= if @current_tab == "metrics" do %>
           <div class="space-y-6">
-            <%!-- KPI Cards --%>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <%!-- What the desk admin wants to know (F-1413): questions and how many were
+                  solved, the tokens answering them and the nightly batch used, and how quick
+                  answers are, in words --%>
+            <div
+              :if={@scope == :app}
+              id="desk-usage-cards"
+              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+            >
+              <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                <p class="text-xs font-medium text-zinc-500">
+                  {gettext("Questions (last %{days} days)", days: @desk_usage.days)}
+                </p>
+                <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
+                  {@desk_usage.questions}
+                  <span class="text-xs font-normal text-zinc-500">{gettext("times")}</span>
+                </p>
+                <p class="text-[11px] text-zinc-400 mt-1">
+                  {gettext("Solved: %{solved} · not yet: %{unsolved}",
+                    solved: @desk_usage.solved,
+                    unsolved: @desk_usage.unsolved
+                  )}
+                  <span
+                    :if={@desk_usage.solved_rate}
+                    class="font-medium text-emerald-600 dark:text-emerald-400"
+                  >
+                    ({@desk_usage.solved_rate}%)
+                  </span>
+                </p>
+                <p :if={@desk_usage.questions > 0} class="text-[11px] text-zinc-400">
+                  {gettext("Marked solved by askers: %{solved} · followed up: %{followed}",
+                    solved: @desk_usage.user_solved,
+                    followed: @desk_usage.followed_up
+                  )}
+                </p>
+              </div>
+
+              <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                <p class="text-xs font-medium text-zinc-500">
+                  {gettext("Tokens for answering questions")}
+                </p>
+                <p class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+                  {@desk_usage.chat.tokens}
+                </p>
+                <p class="text-[11px] text-zinc-400 mt-1">
+                  {gettext("Search and AI summaries of the chat")}
+                </p>
+              </div>
+
+              <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+                <p class="text-xs font-medium text-zinc-500">
+                  {gettext("Tokens processed by the nightly batch")}
+                </p>
+                <p class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+                  {@desk_usage.batch.tokens}
+                </p>
+                <p class="text-[11px] text-zinc-400 mt-1">
+                  {gettext("Importing documents and preparing QA")}
+                </p>
+              </div>
+
+              <div
+                id="desk-response-speed"
+                class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm"
+              >
+                <p class="text-xs font-medium text-zinc-500">{gettext("Response speed")}</p>
+                <p class={[
+                  "text-2xl font-bold mt-1",
+                  case @desk_usage.speed do
+                    :good -> "text-emerald-600 dark:text-emerald-400"
+                    :fair -> "text-zinc-900 dark:text-zinc-100"
+                    :slow -> "text-amber-600 dark:text-amber-400"
+                    _ -> "text-zinc-400"
+                  end
+                ]}>
+                  {speed_label(@desk_usage.speed)}
+                </p>
+                <p class="text-[11px] text-zinc-400 mt-1">
+                  <%= cond do %>
+                    <% @desk_usage.instant_rate && @desk_usage.instant_rate > 0 -> %>
+                      {gettext(
+                        "%{rate}% of questions were answered at once from the QA the nightly batch prepared",
+                        rate: @desk_usage.instant_rate
+                      )}
+                    <% @desk_usage.speed == :unknown -> %>
+                      {gettext("Shown once questions are asked")}
+                    <% true -> %>
+                      {gettext("Answered with the AI summary each time")}
+                  <% end %>
+                </p>
+              </div>
+            </div>
+
+            <%!-- KPI Cards (all desks' API calls, for the platform admin) --%>
+            <div
+              :if={@scope == :platform}
+              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+            >
               <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
                 <p class="text-xs font-medium text-zinc-500">
                   {gettext("Total requests (last 30 days)")}
@@ -4517,164 +4762,6 @@ defmodule AskDriveWeb.AdminLive do
               </div>
             </div>
 
-            <%!-- Provider & Model Breakdown --%>
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
-                <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-cpu-chip" class="w-5 h-5 text-indigo-600" /> {gettext(
-                    "Usage by provider and model"
-                  )}
-                </h3>
-                <%= if @metrics_summary.provider_breakdown == [] do %>
-                  <p class="text-xs text-zinc-500 py-4 text-center">
-                    {gettext("No API calls recorded yet.")}
-                  </p>
-                <% else %>
-                  <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
-                      <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
-                        <tr>
-                          <th class="py-2.5 px-2">{gettext("Provider")}</th>
-                          <th class="py-2.5 px-2">{gettext("Model")}</th>
-                          <th class="py-2.5 px-2 text-right">{gettext("Requests")}</th>
-                          <th class="py-2.5 px-2 text-right">{gettext("Total tokens")}</th>
-                          <th class="py-2.5 px-2 text-right">{gettext("Errors")}</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
-                        <%= for row <- @metrics_summary.provider_breakdown do %>
-                          <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
-                            <td class="py-2.5 px-2 font-medium text-zinc-900 dark:text-zinc-100">
-                              {row.provider}
-                            </td>
-                            <td class="py-2.5 px-2 font-mono text-[11px]">{row.model}</td>
-                            <td class="py-2.5 px-2 text-right">{row.requests}</td>
-                            <td class="py-2.5 px-2 text-right font-mono text-indigo-600 dark:text-indigo-400">
-                              {row.total_tokens}
-                            </td>
-                            <td class="py-2.5 px-2 text-right">
-                              <%= if row.errors > 0 do %>
-                                <span class="text-red-600 dark:text-red-400 font-medium">{row.errors}</span>
-                              <% else %>
-                                <span class="text-zinc-400">0</span>
-                              <% end %>
-                            </td>
-                          </tr>
-                        <% end %>
-                      </tbody>
-                    </table>
-                  </div>
-                <% end %>
-              </div>
-
-              <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
-                <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <.icon name="hero-tag" class="w-5 h-5 text-indigo-600" /> {gettext(
-                    "Usage by feature and purpose"
-                  )}
-                </h3>
-                <%= if @metrics_summary.purpose_breakdown == [] do %>
-                  <p class="text-xs text-zinc-500 py-4 text-center">
-                    {gettext("No API calls recorded yet.")}
-                  </p>
-                <% else %>
-                  <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
-                      <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
-                        <tr>
-                          <th class="py-2.5 px-2">{gettext("Purpose")}</th>
-                          <th class="py-2.5 px-2 text-right">{gettext("Number of requests")}</th>
-                          <th class="py-2.5 px-2 text-right">{gettext("Total token count")}</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
-                        <%= for row <- @metrics_summary.purpose_breakdown do %>
-                          <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
-                            <td class="py-2.5 px-2 font-medium text-zinc-900 dark:text-zinc-100">
-                              {case row.purpose do
-                                "batch_generation" -> gettext("Nightly batch QA generation")
-                                "chat_summary" -> gettext("Chat AI summary")
-                                "embedding" -> gettext("Embedding vector generation")
-                                "generation" -> gettext("Text generation")
-                                other -> other
-                              end}
-                            </td>
-                            <td class="py-2.5 px-2 text-right">{row.requests}</td>
-                            <td class="py-2.5 px-2 text-right font-mono text-indigo-600 dark:text-indigo-400">
-                              {row.total_tokens}
-                            </td>
-                          </tr>
-                        <% end %>
-                      </tbody>
-                    </table>
-                  </div>
-                <% end %>
-              </div>
-            </div>
-
-            <%!-- Recent API Errors Log --%>
-            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
-              <div class="flex items-start justify-between gap-4">
-                <div>
-                  <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                    <.icon name="hero-exclamation-triangle" class="w-5 h-5 text-red-500" />
-                    {gettext(
-                      "Recent API communication errors (for privacy, question text and document content are neither stored nor shown)"
-                    )}
-                  </h3>
-                  <p class="text-xs text-zinc-500 mt-1">
-                    {gettext(
-                      "History of recent API communication errors. Use it to check for revoked API keys, rate limits (429), timeouts and so on."
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              <%= if @recent_api_errors == [] do %>
-                <div class="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
-                  <.icon
-                    name="hero-check-circle"
-                    class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0"
-                  />
-                  <span>{gettext("No recent errors. Everything is running normally.")}</span>
-                </div>
-              <% else %>
-                <div class="overflow-x-auto">
-                  <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
-                    <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
-                      <tr>
-                        <th class="py-2.5 px-2">{gettext("Date and time")}</th>
-                        <th class="py-2.5 px-2">{gettext("Provider")}</th>
-                        <th class="py-2.5 px-2">{gettext("Model")}</th>
-                        <th class="py-2.5 px-2">{gettext("Purpose")}</th>
-                        <th class="py-2.5 px-2">{gettext("Error details")}</th>
-                        <th class="py-2.5 px-2 text-right">{gettext("Latency")}</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
-                      <%= for err <- @recent_api_errors do %>
-                        <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
-                          <td class="py-2.5 px-2 font-mono text-[11px] whitespace-nowrap">
-                            {AskDrive.Clock.format(err.inserted_at, "%Y-%m-%d %H:%M:%S")}
-                          </td>
-                          <td class="py-2.5 px-2 font-medium text-zinc-900 dark:text-zinc-100">
-                            {err.provider}
-                          </td>
-                          <td class="py-2.5 px-2 font-mono text-[11px]">{err.model}</td>
-                          <td class="py-2.5 px-2">{err.purpose}</td>
-                          <td class="py-2.5 px-2 text-red-600 dark:text-red-400 break-all">
-                            {err.error_message}
-                          </td>
-                          <td class="py-2.5 px-2 text-right font-mono whitespace-nowrap">
-                            {err.latency_ms} ms
-                          </td>
-                        </tr>
-                      <% end %>
-                    </tbody>
-                  </table>
-                </div>
-              <% end %>
-            </div>
             <%!-- Data & Ingestion Token Efficiency (spec 14.6) --%>
             <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-5">
               <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-200/60 dark:border-zinc-800 pb-3">
@@ -4856,6 +4943,196 @@ defmodule AskDriveWeb.AdminLive do
                   </div>
                 <% end %>
               </div>
+            </div>
+
+            <%!-- Provider & Model Breakdown --%>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+                <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-cpu-chip" class="w-5 h-5 text-indigo-600" /> {gettext(
+                    "Usage by provider and model"
+                  )}
+                </h3>
+                <%= if @metrics_summary.provider_breakdown == [] do %>
+                  <p class="text-xs text-zinc-500 py-4 text-center">
+                    {gettext("No API calls recorded yet.")}
+                  </p>
+                <% else %>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                      <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                        <tr>
+                          <th class="py-2.5 px-2">{gettext("Provider")}</th>
+                          <th class="py-2.5 px-2">{gettext("Model")}</th>
+                          <th class="py-2.5 px-2 text-right">{gettext("API calls")}</th>
+                          <th class="py-2.5 px-2 text-right">{gettext("Total tokens")}</th>
+                          <th class="py-2.5 px-2 text-right">{gettext("Errors")}</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                        <%= for row <- @metrics_summary.provider_breakdown do %>
+                          <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
+                            <td class="py-2.5 px-2 font-medium text-zinc-900 dark:text-zinc-100">
+                              {row.provider}
+                            </td>
+                            <td class="py-2.5 px-2 font-mono text-[11px]">{row.model}</td>
+                            <td class="py-2.5 px-2 text-right">{row.requests}</td>
+                            <td class="py-2.5 px-2 text-right font-mono text-indigo-600 dark:text-indigo-400">
+                              {row.total_tokens}
+                            </td>
+                            <td class="py-2.5 px-2 text-right">
+                              <%= if row.errors > 0 do %>
+                                <span class="text-red-600 dark:text-red-400 font-medium">{row.errors}</span>
+                              <% else %>
+                                <span class="text-zinc-400">0</span>
+                              <% end %>
+                            </td>
+                          </tr>
+                        <% end %>
+                      </tbody>
+                    </table>
+                  </div>
+                <% end %>
+              </div>
+
+              <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+                <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <.icon name="hero-tag" class="w-5 h-5 text-indigo-600" /> {gettext(
+                    "Usage by feature and purpose"
+                  )}
+                </h3>
+                <%= if @metrics_summary.purpose_breakdown == [] do %>
+                  <p class="text-xs text-zinc-500 py-4 text-center">
+                    {gettext("No API calls recorded yet.")}
+                  </p>
+                <% else %>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                      <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                        <tr>
+                          <th class="py-2.5 px-2">{gettext("Purpose")}</th>
+                          <th class="py-2.5 px-2 text-right">{gettext("API calls")}</th>
+                          <th class="py-2.5 px-2 text-right">{gettext("Total token count")}</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                        <%= for row <- @metrics_summary.purpose_breakdown do %>
+                          <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition">
+                            <td class="py-2.5 px-2 font-medium text-zinc-900 dark:text-zinc-100">
+                              {case row.purpose do
+                                "batch_generation" -> gettext("Nightly batch QA generation")
+                                "chat_summary" -> gettext("Chat AI summary")
+                                "query_embedding" -> gettext("Chat question search (embedding)")
+                                "embedding" -> gettext("Nightly batch embedding")
+                                "generation" -> gettext("Nightly batch QA generation")
+                                other -> other
+                              end}
+                            </td>
+                            <td class="py-2.5 px-2 text-right">{row.requests}</td>
+                            <td class="py-2.5 px-2 text-right font-mono text-indigo-600 dark:text-indigo-400">
+                              {row.total_tokens}
+                            </td>
+                          </tr>
+                        <% end %>
+                      </tbody>
+                    </table>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+
+            <%!-- Recent API Errors Log --%>
+            <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <h3 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                    <.icon name="hero-exclamation-triangle" class="w-5 h-5 text-red-500" />
+                    {gettext(
+                      "Recent API communication errors (for privacy, question text and document content are neither stored nor shown)"
+                    )}
+                  </h3>
+                  <p class="text-xs text-zinc-500 mt-1">
+                    {gettext(
+                      "History of recent API communication errors. Use it to check for revoked API keys, rate limits (429), timeouts and so on."
+                    )}
+                    {gettext(
+                      "Errors from the last %{days} days are shown; mark the ones you know about as seen to hide them.",
+                      days: AskDrive.Metrics.error_display_days()
+                    )}
+                  </p>
+                </div>
+                <button
+                  :if={@recent_api_errors != []}
+                  id="dismiss-all-api-errors-btn"
+                  type="button"
+                  phx-click="dismiss_all_api_errors"
+                  class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition"
+                >
+                  <.icon name="hero-check" class="w-4 h-4" />
+                  {gettext("Mark all as seen")}
+                </button>
+              </div>
+
+              <%= if @recent_api_errors == [] do %>
+                <div class="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                  <.icon
+                    name="hero-check-circle"
+                    class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0"
+                  />
+                  <span>{gettext("No recent errors. Everything is running normally.")}</span>
+                </div>
+              <% else %>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                    <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                      <tr>
+                        <th class="py-2.5 px-2">{gettext("Date and time")}</th>
+                        <th class="py-2.5 px-2">{gettext("Provider")}</th>
+                        <th class="py-2.5 px-2">{gettext("Model")}</th>
+                        <th class="py-2.5 px-2">{gettext("Purpose")}</th>
+                        <th class="py-2.5 px-2">{gettext("Error details")}</th>
+                        <th class="py-2.5 px-2 text-right">{gettext("Latency")}</th>
+                        <th class="py-2.5 px-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                      <%= for err <- @recent_api_errors do %>
+                        <tr
+                          id={"api-error-#{err.id}"}
+                          class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition"
+                        >
+                          <td class="py-2.5 px-2 font-mono text-[11px] whitespace-nowrap">
+                            {AskDrive.Clock.format(err.inserted_at, "%Y-%m-%d %H:%M:%S")}
+                          </td>
+                          <td class="py-2.5 px-2 font-medium text-zinc-900 dark:text-zinc-100">
+                            {err.provider}
+                          </td>
+                          <td class="py-2.5 px-2 font-mono text-[11px]">{err.model}</td>
+                          <td class="py-2.5 px-2">{err.purpose}</td>
+                          <td class="py-2.5 px-2 text-red-600 dark:text-red-400 break-all">
+                            {err.error_message}
+                          </td>
+                          <td class="py-2.5 px-2 text-right font-mono whitespace-nowrap">
+                            {err.latency_ms} ms
+                          </td>
+                          <td class="py-2.5 px-2 text-right">
+                            <button
+                              id={"dismiss-api-error-#{err.id}"}
+                              type="button"
+                              phx-click="dismiss_api_error"
+                              phx-value-id={err.id}
+                              title={gettext("Mark as seen")}
+                              class="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:text-zinc-200 dark:hover:bg-zinc-800 transition"
+                            >
+                              <.icon name="hero-x-mark" class="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      <% end %>
+                    </tbody>
+                  </table>
+                </div>
+              <% end %>
             </div>
           </div>
         <% end %>

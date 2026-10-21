@@ -101,12 +101,11 @@ defmodule AskDrive.Ldap.Client do
       {:ok, result} ->
         acc = [result |> elem(1) |> Enum.map(&entry/1) | acc]
 
-        case :eldap.paged_result_cookie(result) do
+        case paged_cookie(result) do
           {:ok, next} when next in [~c"", ""] -> {:ok, acc |> Enum.reverse() |> Enum.concat()}
           {:ok, next} -> search_pages(handle, opts, next, acc)
-          # no paging control in the answer: the server returned everything at once
-          {:error, _} when cookie == :none -> {:ok, acc |> Enum.reverse() |> Enum.concat()}
-          {:error, reason} -> {:error, reason}
+          # no paging control in the answer: the server returned everything it has
+          {:error, :no_cookie} -> {:ok, acc |> Enum.reverse() |> Enum.concat()}
         end
 
       {:error, reason} when cookie == :none and reason in [:unavailableCriticalExtension] ->
@@ -115,6 +114,18 @@ defmodule AskDrive.Ldap.Client do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  # a server that sends no controls at all leaves them as :asn1_NOVALUE, which
+  # :eldap.paged_result_cookie/1 doesn't accept
+  @doc false
+  def paged_cookie(result) do
+    case elem(result, 3) do
+      controls when is_list(controls) -> :eldap.paged_result_cookie(result)
+      _ -> {:error, :no_cookie}
+    end
+  rescue
+    _ -> {:error, :no_cookie}
   end
 
   defp plain_search(handle, opts) do

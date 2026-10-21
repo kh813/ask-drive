@@ -90,9 +90,30 @@ defmodule AskDriveWeb.ChatLive do
         %{"followup" => %{"question" => question, "thread" => thread}},
         socket
       ) do
-    if Enum.any?(socket.assigns.messages, &(&1.thread == thread)),
-      do: {:noreply, ask(socket, question, thread, :follow_up)},
-      else: {:noreply, assign(socket, :followup_thread, nil)}
+    if Enum.any?(socket.assigns.messages, &(&1.thread == thread)) do
+      socket =
+        if String.trim(question) != "" and not socket.assigns.loading,
+          do: followed_up(socket, thread),
+          else: socket
+
+      {:noreply, ask(socket, question, thread, :follow_up)}
+    else
+      {:noreply, assign(socket, :followup_thread, nil)}
+    end
+  end
+
+  # 「解決した」 under an answer (F-433), or pressed again to take it back. Only an answer on
+  # this screen can be marked.
+  def handle_event("mark_solved", %{"id" => id}, socket) do
+    case Enum.find(socket.assigns.messages, &(to_string(&1.id) == id and &1[:question_log_id])) do
+      nil ->
+        {:noreply, socket}
+
+      msg ->
+        solved? = not Map.get(msg, :solved?, false)
+        AskDrive.QA.mark_solved(msg.question_log_id, solved?)
+        {:noreply, update_message(socket, msg.id, &Map.put(&1, :solved?, solved?))}
+    end
   end
 
   # 停止: the search still running and/or the AI summaries still being written. Killing the
@@ -176,6 +197,29 @@ defmodule AskDriveWeb.ChatLive do
       _ ->
         {:noreply, socket}
     end
+  end
+
+  # A follow-up says the thread's last answer didn't settle the question (F-433)
+  defp followed_up(socket, thread) do
+    last =
+      socket.assigns.messages
+      |> Enum.filter(&(&1.thread == thread and &1.role == :assistant))
+      |> List.last()
+
+    if last && last[:question_log_id] do
+      AskDrive.QA.mark_followed_up(last.question_log_id)
+      update_message(socket, last.id, &Map.put(&1, :solved?, false))
+    else
+      socket
+    end
+  end
+
+  defp update_message(socket, id, fun) do
+    assign(
+      socket,
+      :messages,
+      Enum.map(socket.assigns.messages, fn m -> if m.id == id, do: fun.(m), else: m end)
+    )
   end
 
   # Asks `question` in `thread`: a new one (`:new`) or a follow-up (`:follow_up`), which is
@@ -277,6 +321,9 @@ defmodule AskDriveWeb.ChatLive do
       # Live AI summary of the excerpts (spec 6.4.4): shown above them, streamed in
       summary: if(summarise?, do: %{status: :running, text: "", thinking: ""}),
       history_id: entry && entry.id,
+      # 「解決した」 (F-433) marks this question's log
+      question_log_id: Map.get(result, :question_log_id),
+      solved?: false,
       inserted_at: DateTime.utc_now()
     }
 
@@ -972,6 +1019,7 @@ defmodule AskDriveWeb.ChatLive do
                               <.followup_controls
                                 :if={msg.id == List.last(thread_messages).id}
                                 thread={thread}
+                                msg={msg}
                                 followup_thread={@followup_thread}
                                 followup_form={@followup_form}
                                 loading={@loading}
@@ -1079,6 +1127,7 @@ defmodule AskDriveWeb.ChatLive do
                                 not (msg.tier == 2 and msg.chunks != [])
                             }
                             thread={thread}
+                            msg={msg}
                             followup_thread={@followup_thread}
                             followup_form={@followup_form}
                             loading={@loading}
@@ -1194,6 +1243,7 @@ defmodule AskDriveWeb.ChatLive do
   attr :followup_thread, :string, default: nil
   attr :followup_form, :any, required: true
   attr :loading, :boolean, default: false
+  attr :msg, :map, default: nil, doc: "the answer: 「解決した」 is offered under it (F-433)"
 
   def followup_controls(assigns) do
     ~H"""
@@ -1234,7 +1284,37 @@ defmodule AskDriveWeb.ChatLive do
           </button>
         </.form>
       <% true -> %>
-        <div class="flex justify-start pl-1">
+        <div class="flex flex-wrap items-center justify-start gap-2 pl-1">
+          <%!-- 「解決した」 (F-433): once the answer is complete; pressed again, taken back --%>
+          <button
+            :if={
+              @msg && @msg[:question_log_id] && @msg[:tier] != 3 &&
+                not match?(%{summary: %{status: :running}}, @msg)
+            }
+            type="button"
+            id={"solved-btn-#{@msg.id}"}
+            phx-click="mark_solved"
+            phx-value-id={@msg.id}
+            aria-pressed={to_string(@msg[:solved?] == true)}
+            class={[
+              "text-xs px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition",
+              if(@msg[:solved?],
+                do:
+                  "border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300",
+                else:
+                  "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-950/30"
+              )
+            ]}
+          >
+            <.icon
+              name={if(@msg[:solved?], do: "hero-check-circle-solid", else: "hero-hand-thumb-up")}
+              class="w-3.5 h-3.5"
+            />
+            {if(@msg[:solved?],
+              do: gettext("Solved. Thank you!"),
+              else: gettext("Solved")
+            )}
+          </button>
           <button
             type="button"
             id={"followup-btn-#{@thread}"}

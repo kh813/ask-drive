@@ -10,6 +10,10 @@ defmodule AskDrive.QA.QuestionLog do
     field :resolved_at, :utc_datetime
     belongs_to :resolved_qa, AskDrive.QA.QAPair, foreign_key: :resolved_qa_id
     field :asked_at, :utc_datetime
+    # the asker pressed 「解決した」 under the answer, or asked a follow-up to it (F-433);
+    # set by QA.mark_solved/2 and QA.mark_followed_up/1, never cast
+    field :user_solved_at, :utc_datetime
+    field :followed_up_at, :utc_datetime
 
     timestamps(type: :utc_datetime)
   end

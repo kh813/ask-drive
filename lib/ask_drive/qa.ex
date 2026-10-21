@@ -162,11 +162,44 @@ defmodule AskDrive.QA do
   """
   def list_unresolved_questions do
     Repo.all(
-      from q in QuestionLog,
-        where: is_nil(q.resolved_at) and q.tier_reached in [2, 3],
+      from q in unresolved_query(),
+        where: is_nil(q.user_solved_at),
         order_by: [desc: q.asked_at],
         limit: 50
     )
+  end
+
+  @doc """
+  Questions still waiting for a QA pair: answered from excerpts or not at all, or answered
+  from a QA pair the asker then followed up on — that answer didn't settle it (F-433). One
+  the asker marked 「解決した」 stays in for the nightly batch (a QA pair answers it at once
+  next time) but leaves the admin's list.
+  """
+  def unresolved_query do
+    from q in QuestionLog,
+      where:
+        is_nil(q.resolved_at) and
+          (q.tier_reached in [2, 3] or not is_nil(q.followed_up_at))
+  end
+
+  @doc "The asker pressed 「解決した」 under the answer (`true`), or pressed it again to undo (F-433)."
+  def mark_solved(log_id, solved?) when is_integer(log_id) do
+    at = if solved?, do: DateTime.utc_now() |> DateTime.truncate(:second)
+    Repo.update_all(from(q in QuestionLog, where: q.id == ^log_id), set: [user_solved_at: at])
+    :ok
+  end
+
+  @doc """
+  The asker asked a follow-up to the answer: it didn't settle the question, whatever
+  answered it (F-433). A 「解決した」 pressed before is taken back.
+  """
+  def mark_followed_up(log_id) when is_integer(log_id) do
+    Repo.update_all(
+      from(q in QuestionLog, where: q.id == ^log_id and is_nil(q.followed_up_at)),
+      set: [followed_up_at: DateTime.utc_now() |> DateTime.truncate(:second), user_solved_at: nil]
+    )
+
+    :ok
   end
 
   @doc """
