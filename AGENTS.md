@@ -9,6 +9,10 @@ This is a web application written using the Phoenix web framework.
   - `README.md`: update the parts that operators and administrators read (setup, operation, settings)
   - `docs/FAQ.md`: update it when the change affects what desk administrators see or do
   - Remove or correct descriptions that the change makes outdated, rather than leaving them alongside the new ones
+- **Never release (push a `vX.Y.Z` tag) unless every test passes**:
+  - Run the full `mix test` (and `mix precommit`) on the release commit first; any failure blocks the release, even one that looks unrelated or was already failing before the change
+  - Fix the failing test (or the code) first, and release only once the whole suite is green; if it can't be fixed right away, report it and wait instead of releasing
+  - After pushing to `main`, confirm the CI run (Linux x64) for that commit has passed before pushing the tag
 
 ### Phoenix v1.8 guidelines
 
