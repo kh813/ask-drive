@@ -203,6 +203,19 @@ defmodule AskDrive.Ops.ScriptsTest do
       File.rm_rf!(dir)
     end
 
+    test "the HTTP port ignores a generic PORT meant for another web app" do
+      ssl_dir =
+        Path.join(System.tmp_dir!(), "askdrive_ports_#{System.unique_integer([:positive])}")
+
+      port = fn env ->
+        run_platform(~s(#{env} ASK_DRIVE_SSL_DIR="#{ssl_dir}" askdrive_port http))
+        |> String.trim()
+      end
+
+      assert port.("PORT=5000") == "4000"
+      assert port.("PORT=5000 ASK_DRIVE_HTTP_PORT=4100") == "4100"
+    end
+
     test "the systemd unit runs app.sh start as the given user, with .runtime on PATH" do
       unit = run_platform(~s(systemd_unit_content /opt/askdrive askdrive askdrive /home/askdrive))
       assert unit =~ "ExecStart=/opt/askdrive/app.sh start"

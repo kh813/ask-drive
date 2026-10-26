@@ -4,7 +4,7 @@ defmodule AskDrive.Documents do
   """
   import Ecto.Query, warn: false
   alias AskDrive.Repo
-  alias AskDrive.Documents.Document
+  alias AskDrive.Documents.{Document, Exclusions}
   alias AskDrive.Ingest.FileTypes
 
   @doc """
@@ -40,14 +40,16 @@ defmodule AskDrive.Documents do
   @doc """
   Upserts a document from Google Drive file metadata.
   Returns `{:created, doc}`, `{:updated, doc}`, `{:unchanged, doc}`, or `{:excluded, doc}`
-  for a file that isn't a document (`AskDrive.Ingest.FileTypes`, spec F-356).
+  for a file that isn't a document (`AskDrive.Ingest.FileTypes`, spec F-356) or that the
+  desk left out (`excluded`, the IDs of `AskDrive.Documents.Exclusions` files, spec F-358;
+  `{id, source}` pairs, so AskDrive's own files get their own reason).
 
   A file already indexed (or deliberately skipped) stays `:unchanged` — no re-extraction or
   re-embedding in the batch — when Drive reports the same `modifiedTime`, or the same
   `md5Checksum` even though `modifiedTime` moved (spec F-334). Metadata such as a new name,
   path or link is still recorded. Failed or pending files are always retried.
   """
-  def upsert_document_from_drive(drive_file) do
+  def upsert_document_from_drive(drive_file, excluded \\ %{}) do
     drive_id = drive_file["id"]
     modified_dt = parse_iso_datetime(drive_file["modifiedTime"])
 
@@ -59,14 +61,22 @@ defmodule AskDrive.Documents do
       web_view_link: drive_file["webViewLink"],
       modified_time: modified_dt,
       md5_checksum: drive_file["md5Checksum"],
-      size_bytes: parse_integer(drive_file["size"])
+      size_bytes: parse_integer(drive_file["size"]),
+      folder_ids: drive_file["folder_ids"]
     }
 
     existing = get_document_by_drive_file_id(drive_id)
 
-    if FileTypes.indexable?(attrs.name, attrs.mime_type),
-      do: upsert_indexable(existing, attrs),
-      else: upsert_excluded(existing, attrs)
+    cond do
+      Map.has_key?(excluded, drive_id) ->
+        upsert_excluded(existing, attrs, Exclusions.reason(excluded[drive_id]))
+
+      FileTypes.indexable?(attrs.name, attrs.mime_type) ->
+        upsert_indexable(existing, attrs)
+
+      true ->
+        upsert_excluded(existing, attrs, FileTypes.excluded_reason(attrs.name, attrs.mime_type))
+    end
   end
 
   defp upsert_indexable(existing, attrs) do
@@ -83,7 +93,8 @@ defmodule AskDrive.Documents do
         # a file left out for its type that now counts (renamed .txt, a type added) is read
         if existing.status in ["indexed", "skipped"] and same_content?(existing, attrs) and
              existing.index_version >= current_index_version() and
-             not FileTypes.excluded_reason?(existing.error) do
+             not FileTypes.excluded_reason?(existing.error) and
+             not Exclusions.reason?(existing.error) do
           {:ok, doc} = existing |> Document.changeset(attrs) |> Repo.update()
           {:unchanged, doc}
         else
@@ -101,12 +112,10 @@ defmodule AskDrive.Documents do
     end
   end
 
-  # Not a document (a program, a script, source code): recorded as skipped with the reason,
-  # never downloaded. One indexed before the allowlist (F-356) loses its chunks, QA and
-  # summaries — it's removed and recorded again as left out.
-  defp upsert_excluded(existing, attrs) do
-    reason = FileTypes.excluded_reason(attrs.name, attrs.mime_type)
-
+  # Not a document (a program, a script, source code), or left out by the desk (F-358):
+  # recorded as skipped with the reason, never downloaded. One indexed before loses its
+  # chunks, QA and summaries — it's removed and recorded again as left out.
+  defp upsert_excluded(existing, attrs, reason) do
     case existing do
       %Document{status: "skipped", error: ^reason} = doc ->
         {:ok, doc} = doc |> Document.changeset(attrs) |> Repo.update()
@@ -123,6 +132,54 @@ defmodule AskDrive.Documents do
         {:excluded, doc}
     end
   end
+
+  @doc """
+  Takes a document out of the index now (an exclusion just set, F-358): its chunks, QA pairs
+  and summaries go, and it stays listed as skipped with `reason`. Returns `{:excluded, doc}`.
+  """
+  def exclude_document(%Document{} = doc, reason) do
+    attrs =
+      Map.take(doc, [
+        :drive_file_id,
+        :name,
+        :mime_type,
+        :path,
+        :web_view_link,
+        :modified_time,
+        :md5_checksum,
+        :size_bytes,
+        :folder_ids
+      ])
+
+    upsert_excluded(doc, attrs, reason)
+  end
+
+  @doc """
+  The Drive folders a document sits in below the sync folder, outermost first, as
+  `%{id:, name:, path:}` (F-358) — from its folder IDs and the names in its path. Empty until
+  a sync has recorded the IDs, or when a folder name holds a "/" and the two don't line up.
+  """
+  def ancestor_folders(%Document{folder_ids: ids, path: path})
+      when is_list(ids) and ids != [] and is_binary(path) do
+    # "/<sync folder>/<folder>/…/<file>"
+    segments = path |> String.trim_leading("/") |> String.split("/")
+
+    if length(segments) == length(ids) + 2 do
+      ids
+      |> Enum.with_index()
+      |> Enum.map(fn {id, i} ->
+        %{
+          id: id,
+          name: Enum.at(segments, i + 1),
+          path: "/" <> Enum.join(Enum.take(segments, i + 2), "/")
+        }
+      end)
+    else
+      []
+    end
+  end
+
+  def ancestor_folders(_doc), do: []
 
   defp same_content?(existing, attrs) do
     same_time? =

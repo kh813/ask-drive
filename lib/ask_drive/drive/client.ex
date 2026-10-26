@@ -22,20 +22,26 @@ defmodule AskDrive.Drive.Client do
 
   @doc """
   Recursively lists all non-folder, non-trashed files within a given folder ID.
-  Returns `{:ok, [file_metadata_with_path]}` or `{:error, reason}`.
+  Returns `{:ok, [file_metadata_with_path]}` or `{:error, reason}`. Each file also carries
+  `"folder_ids"`: the folders it sits in below `folder_id`, outermost first.
+
+  `skip_folders:` (a MapSet of folder IDs, the desk's excluded folders, spec F-358) are not
+  entered: nothing below them is listed.
   """
-  def list_files(folder_id) do
+  def list_files(folder_id, opts \\ []) do
+    skip = Keyword.get(opts, :skip_folders, MapSet.new())
+
     case get_metadata(folder_id) do
       {:ok, root_folder} ->
         root_path = "/#{root_folder["name"] || "Root"}"
-        traverse_folder(folder_id, root_path)
+        traverse_folder(folder_id, root_path, [], skip)
 
       {:error, reason} ->
         {:error, reason}
     end
   end
 
-  defp traverse_folder(folder_id, current_path) do
+  defp traverse_folder(folder_id, current_path, chain, skip) do
     case list_folder_children(folder_id) do
       {:ok, items} ->
         {subfolders, files} =
@@ -43,17 +49,21 @@ defmodule AskDrive.Drive.Client do
             item["mimeType"] == "application/vnd.google-apps.folder"
           end)
 
-        # Map files with their virtual path
+        # Map files with their virtual path and the folders above them
         mapped_files =
           Enum.map(files, fn file ->
-            Map.put(file, "path", "#{current_path}/#{file["name"]}")
+            file
+            |> Map.put("path", "#{current_path}/#{file["name"]}")
+            |> Map.put("folder_ids", chain)
           end)
 
-        # Recursively traverse subfolders
+        # Recursively traverse subfolders, except the excluded ones
         subfolder_files_results =
-          Enum.map(subfolders, fn subfolder ->
+          subfolders
+          |> Enum.reject(&MapSet.member?(skip, &1["id"]))
+          |> Enum.map(fn subfolder ->
             sub_path = "#{current_path}/#{subfolder["name"]}"
-            traverse_folder(subfolder["id"], sub_path)
+            traverse_folder(subfolder["id"], sub_path, chain ++ [subfolder["id"]], skip)
           end)
 
         # Check for errors in subfolder traversal

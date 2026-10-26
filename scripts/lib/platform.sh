@@ -269,7 +269,7 @@ askdrive_port() {
   if [[ -z "${value}" ]]; then
     case "${kind}" in
       https) value="${ASK_DRIVE_HTTPS_PORT:-4443}" ;;
-      http) value="${ASK_DRIVE_HTTP_PORT:-${PORT:-4000}}" ;;
+      http) value="${ASK_DRIVE_HTTP_PORT:-4000}" ;;
     esac
   fi
   echo "${value}"

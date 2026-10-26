@@ -140,6 +140,7 @@ Anthropic API キー: ********
 - あとから足りないものに気づいた場合は、全体管理の **「インストールとアップデート」** タブで確認できます。pandoc と Ollama はその画面からインストールでき、pdftotext（poppler-utils）や zstd のように sudo が必要なものは、サーバーで実行するコマンドが表示されます（実行後に「再確認」。再起動は不要で、プログラムがなくてスキップした文書は次の取り込みで読み直します）。
 - 古い形式の Word / Excel / PowerPoint（.doc / .xls / .ppt）を読むには LibreOffice が必要です（`./app.sh setup` では入れません。容量が大きいため任意）。Ubuntu では `sudo apt-get install -y --no-install-recommends libreoffice-writer libreoffice-calc libreoffice-impress` を実行し、「インストールとアップデート」で「再確認」を押してください。未インストールの間、これらのファイルはスキップされます。
 - インデックスの対象は文書（Google ドキュメント / スプレッドシート / スライド、PDF、Word・Excel・PowerPoint、テキスト、Markdown、CSV、HTML）だけです。同じフォルダにあるバッチファイル・プログラム（.exe）・ソースコード（.py など）・設定ファイル（JSON / YAML / XML）・画像などは、ダウンロードせずに対象外とします（文書一覧には「スキップ」として理由を表示）。
+- 同期フォルダの中でも、回答に使いたくないファイル・フォルダ（旧版・下書き・名簿など）は、窓口の管理画面の **「ドキュメント」** タブで夜間バッチの対象外にできます（文書一覧の「対象外にする」、または Drive の URL を入力）。指定した時点でインデックスから外し、フォルダはその下もすべて対象外になります。「対象に戻す」で次回のバッチから取り込み直します。
 - `./app.sh service install` は **systemd のシステムサービス** `/etc/systemd/system/askdrive.service` を作成し、`enable --now` で起動します。サービスは `service install` を実行したユーザーの権限で動き（root では動きません）、ログは `log/ask_drive.log` / `log/ask_drive_error.log` に追記されます。
 - 同時に `/etc/sudoers.d/askdrive` を作成し、そのユーザーに **`systemctl start|stop|restart askdrive.service` だけ**をパスワードなしで許可します。これにより、管理画面からの証明書の適用（再起動）や `./app.sh deploy` の再起動が sudo のパスワードなしで動きます。
 - 状態・ログ: `./app.sh status`、`systemctl status askdrive`、`journalctl -u askdrive`
@@ -428,6 +429,8 @@ v0.0.45 以降、AskDrive の通信はすべて HTTPS で暗号化されます�
 | 4000 | HTTP。HTTPS へ転送。ただし「ポートとリバースプロキシ」で指定したプロキシからは HTTP のまま応答 |
 
 ポート番号は、管理画面の設定タブ **「HTTPS（SSL 証明書）」→「ポートとリバースプロキシ」** で変更できます（ほかのソフトとポートが競合したとき用）。変更すると待ち受けを再起動し、新しいポートで起動できなければ元に戻します。v0.0.68 で HTTP の 4080 は廃止し、4000 にまとめました。
+
+AskDrive が待ち受けるのは、この HTTP / HTTPS の 2 つのポートだけです。80 番や 5000 番など、同じ Mac で動くほかの Web サーバー・Web アプリのポートは使いません（環境変数の `PORT` も読みません。AskDrive の既定値は `ASK_DRIVE_HTTP_PORT` / `ASK_DRIVE_HTTPS_PORT` で変えます）。なお macOS では、「AirPlay レシーバー」（システム設定 → 一般 → AirDrop と Handoff）が 5000 番と 7000 番を使うため、5000 番で動く Web アプリは起動できないことがあります。
 
 - **初回起動時**に自己署名証明書を自動で作成します（`localhost`・PC のホスト名・LAN の IP アドレス向け、`ssl/active/` に保存。秘密鍵は所有者のみ読み取り可）。自己署名証明書のため、ブラウザに「この接続ではプライバシーが保護されません」等の警告が出ます。社内検証中は「詳細」から続行してください。
 - **独自の証明書**（認証局が発行した証明書）は、管理画面の設定タブ **「HTTPS（SSL 証明書）」** で設定します。

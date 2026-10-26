@@ -9,6 +9,7 @@ defmodule AskDrive.Batch.SyncWorker do
   require Logger
   alias AskDrive.{Accounts, Documents, Settings}
   alias AskDrive.Batch.{ItemLog, Progress}
+  alias AskDrive.Documents.Exclusions
   alias AskDrive.Drive.Client, as: DriveClient
 
   @impl Oban.Worker
@@ -53,7 +54,12 @@ defmodule AskDrive.Batch.SyncWorker do
   defp run_sync(folder_id, run_id) do
     Logger.info("SyncWorker: Starting Drive sync for folder #{folder_id}...")
 
-    case DriveClient.list_files(folder_id) do
+    # what the desk left out (F-358): excluded folders aren't even listed
+    excluded_folders = Exclusions.folders()
+    excluded_files = Exclusions.files()
+    skip_folders = MapSet.new(excluded_folders, & &1.drive_id)
+
+    case DriveClient.list_files(folder_id, skip_folders: skip_folders) do
       {:ok, drive_files} ->
         Logger.info("SyncWorker: Found #{length(drive_files)} files in Drive.")
         Progress.start_phase("sync", length(drive_files))
@@ -67,7 +73,7 @@ defmodule AskDrive.Batch.SyncWorker do
               Progress.item(index, file["path"] || file["name"])
 
               try do
-                {outcome, doc} = Documents.upsert_document_from_drive(file)
+                {outcome, doc} = Documents.upsert_document_from_drive(file, excluded_files)
 
                 Logger.info(
                   "SyncWorker: #{outcome} #{file["path"] || file["name"]} (#{file["mimeType"]})"
@@ -98,7 +104,8 @@ defmodule AskDrive.Batch.SyncWorker do
 
         deleted_count =
           Documents.delete_missing_documents(current_drive_ids, fn doc ->
-            Logger.info("SyncWorker: deleted #{doc.name} (no longer in Drive folder)")
+            in_excluded? = Enum.any?(excluded_folders, &Exclusions.in_folder?(doc, &1))
+            Logger.info("SyncWorker: deleted #{doc.name} (no longer listed)")
 
             ItemLog.record(run_id, %{
               phase: "sync",
@@ -106,7 +113,11 @@ defmodule AskDrive.Batch.SyncWorker do
               name: doc.name,
               mime_type: doc.mime_type,
               status: "deleted",
-              message: "Drive のフォルダから無くなったため、インデックスから削除しました"
+              message:
+                if(in_excluded?,
+                  do: "対象外に設定したフォルダにあるため、インデックスから削除しました",
+                  else: "Drive のフォルダから無くなったため、インデックスから削除しました"
+                )
             })
           end)
 

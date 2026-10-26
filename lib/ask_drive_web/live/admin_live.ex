@@ -19,7 +19,7 @@ defmodule AskDriveWeb.AdminLive do
 
   alias AskDrive.Accounts.{AdminAccess, AdminElevationLog, AppAdminAccess}
   alias AskDrive.Batch.{ItemLog, Progress, Scheduler}
-  alias AskDrive.Documents.{Chunk, Document, Listing}
+  alias AskDrive.Documents.{Chunk, Document, Exclusions, Listing}
   alias AskDrive.Drive.{Client, ServiceAccount}
   alias AskDrive.LLM
   alias AskDrive.QA.QAPair
@@ -1184,6 +1184,77 @@ defmodule AskDriveWeb.AdminLive do
 
   def handle_event("reset_document_filter", _params, socket) do
     {:noreply, socket |> assign(:doc_filter, Listing.default_params()) |> assign_document_list()}
+  end
+
+  # --- Files and folders left out of the nightly batch (F-358) ---
+
+  def handle_event("exclude_document", %{"id" => id}, socket) do
+    case Repo.get(Document, id) do
+      nil ->
+        {:noreply, load_dashboard_data(socket)}
+
+      doc ->
+        attrs = %{drive_id: doc.drive_file_id, kind: "file", name: doc.name, path: doc.path}
+        {:noreply, socket |> leave_out(attrs) |> load_dashboard_data()}
+    end
+  end
+
+  def handle_event("exclude_folder", %{"id" => id, "folder" => folder_id}, socket) do
+    folder =
+      with %Document{} = doc <- Repo.get(Document, id),
+           do: Enum.find(Documents.ancestor_folders(doc), &(&1.id == folder_id))
+
+    case folder do
+      %{id: folder_id, name: name, path: path} ->
+        attrs = %{drive_id: folder_id, kind: "folder", name: name, path: path}
+        {:noreply, socket |> leave_out(attrs) |> load_dashboard_data()}
+
+      _ ->
+        {:noreply, load_dashboard_data(socket)}
+    end
+  end
+
+  def handle_event("add_exclusion", %{"exclusion" => %{"target" => target}}, socket) do
+    case Exclusions.resolve(target) do
+      {:ok, attrs} ->
+        socket = leave_out(socket, attrs)
+
+        socket =
+          if Phoenix.Flash.get(socket.assigns.flash, :error),
+            do: socket,
+            else: assign(socket, :exclusion_form, exclusion_form())
+
+        {:noreply, load_dashboard_data(socket)}
+
+      {:error, reason} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Could not find that file or folder in Drive: %{reason}",
+             reason: describe_resolve_error(reason)
+           )
+         )}
+    end
+  end
+
+  def handle_event("remove_exclusion", %{"id" => id}, socket) do
+    socket =
+      case Exclusions.remove(id) do
+        {:ok, ex} ->
+          put_flash(
+            socket,
+            :info,
+            gettext("\"%{name}\" is back. It is read in the next batch.",
+              name: ex.name || ex.drive_id
+            )
+          )
+
+        {:error, reason} ->
+          put_flash(socket, :error, exclusion_error(reason))
+      end
+
+    {:noreply, load_dashboard_data(socket)}
   end
 
   def handle_event("stop_batch", _params, socket) do
@@ -2594,6 +2665,7 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:stale_qas, stale_qas)
     |> assign(:total_docs, total_docs)
     |> assign(:documents, docs)
+    |> assign_exclusions()
     |> assign(:unresolved_questions, unresolved_questions)
     |> assign(:resolved_questions, resolved_questions)
     |> assign(:metrics_summary, metrics_summary)
@@ -2605,6 +2677,65 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:account, account)
     |> assign_document_rows(docs, data_efficiency)
   end
+
+  # --- Files and folders left out of the nightly batch (F-358) ---
+
+  defp assign_exclusions(socket) do
+    exclusions = Exclusions.list()
+
+    socket
+    |> assign(:exclusions, exclusions)
+    |> assign(
+      :excluded_file_ids,
+      for(%{kind: "file", drive_id: id} <- exclusions, into: MapSet.new(), do: id)
+    )
+    |> assign(:exclusions_busy?, Scheduler.running?())
+    |> assign_new(:exclusion_form, fn -> exclusion_form() end)
+  end
+
+  defp exclusion_form, do: to_form(%{"target" => ""}, as: :exclusion)
+
+  defp leave_out(socket, attrs) do
+    user = socket.assigns[:current_user]
+
+    case Exclusions.exclude(attrs, user && user.email) do
+      {:ok, ex, removed} ->
+        put_flash(
+          socket,
+          :info,
+          if(ex.kind == "folder",
+            do:
+              gettext(
+                "Left the folder \"%{name}\" out of the nightly batch (%{count} documents removed from the index).",
+                name: ex.name || ex.drive_id,
+                count: removed
+              ),
+            else:
+              gettext("Left \"%{name}\" out of the nightly batch.", name: ex.name || ex.drive_id)
+          )
+        )
+
+      {:error, reason} ->
+        put_flash(socket, :error, exclusion_error(reason))
+    end
+  end
+
+  defp exclusion_error(:batch_running),
+    do:
+      gettext("The batch is running. Change exclusions once it finishes (or after stopping it).")
+
+  defp exclusion_error(:sync_folder),
+    do: gettext("That is the sync folder itself. Change the sync folder in Settings instead.")
+
+  defp exclusion_error(:already_excluded), do: gettext("It is already left out.")
+  defp exclusion_error(:system), do: gettext("AskDrive's own files can't be brought back.")
+  defp exclusion_error(:not_found), do: gettext("That exclusion no longer exists.")
+  defp exclusion_error(_), do: gettext("Could not change the exclusion.")
+
+  defp describe_resolve_error(:empty_url), do: gettext("enter a URL or ID")
+  defp describe_resolve_error("HTTP 404" <> _), do: gettext("not found, or no access to it")
+  defp describe_resolve_error(reason) when is_binary(reason), do: reason
+  defp describe_resolve_error(reason), do: inspect(reason)
 
   # --- The documents tab's filter (F-1412) ---
 
@@ -3788,6 +3919,11 @@ defmodule AskDriveWeb.AdminLive do
 
         <%!-- Tab 3: Documents List --%>
         <%= if @current_tab == "documents" do %>
+          <AskDriveWeb.ExclusionsPanel.exclusions_card
+            exclusions={@exclusions}
+            form={@exclusion_form}
+            busy?={@exclusions_busy?}
+          />
           <div class="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-4">
             <h2 class="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
               <span>{gettext("Documents for ingestion")}</span>
@@ -3888,11 +4024,14 @@ defmodule AskDriveWeb.AdminLive do
                       <th class="py-3 px-2 text-right">{gettext("Token efficiency")}</th>
                       <th class="py-3 px-2">{gettext("Last synced")}</th>
                       <th class="py-3 px-2 text-right">Drive</th>
+                      <th class="py-3 px-2 text-right">
+                        <span class="sr-only">{gettext("Leave out")}</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody id="document-rows" class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
                     <tr :if={@shown_docs == []} id="no-matching-documents">
-                      <td colspan="6" class="py-8 text-center text-zinc-500">
+                      <td colspan="7" class="py-8 text-center text-zinc-500">
                         {gettext("No documents match the filters.")}
                       </td>
                     </tr>
@@ -3977,6 +4116,13 @@ defmodule AskDriveWeb.AdminLive do
                               <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
                             </.link>
                           <% end %>
+                        </td>
+                        <td class="py-3 px-2 text-right whitespace-nowrap">
+                          <AskDriveWeb.ExclusionsPanel.row_menu
+                            doc={doc}
+                            excluded?={MapSet.member?(@excluded_file_ids, doc.drive_file_id)}
+                            busy?={@exclusions_busy?}
+                          />
                         </td>
                       </tr>
                     <% end %>
@@ -8156,7 +8302,9 @@ defmodule AskDriveWeb.AdminLive do
 
   defp drive_sync_dry_run(folder_id, setting) do
     with {:ok, folder} <- Client.get_metadata(folder_id),
-         {:ok, files} <- Client.list_files(folder_id) do
+         # what the batch would list: without the folders left out (F-358)
+         skip = MapSet.new(Exclusions.folders(), & &1.drive_id),
+         {:ok, files} <- Client.list_files(folder_id, skip_folders: skip) do
       {:ok,
        %{
          folder: folder["name"],

@@ -54,6 +54,37 @@ defmodule AskDrive.Drive.ClientTest do
     end
   end
 
+  test "lists files with the folders above them, without entering excluded folders (F-358)",
+       %{calls: calls} do
+    children = %{
+      "root" => [
+        %{"id" => "top", "name" => "手順.pdf", "mimeType" => "application/pdf"},
+        %{"id" => "old", "name" => "旧版", "mimeType" => "application/vnd.google-apps.folder"},
+        %{"id" => "hr", "name" => "人事", "mimeType" => "application/vnd.google-apps.folder"}
+      ],
+      "hr" => [%{"id" => "leave", "name" => "休暇.pdf", "mimeType" => "application/pdf"}],
+      "old" => [%{"id" => "stale", "name" => "古い.pdf", "mimeType" => "application/pdf"}]
+    }
+
+    stub_drive(calls, fn conn, _n ->
+      case URI.decode_query(conn.query_string)["q"] do
+        nil ->
+          Req.Test.json(conn, %{"id" => "root", "name" => "共有"})
+
+        q ->
+          [_, parent] = Regex.run(~r/'([^']+)' in parents/, q)
+          Req.Test.json(conn, %{"files" => children[parent]})
+      end
+    end)
+
+    assert {:ok, files} = Client.list_files("root", skip_folders: MapSet.new(["old"]))
+
+    assert files |> Enum.map(&{&1["id"], &1["path"], &1["folder_ids"]}) |> Enum.sort() == [
+             {"leave", "/共有/人事/休暇.pdf", ["hr"]},
+             {"top", "/共有/手順.pdf", []}
+           ]
+  end
+
   test "a 404 is returned at once, not retried", %{calls: calls} do
     stub_drive(calls, fn conn, _n -> Plug.Conn.send_resp(conn, 404, "not found") end)
 

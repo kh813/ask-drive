@@ -97,16 +97,28 @@ app_url() {
 
 # 環境変数の読み込み
 load_env() {
+  local file=""
   if [[ -f "${ENV_FILE}" ]]; then
-    set -a
-    # shellcheck disable=SC1090
-    source "${ENV_FILE}"
-    set +a
+    file="${ENV_FILE}"
   elif [[ -f "${SCRIPT_DIR}/.env" ]]; then
-    set -a
-    # shellcheck disable=SC1091
-    source "${SCRIPT_DIR}/.env"
-    set +a
+    file="${SCRIPT_DIR}/.env"
+  fi
+  [[ -n "${file}" ]] || return 0
+
+  set -a
+  # shellcheck disable=SC1090
+  source "${file}"
+  set +a
+
+  # 以前の .env.prod は HTTP ポートを汎用の PORT で書いていた。AskDrive は ASK_DRIVE_HTTP_PORT
+  # だけを読む（同じ Mac の別の Web アプリ向けの PORT=5000 などに引きずられないため）ので、
+  # 設定ファイルに書かれた PORT に限って引き継ぐ。シェルから来た PORT は使わない。
+  if [[ -z "${ASK_DRIVE_HTTP_PORT:-}" ]]; then
+    local legacy
+    legacy="$(sed -n 's/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}PORT=["'"'"']\{0,1\}\([0-9][0-9]*\).*/\2/p' "${file}" | tail -n 1)"
+    if [[ -n "${legacy}" ]]; then
+      export ASK_DRIVE_HTTP_PORT="${legacy}"
+    fi
   fi
 }
 
@@ -200,6 +212,9 @@ cmd_start() {
   if [[ -f "${SCRIPT_DIR}/_build/prod/rel/ask_drive/bin/ask_drive" ]]; then
     export MIX_ENV=prod
     export PHX_SERVER=true
+    # Erlang の分散（epmd の 4369 と毎回変わるポート）は使わないので開かない。
+    # AskDrive が待ち受けるのは管理画面で設定した HTTP / HTTPS のポートだけにする。
+    export RELEASE_DISTRIBUTION=none
     "${SCRIPT_DIR}/_build/prod/rel/ask_drive/bin/ask_drive" start
   else
     mix phx.server

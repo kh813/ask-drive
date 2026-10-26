@@ -1189,18 +1189,19 @@ defmodule AskDriveWeb.ChatLive do
               id="chat-form"
               phx-change="validate"
               phx-submit="send_message"
-              class="flex items-center gap-2"
+              class="flex items-end gap-2"
             >
               <div class="flex-1 relative">
-                <input
-                  type="text"
+                <%!-- Enter sends, Shift+Enter adds a line (.ChatComposer) --%>
+                <textarea
                   name="question"
                   id="chat-input"
-                  value={@form[:question].value}
+                  rows="1"
+                  phx-hook=".ChatComposer"
                   placeholder={gettext("Ask a new question about Google Drive documents...")}
-                  class="w-full px-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition"
+                  class="block w-full max-h-48 resize-none overflow-y-auto px-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm leading-5 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition"
                   autocomplete="off"
-                />
+                >{Phoenix.HTML.Form.normalize_value("textarea", @form[:question].value)}</textarea>
               </div>
               <button
                 :if={@loading or summarising?(@messages)}
@@ -1223,6 +1224,35 @@ defmodule AskDriveWeb.ChatLive do
                 <span>{gettext("New question")}</span>
               </button>
             </.form>
+            <script :type={Phoenix.LiveView.ColocatedHook} name=".ChatComposer">
+              // The question boxes: Enter sends, Shift+Enter starts a new line, and the box
+              // grows with its text (up to its max height, then scrolls). Enter that confirms
+              // an IME conversion (Japanese input) only confirms it, never sends.
+              export default {
+                mounted() {
+                  this.resize = () => {
+                    this.el.style.height = "auto"
+                    this.el.style.height = `${this.el.scrollHeight + this.el.offsetHeight - this.el.clientHeight}px`
+                  }
+                  this.el.addEventListener("input", this.resize)
+                  this.el.addEventListener("keydown", e => {
+                    if (e.key !== "Enter" || e.shiftKey || e.isComposing || e.keyCode === 229) return
+                    e.preventDefault()
+                    const send = this.el.form.querySelector("button[type=submit]")
+                    if (this.el.value.trim() === "" || (send && send.disabled)) return
+                    this.el.form.requestSubmit()
+                  })
+                  this.resize()
+                },
+                updated() { this.resize() }
+              }
+            </script>
+            <p
+              id="chat-keys-hint"
+              class="hidden sm:block text-[10px] text-zinc-400 dark:text-zinc-500 text-right"
+            >
+              {gettext("Enter to send, Shift+Enter for a new line")}
+            </p>
             <p
               id="chat-disclaimer"
               class="text-[10px] text-zinc-400 dark:text-zinc-500 text-center pt-0.5"
@@ -1253,19 +1283,19 @@ defmodule AskDriveWeb.ChatLive do
           for={@followup_form}
           id={"followup-form-#{@thread}"}
           phx-submit="send_followup"
-          class="flex flex-wrap items-center gap-2 pl-1"
+          class="flex flex-wrap items-end gap-2 pl-1"
         >
           <input type="hidden" name="followup[thread]" value={@thread} />
-          <input
-            type="text"
+          <textarea
             name="followup[question]"
             id={"followup-input-#{@thread}"}
-            value=""
+            rows="1"
+            phx-hook=".ChatComposer"
             phx-mounted={JS.focus()}
             placeholder={gettext("Ask more about this answer...")}
             autocomplete="off"
-            class="flex-1 min-w-[12rem] px-3 py-2 rounded-xl border border-indigo-300 dark:border-indigo-800 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-          />
+            class="flex-1 min-w-[12rem] max-h-40 resize-none overflow-y-auto px-3 py-2 rounded-xl border border-indigo-300 dark:border-indigo-800 bg-white dark:bg-zinc-900 text-sm leading-5 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+          ></textarea>
           <button
             type="submit"
             id={"followup-send-#{@thread}"}

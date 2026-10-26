@@ -21,6 +21,20 @@ defmodule AskDriveWeb.ChatLiveTest do
     assert html =~ "社内規定について教えてください"
   end
 
+  test "the question box takes several lines (Shift+Enter) and keeps them", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/it-support")
+    assert has_element?(view, "textarea#chat-input[phx-hook]")
+    assert has_element?(view, "#chat-keys-hint")
+
+    view
+    |> form("#chat-form", %{"question" => "VPNに接続できません。\nエラーは 809 です。"})
+    |> render_submit()
+
+    assert view
+           |> element(~s([data-role="user"] p.whitespace-pre-wrap), "エラーは 809 です。")
+           |> render() =~ "VPNに接続できません。\nエラーは 809 です。"
+  end
+
   test "answers asynchronously: question first, then the answer bubble", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/it-support")
 

@@ -61,7 +61,7 @@ defmodule AskDrive.Network do
     }
   end
 
-  # the configured default (ASK_DRIVE_HTTP_PORT / PORT in prod), else the endpoint's own
+  # the configured default (ASK_DRIVE_HTTP_PORT in prod), else the endpoint's own
   defp default_http do
     Application.get_env(:ask_drive, :http_port) ||
       get_in(Application.get_env(:ask_drive, AskDriveWeb.Endpoint, []), [:http, :port]) ||

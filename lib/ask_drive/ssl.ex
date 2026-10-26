@@ -463,7 +463,10 @@ defmodule AskDrive.SSL do
         end
 
       {:ok, _} = Application.ensure_all_started(:ssl)
-      {:ok, listen} = :ssl.listen(0, [:binary, active: false, reuseaddr: true] ++ opts)
+      # loopback only: the check needs no port reachable from the network
+      {:ok, listen} =
+        :ssl.listen(0, [:binary, active: false, reuseaddr: true, ip: {127, 0, 0, 1}] ++ opts)
+
       {:ok, {_, port}} = :ssl.sockname(listen)
       parent = self()
 
@@ -479,7 +482,7 @@ defmodule AskDrive.SSL do
           send(parent, {:handshake, result})
         end)
 
-      client = :ssl.connect(~c"localhost", port, [verify: :verify_none, active: false], 10_000)
+      client = :ssl.connect({127, 0, 0, 1}, port, [verify: :verify_none, active: false], 10_000)
       with {:ok, socket} <- client, do: :ssl.close(socket)
 
       result =

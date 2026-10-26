@@ -26,8 +26,10 @@ config :ask_drive,
   encryption_key: System.get_env("ASK_DRIVE_ENCRYPTION_KEY"),
   ollama_host: System.get_env("OLLAMA_HOST", "http://localhost:11434")
 
+# Only AskDrive's own variable: a generic PORT in the environment is often meant for another
+# web app on the same Mac (Flask's 5000, a server on 80) and must not move AskDrive there.
 config :ask_drive, AskDriveWeb.Endpoint,
-  http: [port: String.to_integer(System.get_env("PORT", "4000"))]
+  http: [port: String.to_integer(System.get_env("ASK_DRIVE_HTTP_PORT", "4000"))]
 
 if config_env() == :dev do
   # Reload browser tabs when matching files change.
@@ -59,7 +61,7 @@ if config_env() == :prod do
     System.get_env("SECRET_KEY_BASE") ||
       "D3faul7S3cr3tK3y8as3ForPr0dBuildOnlyMust0verrideInEnvFile123456789012"
 
-  port = String.to_integer(System.get_env("PORT") || "4000")
+  port = String.to_integer(System.get_env("ASK_DRIVE_HTTP_PORT") || "4000")
   host = System.get_env("PHX_HOST") || "localhost"
 
   config :ask_drive, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
@@ -71,7 +73,7 @@ if config_env() == :prod do
   config :ask_drive,
     ssl_enabled: System.get_env("ASK_DRIVE_SSL", "true") not in ["false", "0", "no", "off"],
     https_port: String.to_integer(System.get_env("ASK_DRIVE_HTTPS_PORT") || "4443"),
-    http_port: String.to_integer(System.get_env("ASK_DRIVE_HTTP_PORT") || to_string(port)),
+    http_port: port,
     ssl_dir: System.get_env("ASK_DRIVE_SSL_DIR")
 
   config :ask_drive, AskDriveWeb.Endpoint,

@@ -19,6 +19,8 @@ defmodule AskDrive.Documents.Document do
     # a PDF's pages and those with (almost) no text (F-1410); nil for other formats
     field :page_count, :integer
     field :textless_pages, :integer
+    # the Drive folders it sits in below the sync folder, outermost first (F-358)
+    field :folder_ids, {:array, :string}
 
     has_many :chunks, AskDrive.Documents.Chunk, on_delete: :delete_all
     has_many :qa_pairs, AskDrive.QA.QAPair, on_delete: :delete_all
@@ -46,7 +48,8 @@ defmodule AskDrive.Documents.Document do
       :error,
       :synced_at,
       :page_count,
-      :textless_pages
+      :textless_pages,
+      :folder_ids
     ])
     |> validate_required([:drive_file_id, :name, :mime_type])
     |> unique_constraint(:drive_file_id)
