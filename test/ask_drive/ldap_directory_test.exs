@@ -116,11 +116,15 @@ defmodule AskDrive.LdapDirectoryTest do
     setting = Settings.platform_setting!()
     refute Directory.due?(setting, day)
 
-    # in the night window, if not tried since it opened
+    # in the night window, if not tried since it opened (relative to that night, not to
+    # today, so the test doesn't depend on the date it runs)
+    window_start = AskDrive.Runtime.Mode.night_window_start_utc(night)
+
     {:ok, setting} =
       setting
       |> Ecto.Changeset.change(
-        ldap_directory_checked_at: DateTime.add(DateTime.utc_now(:second), -2 * 86_400)
+        ldap_directory_checked_at:
+          window_start |> DateTime.add(-86_400) |> DateTime.truncate(:second)
       )
       |> Repo.update()
 
