@@ -4,7 +4,7 @@ This document outlines planned improvements, future concepts, and the technical 
 
 ---
 
-## Current Version: `0.2.10` (MVP: Minimum Viable Product)
+## Current Version: `0.2.11` (MVP: Minimum Viable Product)
 - **License**: Changed to [Apache License 2.0](LICENSE) (from MIT) with [NOTICE](NOTICE) file.
 - **Prototype (v0.1.x) to MVP (v0.2.0)**: The core feature set has matured from the initial prototype phase into an operational Minimum Viable Product for enterprise internal deployments.
 - **Multi-lingual Support (i18n)**: English (default) & Japanese (`en` / `ja`) with browser `Accept-Language` auto-detection and UI switcher. The admin screens (desk and platform) are fully available in English (v0.1.41, Gettext with English source strings); text recorded by background work (batch, health check, certificate renewal, updater) stays Japanese.
@@ -36,6 +36,7 @@ This document outlines planned improvements, future concepts, and the technical 
 - **チャットの複数行入力と待ち受けポートの限定**（v0.2.8）: 質問欄で Shift+Enter で改行。AskDrive は管理画面で設定した HTTP / HTTPS のポートだけで待ち受け、汎用の `PORT` や Erlang の分散用ポートで同じ Mac の別の Web アプリを妨げない
 - **利用状況タブ**（v0.2.9）: 窓口の管理画面に、よく使うユーザー（質問回数・トークン・解決率）とよくある質問。全体管理に、ユーザーごとの全窓口の合計（窓口別の内訳つき）。ユーザーごとの記録に質問の文面は持たず、90 日で削除。全体管理の「API利用量・ログ」を全窓口の合計に
 - **クラウド API の窓口は夜間バッチの生成を同時に**（v0.2.10）: 同じ API キー（Vertex はプロジェクト）を使う窓口は同時実行数を分け合い、429 で自動的に減らして戻す。窓口の設定に「同時に生成する数」（1〜32、既定 4）。ローカル LLM の窓口と取り込みは従来どおり 1 つずつ
+- **規則に当てはめて答える AI 要約と全体管理のタブの並び**（v0.2.11）: 「この名前は命名規則に沿っていますか？」のような質問に、抜粋の規則を当てはめて答える（名前そのものが文書に無くても）。全体管理のタブは「API利用量・ログ」「利用状況」「全体設定」を左に
 - **管理画面の保存と有効化の分離**（v0.1.39〜）: 「保存」は値の保存だけ、機能ごとの有効・無効はスイッチですぐに反映
 
 ---
