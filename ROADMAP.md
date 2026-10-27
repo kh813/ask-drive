@@ -4,7 +4,7 @@ This document outlines planned improvements, future concepts, and the technical 
 
 ---
 
-## Current Version: `0.2.8` (MVP: Minimum Viable Product)
+## Current Version: `0.2.9` (MVP: Minimum Viable Product)
 - **License**: Changed to [Apache License 2.0](LICENSE) (from MIT) with [NOTICE](NOTICE) file.
 - **Prototype (v0.1.x) to MVP (v0.2.0)**: The core feature set has matured from the initial prototype phase into an operational Minimum Viable Product for enterprise internal deployments.
 - **Multi-lingual Support (i18n)**: English (default) & Japanese (`en` / `ja`) with browser `Accept-Language` auto-detection and UI switcher. The admin screens (desk and platform) are fully available in English (v0.1.41, Gettext with English source strings); text recorded by background work (batch, health check, certificate renewal, updater) stays Japanese.
@@ -34,6 +34,7 @@ This document outlines planned improvements, future concepts, and the technical 
 - **数の表示と FAQ**（v0.2.7）: 3 桁ごとの区切り、カードの大きな数は「12.3 万」「1.2 億」に短縮。窓口管理者向けのよくある質問 [docs/FAQ.md](docs/FAQ.md)
 - **夜間バッチの対象外の指定**（v0.2.8）: 窓口管理者が、同期フォルダ内の旧版・下書き・名簿などのファイルやフォルダを「ドキュメント」タブで対象外に（指定した時点でインデックスから外し、Drive の ID で管理）
 - **チャットの複数行入力と待ち受けポートの限定**（v0.2.8）: 質問欄で Shift+Enter で改行。AskDrive は管理画面で設定した HTTP / HTTPS のポートだけで待ち受け、汎用の `PORT` や Erlang の分散用ポートで同じ Mac の別の Web アプリを妨げない
+- **利用状況タブ**（v0.2.9）: 窓口の管理画面に、よく使うユーザー（質問回数・トークン・解決率）とよくある質問。全体管理に、ユーザーごとの全窓口の合計（窓口別の内訳つき）。ユーザーごとの記録に質問の文面は持たず、90 日で削除。全体管理の「API利用量・ログ」を全窓口の合計に
 - **管理画面の保存と有効化の分離**（v0.1.39〜）: 「保存」は値の保存だけ、機能ごとの有効・無効はスイッチですぐに反映
 
 ---
