@@ -127,6 +127,9 @@ defmodule AskDrive.Settings.Setting do
     field :embed_provider, :string, default: "ollama"
     field :embedding_dim, :integer, default: 1024
     field :llm_max_tokens, :integer, default: 4096
+    # chunks the nightly batch generates at once on a cloud API (F-841); the desks using the
+    # same API key (or Vertex project) share them
+    field :cloud_generation_concurrency, :integer, default: 4
     field :llm_temperature, :float
 
     # --- Provider endpoints and credentials (spec 6.2.2.1) ---
@@ -364,6 +367,7 @@ defmodule AskDrive.Settings.Setting do
         :embedding_dim,
         :llm_max_tokens,
         :llm_temperature,
+        :cloud_generation_concurrency,
         :vertex_project,
         :vertex_location
       ] ++ @api_key_fields ++ @base_url_fields
@@ -395,6 +399,10 @@ defmodule AskDrive.Settings.Setting do
       less_than_or_equal_to: 1.0
     )
     |> validate_number(:batch_num_ctx, greater_than: 512)
+    |> validate_number(:cloud_generation_concurrency,
+      greater_than_or_equal_to: 1,
+      less_than_or_equal_to: 32
+    )
     |> validate_inclusion(:llm_provider, @generation_providers,
       message: "is not a supported provider"
     )

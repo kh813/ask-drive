@@ -12,11 +12,22 @@ defmodule AskDrive.LLM.Semaphore do
 
   @doc """
   For text generation: in a slot when it runs on this machine (Ollama / LM Studio, whose
-  memory and CPU allow one at a time), right away when it runs on a cloud API, where
-  requests mostly wait on the network and several can be in flight (F-840).
+  memory and CPU allow one at a time); on a cloud API, where requests mostly wait on the
+  network and several can be in flight (F-840), in one of its API key's slots, shared with
+  the other desks using the same key (F-841, `AskDrive.LLM.QuotaLimiter`).
   """
   def generation(fun) when is_function(fun, 0) do
-    if AskDrive.LLM.local_generation?(), do: run(fun), else: fun.()
+    setting = AskDrive.Settings.get_setting()
+
+    if AskDrive.LLM.local_generation?(setting) do
+      run(fun)
+    else
+      AskDrive.LLM.QuotaLimiter.run(
+        AskDrive.LLM.quota_key(setting),
+        AskDrive.LLM.generation_concurrency(setting),
+        fun
+      )
+    end
   end
 
   @doc """

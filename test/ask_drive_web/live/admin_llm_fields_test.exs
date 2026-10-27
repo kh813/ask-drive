@@ -313,4 +313,22 @@ defmodule AskDriveWeb.AdminLlmFieldsTest do
       assert has_element?(view, "#cloud-models-status")
     end
   end
+
+  test "the cloud API's number of chunks generated at once is saved (F-841)", %{conn: conn} do
+    view = open(conn)
+    assert hidden?(view, "batch-cloud-concurrency")
+
+    view
+    |> form("#settings-form", %{
+      "setting" => %{
+        "batch_llm_mode" => "cloud",
+        "cloud_llm_provider" => "gemini",
+        "cloud_generation_concurrency" => "12"
+      }
+    })
+    |> render_submit()
+
+    refute hidden?(view, "batch-cloud-concurrency")
+    assert Settings.get_setting!().cloud_generation_concurrency == 12
+  end
 end

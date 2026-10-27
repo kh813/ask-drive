@@ -15,7 +15,8 @@ defmodule AskDrive.StubGemini do
     * `:models_blocked` — answer `GET /models` with the 403 of a key whose API restrictions
       leave out ListModels
 
-  Every request body is sent to the owner as `{:stub_gemini, path, body}`.
+  Every request body is sent to the owner as `{:stub_gemini, path, body}`. `max_in_flight/0`
+  is the most POSTs it has been answering at once (generations running in parallel).
   """
   use Plug.Router
 
@@ -46,7 +47,12 @@ defmodule AskDrive.StubGemini do
 
   post "/models/:call" do
     send(fetch(:owner), {:stub_gemini, call, conn.body_params})
+    flight = fetch(:flight)
+    :atomics.add(flight, 1, 1)
+    now = :atomics.get(flight, 1)
+    if now > :atomics.get(flight, 2), do: :atomics.put(flight, 2, now)
     if delay = fetch(:delay), do: Process.sleep(delay)
+    :atomics.sub(flight, 1, 1)
     thinking = get_in(conn.body_params, ["generationConfig", "thinkingConfig"]) || %{}
 
     rejected_levels =
@@ -104,6 +110,9 @@ defmodule AskDrive.StubGemini do
   end
 
   def set(key, value), do: :persistent_term.put({__MODULE__, key}, value)
+
+  @doc "The most POSTs answered at once since `start!/1`."
+  def max_in_flight, do: :atomics.get(fetch(:flight), 2)
   defp fetch(key), do: :persistent_term.get({__MODULE__, key}, nil)
 
   def start!(owner) do
@@ -120,6 +129,7 @@ defmodule AskDrive.StubGemini do
         do: set(key, nil)
 
     set(:owner, owner)
+    set(:flight, :atomics.new(2, signed: true))
     {:ok, pid} = Bandit.start_link(plug: __MODULE__, port: 0, ip: {127, 0, 0, 1})
     {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
     {pid, "http://127.0.0.1:#{port}"}

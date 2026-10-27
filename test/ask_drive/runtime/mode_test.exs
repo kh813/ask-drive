@@ -35,6 +35,40 @@ defmodule AskDrive.Runtime.ModeTest do
       assert Mode.current_mode() == resting
     end
 
+    test "with several desks' batches at once, the last one to end leaves night_batch (F-841)" do
+      test = self()
+
+      other =
+        spawn(fn ->
+          :ok = Mode.begin_batch(true)
+          send(test, :begun)
+
+          receive do
+            :end -> send(test, {:ended, Mode.end_batch()})
+          end
+        end)
+
+      assert_receive :begun
+      :ok = Mode.begin_batch(true)
+      assert Mode.current_mode() == :night_batch
+
+      # this one ends first: the other still generates
+      assert Mode.end_batch() == :night_batch
+      assert Mode.current_mode() == :night_batch
+
+      send(other, :end)
+      assert_receive {:ended, resting}
+      assert resting in [:daytime, :standby]
+    end
+
+    test "a batch whose process dies no longer holds night_batch" do
+      pid = spawn(fn -> Mode.begin_batch(true) end)
+      ref = Process.monitor(pid)
+      assert_receive {:DOWN, ^ref, :process, ^pid, _}
+      _ = :sys.get_state(Mode)
+      assert Mode.end_batch() in [:daytime, :standby]
+    end
+
     test "without a running batch the clock never rests in night_batch" do
       :ok = Mode.set_mode(:night_batch)
       assert Mode.sync_with_clock() in [:daytime, :standby]

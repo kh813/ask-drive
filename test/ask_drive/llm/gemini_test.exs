@@ -92,6 +92,20 @@ defmodule AskDrive.LLM.GeminiTest do
     assert System.monotonic_time(:millisecond) - started >= 200
   end
 
+  test "a 429 inside a generation's slot halves its API key's slots (F-841)", %{opts: opts} do
+    StubGemini.set(:rate_limit_once, true)
+    StubGemini.set(:parts, [%{"text" => "QA"}])
+    key = {"gemini", "test-#{System.unique_integer([:positive])}"}
+
+    info =
+      AskDrive.LLM.QuotaLimiter.run(key, 4, fn ->
+        assert {:ok, "QA"} = Gemini.generate("m", "q", opts)
+        AskDrive.LLM.QuotaLimiter.info(key)
+      end)
+
+    assert info.cap == 2
+  end
+
   test "retry hints come from Retry-After or RetryInfo" do
     assert HTTP.retry_hint_ms(%{headers: %{"retry-after" => ["2"]}, body: %{}}) == 2000
 

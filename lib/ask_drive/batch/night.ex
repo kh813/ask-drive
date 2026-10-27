@@ -1,17 +1,22 @@
 defmodule AskDrive.Batch.Night do
   @moduledoc """
-  The nightly batch across desks (spec F-355). The desks share one local model, so they run
-  one at a time (F-1107), in two passes:
+  The nightly batch across desks (spec F-355, F-841), in two passes:
 
-    1. **Import** (sync, invalidate, embed: phases 1-3) for every desk, the least imported
-       first (share of its documents indexed; a desk with none yet goes first). A document
-       that isn't imported can't even be found by search, and importing is the shorter part.
-       Each run is then left "waiting".
-    2. **Generate** (QA generation, then phases 5-6) for the waiting desks, the least
-       covered first (share of its chunks that need no more generation). The time left until
-       the night's cut-off is shared between them in proportion to the chunks each still has
-       to generate, recomputed as each desk finishes, so time one doesn't use goes to the
-       next — no desk can take the whole night and leave the others none.
+    1. **Import** (sync, invalidate, embed: phases 1-3) for every desk, one at a time
+       (F-1107: the embedding model is shared), the least imported first (share of its
+       documents indexed; a desk with none yet goes first). A document that isn't imported
+       can't even be found by search, and importing is the shorter part. Each run is then
+       left "waiting".
+    2. **Generate** (QA generation, then phases 5-6) for the waiting desks:
+       - the desks generating on a **cloud API** all at once, each until the cut-off: their
+         rate limits belong to the API key, and the desks using the same key share its
+         slots (`AskDrive.LLM.QuotaLimiter`), first come first served;
+       - meanwhile the desks generating on the **local LLM** one at a time (one model, one
+         generation at a time), the least covered first (share of its chunks that need no
+         more generation). The time left until the cut-off is shared between them in
+         proportion to the chunks each still has to generate, recomputed as each desk
+         finishes, so time one doesn't use goes to the next — no desk can take the whole
+         night and leave the others none.
 
   The cut-off is fixed once, at the start of the night: a desk whose turn comes after it
   generates nothing (it used to compute its own cut-off when it started, and one starting
@@ -140,11 +145,40 @@ defmodule AskDrive.Batch.Night do
 
   # --- Pass 2: generate --------------------------------------------------------------------
 
-  defp generate_pass(waiting, cutoff), do: waiting |> generate_queue() |> generate_in_turn(cutoff)
+  defp generate_pass(waiting, cutoff) do
+    {local, cloud} = Enum.split_with(waiting, fn {app, _id} -> Apps.with_app(app, &local?/0) end)
+
+    # each cloud desk in its own task, the local ones in turn in another; all until the
+    # cut-off. Unlinked: one desk crashing (resume_batch records it) leaves the others going.
+    lanes =
+      Enum.map(cloud, fn {app, id} -> fn -> generate_cloud(app, id, cutoff) end end) ++
+        if(local == [],
+          do: [],
+          else: [fn -> local |> generate_queue() |> generate_in_turn(cutoff) end]
+        )
+
+    AskDrive.TaskSupervisor
+    |> Task.Supervisor.async_stream_nolink(lanes, & &1.(),
+      max_concurrency: max(length(lanes), 1),
+      ordered: false,
+      timeout: :infinity
+    )
+    |> Stream.run()
+  end
+
+  defp local?, do: AskDrive.LLM.local_generation?(Settings.get_setting!())
+
+  defp generate_cloud(app, id, cutoff) do
+    Logger.info(
+      "Nightly batch: #{app.slug} generates on a cloud API until #{inspect(cutoff)} (F-841)"
+    )
+
+    Apps.with_app(app, fn -> Scheduler.resume_batch(id, deadline: cutoff, night: true) end)
+  end
 
   @doc """
-  The waiting `{app, run_id}`s in the order they generate, each with its `backlog/0`: the
-  least covered first (ties keep their order).
+  The waiting `{app, run_id}`s on the local LLM in the order they generate, each with its
+  `backlog/0`: the least covered first (ties keep their order).
   """
   def generate_queue(waiting) do
     waiting
@@ -166,9 +200,10 @@ defmodule AskDrive.Batch.Night do
   end
 
   @doc """
-  When a desk with `pending` chunks to generate must stop, with `others` (the later desks'
-  pending counts) still to go: its share of the time left until `cutoff`, in proportion to
-  its pending chunks; the last desk gets all of it. Never past the cut-off.
+  When a desk on the local LLM with `pending` chunks to generate must stop, with `others`
+  (the later local desks' pending counts) still to go: its share of the time left until
+  `cutoff`, in proportion to its pending chunks; the last desk gets all of it. Never past
+  the cut-off.
   """
   def share_deadline(pending, others, cutoff, now \\ DateTime.utc_now()) do
     left = max(DateTime.diff(cutoff, now), 0)

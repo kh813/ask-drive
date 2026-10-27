@@ -367,7 +367,8 @@ defmodule AskDrive.Batch.Scheduler do
 
     # Transition runtime mode into night_batch (a full batch only: ingest-only never loads the
     # generation model, and the daytime mode keeps the embedding model resident for chat)
-    unless ingest_only?, do: Mode.set_mode(:night_batch)
+    # (several desks may be generating at once on cloud APIs, F-841: the last one leaves it)
+    Mode.begin_batch(not ingest_only?)
 
     # the cut-off hour is platform-wide (spec 6.11); the nightly batch gives each desk its
     # share of the night (F-355)
@@ -738,12 +739,9 @@ defmodule AskDrive.Batch.Scheduler do
   end
 
   @doc false
-  # How many chunks are generated at once: 1 on a local LLM, a few on a cloud API
-  def generation_concurrency(setting) do
-    if LLM.local_generation?(setting),
-      do: 1,
-      else: Application.get_env(:ask_drive, :cloud_generation_concurrency, 4)
-  end
+  # How many chunks are generated at once: 1 on a local LLM, the desk's setting on a cloud
+  # API (F-841), where the desks sharing an API key share them (LLM.QuotaLimiter)
+  def generation_concurrency(setting), do: LLM.generation_concurrency(setting)
 
   defp generate_group([chunk], setting), do: [generate_chunk_safely(chunk, setting)]
 

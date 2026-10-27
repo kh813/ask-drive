@@ -61,12 +61,23 @@ defmodule AskDrive.Runtime.Mode do
   end
 
   @doc """
-  Leaves the batch: switches to whatever mode the clock calls for. `sync_with_clock/0`
-  deliberately never leaves `:night_batch` (so a clock tick can't pull the rug out from under
-  a running batch), which is why the batch itself must call this when it finishes.
+  A batch starts in the calling process: with `night?` (a full batch) the mode becomes
+  `:night_batch`. Several desks' batches can run at once (their generation on cloud APIs,
+  F-841); the mode is left only when the last of them ends (`end_batch/0`) or its process
+  dies.
+  """
+  def begin_batch(night?) do
+    GenServer.call(__MODULE__, {:begin_batch, self(), night?})
+  end
+
+  @doc """
+  Leaves the batch: once no other batch runs, switches to whatever mode the clock calls for.
+  `sync_with_clock/0` deliberately never leaves `:night_batch` (so a clock tick can't pull
+  the rug out from under a running batch), which is why the batch itself must call this when
+  it finishes.
   """
   def end_batch do
-    GenServer.call(__MODULE__, :end_batch)
+    GenServer.call(__MODULE__, {:end_batch, self()})
   end
 
   # --- GenServer Callbacks ---
@@ -83,7 +94,7 @@ defmodule AskDrive.Runtime.Mode do
     # Schedule clock check every 1 minute
     schedule_clock_tick()
 
-    {:ok, %{mode: initial_mode}}
+    {:ok, %{mode: initial_mode, batches: %{}}}
   end
 
   @impl true
@@ -102,15 +113,36 @@ defmodule AskDrive.Runtime.Mode do
   end
 
   @impl true
-  def handle_call(:end_batch, _from, state) do
-    target = resting_mode(calculate_current_mode())
+  def handle_call({:begin_batch, pid, night?}, _from, state) do
+    state = %{state | batches: Map.put(state.batches, Process.monitor(pid), pid)}
 
-    if target != state.mode do
-      Logger.info("Batch finished; runtime mode transitioning from #{state.mode} to #{target}")
-      apply_mode_transition(state.mode, target)
+    if night? and state.mode != :night_batch do
+      Logger.info("Runtime mode transitioning from #{state.mode} to night_batch")
+      apply_mode_transition(state.mode, :night_batch)
+      {:reply, :ok, %{state | mode: :night_batch}}
+    else
+      {:reply, :ok, state}
     end
+  end
 
-    {:reply, target, %{state | mode: target}}
+  def handle_call({:end_batch, pid}, _from, state) do
+    {mine, others} = Map.split_with(state.batches, fn {_ref, p} -> p == pid end)
+    Enum.each(Map.keys(mine), &Process.demonitor(&1, [:flush]))
+    state = %{state | batches: others}
+
+    # another desk's batch still runs (F-841): it keeps the mode
+    if others != %{} do
+      {:reply, state.mode, state}
+    else
+      target = resting_mode(calculate_current_mode())
+
+      if target != state.mode do
+        Logger.info("Batch finished; runtime mode transitioning from #{state.mode} to #{target}")
+        apply_mode_transition(state.mode, target)
+      end
+
+      {:reply, target, %{state | mode: target}}
+    end
   end
 
   @impl true
@@ -133,7 +165,12 @@ defmodule AskDrive.Runtime.Mode do
     {:reply, new_state.mode, new_state}
   end
 
+  # a batch's process died without end_batch/0: the next clock tick sees it no longer runs
   @impl true
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
+    {:noreply, %{state | batches: Map.delete(state.batches, ref)}}
+  end
+
   def handle_info(:clock_tick, state) do
     # tonight's update check first (F-1504): an automatic update then runs before the batch
     if Application.get_env(:ask_drive, :auto_update_check, true),
@@ -166,7 +203,9 @@ defmodule AskDrive.Runtime.Mode do
   # night window rests in `:standby`. (The clock used to switch into `:night_batch` itself
   # and then refused to ever leave it, so the mode stuck there until a restart.)
   defp follow_clock(state, reason) do
-    if state.mode == :night_batch and AskDrive.Batch.Scheduler.running_anywhere?() do
+    # a batch still in it (begin_batch/1), or one recorded as running
+    if state.mode == :night_batch and
+         (state.batches != %{} or AskDrive.Batch.Scheduler.running_anywhere?()) do
       state
     else
       target = resting_mode(calculate_current_mode())

@@ -48,6 +48,9 @@ defmodule AskDrive.LLM.HTTP do
         {:ok, body}
 
       {:ok, %{status: 429, body: body} = resp} ->
+        # the desks sharing this API key generate fewer at once for a while (F-841)
+        AskDrive.LLM.QuotaLimiter.rate_limited()
+
         retry_or_fail(method, url, req_opts, attempt, opts, classify(429, body),
           hint_ms: retry_hint_ms(resp),
           max_attempts: @rate_limit_attempts

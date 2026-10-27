@@ -25,6 +25,7 @@ defmodule AskDrive.Application do
         # updating from the admin screen (F-1501); after a restart it continues paused batches
         AskDrive.Updates.Server,
         AskDrive.LLM.Semaphore,
+        AskDrive.LLM.QuotaLimiter,
         AskDrive.Drive.ServiceAccount,
         # Secure LDAP sign-in caches, in memory (spec F-1311)
         AskDrive.Ldap.Cache,

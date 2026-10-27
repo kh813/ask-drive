@@ -114,6 +114,47 @@ defmodule AskDrive.LLM do
   @doc "Whether generation currently runs locally. Drives R-106."
   def local_generation?(setting \\ nil), do: local?(generation_provider(setting))
 
+  @doc """
+  What a cloud generation's rate limits belong to (spec F-841): the Vertex project (its
+  quotas are the project's, whichever key reaches it), or the provider's endpoint and API
+  key. Desks with the same one share its slots in `AskDrive.LLM.QuotaLimiter`. The key
+  itself is only hashed, never kept or logged.
+  """
+  def quota_key(setting \\ nil) do
+    setting = resolve_setting(setting)
+    provider = generation_provider(setting)
+
+    case {provider, get(setting, :vertex_project)} do
+      {"vertex", project} when is_binary(project) and project != "" -> {"vertex", project}
+      _ -> {provider, fingerprint([base_url(provider, setting), api_key(provider, setting)])}
+    end
+  end
+
+  defp fingerprint(parts) do
+    :crypto.hash(:sha256, Enum.map_join(parts, "\n", &to_string/1))
+    |> Base.encode16(case: :lower)
+    |> binary_part(0, 16)
+  end
+
+  @doc """
+  How many chunks the nightly batch generates at once (F-840, F-841): one on a local LLM
+  (memory and CPU), the desk's 「同時に生成する数」 on a cloud API.
+  """
+  def generation_concurrency(setting \\ nil) do
+    setting = resolve_setting(setting)
+
+    cond do
+      local_generation?(setting) ->
+        1
+
+      is_integer(get(setting, :cloud_generation_concurrency)) ->
+        get(setting, :cloud_generation_concurrency)
+
+      true ->
+        4
+    end
+  end
+
   @doc "Whether embedding currently runs locally. Drives R-107."
   def local_embedding?(setting \\ nil), do: local?(embedding_provider(setting))
 

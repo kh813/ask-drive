@@ -7075,6 +7075,29 @@ defmodule AskDriveWeb.AdminLive do
                       />
                     </div>
 
+                    <%!-- How many chunks at once on the cloud API (F-841): the desks using the
+                          same API key (or Vertex project) share them --%>
+                    <div
+                      id="batch-cloud-concurrency"
+                      class={[
+                        "grid grid-cols-1 sm:grid-cols-3 gap-4 items-start",
+                        @llm_view.batch != "cloud" && "hidden"
+                      ]}
+                    >
+                      <.input
+                        field={@form[:cloud_generation_concurrency]}
+                        type="number"
+                        label={gettext("Chunks generated at once")}
+                        min="1"
+                        max="32"
+                      />
+                      <p class="sm:col-span-2 sm:pt-7 text-[11px] text-zinc-500 leading-relaxed">
+                        {gettext(
+                          "How many chunks the nightly batch generates at once on the cloud API (1-32, default 4). More finishes the night sooner, within the API's rate limits. Desks using the same API key (or Vertex project) generate at the same time and share this number (the smallest of theirs). When the API answers \"too many requests\" (429), it is halved for a while and comes back by itself."
+                        )}
+                      </p>
+                    </div>
+
                     <.provider_connection
                       :if={@llm_view.connection_at[@llm_view.batch_provider] == :batch}
                       provider={@llm_view.batch_provider}
