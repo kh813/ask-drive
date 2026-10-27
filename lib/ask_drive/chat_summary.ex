@@ -13,8 +13,14 @@ defmodule AskDrive.ChatSummary do
 
   use Gettext, backend: AskDriveWeb.Gettext
   alias AskDrive.{LLM, Settings, Snippet}
+  alias AskDrive.ChatSummary.Reasoned
 
   @max_excerpt_chars 1_200
+
+  # a reasoned answer (F-436): longer than any style's, and room for the model's thinking
+  @reasoned_ja_cap 1_100
+  @reasoned_en_cap 3_600
+  @reasoned_max_tokens 16_384
   @timeout 120_000
 
   # A reasoning model's hidden thinking isn't shown, but it mustn't run forever either.
@@ -193,6 +199,27 @@ defmodule AskDrive.ChatSummary do
     cap = if ja?, do: config.ja_cap, else: config.en_cap
     thinks? = reasoning_model?(model)
 
+    # a question to think through, on a cloud model only (F-436): more to go on, and thinking
+    plan =
+      if LLM.local?(provider),
+        do: :direct,
+        else: Reasoned.plan(question, chunks, setting, provider, model)
+
+    {prompt, system, cap, max_tokens, think, sources} =
+      case plan do
+        {:reasoned, intent, queries} ->
+          sources = Reasoned.sources(chunks, queries, setting)
+          Logger.info("ChatSummary: thinking it through, with #{sources.count} part(s) (F-436)")
+
+          {Reasoned.prompt(question, intent, sources, ja?, context_text(context, ja?)),
+           Reasoned.system(), if(ja?, do: @reasoned_ja_cap, else: @reasoned_en_cap),
+           @reasoned_max_tokens, nil, sources}
+
+        :direct ->
+          {build_prompt(question, chunks, model, context, style), config.system, cap,
+           if(thinks?, do: nil, else: config.max_tokens), thinks?, nil}
+      end
+
     reset_state()
 
     # Reasoning models: ask Ollama to return the thinking in its own field (think: true), so
@@ -202,11 +229,11 @@ defmodule AskDrive.ChatSummary do
       [
         setting: setting,
         provider: provider,
-        system: config.system,
+        system: system,
         timeout: @timeout,
-        max_tokens: if(thinks?, do: nil, else: config.max_tokens),
+        max_tokens: max_tokens,
         temperature: 0.2,
-        think: thinks?,
+        think: think,
         on_thinking: fn thought ->
           field = Process.get({__MODULE__, :field_thinking}) <> thought
           Process.put({__MODULE__, :field_thinking}, field)
@@ -230,12 +257,7 @@ defmodule AskDrive.ChatSummary do
     end
 
     result =
-      LLM.generate_stream(
-        model,
-        build_prompt(question, chunks, model, context, style),
-        opts,
-        filtered
-      )
+      LLM.generate_stream(model, prompt, opts, filtered)
 
     with {:ok, _} <- result do
       raw = Process.get({__MODULE__, :raw}, "")
@@ -267,9 +289,9 @@ defmodule AskDrive.ChatSummary do
           context: context
         })
       else
-        answer = tidy(answer, length(chunks))
+        {answer, cited} = finish_text(answer, chunks, sources)
         emit(:answer, String.slice(answer, 0, cap), on_event)
-        {:ok, %{text: cap_text(answer, cap, on_event), thinking: thinking}}
+        {:ok, %{text: cap_text(answer, cap, on_event), thinking: thinking, sources: cited}}
       end
     end
   end
@@ -308,7 +330,7 @@ defmodule AskDrive.ChatSummary do
         Process.get({__MODULE__, :raw}, "") |> visible_text(false, true) |> tidy(length(chunks))
 
       emit(:answer, String.slice(answer, 0, cap), on_event)
-      {:ok, %{text: cap_text(answer, cap, on_event), thinking: String.trim(notes)}}
+      {:ok, %{text: cap_text(answer, cap, on_event), thinking: String.trim(notes), sources: []}}
     end
   end
 
@@ -359,6 +381,14 @@ defmodule AskDrive.ChatSummary do
     if reasoning_model?(model) and String.contains?(String.downcase(model), "qwen3"),
       do: prompt <> "/no_think",
       else: prompt
+  end
+
+  # the excerpts' citations kept; for a reasoned answer, the other parts it cites numbered on
+  # after them and returned, to be shown with them
+  defp finish_text(answer, chunks, nil), do: {tidy(answer, length(chunks)), []}
+
+  defp finish_text(answer, chunks, sources) do
+    answer |> tidy(sources.count) |> Reasoned.renumber(length(chunks), sources.extra)
   end
 
   @not_covered ["資料からは確認できませんでした", "The documents don't cover this"]
@@ -546,6 +576,9 @@ defmodule AskDrive.ChatSummary do
   # the thread so far (F-431): the last few exchanges, each kept short
   @context_turns 3
   @context_answer_chars 400
+
+  defp context_text(context, true), do: ja_context(context)
+  defp context_text(context, false), do: en_context(context)
 
   defp ja_context([]), do: ""
 

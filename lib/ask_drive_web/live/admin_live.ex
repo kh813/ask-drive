@@ -5234,6 +5234,7 @@ defmodule AskDriveWeb.AdminLive do
                               {case row.purpose do
                                 "batch_generation" -> gettext("Nightly batch QA generation")
                                 "chat_summary" -> gettext("Chat AI summary")
+                                "chat_plan" -> gettext("Chat: deciding how to answer")
                                 "query_embedding" -> gettext("Chat question search (embedding)")
                                 "embedding" -> gettext("Nightly batch embedding")
                                 "generation" -> gettext("Nightly batch QA generation")

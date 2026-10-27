@@ -372,9 +372,17 @@ defmodule AskDriveWeb.ChatLive do
     {:noreply, socket}
   end
 
-  def handle_async({:summary, id}, {:ok, {:ok, %{text: text, thinking: thinking}}}, socket) do
-    ChatHistory.put_summary(history_id(socket, id), text)
-    {:noreply, update_summary(socket, id, &%{&1 | status: :done, text: text, thinking: thinking})}
+  def handle_async({:summary, id}, {:ok, {:ok, %{text: text, thinking: thinking} = done}}, socket) do
+    # a reasoned answer's other cited parts are shown after the excerpts (F-436)
+    sources = Map.get(done, :sources, [])
+    ChatHistory.put_summary(history_id(socket, id), text, sources)
+
+    socket =
+      socket
+      |> update_summary(id, &%{&1 | status: :done, text: text, thinking: thinking})
+      |> add_sources(id, sources)
+
+    {:noreply, socket}
   end
 
   def handle_async({:summary, id}, {:ok, {:error, reason}}, socket) do
@@ -471,6 +479,18 @@ defmodule AskDriveWeb.ChatLive do
     }
 
     [user_msg, assistant_msg]
+  end
+
+  defp add_sources(socket, _id, []), do: socket
+
+  defp add_sources(socket, id, sources) do
+    messages =
+      Enum.map(socket.assigns.messages, fn
+        %{id: ^id} = msg -> %{msg | chunks: msg.chunks ++ sources}
+        msg -> msg
+      end)
+
+    assign(socket, :messages, messages)
   end
 
   defp update_summary(socket, id, fun) do

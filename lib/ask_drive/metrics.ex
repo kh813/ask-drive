@@ -207,7 +207,7 @@ defmodule AskDrive.Metrics do
 
   # what a desk's API calls were for (F-1413): answering questions in the chat, or the
   # nightly batch's import and QA generation
-  @chat_purposes ~w(chat_summary query_embedding)
+  @chat_purposes ~w(chat_summary chat_plan query_embedding)
   @batch_purposes ~w(generation batch_generation embedding)
 
   @doc "The API usage purposes that answer a chat question (F-1413)."

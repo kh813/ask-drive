@@ -61,13 +61,35 @@ defmodule AskDrive.ChatHistory do
     }
   end
 
-  @doc "Keeps the AI summary as it was shown (finished, or as far as it got when stopped)."
-  def put_summary(nil, _text), do: :ok
-  def put_summary(_entry_id, ""), do: :ok
+  @doc """
+  Keeps the AI summary as it was shown (finished, or as far as it got when stopped), with
+  the other parts a reasoned answer cited (F-436) after the excerpts.
+  """
+  def put_summary(entry_id, text, sources \\ [])
+  def put_summary(nil, _text, _sources), do: :ok
+  def put_summary(_entry_id, "", _sources), do: :ok
 
-  def put_summary(entry_id, text) do
+  def put_summary(entry_id, text, []) do
     Repo.update_all(from(e in Entry, where: e.id == ^entry_id), set: [summary: text])
     :ok
+  end
+
+  def put_summary(entry_id, text, sources) do
+    case Repo.get(Entry, entry_id) do
+      nil ->
+        :ok
+
+      entry ->
+        entry
+        |> Ecto.Changeset.change(
+          summary: text,
+          chunk_ids: (entry.chunk_ids || []) ++ Enum.map(sources, & &1.id),
+          sources: (entry.sources || []) ++ Enum.map(sources, &source/1)
+        )
+        |> Repo.update()
+
+        :ok
+    end
   end
 
   @doc """

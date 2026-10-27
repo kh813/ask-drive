@@ -5,6 +5,8 @@ defmodule AskDrive.StubGemini do
   key. Behaviour is set per test with `set/2`:
 
     * `:parts` — the parts returned (may include `%{"thought" => true, ...}`)
+    * `:generate_parts` — the parts `generateContent` returns instead (the chat summary's
+      plan, F-436, before its streamed answer)
     * `:reject_thinking` — answer 400 when thinkingBudget is 0 or thinkingLevel is "minimal"
       (models that must think); `:all` rejects thinkingLevel "low" too (Pro-like)
     * `:delay` — wait this many ms before answering a POST (a model that takes its time)
@@ -104,7 +106,11 @@ defmodule AskDrive.StubGemini do
         end)
 
       true ->
-        body = %{candidates: [%{content: %{parts: fetch(:parts) || []}}]}
+        parts =
+          (String.ends_with?(call, ":generateContent") && fetch(:generate_parts)) ||
+            fetch(:parts) || []
+
+        body = %{candidates: [%{content: %{parts: parts}}]}
         conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(body))
     end
   end
@@ -118,6 +124,7 @@ defmodule AskDrive.StubGemini do
   def start!(owner) do
     for key <- [
           :parts,
+          :generate_parts,
           :reject_thinking,
           :no_text,
           :delay,
