@@ -10,7 +10,10 @@ defmodule AskDrive.CertHelper do
     dir
   end
 
-  @doc "A CA and a server certificate for `names` signed by it; returns PEM strings."
+  @doc """
+  A CA and a server certificate for `names` signed by it; returns PEM strings. `expired: true`
+  gives a server certificate whose validity has already ended.
+  """
   def ca_signed(names, opts \\ []) do
     dir = tmp_dir()
     days = Keyword.get(opts, :days, 30)
@@ -31,13 +34,35 @@ defmodule AskDrive.CertHelper do
       ~w(req -newkey rsa:2048 -nodes -keyout leaf.key -out leaf.csr -subj /CN=#{hd(names)})
     )
 
-    run!(
-      dir,
-      ~w(x509 -req -in leaf.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out leaf.pem -days #{days} -extfile ext.cnf)
-    )
+    sign =
+      ~w(x509 -req -in leaf.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out leaf.pem -extfile ext.cnf)
+
+    if Keyword.get(opts, :expired, false) do
+      sign_expired!(dir, sign)
+    else
+      run!(dir, sign ++ ~w(-days #{days}))
+    end
 
     read = &File.read!(Path.join(dir, &1))
     %{cert: read.("leaf.pem"), key: read.("leaf.key"), chain: read.("ca.pem"), dir: dir}
+  end
+
+  # OpenSSL 3.4+ takes explicit dates in the past; older ones (Ubuntu's 3.0) don't, but still
+  # accept -days 0 (valid only for "now"), which OpenSSL 4 refuses: then wait past it
+  defp sign_expired!(dir, sign) do
+    case System.cmd(
+           "openssl",
+           sign ++ ~w(-not_before 20200101000000Z -not_after 20200102000000Z),
+           cd: dir,
+           stderr_to_stdout: true
+         ) do
+      {_out, 0} ->
+        :ok
+
+      _ ->
+        run!(dir, sign ++ ~w(-days 0))
+        Process.sleep(1100)
+    end
   end
 
   defp run!(dir, args) do

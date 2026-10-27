@@ -36,6 +36,9 @@ defmodule AskDrive.Metrics do
       |> Map.put(:completion_tokens, completion_tokens)
       |> Map.put(:total_tokens, total_tokens)
 
+    # the question being answered counts them for its asker (F-1415), not this log
+    AskDrive.Usage.count_tokens(total_tokens)
+
     try do
       %ApiUsageLog{}
       |> ApiUsageLog.changeset(attrs)
@@ -134,6 +137,72 @@ defmodule AskDrive.Metrics do
       provider_breakdown: provider_breakdown,
       purpose_breakdown: purpose_breakdown
     }
+  end
+
+  @doc """
+  `get_summary/1` added up over every desk, for the platform's 「API利用量・ログ」 (each desk
+  keeps its own logs; the platform's database is only the primary desk's).
+  """
+  def all_desks_summary(days \\ 30) do
+    summaries = AskDrive.Apps.each(fn _app -> get_summary(days) end) |> Enum.map(&elem(&1, 1))
+    total_requests = Enum.sum_by(summaries, & &1.total_requests)
+    error_requests = Enum.sum_by(summaries, & &1.error_requests)
+
+    %{
+      days: days,
+      total_requests: total_requests,
+      error_requests: error_requests,
+      rate_limit_errors: Enum.sum_by(summaries, & &1.rate_limit_errors),
+      success_rate:
+        if(total_requests > 0,
+          do: Float.round((total_requests - error_requests) / total_requests * 100, 1),
+          else: 100.0
+        ),
+      prompt_tokens: Enum.sum_by(summaries, & &1.prompt_tokens),
+      completion_tokens: Enum.sum_by(summaries, & &1.completion_tokens),
+      total_tokens: Enum.sum_by(summaries, & &1.total_tokens),
+      total_bytes: Enum.sum_by(summaries, & &1.total_bytes),
+      # weighted by each desk's calls
+      avg_latency_ms:
+        if(total_requests > 0,
+          do:
+            round(
+              Enum.sum_by(summaries, &(&1.avg_latency_ms * &1.total_requests)) / total_requests
+            ),
+          else: 0
+        ),
+      provider_breakdown:
+        merge_breakdown(summaries, :provider_breakdown, [:provider, :model], [
+          :requests,
+          :total_tokens,
+          :errors
+        ]),
+      purpose_breakdown:
+        merge_breakdown(summaries, :purpose_breakdown, [:purpose], [:requests, :total_tokens])
+    }
+  end
+
+  defp merge_breakdown(summaries, field, keys, sums) do
+    summaries
+    |> Enum.flat_map(&Map.fetch!(&1, field))
+    |> Enum.group_by(&Map.take(&1, keys))
+    |> Enum.map(fn {key, rows} ->
+      Enum.reduce(sums, key, fn f, acc ->
+        Map.put(acc, f, Enum.sum_by(rows, &Map.fetch!(&1, f)))
+      end)
+    end)
+    |> Enum.sort_by(&(-&1.requests))
+  end
+
+  @doc """
+  `list_recent_errors/1` over every desk, newest first, each with the desk it came from as
+  `:app` (for the platform's 「API利用量・ログ」).
+  """
+  def list_recent_errors_all(limit \\ 20) do
+    AskDrive.Apps.each(fn _app -> list_recent_errors(limit) end)
+    |> Enum.flat_map(fn {app, errors} -> Enum.map(errors, &Map.put(&1, :app, app)) end)
+    |> Enum.sort_by(&{DateTime.to_unix(&1.inserted_at), &1.id}, :desc)
+    |> Enum.take(limit)
   end
 
   # what a desk's API calls were for (F-1413): answering questions in the chat, or the

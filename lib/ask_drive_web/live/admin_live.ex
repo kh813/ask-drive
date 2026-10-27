@@ -119,6 +119,9 @@ defmodule AskDriveWeb.AdminLive do
      |> assign(:custom_cloud_model?, false)
      |> maybe_load_cloud_models()
      |> assign(:ollama_starting, false)
+     |> assign(:usage_days, 30)
+     |> assign(:usage_sort, :questions)
+     |> assign(:usage_report, nil)
      |> assign_ollama_runtime()
      |> load_dashboard_data()}
   end
@@ -144,13 +147,28 @@ defmodule AskDriveWeb.AdminLive do
   def handle_params(params, _uri, socket) do
     tabs = Enum.map(tabs(socket.assigns.scope), &elem(&1, 0))
     tab = if params["tab"] in tabs, do: params["tab"], else: default_tab(socket.assigns.scope)
-    {:noreply, assign(socket, :current_tab, tab)}
+    socket = assign(socket, :current_tab, tab)
+    {:noreply, if(tab == "usage", do: assign_usage(socket), else: socket)}
+  end
+
+  # the 「利用状況」 tab (F-1415, F-1416): read when opened, not on every tick
+  defp assign_usage(socket) do
+    %{scope: scope, usage_days: days, usage_sort: sort} = socket.assigns
+
+    report =
+      case scope do
+        :platform -> AskDrive.Usage.platform_report(days, sort: sort)
+        _ -> AskDrive.Usage.desk_report(days, sort: sort)
+      end
+
+    assign(socket, :usage_report, report)
   end
 
   defp tabs(:platform),
     do: [
       {"apps", gettext("Desks (apps)")},
       {"users", gettext("Users")},
+      {"usage", gettext("Usage")},
       {"audit", gettext("Elevation log")},
       {"metrics", gettext("API usage & logs")},
       {"settings", gettext("Platform settings")},
@@ -162,6 +180,7 @@ defmodule AskDriveWeb.AdminLive do
       {"overview", gettext("Overview & batch status")},
       {"questions", gettext("Unanswered & resolved questions")},
       {"documents", gettext("Documents")},
+      {"usage", gettext("Usage")},
       {"metrics", gettext("API usage & logs")},
       {"settings", gettext("Settings")}
     ]
@@ -1166,15 +1185,32 @@ defmodule AskDriveWeb.AdminLive do
      |> load_dashboard_data()}
   end
 
-  # a known API error leaves the list; the log is kept (F-1411)
-  def handle_event("dismiss_api_error", %{"id" => id}, socket) do
-    with {id, ""} <- Integer.parse(to_string(id)), do: AskDrive.Metrics.dismiss_error(id)
-    {:noreply, assign(socket, :recent_api_errors, AskDrive.Metrics.list_recent_errors(20))}
+  # a known API error leaves the list; the log is kept (F-1411). On the platform screen the
+  # list is every desk's, and each error says which desk keeps it.
+  def handle_event("dismiss_api_error", %{"id" => id} = params, socket) do
+    with {id, ""} <- Integer.parse(to_string(id)) do
+      in_error_desk(socket, params["app"], fn -> AskDrive.Metrics.dismiss_error(id) end)
+    end
+
+    {:noreply, assign(socket, :recent_api_errors, recent_api_errors(socket.assigns.scope))}
   end
 
   def handle_event("dismiss_all_api_errors", _params, socket) do
-    AskDrive.Metrics.dismiss_all_errors()
-    {:noreply, assign(socket, :recent_api_errors, AskDrive.Metrics.list_recent_errors(20))}
+    case socket.assigns.scope do
+      :platform -> AskDrive.Apps.each(fn _app -> AskDrive.Metrics.dismiss_all_errors() end)
+      _ -> AskDrive.Metrics.dismiss_all_errors()
+    end
+
+    {:noreply, assign(socket, :recent_api_errors, recent_api_errors(socket.assigns.scope))}
+  end
+
+  def handle_event("usage_period", %{"days" => days}, socket) do
+    {:noreply, socket |> assign(:usage_days, AskDrive.Usage.period(days)) |> assign_usage()}
+  end
+
+  def handle_event("usage_sort", %{"by" => by}, socket) do
+    sort = if by == "tokens", do: :tokens, else: :questions
+    {:noreply, socket |> assign(:usage_sort, sort) |> assign_usage()}
   end
 
   def handle_event("filter_documents", %{"filter" => params}, socket) do
@@ -2599,8 +2635,13 @@ defmodule AskDriveWeb.AdminLive do
     users = Accounts.list_users()
 
     # 6. Metrics & API Usage
-    metrics_summary = AskDrive.Metrics.get_summary(30)
-    recent_api_errors = AskDrive.Metrics.list_recent_errors(20)
+    # the platform screen adds up every desk's logs (each desk keeps its own)
+    metrics_summary =
+      if socket.assigns[:scope] == :platform,
+        do: AskDrive.Metrics.all_desks_summary(30),
+        else: AskDrive.Metrics.get_summary(30)
+
+    recent_api_errors = recent_api_errors(socket.assigns[:scope])
     data_efficiency = AskDrive.Metrics.get_data_efficiency_summary()
 
     socket
@@ -2677,6 +2718,18 @@ defmodule AskDriveWeb.AdminLive do
     |> assign(:account, account)
     |> assign_document_rows(docs, data_efficiency)
   end
+
+  defp recent_api_errors(:platform), do: AskDrive.Metrics.list_recent_errors_all(20)
+  defp recent_api_errors(_scope), do: AskDrive.Metrics.list_recent_errors(20)
+
+  defp in_error_desk(%{assigns: %{scope: :platform}}, slug, fun) do
+    case AskDrive.Apps.get_by_slug(slug) do
+      nil -> :ok
+      app -> AskDrive.Apps.with_app(app, fun)
+    end
+  end
+
+  defp in_error_desk(_socket, _slug, fun), do: fun.()
 
   # --- Files and folders left out of the nightly batch (F-358) ---
 
@@ -4755,6 +4808,15 @@ defmodule AskDriveWeb.AdminLive do
           </div>
         <% end %>
 
+        <%!-- Tab: who uses the desk(s), and what is asked often (F-1415, F-1416) --%>
+        <%= if @current_tab == "usage" and @usage_report do %>
+          <AskDriveWeb.UsagePanel.usage_tab
+            scope={@scope}
+            report={@usage_report}
+            sort={@usage_sort}
+          />
+        <% end %>
+
         <%!-- Tab: API Usage Metrics & Logs --%>
         <%= if @current_tab == "metrics" do %>
           <div class="space-y-6">
@@ -5237,6 +5299,7 @@ defmodule AskDriveWeb.AdminLive do
                     <thead class="text-[11px] uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
                       <tr>
                         <th class="py-2.5 px-2">{gettext("Date and time")}</th>
+                        <th :if={@scope == :platform} class="py-2.5 px-2">{gettext("Desk")}</th>
                         <th class="py-2.5 px-2">{gettext("Provider")}</th>
                         <th class="py-2.5 px-2">{gettext("Model")}</th>
                         <th class="py-2.5 px-2">{gettext("Purpose")}</th>
@@ -5248,11 +5311,22 @@ defmodule AskDriveWeb.AdminLive do
                     <tbody class="divide-y divide-zinc-200/60 dark:divide-zinc-800">
                       <%= for err <- @recent_api_errors do %>
                         <tr
-                          id={"api-error-#{err.id}"}
+                          id={
+                            if(@scope == :platform,
+                              do: "api-error-#{err.app.slug}-#{err.id}",
+                              else: "api-error-#{err.id}"
+                            )
+                          }
                           class="hover:bg-zinc-50 dark:hover:bg-zinc-950/50 transition"
                         >
                           <td class="py-2.5 px-2 font-mono text-[11px] whitespace-nowrap">
                             {AskDrive.Clock.format(err.inserted_at, "%Y-%m-%d %H:%M:%S")}
+                          </td>
+                          <td
+                            :if={@scope == :platform}
+                            class="py-2.5 px-2 whitespace-nowrap text-zinc-900 dark:text-zinc-100"
+                          >
+                            {err.app.name}
                           </td>
                           <td class="py-2.5 px-2 font-medium text-zinc-900 dark:text-zinc-100">
                             {err.provider}
@@ -5267,10 +5341,16 @@ defmodule AskDriveWeb.AdminLive do
                           </td>
                           <td class="py-2.5 px-2 text-right">
                             <button
-                              id={"dismiss-api-error-#{err.id}"}
+                              id={
+                                if(@scope == :platform,
+                                  do: "dismiss-api-error-#{err.app.slug}-#{err.id}",
+                                  else: "dismiss-api-error-#{err.id}"
+                                )
+                              }
                               type="button"
                               phx-click="dismiss_api_error"
                               phx-value-id={err.id}
+                              phx-value-app={@scope == :platform && err.app.slug}
                               title={gettext("Mark as seen")}
                               class="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:text-zinc-200 dark:hover:bg-zinc-800 transition"
                             >

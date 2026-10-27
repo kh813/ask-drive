@@ -60,9 +60,7 @@ defmodule AskDrive.SSLTest do
   end
 
   test "an expired certificate is rejected" do
-    # -days 0 gives a certificate valid only for "now"; wait past it
-    a = CertHelper.ca_signed(["a.example.com"], days: 0)
-    Process.sleep(1100)
+    a = CertHelper.ca_signed(["a.example.com"], expired: true)
     assert {:error, errors} = SSL.validate(a)
     assert Enum.any?(errors, &(&1 =~ "有効期限が切れています"))
   end

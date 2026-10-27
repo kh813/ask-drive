@@ -141,6 +141,7 @@ Anthropic API キー: ********
 - 古い形式の Word / Excel / PowerPoint（.doc / .xls / .ppt）を読むには LibreOffice が必要です（`./app.sh setup` では入れません。容量が大きいため任意）。Ubuntu では `sudo apt-get install -y --no-install-recommends libreoffice-writer libreoffice-calc libreoffice-impress` を実行し、「インストールとアップデート」で「再確認」を押してください。未インストールの間、これらのファイルはスキップされます。
 - インデックスの対象は文書（Google ドキュメント / スプレッドシート / スライド、PDF、Word・Excel・PowerPoint、テキスト、Markdown、CSV、HTML）だけです。同じフォルダにあるバッチファイル・プログラム（.exe）・ソースコード（.py など）・設定ファイル（JSON / YAML / XML）・画像などは、ダウンロードせずに対象外とします（文書一覧には「スキップ」として理由を表示）。
 - 同期フォルダの中でも、回答に使いたくないファイル・フォルダ（旧版・下書き・名簿など）は、窓口の管理画面の **「ドキュメント」** タブで夜間バッチの対象外にできます（文書一覧の「対象外にする」、または Drive の URL を入力）。指定した時点でインデックスから外し、フォルダはその下もすべて対象外になります。「対象に戻す」で次回のバッチから取り込み直します。
+- 窓口の管理画面の **「利用状況」** タブでは、直近 7 / 30 / 90 日について、よく使うユーザー（質問回数・回答に使ったトークン・解決率）と、2 回以上聞かれた **よくある質問**（回数・解決率）を確認できます。全体管理（`/admin`）の **「利用状況」** タブでは、ユーザーごとに全窓口の質問回数とトークンを合計して表示します（窓口ごとの内訳つき）。プライバシーのため、ユーザーごとの表示は数だけで、誰が何を質問したかは表示しません。記録は 90 日で自動的に削除します。
 - `./app.sh service install` は **systemd のシステムサービス** `/etc/systemd/system/askdrive.service` を作成し、`enable --now` で起動します。サービスは `service install` を実行したユーザーの権限で動き（root では動きません）、ログは `log/ask_drive.log` / `log/ask_drive_error.log` に追記されます。
 - 同時に `/etc/sudoers.d/askdrive` を作成し、そのユーザーに **`systemctl start|stop|restart askdrive.service` だけ**をパスワードなしで許可します。これにより、管理画面からの証明書の適用（再起動）や `./app.sh deploy` の再起動が sudo のパスワードなしで動きます。
 - 状態・ログ: `./app.sh status`、`systemctl status askdrive`、`journalctl -u askdrive`
@@ -318,8 +319,8 @@ v0.0.47 以降、1 つの AskDrive の中で、部門ごとの相談窓口を並
 | `https://<ホスト>:4443/` | 窓口の一覧 |
 | `https://<ホスト>:4443/it-support` | 窓口「IT-Support」のチャット |
 | `https://<ホスト>:4443/hr` | 窓口「HR」のチャット（作成した場合） |
-| `https://<ホスト>:4443/<窓口>/admin` | 窓口の管理（バッチ・ドキュメント・未回答質問・**Drive と API キー/AI 設定**） |
-| `https://<ホスト>:4443/admin` | 全体の管理（窓口の追加・編集・削除、ユーザー管理・窓口管理者の割り当て、HTTPS、Google ログイン、「インストールとアップデート」（AskDrive のアップデート、Ollama とそのモデル、外部プログラム）） |
+| `https://<ホスト>:4443/<窓口>/admin` | 窓口の管理（バッチ・ドキュメント・未回答質問・利用状況・**Drive と API キー/AI 設定**） |
+| `https://<ホスト>:4443/admin` | 全体の管理（窓口の追加・編集・削除、ユーザー管理・窓口管理者の割り当て、全窓口の利用状況と API 利用量、HTTPS、Google ログイン、「インストールとアップデート」（AskDrive のアップデート、Ollama とそのモデル、外部プログラム）） |
 
 **窓口を追加して API キーやパスワードを設定する手順**
 1. 全体の管理（`/admin`）の **「窓口（アプリ）」** タブで、窓口名（例: HR）、URL 名（例: `hr`）、**担当者のメールアドレス**（必須）を入力して「窓口を作成」を押します。

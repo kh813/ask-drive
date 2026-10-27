@@ -43,6 +43,12 @@ defmodule AskDrive.Batch.Night do
       0 -> :ok
       n -> Logger.info("Nightly batch: deleted #{n} API usage log(s) older than 90 days")
     end
+
+    # and who asked how much (F-1415), kept as long
+    case AskDrive.Usage.prune() do
+      0 -> :ok
+      n -> Logger.info("Nightly batch: deleted #{n} question usage row(s) older than 90 days")
+    end
   rescue
     e -> Logger.warning("Could not prune the API usage logs: #{Exception.message(e)}")
   end
@@ -66,7 +72,7 @@ defmodule AskDrive.Batch.Night do
       started_at: DateTime.utc_now() |> DateTime.truncate(:second)
     })
 
-    # the API usage logs are kept for 90 days (F-1411)
+    # the API usage logs and the question usage are kept for 90 days (F-1411, F-1415)
     Enum.each(apps, fn app -> Apps.with_app(app, &prune_usage_logs/0) end)
 
     # An update about to restart refuses new runs and pauses the waiting ones (F-1503), so

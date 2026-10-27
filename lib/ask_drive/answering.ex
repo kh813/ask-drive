@@ -58,7 +58,7 @@ defmodule AskDrive.Answering do
     if tier0_result &&
          (tier0_result.status == "active" ||
             (tier0_result.status == "stale" && setting.serve_stale_qa)) do
-      log_id = record_question_log(trimmed, nil, 0, [tier0_result.chunk_id], now)
+      log_id = record_question_log(trimmed, nil, 0, [tier0_result.chunk_id], now, false)
 
       %{
         question_log_id: log_id,
@@ -130,7 +130,7 @@ defmodule AskDrive.Answering do
       if tier1_match do
         {matched_qa, _sim} = tier1_match
         candidate_ids = if matched_qa.chunk_id, do: [matched_qa.chunk_id], else: []
-        log_id = record_question_log(logged, embedding, 1, candidate_ids, now)
+        log_id = record_question_log(logged, embedding, 1, candidate_ids, now, follow_up?)
 
         %{
           question_log_id: log_id,
@@ -164,7 +164,7 @@ defmodule AskDrive.Answering do
 
         # --- Tier 2 / 3: Record question in question_log table ---
         candidate_ids = Enum.map(matched_chunks, & &1.id)
-        log_id = record_question_log(logged, embedding, tier, candidate_ids, now)
+        log_id = record_question_log(logged, embedding, tier, candidate_ids, now, follow_up?)
 
         %{
           question_log_id: log_id,
@@ -214,7 +214,7 @@ defmodule AskDrive.Answering do
   end
 
   # the log's id: the chat marks it when the asker presses 「解決した」 or follows up (F-433)
-  defp record_question_log(question, embedding, tier, candidate_ids, now) do
+  defp record_question_log(question, embedding, tier, candidate_ids, now, follow_up?) do
     embedding_blob = if embedding, do: Vector.encode(embedding), else: nil
 
     %QuestionLog{}
@@ -223,7 +223,8 @@ defmodule AskDrive.Answering do
       question_embedding: embedding_blob,
       tier_reached: tier,
       candidate_chunk_ids: candidate_ids,
-      asked_at: now
+      asked_at: now,
+      follow_up: follow_up?
     })
     |> Repo.insert()
     |> case do

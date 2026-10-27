@@ -10,7 +10,8 @@ defmodule AskDriveWeb.ChatLive do
     LLM,
     Repo,
     Settings,
-    Snippet
+    Snippet,
+    Usage
   }
 
   alias AskDrive.Accounts.{AdminAccess, User}
@@ -247,6 +248,9 @@ defmodule AskDriveWeb.ChatLive do
         inserted_at: DateTime.utc_now()
       }
 
+      user = socket.assigns.current_user
+      follow_up? = kind == :follow_up
+
       # Answer off the LiveView process: a query embedding can wait on a busy local model
       # (e.g. while a batch is generating), and doing it inline froze the page with no
       # feedback until it finished. The question shows at once with a "searching" bubble.
@@ -258,7 +262,15 @@ defmodule AskDriveWeb.ChatLive do
       |> assign(:followup_thread, nil)
       |> then(&if(kind == :new, do: assign(&1, :form, to_form(%{"question" => ""})), else: &1))
       # bind: the task must search this app's database, not the platform's (spec 6.11)
-      |> start_async(:answer, AskDrive.Apps.bind(fn -> Answering.ask(trimmed, opts) end))
+      |> start_async(
+        :answer,
+        AskDrive.Apps.bind(fn ->
+          # who asked and the tokens it used, for the 「利用状況」 tab (F-1415)
+          Usage.track_question(user, follow_up?, fn ->
+            Answering.ask(trimmed, opts)
+          end)
+        end)
+      )
     end
   end
 
@@ -337,17 +349,20 @@ defmodule AskDriveWeb.ChatLive do
       if summarise? do
         lv = self()
         id = assistant_msg.id
+        usage_id = Map.get(result, :usage_id)
 
         start_async(
           socket,
           {:summary, id},
           AskDrive.Apps.bind(fn ->
-            ChatSummary.generate(
-              result.question,
-              result.chunks,
-              fn event -> send(lv, {:summary_delta, id, event}) end,
-              context: context
-            )
+            Usage.track_tokens(usage_id, fn ->
+              ChatSummary.generate(
+                result.question,
+                result.chunks,
+                fn event -> send(lv, {:summary_delta, id, event}) end,
+                context: context
+              )
+            end)
           end)
         )
       else
