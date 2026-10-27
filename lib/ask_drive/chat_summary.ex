@@ -151,6 +151,20 @@ defmodule AskDrive.ChatSummary do
 
   defp style_config(style), do: Map.get(@styles, style, @styles[@default_style])
 
+  @doc """
+  How many excerpts Tier 2 finds (spec F-434): up to 8 for a summary on a cloud API, 4 on the
+  local LLM (Ollama's context, 4,096 tokens by default, holds about that many with the
+  instructions; more and the start of the prompt is cut off), and 3 without a summary (the
+  excerpts alone are read by the person).
+  """
+  def excerpt_limit(setting \\ Settings.get_setting!()) do
+    cond do
+      not enabled?(setting) -> 3
+      LLM.local?(elem(provider_and_model(setting), 0)) -> 4
+      true -> 8
+    end
+  end
+
   @doc "Whether chat summaries are switched on in the settings."
   def enabled?(setting \\ Settings.get_setting!()),
     do: Map.get(setting, :chat_summary_enabled, true)
@@ -253,6 +267,7 @@ defmodule AskDrive.ChatSummary do
           context: context
         })
       else
+        answer = tidy(answer, length(chunks))
         emit(:answer, String.slice(answer, 0, cap), on_event)
         {:ok, %{text: cap_text(answer, cap, on_event), thinking: thinking}}
       end
@@ -289,7 +304,9 @@ defmodule AskDrive.ChatSummary do
     end
 
     with {:ok, _} <- LLM.generate_stream(model, prompt, opts, stream) do
-      answer = visible_text(Process.get({__MODULE__, :raw}, ""), false, true)
+      answer =
+        Process.get({__MODULE__, :raw}, "") |> visible_text(false, true) |> tidy(length(chunks))
+
       emit(:answer, String.slice(answer, 0, cap), on_event)
       {:ok, %{text: cap_text(answer, cap, on_event), thinking: String.trim(notes)}}
     end
@@ -342,6 +359,55 @@ defmodule AskDrive.ChatSummary do
     if reasoning_model?(model) and String.contains?(String.downcase(model), "qwen3"),
       do: prompt <> "/no_think",
       else: prompt
+  end
+
+  @not_covered ["資料からは確認できませんでした", "The documents don't cover this"]
+
+  @doc """
+  Cleans up what a model got wrong in an answer (spec F-435): the "not covered" line added
+  after an answer (it is meant to be the whole reply, when there is no answer), and citations
+  of excerpts that don't exist (`[4]` with three excerpts).
+  """
+  def tidy(answer, excerpts) do
+    lines = String.split(answer, "\n")
+    kept = Enum.reject(lines, &not_covered_line?/1)
+
+    answer =
+      if Enum.any?(kept, &(String.trim(&1) != "")),
+        do: kept |> Enum.join("\n") |> String.trim(),
+        else: answer
+
+    Regex.replace(~r/ ?\[(\d+(?:\s*,\s*\d+)*)\]/u, answer, fn whole, numbers ->
+      valid =
+        numbers
+        |> String.split(",")
+        |> Enum.map(&String.to_integer(String.trim(&1)))
+        |> Enum.filter(&(&1 in 1..max(excerpts, 1)//1 and excerpts > 0))
+
+      cond do
+        length(valid) == length(String.split(numbers, ",")) -> whole
+        valid == [] -> ""
+        true -> String.replace(whole, "[" <> numbers <> "]", "[#{Enum.join(valid, ", ")}]")
+      end
+    end)
+  end
+
+  # a line that is only the "not covered" reply (maybe as a bullet, or in quotes)
+  defp not_covered_line?(line) do
+    text =
+      line
+      |> String.trim()
+      |> String.trim_leading("-")
+      |> String.trim_leading("・")
+      |> String.trim()
+      |> String.trim("「")
+      |> String.trim("」")
+      |> String.trim("\"")
+      |> String.trim_trailing("。")
+      |> String.trim_trailing(".")
+      |> String.trim()
+
+    text in @not_covered
   end
 
   defp cap_text(answer, cap, on_event) do

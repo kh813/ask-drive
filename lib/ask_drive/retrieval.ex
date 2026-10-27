@@ -223,6 +223,57 @@ defmodule AskDrive.Retrieval do
     end
   end
 
+  @doc """
+  The Tier 2 excerpts (spec F-434): `hybrid_search/3`'s hits, at most `limit`, with the best
+  document's hits widened by the chunks just before and after them.
+
+  A document's rules are often spread over it (a naming rule's "no spaces or symbols" a few
+  paragraphs from the part that matched the question), and the summary can only apply what
+  it is given. The best document's chunks come first, in their order in the document; at
+  least two hits from other documents are kept when there are any.
+  """
+  def excerpts(query_text, query_embedding, limit) do
+    query_text
+    |> hybrid_search(query_embedding, limit: limit)
+    |> with_neighbors(limit)
+  end
+
+  @doc false
+  def with_neighbors([], _limit), do: []
+
+  def with_neighbors([{top, _} | _] = hits, limit) do
+    {same, others} = Enum.split_with(hits, fn {c, _} -> c.document_id == top.document_id end)
+    room = max(limit - length(same) - min(length(others), 2), 0)
+    taken = MapSet.new(hits, fn {c, _} -> c.id end)
+
+    # the chunks next to the best hit first, then next to the document's other hits
+    wanted =
+      for({c, score} <- same, delta <- [1, -1], do: {c.position + delta, score})
+      |> Enum.uniq_by(&elem(&1, 0))
+
+    by_position =
+      Repo.all(
+        from c in Chunk,
+          where:
+            c.document_id == ^top.document_id and c.position in ^Enum.map(wanted, &elem(&1, 0)),
+          preload: [:document]
+      )
+      |> Map.new(&{&1.position, &1})
+
+    neighbors =
+      wanted
+      |> Enum.flat_map(fn {position, score} ->
+        case by_position[position] do
+          %Chunk{} = c -> if MapSet.member?(taken, c.id), do: [], else: [{c, score}]
+          nil -> []
+        end
+      end)
+      |> Enum.take(room)
+
+    block = Enum.sort_by(same ++ neighbors, fn {c, _} -> c.position end)
+    Enum.take(block ++ others, limit)
+  end
+
   # RRF only sees ranks, so a chunk that literally contains "USBメモリ" could sit below ones
   # that are merely on the same topic. Add up to one top rank's worth (1/(k+1)) for the share
   # of the question's term characters the chunk contains (whitespace-insensitive, so the

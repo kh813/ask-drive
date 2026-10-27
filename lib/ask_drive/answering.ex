@@ -145,11 +145,11 @@ defmodule AskDrive.Answering do
       else
         # --- Tier 2: Hybrid Search on Raw Document Chunks (RRF) ---
         tier2_enabled = Map.get(setting, :tier2_enabled, true)
-        excerpt_count = Map.get(setting, :tier2_excerpt_count, 3)
+        excerpt_count = AskDrive.ChatSummary.excerpt_limit(setting)
 
         scored_chunks =
           if tier2_enabled do
-            Retrieval.hybrid_search(query, embedding, limit: excerpt_count)
+            Retrieval.excerpts(query, embedding, excerpt_count)
           else
             []
           end
