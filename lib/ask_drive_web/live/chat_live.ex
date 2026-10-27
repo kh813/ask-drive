@@ -1462,23 +1462,16 @@ defmodule AskDriveWeb.ChatLive do
 
   defp drive_link(%{document: %{web_view_link: link}}), do: link
 
-  # The summary as HTML: escaped text, line breaks as <br>, and each citation "[n]" that
-  # refers to an excerpt turned into a link to that excerpt's card.
+  # The summary as HTML: its Markdown (lists, bold, …) rendered from escaped text (F-437),
+  # and each citation "[n]" that refers to an excerpt turned into a link to that excerpt's card.
   defp summary_html(text, msg_id, source_count) do
     text
-    |> escape_lines()
-    |> Enum.map(fn
-      "<br>" ->
-        "<br>"
-
-      line ->
-        Regex.replace(~r/\[(\d+)\]/, line, fn whole, n ->
-          if String.to_integer(n) in 1..source_count//1 do
-            ~s(<a href="#src-#{msg_id}-#{n}" class="inline-block px-1 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-[11px] font-semibold no-underline hover:bg-indigo-200">[#{n}]</a>)
-          else
-            whole
-          end
-        end)
+    |> AskDriveWeb.SummaryMarkdown.to_html(fn whole, n ->
+      if n in 1..source_count//1 do
+        ~s(<a href="#src-#{msg_id}-#{n}" class="inline-block px-1 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-[11px] font-semibold no-underline hover:bg-indigo-200">[#{n}]</a>)
+      else
+        whole
+      end
     end)
     |> Phoenix.HTML.raw()
   end
