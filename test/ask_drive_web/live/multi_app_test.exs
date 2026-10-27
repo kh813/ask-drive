@@ -72,8 +72,23 @@ defmodule AskDriveWeb.MultiAppTest do
     assert has_element?(view, "#app-switcher a[href='/it-support']", "AskDrive for IT-Support")
   end
 
-  test "platform admin creates an app; its admin page shows only app settings", %{conn: conn} do
+  test "the platform's tabs, left to right; /admin opens on the first", %{conn: conn} do
     {:ok, view, html} = live(conn, ~p"/admin")
+
+    ids =
+      html
+      |> LazyHTML.from_document()
+      |> LazyHTML.query("button[id^='tab-']")
+      |> LazyHTML.attribute("id")
+
+    assert ids ==
+             ~w(tab-metrics tab-usage tab-settings tab-apps tab-users tab-audit tab-update)
+
+    assert has_element?(view, "#tab-metrics.border-indigo-600")
+  end
+
+  test "platform admin creates an app; its admin page shows only app settings", %{conn: conn} do
+    {:ok, view, html} = live(conn, ~p"/admin?tab=apps")
     assert html =~ "全体管理"
     assert has_element?(view, "#app-row-hr")
     assert has_element?(view, "#admin-scope-label", "すべての窓口に適用")

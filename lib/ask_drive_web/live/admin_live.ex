@@ -166,12 +166,12 @@ defmodule AskDriveWeb.AdminLive do
 
   defp tabs(:platform),
     do: [
+      {"metrics", gettext("API usage & logs")},
+      {"usage", gettext("Usage")},
+      {"settings", gettext("Platform settings")},
       {"apps", gettext("Desks (apps)")},
       {"users", gettext("Users")},
-      {"usage", gettext("Usage")},
       {"audit", gettext("Elevation log")},
-      {"metrics", gettext("API usage & logs")},
-      {"settings", gettext("Platform settings")},
       {"update", gettext("Install & updates")}
     ]
 

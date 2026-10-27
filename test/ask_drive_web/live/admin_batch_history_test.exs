@@ -223,7 +223,7 @@ defmodule AskDriveWeb.AdminBatchHistoryTest do
     refute AskDrive.Settings.get_setting!().auto_batch_enabled
 
     # the platform's desk list says which desks are off
-    {:ok, platform, _html} = live(conn, "/admin")
+    {:ok, platform, _html} = live(conn, "/admin?tab=apps")
     assert has_element?(platform, "#app-auto-off-it-support")
   end
 end
