@@ -67,12 +67,15 @@ defmodule AskDrive.ChatSummaryTest do
       assert ja =~ "必ず日本語で答えてください"
       assert ja =~ "抜粋に書かれている内容だけを使ってください"
       assert ja =~ "[1] のように付けてください"
+      # a rule in the excerpts is applied to the question's own case (F-416)
+      assert ja =~ "その規則を当てはめて判断し"
       assert ja =~ "資料からは確認できませんでした"
       refute ja =~ "__CHARS__"
 
       en = ChatSummary.build_prompt("What are the rules for USB drives?", [chunk], nil, [], style)
       assert en =~ "Use only what the excerpts say"
       assert en =~ "like [1]"
+      assert en =~ "apply that rule to it"
       assert en =~ "The documents don't cover this"
       refute en =~ "__WORDS__"
     end

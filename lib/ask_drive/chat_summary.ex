@@ -526,8 +526,9 @@ defmodule AskDrive.ChatSummary do
     - 必ず日本語で答えてください。
     #{style_rules(config.ja_rules, "__CHARS__", config.ja_chars)}
     - 抜粋に書かれている内容だけを使ってください。
+    - 質問の名前・事例などが抜粋の規則や条件に合うかを尋ねられたら、その規則を当てはめて判断し、どの規則に合う（合わない）かを示してください。抜粋にその名前・事例そのものが書かれていなくても構いません。
     - 根拠にした抜粋の番号を、該当する文の末尾に [1] のように付けてください。
-    - 抜粋から答えられない場合は「資料からは確認できませんでした。」とだけ答えてください。
+    - 抜粋に関係する記述が無く答えられない場合だけ、「資料からは確認できませんでした。」とだけ答えてください。
     """
   end
 
@@ -542,8 +543,9 @@ defmodule AskDrive.ChatSummary do
     - Answer in the same language as the question.
     #{style_rules(config.en_rules, "__WORDS__", config.en_words)}
     - Use only what the excerpts say.
+    - If asked whether a name, case or example in the question meets a rule or condition in the excerpts, apply that rule to it and say which rule it meets or breaks, even though the excerpts don't mention that name or case itself.
     - Cite the excerpt(s) you rely on at the end of the sentence, like [1].
-    - If the excerpts don't answer the question, reply only: "The documents don't cover this."
+    - Only if nothing in the excerpts bears on the question, reply only: "The documents don't cover this."
     """
   end
 
