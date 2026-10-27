@@ -7,6 +7,8 @@ defmodule AskDrive.Settings do
   """
   import Ecto.Query, warn: false
 
+  require Logger
+
   alias AskDrive.Repo
   alias AskDrive.Settings.Setting
 
@@ -195,9 +197,37 @@ defmodule AskDrive.Settings do
       openai_api_key: System.get_env("OPENAI_API_KEY"),
       anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
       gemini_api_key: System.get_env("GEMINI_API_KEY"),
+      vertex_api_key: System.get_env("VERTEX_API_KEY"),
       ollama_host: System.get_env("OLLAMA_HOST"),
       lmstudio_base_url: System.get_env("LMSTUDIO_BASE_URL")
     }
+    |> Map.merge(vertex_endpoint_env())
+  end
+
+  # Agent Platform's project and location from the setup (F-835), each only if it is one: a
+  # mistyped value would fail the first settings row, and with it every screen. It is then
+  # left for the settings screen, with a warning.
+  defp vertex_endpoint_env do
+    [
+      vertex_project: {"VERTEX_PROJECT", ~r/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/},
+      vertex_location: {"VERTEX_LOCATION", ~r/^[a-z]+(-[a-z0-9]+)*$/}
+    ]
+    |> Enum.flat_map(fn {field, {name, format}} ->
+      value = System.get_env(name, "") |> String.trim() |> String.downcase()
+
+      cond do
+        value == "" ->
+          []
+
+        Regex.match?(format, value) ->
+          [{field, value}]
+
+        true ->
+          Logger.warning("#{name}=#{inspect(value)} is not valid; set it on the settings screen")
+          []
+      end
+    end)
+    |> Map.new()
   end
 
   defp env_integer(name, default) do

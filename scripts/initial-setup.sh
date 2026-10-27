@@ -173,17 +173,19 @@ BANNER
   echo "  1) ollama    - ローカル推論（既定・完全ローカル、追加費用なし）"
   echo "  2) lmstudio  - LM Studio のローカルサーバー（OpenAI 互換）"
   echo "  3) gemini    - Google Gemini API"
-  echo "  4) anthropic - Anthropic Claude API"
-  echo "  5) openai    - OpenAI API"
-  echo -e "  ${YELLOW}※ 3〜5 を選ぶと、文書本文と質問が外部 API に送信されます。${NC}"
+  echo "  4) vertex    - Google Agent Platform（旧 Vertex AI。回答生成のみ）"
+  echo "  5) anthropic - Anthropic Claude API"
+  echo "  6) openai    - OpenAI API"
+  echo -e "  ${YELLOW}※ 3〜6 を選ぶと、文書本文と質問が外部 API に送信されます。${NC}"
 
   provider_from_choice() {
     case "$1" in
       1) echo "ollama" ;;
       2) echo "lmstudio" ;;
       3) echo "gemini" ;;
-      4) echo "anthropic" ;;
-      5) echo "openai" ;;
+      4) echo "vertex" ;;
+      5) echo "anthropic" ;;
+      6) echo "openai" ;;
       *) echo "" ;;
     esac
   }
@@ -195,13 +197,14 @@ BANNER
       gemini) echo "gemini (Google Gemini API)" ;;
       anthropic) echo "anthropic (Anthropic Claude API)" ;;
       openai) echo "openai (OpenAI API)" ;;
+      vertex) echo "vertex (Google Agent Platform)" ;;
       *) echo "$1" ;;
     esac
   }
 
   default_gen_model_for() {
     case "$1" in
-      gemini) echo "gemini-2.5-flash" ;;
+      gemini|vertex) echo "gemini-2.5-flash" ;;
       anthropic) echo "claude-sonnet-5" ;;
       openai) echo "gpt-5" ;;
       lmstudio) echo "" ;;
@@ -228,14 +231,14 @@ BANNER
   }
 
   while true; do
-    read -r -p "回答生成に使うプロバイダ [1-5] (既定: 1): " GEN_CHOICE
+    read -r -p "回答生成に使うプロバイダ [1-6] (既定: 1): " GEN_CHOICE
     GEN_CHOICE="${GEN_CHOICE:-1}"
     LLM_PROVIDER="$(provider_from_choice "${GEN_CHOICE}")"
     if [[ -n "${LLM_PROVIDER}" ]]; then
       echo -e "  -> 選択: ${GREEN}$(provider_label "${LLM_PROVIDER}")${NC}"
       break
     fi
-    echo -e "${RED}1 〜 5 の番号を入力してください（1: ollama, 2: lmstudio, 3: gemini, 4: anthropic, 5: openai）。${NC}"
+    echo -e "${RED}1 〜 6 の番号を入力してください（1: ollama, 2: lmstudio, 3: gemini, 4: vertex, 5: anthropic, 6: openai）。${NC}"
   done
 
   DEFAULT_GEN_MODEL="$(default_gen_model_for "${LLM_PROVIDER}")"
@@ -243,32 +246,32 @@ BANNER
   LLM_MODEL="${LLM_MODEL:-${DEFAULT_GEN_MODEL}}"
 
   # 埋め込みの既定は、回答生成と同じプロバイダ（Gemini / OpenAI / LM Studio は埋め込みにも
-  # 対応）。Claude は埋め込み非対応のためローカル（Ollama）。Enter だけで Ollama になって、
+  # 対応）。Claude と Agent Platform は埋め込み非対応のためローカル（Ollama）。Enter だけで Ollama になって、
   # Ollama を動かせないマシンで詰まることがないようにする。
   case "${LLM_PROVIDER}" in
     lmstudio) DEFAULT_EMB_CHOICE=2 ;;
     gemini) DEFAULT_EMB_CHOICE=3 ;;
-    openai) DEFAULT_EMB_CHOICE=5 ;;
+    openai) DEFAULT_EMB_CHOICE=6 ;;
     *) DEFAULT_EMB_CHOICE=1 ;;
   esac
 
   echo ""
-  echo "  ※ 埋め込みは Claude API 非対応のため選択肢から除外されます。"
+  echo "  ※ 埋め込みは Google Agent Platform と Claude API 非対応のため選択肢から除外されます。"
   echo "  ※ 埋め込みを後から変更すると、全ドキュメントの再インデックスが必要です。"
 
   while true; do
-    read -r -p "埋め込みに使うプロバイダ [1,2,3,5] (既定: ${DEFAULT_EMB_CHOICE}): " EMB_CHOICE
+    read -r -p "埋め込みに使うプロバイダ [1,2,3,6] (既定: ${DEFAULT_EMB_CHOICE}): " EMB_CHOICE
     EMB_CHOICE="${EMB_CHOICE:-${DEFAULT_EMB_CHOICE}}"
-    if [[ "${EMB_CHOICE}" == "4" ]]; then
-      echo -e "${YELLOW}Claude API は埋め込みに対応していません。1, 2, 3, 5 のいずれかを選択してください。${NC}"
+    if [[ "${EMB_CHOICE}" == "4" || "${EMB_CHOICE}" == "5" ]]; then
+      echo -e "${YELLOW}Google Agent Platform と Claude API は埋め込みに対応していません。1, 2, 3, 6 のいずれかを選択してください。${NC}"
       continue
     fi
     EMBED_PROVIDER="$(provider_from_choice "${EMB_CHOICE}")"
-    if [[ -n "${EMBED_PROVIDER}" && "${EMBED_PROVIDER}" != "anthropic" ]]; then
+    if [[ -n "${EMBED_PROVIDER}" && "${EMBED_PROVIDER}" != "anthropic" && "${EMBED_PROVIDER}" != "vertex" ]]; then
       echo -e "  -> 選択: ${GREEN}$(provider_label "${EMBED_PROVIDER}")${NC}"
       break
     fi
-    echo -e "${RED}1, 2, 3, 5 のいずれかの番号を入力してください。${NC}"
+    echo -e "${RED}1, 2, 3, 6 のいずれかの番号を入力してください。${NC}"
   done
 
   DEFAULT_EMBED_MODEL="$(default_embed_model_for "${EMBED_PROVIDER}")"
@@ -283,8 +286,11 @@ BANNER
   ANTHROPIC_KEY=""
   GEMINI_KEY=""
   OPENAI_KEY=""
+  VERTEX_KEY=""
+  VERTEX_PROJECT=""
+  VERTEX_LOCATION=""
   case " ${LLM_PROVIDER} ${EMBED_PROVIDER} " in
-    *" gemini "*|*" anthropic "*|*" openai "*)
+    *" gemini "*|*" anthropic "*|*" openai "*|*" vertex "*)
       echo ""
       echo "  ※ API キーが未発行なら、空欄のまま Enter で進めます（あとで管理画面で登録できます）。"
       ;;
@@ -306,6 +312,23 @@ BANNER
           read -r -s -p "OpenAI API キー: " OPENAI_KEY; echo ""
         fi
         ;;
+      vertex)
+        if [[ -z "${VERTEX_KEY}" ]]; then
+          read -r -s -p "Google Agent Platform API キー: " VERTEX_KEY; echo ""
+          # プロジェクトは任意。空欄なら API キーだけで使うグローバルのエンドポイント（F-835）
+          while true; do
+            read -r -p "Google Cloud のプロジェクト ID (空欄: 指定しない): " VERTEX_PROJECT
+            if [[ -z "${VERTEX_PROJECT}" || "${VERTEX_PROJECT}" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]; then
+              break
+            fi
+            echo -e "${RED}プロジェクト ID は、英小文字で始まる 6〜30 文字の英小文字・数字・ハイフンです（例: my-project-123）。${NC}"
+          done
+          if [[ -n "${VERTEX_PROJECT}" ]]; then
+            read -r -p "リージョン (既定: global): " VERTEX_LOCATION
+            VERTEX_LOCATION="${VERTEX_LOCATION:-global}"
+          fi
+        fi
+        ;;
     esac
   done
 
@@ -317,6 +340,7 @@ BANNER
       anthropic) if [[ -z "${ANTHROPIC_KEY}" ]]; then missing="Anthropic"; fi ;;
       gemini) if [[ -z "${GEMINI_KEY}" ]]; then missing="Gemini"; fi ;;
       openai) if [[ -z "${OPENAI_KEY}" ]]; then missing="OpenAI"; fi ;;
+      vertex) if [[ -z "${VERTEX_KEY}" ]]; then missing="Agent Platform"; fi ;;
     esac
     if [[ -n "${missing}" && " ${MISSING_KEYS} " != *" ${missing} "* ]]; then
       MISSING_KEYS="${MISSING_KEYS:+${MISSING_KEYS} }${missing}"
@@ -361,6 +385,9 @@ LMSTUDIO_BASE_URL=http://localhost:1234/v1
 ANTHROPIC_API_KEY=${ANTHROPIC_KEY}
 GEMINI_API_KEY=${GEMINI_KEY}
 OPENAI_API_KEY=${OPENAI_KEY}
+VERTEX_API_KEY=${VERTEX_KEY}
+VERTEX_PROJECT=${VERTEX_PROJECT}
+VERTEX_LOCATION=${VERTEX_LOCATION}
 EOF
   chmod 600 "${SCRIPT_DIR}/.env.prod"
   echo -e "${GREEN}.env.prod を生成しました（パーミッション 600）。${NC}"

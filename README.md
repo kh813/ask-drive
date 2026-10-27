@@ -101,17 +101,30 @@ cd ask-drive
   1) ollama    - ローカル推論（既定・完全ローカル、追加費用なし）
   2) lmstudio  - LM Studio のローカルサーバー（OpenAI 互換）
   3) gemini    - Google Gemini API
-  4) anthropic - Anthropic Claude API
-  5) openai    - OpenAI API
+  4) vertex    - Google Agent Platform（旧 Vertex AI。回答生成のみ）
+  5) anthropic - Anthropic Claude API
+  6) openai    - OpenAI API
 
-回答生成に使うプロバイダ [1-5] (既定: 1): 4
+回答生成に使うプロバイダ [1-6] (既定: 1): 5
 生成モデル名 (既定: claude-sonnet-5):
 Anthropic API キー: ********
 
-埋め込みに使うプロバイダ [1,2,3,5] (既定: 1): 1
+埋め込みに使うプロバイダ [1,2,3,6] (既定: 1): 1
 埋め込みモデル名 (既定: bge-m3):
 埋め込み次元 (既定: 1024):
 
+```
+
+Google のサービスで文書を保管している（Google Drive）ため、外部 API は Google の Gemini API と Google Agent Platform を先に並べています。Google Agent Platform（4）を選ぶと、API キーに続けて Google Cloud のプロジェクト ID（任意。空欄なら API キーだけで使うグローバルのエンドポイント）と、プロジェクトを入れた場合はリージョン（既定: `global`）を尋ねます。Agent Platform は回答生成だけに使えるため、埋め込みは 1・2・3・6 から選びます（既定は 1 の Ollama）。
+
+```text
+回答生成に使うプロバイダ [1-6] (既定: 1): 4
+生成モデル名 (既定: gemini-2.5-flash):
+Google Agent Platform API キー: ********
+Google Cloud のプロジェクト ID (空欄: 指定しない): my-project-123
+リージョン (既定: global): asia-northeast1
+
+埋め込みに使うプロバイダ [1,2,3,6] (既定: 1): 1
 ```
 
 > **注意**: 外部 API プロバイダを選ぶと、文書本文と質問がそのプロバイダに送信されます。機密文書を扱う場合は `ollama` または `lmstudio` を選んでください。
@@ -670,6 +683,7 @@ AskDrive は、全社公開マニュアルなどの Google Drive フォルダを
        3. プロジェクト ID とリージョンは任意です。空欄ならグローバル エンドポイント（`aiplatform.googleapis.com`）に送ります。処理するリージョンを指定したい場合（例: 国内の `asia-northeast1`）は、プロジェクト ID とリージョンを入力します。
        4. モデル名は、Agent Platform では API キーでモデルの一覧を取得できないため、Gemini の公式マニュアルに載っているモデルが入力欄の候補に出ます（候補にない名前も入力できます）。
        5. 「接続テスト」で疎通を確認します。
+       6. 初期設定（`./app.sh setup`）の時点で選ぶこともできます。回答生成のプロバイダに 4（vertex）を選び、API キー・プロジェクト ID・リージョンを入力します（あとから管理画面で変更できます）。
      - **夜間バッチ（QA 生成）もクラウドにできます。** 管理画面の「夜間バッチ（QA 生成）の実行方法」で「ローカル LLM」と「クラウド API」を切り替えます。ローカル用・クラウド用のプロバイダとモデル名はそれぞれ保存されるので、切り替えのたびに入れ直す必要はありません。クラウドは QA の精度と速度が上がりますが、全チャンクの本文が API 提供元に送信され従量課金になります（差分取り込みのため、2回目以降は変更分のみ）。
      - **クラウド API の「同時に生成する数」**（既定 4、1〜32）: 夜間バッチがクラウド API で同時に生成するチャンクの数です。API の利用上限（1 分あたりのリクエスト数・トークン数）の範囲で増やすと早く終わります。夜間バッチの生成は、クラウド API を使う窓口どうしは同時に進み（ローカル LLM の窓口は 1 つずつ）、**同じ API キー（Vertex AI は同じプロジェクト）を使う窓口は、この数を分け合います**（窓口ごとに違うときは小さいほう）。部門ごとに API キーを分けると、部門どうしが互いの上限を使い合いません。API が 429（リクエストが多すぎる）を返すと、そのキーの同時実行数を一時的に半分にし、自動で戻します。文書の取り込み（同期・埋め込み）は、これまでどおり窓口を 1 つずつ処理します。
      - ローカルで遅い場合、メモリに余裕があれば `.env.prod` に `OLLAMA_MAX_LOADED_MODELS=2` を設定すると、埋め込みモデルと生成モデルを両方常駐させて入れ替えを避けられます。
@@ -738,6 +752,9 @@ Claude API と Google Agent Platform（API キーでの利用）は埋め込み�
 | `OPENAI_API_KEY` | `sk-...` |
 | `ANTHROPIC_API_KEY` | `sk-ant-...` |
 | `GEMINI_API_KEY` | `AIza...` |
+| `VERTEX_API_KEY` | Google Agent Platform の API キー |
+| `VERTEX_PROJECT` | `my-project-123`（任意。形式が正しくない値は使わず、管理画面での設定を待ちます） |
+| `VERTEX_LOCATION` | `asia-northeast1`（任意。既定 `global`） |
 
 ---
 
