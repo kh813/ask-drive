@@ -62,19 +62,17 @@ defmodule AskDrive.Batch.CloudGenerationConcurrencyTest do
 
   test "on a cloud API, chunks are generated four at a time", %{chunks: chunks} do
     assert Scheduler.generation_concurrency(Settings.get_setting!()) == 4
-    StubGemini.set(:delay, 300)
+    # long enough for the requests to overlap
+    StubGemini.set(:delay, 200)
 
-    started = System.monotonic_time(:millisecond)
     {:ok, run} = Scheduler.run_batch()
-    elapsed = System.monotonic_time(:millisecond) - started
-
     assert run.chunks_processed == 8
 
     for chunk <- chunks,
         do: assert(Repo.exists?(from q in AskDrive.QA.QAPair, where: q.chunk_id == ^chunk.id))
 
-    # 8 requests of 300ms each: ~2.4s one by one, ~0.6s four at a time
-    assert elapsed < 1_800
+    # counted at the API, not timed: a slow CI machine doesn't fail it
+    assert StubGemini.max_in_flight() == 4
   end
 
   test "on a local LLM, one at a time" do
