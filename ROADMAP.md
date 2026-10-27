@@ -4,7 +4,7 @@ This document outlines planned improvements, future concepts, and the technical 
 
 ---
 
-## Current Version: `0.2.13` (MVP: Minimum Viable Product)
+## Current Version: `0.2.14` (MVP: Minimum Viable Product)
 - **License**: Changed to [Apache License 2.0](LICENSE) (from MIT) with [NOTICE](NOTICE) file.
 - **Prototype (v0.1.x) to MVP (v0.2.0)**: The core feature set has matured from the initial prototype phase into an operational Minimum Viable Product for enterprise internal deployments.
 - **Multi-lingual Support (i18n)**: English (default) & Japanese (`en` / `ja`) with browser `Accept-Language` auto-detection and UI switcher. The admin screens (desk and platform) are fully available in English (v0.1.41, Gettext with English source strings); text recorded by background work (batch, health check, certificate renewal, updater) stays Japanese.
@@ -39,6 +39,7 @@ This document outlines planned improvements, future concepts, and the technical 
 - **規則に当てはめて答える AI 要約と全体管理のタブの並び**（v0.2.11）: 「この名前は命名規則に沿っていますか？」のような質問に、抜粋の規則を当てはめて答える（名前そのものが文書に無くても）。全体管理のタブは「API利用量・ログ」「利用状況」「全体設定」を左に
 - **AI 要約に渡す抜粋を増やす**（v0.2.12）: クラウド API なら最大 8 件（ローカル LLM は 4 件）、最も関係の深い文書は見つかった部分の前後も渡す。回答の後に付いた「資料からは確認できませんでした」と、存在しない番号の引用を取り除く
 - **考えて答える回答**（v0.2.13）: クラウド API では、規則に沿っているかの確認や、文面の奥に目的がある質問だと判断したとき、関係する文書を丸ごと渡して思考させ、規則の目的に照らした判定・直し方の例・目的に合う別の方法を答える。FAQ にその質問と回答があれば FAQ を基に。一問一答の質問とローカル LLM は従来どおり。README に FAQ 文書の書き方
+- **要約の Markdown の表示**（v0.2.14）: 見出し・入れ子の箇条書き・番号付きリスト・太字などを整えて表示（エスケープしてから変換し、リンク・画像・タグは作らない）
 - **管理画面の保存と有効化の分離**（v0.1.39〜）: 「保存」は値の保存だけ、機能ごとの有効・無効はスイッチですぐに反映
 
 ---
