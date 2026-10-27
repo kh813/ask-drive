@@ -6,8 +6,8 @@ defmodule AskDrive.ChatSummary.Reasoned do
   the allowed list may also do).
 
   `plan/5` asks the model first, briefly and without thinking, how to answer: `:direct` (the
-  excerpts answer it as they are, as for "USBメモリを使っていいですか": the summary is made as
-  before) or reasoned, with what the person is likely after and search words for it. A
+  excerpts answer it as they are, as for "USBメモリを使っていいですか", or an FAQ among them
+  has the question and its answer: the summary is made as before) or reasoned, with what the person is likely after and search words for it. A
   reasoned answer is then given more to go on (`sources/3`): the whole documents the excerpts
   and those searches found, as far as they fit, so a rule is read with its purpose; and the
   model thinks before answering (`prompt/5`).
@@ -28,6 +28,8 @@ defmodule AskDrive.ChatSummary.Reasoned do
   @max_queries 3
   @per_query 4
   @plan_timeout 15_000
+  # enough of each excerpt for the plan to see an FAQ's question and its answer
+  @plan_excerpt_chars 300
   @embed_timeout 10_000
 
   @doc """
@@ -64,7 +66,7 @@ defmodule AskDrive.ChatSummary.Reasoned do
           (chunk.content
            |> Snippet.display_text()
            |> String.replace(~r/\s+/u, " ")
-           |> String.slice(0, 160))
+           |> String.slice(0, @plan_excerpt_chars))
       end)
 
     """
@@ -76,7 +78,7 @@ defmodule AskDrive.ChatSummary.Reasoned do
     #{excerpts}
 
     答え方:
-    - "direct": 資料に、質問への答え（してよいか・いけないか、手順、期限、問い合わせ先など）がそのまま書かれていて、一問一答で答えられる。
+    - "direct": 資料に、質問への答え（してよいか・いけないか、手順、期限、問い合わせ先など）がそのまま書かれていて、一問一答で答えられる。資料の FAQ（よくある質問・Q&A）に、この質問に当たる質問と回答があれば、規則の確認や意図の汲み取りが要る質問でも "direct" にしてください（FAQ の回答を基に答えます）。
     - "reasoned": 質問の名前・事例・計画が規則や方針に沿っているかの確認を求めている。または、質問の文面（例:「〇〇を使いたい」）の奥に別の目的（例: PDF を編集したい）があり、規則や方針、複数の資料を考え合わせて案内したほうがよい。
 
     次の JSON だけを出力してください（説明は不要です）:
@@ -223,6 +225,7 @@ defmodule AskDrive.ChatSummary.Reasoned do
       指示:
       - 必ず日本語で答えてください。
       - 質問者が本当に知りたいこと・したいことを考えてから答えてください。
+      - 資料の FAQ（よくある質問・Q&A）に、この質問に当たる質問と回答があれば、その回答を基に答えてください。
       - 資料の規則・方針は、その目的や背景（なぜその決まりがあるのか）まで読み取り、質問の名前・事例・やりたいことに当てはめて検討してください。
       - 規則や方針に沿っているかを尋ねる質問には、最初に結論（沿っている／沿っていない／資料からは判断できない）を示し、関係する規則ごとに、当てはめた結果とその理由（規則の目的に照らして）を箇条書きで示してください。沿っていない場合は、沿うように直した例を示してください。
       - 何かをしたい・使いたいという質問には、社内の手続き（承認・依頼先など）を示したうえで、質問者の目的に合う別の方法（許可されているアプリなど）が資料にあれば、それも案内してください。
@@ -241,6 +244,7 @@ defmodule AskDrive.ChatSummary.Reasoned do
       Instructions:
       - Answer in the same language as the question.
       - Think about what the person really wants to know or do before answering.
+      - If an FAQ (Q&A) in the documents has this question and its answer, base your answer on that answer.
       - Read the rules and policies in the documents together with their purpose (why they exist), and apply them to the names, cases or plans in the question.
       - If asked whether something follows the rules, start with the conclusion (follows / does not follow / can't tell from the documents), then for each relevant rule, how it applies and why, in the light of its purpose, as bullets. If it doesn't follow them, show a version that does.
       - If the person wants to do or use something, give the procedure (approvals, whom to ask), then any other way in the documents that serves their aim (an allowed app, for example).

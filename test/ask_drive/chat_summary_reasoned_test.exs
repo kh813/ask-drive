@@ -90,6 +90,8 @@ defmodule AskDrive.ChatSummaryReasonedTest do
       assert prompt =~ "この名前は命名規則に沿っていますか？"
       assert prompt =~ "[1] 命名規則.pdf: 共有ドライブの命名規則"
       assert prompt =~ ~s("reasoned")
+      # an FAQ that has the question answers it directly, even a rule question
+      assert prompt =~ "FAQ（よくある質問・Q&A）に、この質問に当たる質問と回答があれば"
     end
   end
 
@@ -158,6 +160,7 @@ defmodule AskDrive.ChatSummaryReasonedTest do
     assert prompt =~ "名前に空白文字や記号は使わない"
     assert prompt =~ "なぜその決まりがあるのか"
     assert prompt =~ "名前が規則に合うか知りたい"
+    assert prompt =~ "FAQ（よくある質問・Q&A）に、この質問に当たる質問と回答があれば、その回答を基に"
   end
 
   test "a question the excerpts answer as they are is summarised as before" do
