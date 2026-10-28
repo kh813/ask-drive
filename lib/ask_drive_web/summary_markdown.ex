@@ -76,7 +76,7 @@ defmodule AskDriveWeb.SummaryMarkdown do
     size = if level <= 2, do: "text-[15px]", else: "text-sm"
 
     html =
-      ~s(<p class="#{size} font-semibold text-zinc-900 dark:text-zinc-100 mt-3 first:mt-0">) <>
+      ~s(<p class="#{size} font-bold text-zinc-950 dark:text-white mt-3 first:mt-0">) <>
         inline(content, cite) <> "</p>"
 
     {[html | out], [], false}
@@ -151,20 +151,24 @@ defmodule AskDriveWeb.SummaryMarkdown do
     |> then(&Regex.split(~r/`[^`]+`/u, &1, include_captures: true))
     |> Enum.map_join(fn
       "`" <> _ = code ->
-        ~s(<code class="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono text-[12px]">) <>
+        ~s(<code class="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono text-[12px] text-zinc-900 dark:text-zinc-100">) <>
           String.slice(code, 1..-2//1) <> "</code>"
 
       text ->
         text
         |> then(
           &Regex.replace(
-            ~r/\*\*(?=\S)(.+?)(?<=\S)\*\*/u,
+            ~r/\*\*\s*([^\*\s](?:.*?[^\*\s])?)\s*\*\*/u,
             &1,
-            "<strong class=\"font-semibold\">\\1</strong>"
+            "<strong class=\"font-bold text-zinc-950 dark:text-white\">\\1</strong>"
           )
         )
         |> then(
-          &Regex.replace(~r/(?<![*\w])\*(?=\S)([^*]+?)(?<=\S)\*(?![*\w])/u, &1, "<em>\\1</em>")
+          &Regex.replace(
+            ~r/(?<![*\w])\*\s*([^\*\s](?:.*?[^\*\s])?)\s*\*(?![*\w])/u,
+            &1,
+            "<em class=\"italic text-zinc-900 dark:text-zinc-100\">\\1</em>"
+          )
         )
         |> then(
           &Regex.replace(~r/\[(\d+)\]/u, &1, fn whole, n -> cite.(whole, String.to_integer(n)) end)

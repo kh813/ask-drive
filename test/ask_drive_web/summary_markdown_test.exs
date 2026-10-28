@@ -43,7 +43,7 @@ defmodule AskDriveWeb.SummaryMarkdownTest do
       IT サポート
       """)
 
-    assert texts(doc, "p.font-semibold") == ["手順"]
+    assert texts(doc, "p.font-bold") == ["手順"]
     assert texts(doc, "ol > li") == ["上長の承認を取る", "IT サポートに依頼する"]
     assert Enum.count(LazyHTML.query(doc, "hr")) == 1
     assert Enum.count(LazyHTML.query(doc, "p br")) == 1
@@ -56,12 +56,19 @@ defmodule AskDriveWeb.SummaryMarkdownTest do
     assert texts(doc, "a#c1") == ["[1]"]
   end
 
+  test "bold with spaces around contents like ** aaa **" do
+    doc = html("これは ** aaa ** です。")
+    assert texts(doc, "strong") == ["aaa"]
+  end
+
   test "the model's own markup is escaped, never run" do
     out = SummaryMarkdown.to_html("<script>alert(1)</script> **<b>x</b>**")
     refute out =~ "<script>"
     refute out =~ "<b>"
     assert out =~ "&lt;script&gt;"
-    assert out =~ ~s(<strong class="font-semibold">&lt;b&gt;x&lt;/b&gt;</strong>)
+
+    assert out =~
+             ~s(<strong class="font-bold text-zinc-950 dark:text-white">&lt;b&gt;x&lt;/b&gt;</strong>)
   end
 
   test "text still streaming: an unclosed ** stays as written" do
