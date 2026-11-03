@@ -200,3 +200,9 @@ msgstr ""
 
 msgid "must be a location such as global, us-central1 or asia-northeast1"
 msgstr ""
+
+msgid "is a link to a file, not a folder. Open the folder in Google Drive and copy the address bar"
+msgstr ""
+
+msgid "has no Google Drive folder ID in it"
+msgstr ""

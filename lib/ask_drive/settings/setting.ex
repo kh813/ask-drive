@@ -3,6 +3,7 @@ defmodule AskDrive.Settings.Setting do
   import Ecto.Changeset
 
   alias AskDrive.Drive.ServiceAccount
+  alias AskDrive.Drive.Url
   alias AskDrive.Encrypted.Binary
 
   @generation_providers ~w(ollama lmstudio gemini vertex anthropic openai)
@@ -315,6 +316,34 @@ defmodule AskDrive.Settings.Setting do
     end
   end
 
+  # A folder link pasted into the folder field is stored as the folder's ID (spec F-359).
+  # Input without a slash is taken as an ID as it is.
+  defp normalize_drive_folder(changeset) do
+    case get_change(changeset, :drive_folder_id) do
+      nil ->
+        changeset
+
+      input ->
+        input = String.trim(input)
+        folder = if String.contains?(input, "/"), do: Url.folder_id(input), else: {:ok, input}
+
+        case folder do
+          {:ok, id} ->
+            put_change(changeset, :drive_folder_id, id)
+
+          {:error, :not_a_folder} ->
+            add_error(
+              changeset,
+              :drive_folder_id,
+              "is a link to a file, not a folder. Open the folder in Google Drive and copy the address bar"
+            )
+
+          {:error, _} ->
+            add_error(changeset, :drive_folder_id, "has no Google Drive folder ID in it")
+        end
+    end
+  end
+
   defp check_present(changeset, value, field, message) do
     if present?(value), do: changeset, else: add_error(changeset, field, message)
   end
@@ -372,6 +401,7 @@ defmodule AskDrive.Settings.Setting do
         :vertex_location
       ] ++ @api_key_fields ++ @base_url_fields
     )
+    |> normalize_drive_folder()
     |> validate_required([
       :batch_start_hour,
       :batch_end_hour,

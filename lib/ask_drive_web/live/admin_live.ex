@@ -6818,6 +6818,11 @@ defmodule AskDriveWeb.AdminLive do
                         label={gettext("Folder display name (optional)")}
                       />
                     </div>
+                    <p id="drive-folder-hint" class="text-[11px] text-zinc-500 leading-relaxed">
+                      {gettext(
+                        "Open the folder in Google Drive and paste the address bar's URL as it is. The folder ID is taken out of it when you save."
+                      )}
+                    </p>
                     <div class="flex flex-wrap items-center gap-3">
                       <button
                         type="submit"

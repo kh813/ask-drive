@@ -27,6 +27,43 @@ defmodule AskDriveWeb.AdminDriveSettingsTest do
     assert Settings.get_setting!().drive_folder_name == "マニュアル"
   end
 
+  test "a pasted folder URL is saved as the folder ID (spec F-359)", %{conn: conn} do
+    {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
+    assert has_element?(view, "#drive-folder-hint")
+
+    view
+    |> form("#drive-settings-form", %{
+      "setting" => %{
+        "drive_folder_id" => "https://drive.google.com/drive/folders/1AbCdEfGhIjK?usp=sharing"
+      }
+    })
+    |> render_submit()
+
+    assert Settings.get_setting!().drive_folder_id == "1AbCdEfGhIjK"
+
+    assert has_element?(
+             view,
+             "#drive-settings-form input[name='setting[drive_folder_id]'][value='1AbCdEfGhIjK']"
+           )
+  end
+
+  test "a link to a file is not saved as the folder", %{conn: conn} do
+    {:ok, _} = Settings.update_setting(Settings.get_setting!(), %{drive_folder_id: "1AbCdEf"})
+    {:ok, view, _html} = live(conn, "/it-support/admin?tab=settings")
+
+    html =
+      view
+      |> form("#drive-settings-form", %{
+        "setting" => %{
+          "drive_folder_id" => "https://docs.google.com/document/d/1XyZ1234567/edit"
+        }
+      })
+      |> render_submit()
+
+    assert html =~ "フォルダではなくファイルのリンクです"
+    assert Settings.get_setting!().drive_folder_id == "1AbCdEf"
+  end
+
   test "one save button for the whole card, at its bottom", %{conn: conn} do
     for mode <- ["service_account", "oauth"] do
       {:ok, _} = Settings.update_setting(Settings.get_setting!(), %{drive_auth_mode: mode})

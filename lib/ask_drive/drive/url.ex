@@ -27,7 +27,7 @@ defmodule AskDrive.Drive.Url do
       # Folder URL: /folders/<ID>
       match =
           Regex.run(
-            ~r/drive\.google\.com\/drive\/(?:u\/\d+\/)?folders\/([a-zA-Z0-9_-]+)/,
+            ~r/drive\.google\.com\/drive\/(?:u\/\d+\/|mobile\/)*folders\/([a-zA-Z0-9_-]+)/,
             trimmed
           ) ->
         [_, id] = match
@@ -59,6 +59,36 @@ defmodule AskDrive.Drive.Url do
 
       true ->
         {:error, :invalid_drive_url}
+    end
+  end
+
+  @doc """
+  Returns the folder ID from a pasted folder URL or a raw ID (spec F-359).
+
+  A link to a file (Docs, Sheets, Slides or `/file/d/`) is `{:error, :not_a_folder}`.
+
+  ## Examples
+
+      iex> AskDrive.Drive.Url.folder_id("https://drive.google.com/drive/folders/1aBcDeFgHiJkLmNoP?usp=sharing")
+      {:ok, "1aBcDeFgHiJkLmNoP"}
+
+      iex> AskDrive.Drive.Url.folder_id("https://drive.google.com/open?id=1aBcDeFgHiJkLmNoP")
+      {:ok, "1aBcDeFgHiJkLmNoP"}
+  """
+  def folder_id(input) do
+    case parse(input) do
+      {:ok, %{id: id, type: type}} when type in [:folder, :raw_id] ->
+        {:ok, id}
+
+      {:ok, _file} ->
+        {:error, :not_a_folder}
+
+      {:error, _} = error ->
+        # the older share link form: drive.google.com/open?id=<ID>
+        case Regex.run(~r/drive\.google\.com\/open\?(?:.*&)?id=([a-zA-Z0-9_-]+)/, input || "") do
+          [_, id] -> {:ok, id}
+          nil -> error
+        end
     end
   end
 end

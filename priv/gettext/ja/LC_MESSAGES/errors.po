@@ -187,3 +187,9 @@ msgstr "は Google Cloud のプロジェクト ID（例: my-project-123）で入
 
 msgid "must be a location such as global, us-central1 or asia-northeast1"
 msgstr "は global・us-central1・asia-northeast1 のようなリージョンで入力してください"
+
+msgid "is a link to a file, not a folder. Open the folder in Google Drive and copy the address bar"
+msgstr "フォルダではなくファイルのリンクです。Google Drive でフォルダを開き、ブラウザのアドレス欄の URL をコピーして貼り付けてください"
+
+msgid "has no Google Drive folder ID in it"
+msgstr "Google Drive のフォルダの URL として読み取れませんでした。Google Drive でフォルダを開き、ブラウザのアドレス欄の URL をそのまま貼り付けてください"
