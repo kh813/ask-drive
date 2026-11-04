@@ -4,7 +4,7 @@ This document outlines planned improvements, future concepts, and the technical 
 
 ---
 
-## Current Version: `0.2.16` (MVP: Minimum Viable Product)
+## Current Version: `0.2.17` (MVP: Minimum Viable Product)
 - **License**: Changed to [Apache License 2.0](LICENSE) (from MIT) with [NOTICE](NOTICE) file.
 - **Prototype (v0.1.x) to MVP (v0.2.0)**: The core feature set has matured from the initial prototype phase into an operational Minimum Viable Product for enterprise internal deployments.
 - **Multi-lingual Support (i18n)**: English (default) & Japanese (`en` / `ja`) with browser `Accept-Language` auto-detection and UI switcher. The admin screens (desk and platform) are fully available in English (v0.1.41, Gettext with English source strings); text recorded by background work (batch, health check, certificate renewal, updater) stays Japanese.
@@ -42,6 +42,7 @@ This document outlines planned improvements, future concepts, and the technical 
 - **要約の Markdown の表示**（v0.2.14）: 見出し・入れ子の箇条書き・番号付きリスト・太字などを整えて表示（エスケープしてから変換し、リンク・画像・タグは作らない）
 - **初期設定で Google Agent Platform を選べる**（v0.2.15）: 回答生成のプロバイダに Agent Platform（API キー、任意のプロジェクト ID とリージョン）。選択肢は Google の API（Gemini、Agent Platform）を先に
 - **要約の Markdown の視認性強化と仕様明記**（v0.2.16）: 太字（700）と高コントラスト色（黒/白）で日本語環境でも明瞭に強調、`** aaa **` 等の内側余白に対応。見出し・インラインコードの視認性向上、サポート・非サポート仕様のドキュメント化
+- **「もっと詳しく」「やさしく言い直す」と役割ごとの資料**（v0.2.17）: 回答スタイルは窓口の設定を既定に、利用者は AI 要約の下のボタンで同じ抜粋から詳しく・やさしく作り直せる（クラウド API の窓口）。同期するフォルダは URL を貼り付けるとフォルダ ID を取り出して保存。窓口管理者のスタートアップガイド（Step 1〜7）と利用者向けの「チャットの使い方」を追加
 - **管理画面の保存と有効化の分離**（v0.1.39〜）: 「保存」は値の保存だけ、機能ごとの有効・無効はスイッチですぐに反映
 
 ---
