@@ -87,13 +87,19 @@ defmodule AskDrive.Notify.GoogleChatTest do
             ],
             do: Application.delete_env(:ask_drive, key)
 
-        File.rm_rf!(Path.dirname(Server.marker_path()))
-        restart_server()
+        reset_state()
       end)
 
-      File.rm_rf!(Path.dirname(Server.marker_path()))
-      restart_server()
+      reset_state()
       :ok
+    end
+
+    # the server is stopped before its state directory is removed: an update that just
+    # failed may still be writing there, and removing under it raced (File.rm_rf! failed)
+    defp reset_state do
+      :ok = Supervisor.terminate_child(AskDrive.Supervisor, Server)
+      File.rm_rf!(Path.dirname(Server.marker_path()))
+      {:ok, _} = Supervisor.restart_child(AskDrive.Supervisor, Server)
     end
 
     defp restart_server do
