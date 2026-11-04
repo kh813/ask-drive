@@ -338,7 +338,8 @@ defmodule AskDrive.Ldap do
   """
   def test_connection(%Setting{} = setting) do
     if configured?(setting) do
-      with_connection(setting, fn client, handle ->
+      # the admin's check always verifies both certificates afresh (no resumed session)
+      with_connection(setting, [fresh: true], fn client, handle ->
         with :ok <- service_bind(client, handle, setting) do
           case client.search(handle, base_dn(setting), :base) do
             {:ok, _} ->
@@ -367,16 +368,27 @@ defmodule AskDrive.Ldap do
     end
   end
 
-  defp with_connection(setting, fun) do
+  defp with_connection(setting, options \\ [], fun) do
     client = client()
     host = host(setting)
+    tls = tls_fingerprint(setting)
+    resume? = not Keyword.get(options, :fresh, false) and verified_tls() == tls
 
     case sslopts(setting) do
       {:ok, opts} ->
+        opts = if resume?, do: opts, else: without_resumption(opts)
+
         case client.open(host, port(setting), opts, @timeout) do
           {:ok, handle} ->
             try do
-              fun.(client, handle)
+              # with TLS 1.3 the server checks the client certificate after the handshake,
+              # so the settings count as verified once the work itself went through
+              result = fun.(client, handle)
+
+              if verified_tls() != tls and not match?({:error, {:unavailable, _}}, result),
+                do: :persistent_term.put({__MODULE__, :verified_tls}, tls)
+
+              result
             after
               client.close(handle)
             end
@@ -395,6 +407,28 @@ defmodule AskDrive.Ldap do
         {:error, {:unavailable, message}}
     end
   end
+
+  # A resumed TLS session skips the certificate checks on both sides, so it is used only for
+  # the TLS settings that last passed a full handshake: after a change of the server, the
+  # client certificate or the CA, the next connection verifies afresh (F-1311). Without this,
+  # a wrong CA or client certificate was accepted on a server that issues session tickets.
+  defp verified_tls, do: :persistent_term.get({__MODULE__, :verified_tls}, nil)
+
+  defp tls_fingerprint(setting) do
+    [
+      host(setting),
+      to_string(port(setting)),
+      setting.ldap_client_cert || "",
+      setting.ldap_client_key || "",
+      setting.ldap_ca_cert || ""
+    ]
+    |> Enum.join(<<0>>)
+    |> then(&:crypto.hash(:sha256, &1))
+  end
+
+  @doc false
+  def without_resumption(opts),
+    do: Keyword.merge(opts, session_tickets: :disabled, reuse_sessions: false)
 
   @doc false
   def sslopts(%Setting{} = setting) do

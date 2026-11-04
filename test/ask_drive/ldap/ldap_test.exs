@@ -122,11 +122,33 @@ defmodule AskDrive.LdapTest do
       assert_received {:ldap, :open, _}
     end
 
-    test "the TLS session is resumed on the next connection" do
+    test "the TLS session is resumed only for the settings that passed a full handshake" do
       {setting, _} = enable_ldap!()
-      {:ok, opts} = Ldap.sslopts(setting)
-      assert opts[:session_tickets] == :auto
+      FakeLdap.reset()
+      resumes? = fn {:ldap, :open, {_, _, opts}} -> opts[:session_tickets] == :auto end
+
+      # first connection: certificates verified in full, no resumed session
+      Ldap.authenticate(setting, "taro@example.com", "wrong")
+      assert_received {:ldap, :open, _} = open
+      refute resumes?.(open)
+
+      # then resumed (F-1311)
+      Ldap.authenticate(setting, "taro@example.com", "wrong")
+      assert_received {:ldap, :open, _} = open
+      assert resumes?.(open)
+      assert {:ldap, :open, {_, _, opts}} = open
       assert opts[:reuse_sessions] == true
+
+      # another CA (or client certificate): verified afresh, as is the admin's 接続テスト
+      other = %{setting | ldap_ca_cert: CertHelper.ca_signed(["x"]).chain}
+      Ldap.authenticate(other, "taro@example.com", "wrong")
+      assert_received {:ldap, :open, _} = open
+      refute resumes?.(open)
+
+      flush_ldap()
+      Ldap.test_connection(setting)
+      assert_received {:ldap, :open, _} = open
+      refute resumes?.(open)
     end
   end
 
