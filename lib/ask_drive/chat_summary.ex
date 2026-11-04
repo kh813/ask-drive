@@ -138,6 +138,8 @@ defmodule AskDrive.ChatSummary do
   }
   @style_order ~w(concise conversational detailed plain)
   @default_style "concise"
+  # offered under an answer to write it again (F-438): 「もっと詳しく」 and 「やさしく言い直す」
+  @restyles ~w(detailed plain)
 
   @doc "The answer styles as `{label, value}` pairs for a select, in display order (F-432)."
   def style_options,
@@ -156,6 +158,12 @@ defmodule AskDrive.ChatSummary do
   end
 
   defp style_config(style), do: Map.get(@styles, style, @styles[@default_style])
+
+  @doc """
+  The styles an answer can be written again in (F-438), less the desk's own: an answer
+  already detailed is not offered 「もっと詳しく」.
+  """
+  def restyles(setting), do: Enum.reject(@restyles, &(&1 == style(setting)))
 
   @doc """
   How many excerpts Tier 2 finds (spec F-434): up to 8 for a summary on a cloud API, 4 on the
@@ -187,13 +195,18 @@ defmodule AskDrive.ChatSummary do
   A follow-up in a chat thread (F-431) passes the thread's earlier exchanges as `context:`
   (`[%{question: q, answer: a}]`, oldest first): the prompt shows them, so the question is
   read as their continuation.
+
+  `style:` writes the answer in that style instead of the desk's (F-438: 「もっと詳しく」 /
+  「やさしく言い直す」). It answers from the given excerpts as they are, without F-436's
+  thinking it through.
   """
   def generate(question, chunks, on_event \\ fn _ -> :ok end, opts \\ []) when is_list(chunks) do
     context = Keyword.get(opts, :context, [])
     setting = Settings.get_setting!()
     {provider, model} = provider_and_model(setting)
     model = available_model(provider, model, setting)
-    style = style(setting)
+    restyle = Keyword.get(opts, :style)
+    style = if is_map_key(@styles, restyle), do: restyle, else: style(setting)
     config = style_config(style)
     ja? = japanese?(question)
     cap = if ja?, do: config.ja_cap, else: config.en_cap
@@ -201,7 +214,7 @@ defmodule AskDrive.ChatSummary do
 
     # a question to think through, on a cloud model only (F-436): more to go on, and thinking
     plan =
-      if LLM.local?(provider),
+      if LLM.local?(provider) or restyle != nil,
         do: :direct,
         else: Reasoned.plan(question, chunks, setting, provider, model)
 

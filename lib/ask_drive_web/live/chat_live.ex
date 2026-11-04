@@ -45,6 +45,12 @@ defmodule AskDriveWeb.ChatLive do
      |> assign(:embedding_provider_label, LLM.label(LLM.embedding_provider(setting)))
      |> assign(:admin_eligible?, User.admin_eligible?(socket.assigns.current_user))
      |> assign(:summary_local?, summary_local?(setting))
+     # 「もっと詳しく」 / 「やさしく言い直す」 under an AI summary (F-438): cloud models only, as a
+     # longer answer from a local model would take minutes
+     |> assign(
+       :restyles,
+       if(summary_local?(setting), do: [], else: ChatSummary.restyles(setting))
+     )
      |> assign(:access_locked?, access_locked?)
      |> assign(:access_password_form, to_form(%{"password" => ""}, as: :chat_access))
      |> assign(:messages, [])
@@ -117,6 +123,50 @@ defmodule AskDriveWeb.ChatLive do
     end
   end
 
+  # 「もっと詳しく」 / 「やさしく言い直す」 (F-438): the summary written again in that style from
+  # the same excerpts, shown below it. Each style once per answer.
+  def handle_event("restyle", %{"id" => id, "style" => style}, socket) do
+    msg =
+      Enum.find(socket.assigns.messages, fn msg ->
+        to_string(msg.id) == id and match?(%{summary: %{status: :done}}, msg) and
+          msg.chunks != [] and not Enum.any?(restyled(msg), &(&1.style == style))
+      end)
+
+    if msg && style in socket.assigns.restyles do
+      lv = self()
+      id = msg.id
+      context = Map.get(msg, :context, [])
+
+      socket =
+        socket
+        |> update_message(id, fn msg ->
+          Map.put(
+            msg,
+            :restyled,
+            restyled(msg) ++ [%{style: style, status: :running, text: "", thinking: ""}]
+          )
+        end)
+        |> start_async(
+          {:restyle, id, style},
+          AskDrive.Apps.bind(fn ->
+            Usage.track_tokens(msg[:usage_id], fn ->
+              ChatSummary.generate(
+                msg.question,
+                msg.chunks,
+                fn event -> send(lv, {:restyle_delta, id, style, event}) end,
+                context: context,
+                style: style
+              )
+            end)
+          end)
+        )
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
+  end
+
   # 停止: the search still running and/or the AI summaries still being written. Killing the
   # task closes its request, so a local model stops generating too.
   @impl true
@@ -142,6 +192,16 @@ defmodule AskDriveWeb.ChatLive do
         |> cancel_async({:summary, msg.id})
         |> update_summary(msg.id, &%{&1 | status: :cancelled})
       end)
+
+    socket =
+      for msg <- socket.assigns.messages,
+          %{style: style, status: :running} <- restyled(msg),
+          reduce: socket do
+        socket ->
+          socket
+          |> cancel_async({:restyle, msg.id, style})
+          |> update_restyled(msg.id, style, &%{&1 | status: :cancelled})
+      end
 
     {:noreply, socket}
   end
@@ -332,6 +392,10 @@ defmodule AskDriveWeb.ChatLive do
       index_empty?: Map.get(result, :index_empty?, false),
       # Live AI summary of the excerpts (spec 6.4.4): shown above them, streamed in
       summary: if(summarise?, do: %{status: :running, text: "", thinking: ""}),
+      # what 「もっと詳しく」 / 「やさしく言い直す」 (F-438) write again with, and their answers
+      context: context,
+      usage_id: Map.get(result, :usage_id),
+      restyled: [],
       history_id: entry && entry.id,
       # 「解決した」 (F-433) marks this question's log
       question_log_id: Map.get(result, :question_log_id),
@@ -400,6 +464,23 @@ defmodule AskDriveWeb.ChatLive do
     {:noreply, update_summary(socket, id, &Map.merge(&1, %{status: :failed, error: reason}))}
   end
 
+  def handle_async({:restyle, id, style}, {:ok, {:ok, %{text: text, thinking: thinking}}}, socket) do
+    {:noreply,
+     update_restyled(socket, id, style, &%{&1 | status: :done, text: text, thinking: thinking})}
+  end
+
+  def handle_async({:restyle, id, style}, {:ok, {:error, reason}}, socket) do
+    require Logger
+    Logger.warning("ChatLive: rewriting the summary (#{style}) failed: #{inspect(reason)}")
+    {:noreply, update_restyled(socket, id, style, &%{&1 | status: :failed})}
+  end
+
+  def handle_async({:restyle, id, style}, {:exit, reason}, socket) do
+    require Logger
+    Logger.error("ChatLive: rewriting the summary (#{style}) crashed: #{inspect(reason)}")
+    {:noreply, update_restyled(socket, id, style, &%{&1 | status: :failed})}
+  end
+
   def handle_async(:answer, {:exit, reason}, socket) do
     require Logger
     Logger.error("ChatLive: answering crashed: #{inspect(reason)}")
@@ -422,6 +503,18 @@ defmodule AskDriveWeb.ChatLive do
 
   def handle_info({:summary_delta, id, {:thinking, delta}}, socket) do
     {:noreply, update_summary(socket, id, &%{&1 | thinking: &1.thinking <> delta})}
+  end
+
+  def handle_info({:restyle_delta, id, style, {:answer, delta}}, socket) do
+    {:noreply, update_restyled(socket, id, style, &%{&1 | text: &1.text <> delta})}
+  end
+
+  def handle_info({:restyle_delta, id, style, :answer_reset}, socket) do
+    {:noreply, update_restyled(socket, id, style, &%{&1 | text: ""})}
+  end
+
+  def handle_info({:restyle_delta, id, style, {:thinking, delta}}, socket) do
+    {:noreply, update_restyled(socket, id, style, &%{&1 | thinking: &1.thinking <> delta})}
   end
 
   defp history_id(socket, id) do
@@ -503,6 +596,35 @@ defmodule AskDriveWeb.ChatLive do
       end)
 
     assign(socket, :messages, messages)
+  end
+
+  defp restyled(msg), do: Map.get(msg, :restyled, [])
+
+  # the buttons still to show under an answer: each style once
+  defp restyle_options(restyles, msg),
+    do: Enum.reject(restyles, fn style -> Enum.any?(restyled(msg), &(&1.style == style)) end)
+
+  defp restyle_label("detailed"), do: gettext("More detail")
+  defp restyle_label("plain"), do: gettext("Say it more simply")
+
+  defp restyle_heading("detailed"), do: gettext("In more detail")
+  defp restyle_heading("plain"), do: gettext("In simpler words")
+
+  defp restyle_icon("detailed"), do: "hero-document-magnifying-glass"
+  defp restyle_icon("plain"), do: "hero-face-smile"
+
+  defp update_restyled(socket, id, style, fun) do
+    update_message(socket, id, fn msg ->
+      answers =
+        Enum.map(restyled(msg), fn
+          # stopped: pieces still in the mailbox are dropped
+          %{style: ^style, status: :cancelled} = answer -> answer
+          %{style: ^style} = answer -> fun.(answer)
+          answer -> answer
+        end)
+
+      Map.put(msg, :restyled, answers)
+    end)
   end
 
   @impl true
@@ -1049,6 +1171,66 @@ defmodule AskDriveWeb.ChatLive do
                                 </details>
                               </div>
 
+                              <%!-- The summary written again in another style (F-438) --%>
+                              <div
+                                :for={answer <- restyled(msg)}
+                                id={"restyled-#{msg.id}-#{answer.style}"}
+                                class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-indigo-200/60 dark:border-indigo-900/60 space-y-2"
+                              >
+                                <div class="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+                                  <.icon name={restyle_icon(answer.style)} class="w-4 h-4" />
+                                  {restyle_heading(answer.style)}
+                                </div>
+                                <%= case answer do %>
+                                  <% %{status: :failed} -> %>
+                                    <p class="text-xs text-zinc-500">
+                                      {gettext("Could not write the answer again. Please try later.")}
+                                    </p>
+                                  <% %{status: :cancelled, text: ""} -> %>
+                                    <p class="text-xs text-zinc-500">{gettext("(Stopped)")}</p>
+                                  <% %{status: :running, text: ""} -> %>
+                                    <p class="text-xs text-zinc-500 flex items-center gap-1.5">
+                                      <.icon name="hero-arrow-path" class="w-3.5 h-3.5 animate-spin" />
+                                      {gettext("Writing the answer again…")}
+                                    </p>
+                                  <% answer -> %>
+                                    <div class="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed">
+                                      {summary_html(answer.text, msg.id, length(msg.chunks))}<span
+                                        :if={answer.status == :running}
+                                        class="inline-block w-1.5 h-3.5 ml-0.5 bg-indigo-400 animate-pulse align-middle"
+                                      ></span>
+                                    </div>
+                                    <p
+                                      :if={answer.status == :cancelled}
+                                      class="text-[10px] text-zinc-400"
+                                    >
+                                      {gettext("(Stopped)")}
+                                    </p>
+                                <% end %>
+                              </div>
+
+                              <div
+                                :if={
+                                  match?(%{summary: %{status: :done}}, msg) and
+                                    restyle_options(@restyles, msg) != []
+                                }
+                                id={"restyle-#{msg.id}"}
+                                class="flex flex-wrap items-center gap-2 pl-1"
+                              >
+                                <button
+                                  :for={style <- restyle_options(@restyles, msg)}
+                                  type="button"
+                                  id={"restyle-#{msg.id}-#{style}"}
+                                  phx-click="restyle"
+                                  phx-value-id={msg.id}
+                                  phx-value-style={style}
+                                  class="text-xs px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-300 bg-white/70 dark:bg-zinc-900/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:-translate-y-px flex items-center gap-1.5 transition"
+                                >
+                                  <.icon name={restyle_icon(style)} class="w-3.5 h-3.5" />
+                                  {restyle_label(style)}
+                                </button>
+                              </div>
+
                               <%!-- Follow-up right after the answer, before the excerpts that
                                     would push it out of sight --%>
                               <.followup_controls
@@ -1405,7 +1587,11 @@ defmodule AskDriveWeb.ChatLive do
   end
 
   defp summarising?(messages),
-    do: Enum.any?(messages, &match?(%{summary: %{status: :running}}, &1))
+    do:
+      Enum.any?(messages, fn msg ->
+        match?(%{summary: %{status: :running}}, msg) or
+          Enum.any?(restyled(msg), &(&1.status == :running))
+      end)
 
   defp format_datetime(%DateTime{} = dt), do: AskDrive.Clock.format(dt, "%Y-%m-%d %H:%M")
   defp format_datetime(_), do: ""

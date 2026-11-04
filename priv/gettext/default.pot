@@ -11,12 +11,12 @@
 msgid ""
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1015
+#: lib/ask_drive_web/live/chat_live.ex:1134
 #, elixir-autogen, elixir-format
 msgid " (local LLMs may take several seconds)"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:569
+#: lib/ask_drive_web/live/chat_live.ex:688
 #, elixir-autogen, elixir-format
 msgid "%{count} chunks indexed for search"
 msgstr ""
@@ -26,12 +26,12 @@ msgstr ""
 msgid "(%{minutes} min remaining)"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1066
+#: lib/ask_drive_web/live/chat_live.ex:1242
 #, elixir-autogen, elixir-format
 msgid "(Excerpts with search terms highlighted):"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:990
+#: lib/ask_drive_web/live/chat_live.ex:1109
 #, elixir-autogen, elixir-format
 msgid "(Grounded solely on the cited excerpts below)"
 msgstr ""
@@ -41,27 +41,27 @@ msgstr ""
 msgid "1. Setup Code"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:530
+#: lib/ask_drive_web/live/chat_live.ex:649
 #, elixir-autogen, elixir-format
 msgid "A passphrase is required to use the chat for desk \"%{name}\"."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:986
+#: lib/ask_drive_web/live/chat_live.ex:1105
 #, elixir-autogen, elixir-format
 msgid "AI Summary"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:834
+#: lib/ask_drive_web/live/chat_live.ex:953
 #, elixir-autogen, elixir-format
 msgid "AI Summary & Sources"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1031
+#: lib/ask_drive_web/live/chat_live.ex:1150
 #, elixir-autogen, elixir-format
 msgid "AI summaries may contain errors. Always verify key details against the cited sources."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:765
+#: lib/ask_drive_web/live/chat_live.ex:884
 #, elixir-autogen, elixir-format
 msgid "Act as administrator"
 msgstr ""
@@ -92,13 +92,13 @@ msgstr ""
 msgid "An administrator needs to configure Google Secure LDAP or Google Login (OAuth) in Platform Settings."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:846
-#: lib/ask_drive_web/live/chat_live.ex:1415
+#: lib/ask_drive_web/live/chat_live.ex:965
+#: lib/ask_drive_web/live/chat_live.ex:1595
 #, elixir-autogen, elixir-format
 msgid "Answer"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:785
+#: lib/ask_drive_web/live/chat_live.ex:904
 #, elixir-autogen, elixir-format
 msgid "Ask questions about your Google Drive documents"
 msgstr ""
@@ -114,7 +114,7 @@ msgstr ""
 msgid "Attempting to reconnect"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:581
+#: lib/ask_drive_web/live/chat_live.ex:700
 #, elixir-autogen, elixir-format
 msgid "Cannot connect to %{provider}"
 msgstr ""
@@ -129,22 +129,22 @@ msgstr ""
 msgid "Complete Setup"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:758
+#: lib/ask_drive_web/live/chat_live.ex:877
 #, elixir-autogen, elixir-format
 msgid "Connect now"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1000
+#: lib/ask_drive_web/live/chat_live.ex:1119
 #, elixir-autogen, elixir-format
 msgid "Could not create summary. Please check the excerpts below."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:923
+#: lib/ask_drive_web/live/chat_live.ex:1042
 #, elixir-autogen, elixir-format
 msgid "Could not find a clear statement for this question in the current index."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:720
+#: lib/ask_drive_web/live/chat_live.ex:839
 #, elixir-autogen, elixir-format
 msgid "Database updates or maintenance are in progress. Please wait a moment."
 msgstr ""
@@ -155,8 +155,8 @@ msgid "Desk list"
 msgstr ""
 
 #: lib/ask_drive_web/live/admin_live.ex:5101
-#: lib/ask_drive_web/live/chat_live.ex:961
-#: lib/ask_drive_web/live/chat_live.ex:1083
+#: lib/ask_drive_web/live/chat_live.ex:1080
+#: lib/ask_drive_web/live/chat_live.ex:1259
 #, elixir-autogen, elixir-format
 msgid "Document"
 msgstr ""
@@ -177,8 +177,8 @@ msgstr ""
 msgid "Enter Desk Admin for \"%{name}\""
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:527
-#: lib/ask_drive_web/live/chat_live.ex:546
+#: lib/ask_drive_web/live/chat_live.ex:646
+#: lib/ask_drive_web/live/chat_live.ex:665
 #, elixir-autogen, elixir-format
 msgid "Enter passphrase"
 msgstr ""
@@ -194,32 +194,32 @@ msgstr ""
 msgid "Entering as %{email}. Identity verification required. Recorded in audit log."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:891
+#: lib/ask_drive_web/live/chat_live.ex:1010
 #, elixir-autogen, elixir-format
 msgid "Generated at: %{date}"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1014
+#: lib/ask_drive_web/live/chat_live.ex:1133
 #, elixir-autogen, elixir-format
 msgid "Generating summary…"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:573
+#: lib/ask_drive_web/live/chat_live.ex:692
 #, elixir-autogen, elixir-format
 msgid "Google Drive disconnected"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:732
+#: lib/ask_drive_web/live/chat_live.ex:851
 #, elixir-autogen, elixir-format
 msgid "Google Drive is not connected"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:913
+#: lib/ask_drive_web/live/chat_live.ex:1032
 #, elixir-autogen, elixir-format
 msgid "Google Drive synchronization or ingestion may not be finished. Please check with an administrator."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:788
+#: lib/ask_drive_web/live/chat_live.ex:907
 #, elixir-autogen, elixir-format
 msgid "Instant answers and document excerpts from your internal policies, manuals, and notes."
 msgstr ""
@@ -239,7 +239,7 @@ msgstr ""
 msgid "New users are automatically registered on first login. Admin permissions can be granted in Platform Settings."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:744
+#: lib/ask_drive_web/live/chat_live.ex:863
 #, elixir-autogen, elixir-format
 msgid "No documents have been ingested yet. Please ask an administrator to connect Google Drive."
 msgstr ""
@@ -249,7 +249,7 @@ msgstr ""
 msgid "No login method configured"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:911
+#: lib/ask_drive_web/live/chat_live.ex:1030
 #, elixir-autogen, elixir-format
 msgid "No searchable documents have been ingested yet."
 msgstr ""
@@ -269,14 +269,14 @@ msgstr ""
 msgid "Only accounts from this domain will be accepted for Google Login (SSO) and Google Drive."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:879
-#: lib/ask_drive_web/live/chat_live.ex:969
-#: lib/ask_drive_web/live/chat_live.ex:1104
+#: lib/ask_drive_web/live/chat_live.ex:998
+#: lib/ask_drive_web/live/chat_live.ex:1088
+#: lib/ask_drive_web/live/chat_live.ex:1280
 #, elixir-autogen, elixir-format
 msgid "Open in Drive"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1103
+#: lib/ask_drive_web/live/chat_live.ex:1279
 #, elixir-autogen, elixir-format
 msgid "Open in Drive (p.%{page})"
 msgstr ""
@@ -323,13 +323,13 @@ msgstr ""
 msgid "Release"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:835
-#: lib/ask_drive_web/live/chat_live.ex:1066
+#: lib/ask_drive_web/live/chat_live.ex:954
+#: lib/ask_drive_web/live/chat_live.ex:1242
 #, elixir-autogen, elixir-format
 msgid "Relevant excerpts"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:611
+#: lib/ask_drive_web/live/chat_live.ex:730
 #, elixir-autogen, elixir-format
 msgid "Reset conversation"
 msgstr ""
@@ -339,7 +339,7 @@ msgstr ""
 msgid "Return to Chat"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1180
+#: lib/ask_drive_web/live/chat_live.ex:1356
 #, elixir-autogen, elixir-format
 msgid "Searching for answers…"
 msgstr ""
@@ -349,12 +349,12 @@ msgstr ""
 msgid "Select a desk to ask questions."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1042
+#: lib/ask_drive_web/live/chat_live.ex:1161
 #, elixir-autogen, elixir-format
 msgid "Show AI thinking process (%{count} chars)"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1141
+#: lib/ask_drive_web/live/chat_live.ex:1317
 #, elixir-autogen, elixir-format
 msgid "Show full text"
 msgstr ""
@@ -385,42 +385,42 @@ msgstr ""
 msgid "Something went wrong!"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1065
+#: lib/ask_drive_web/live/chat_live.ex:1241
 #, elixir-autogen, elixir-format
 msgid "Sources"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:716
+#: lib/ask_drive_web/live/chat_live.ex:835
 #, elixir-autogen, elixir-format
 msgid "System is currently under maintenance"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1007
+#: lib/ask_drive_web/live/chat_live.ex:1126
 #, elixir-autogen, elixir-format
 msgid "Thinking… (%{count} chars)"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:740
+#: lib/ask_drive_web/live/chat_live.ex:859
 #, elixir-autogen, elixir-format
 msgid "To connect Drive, please elevate to administrator privileges first."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:736
+#: lib/ask_drive_web/live/chat_live.ex:855
 #, elixir-autogen, elixir-format
 msgid "To ingest documents and search/answer, please configure Google Drive integration in Admin."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:841
+#: lib/ask_drive_web/live/chat_live.ex:960
 #, elixir-autogen, elixir-format
 msgid "Unanswered (no documents ingested)"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:842
+#: lib/ask_drive_web/live/chat_live.ex:961
 #, elixir-autogen, elixir-format
 msgid "Unanswered (will generate in nightly batch)"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:556
+#: lib/ask_drive_web/live/chat_live.ex:675
 #, elixir-autogen, elixir-format
 msgid "Unlock and start chat"
 msgstr ""
@@ -451,7 +451,7 @@ msgstr ""
 msgid "Your Google Workspace Password (identity verification)"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:928
+#: lib/ask_drive_web/live/chat_live.ex:1047
 #, elixir-autogen, elixir-format
 msgid "Your question has been logged. Answers will be generated during the nightly batch."
 msgstr ""
@@ -532,27 +532,29 @@ msgstr ""
 msgid "You may leave out @%{domain}: it is filled in. For another domain of your organization, type the whole address."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1028
+#: lib/ask_drive_web/live/chat_live.ex:1147
+#: lib/ask_drive_web/live/chat_live.ex:1187
+#: lib/ask_drive_web/live/chat_live.ex:1201
 #, elixir-autogen, elixir-format
 msgid "(Stopped)"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1250
+#: lib/ask_drive_web/live/chat_live.ex:1426
 #, elixir-autogen, elixir-format
 msgid "Stop"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1246
+#: lib/ask_drive_web/live/chat_live.ex:1422
 #, elixir-autogen, elixir-format
 msgid "Stop answering"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:131
+#: lib/ask_drive_web/live/chat_live.ex:178
 #, elixir-autogen, elixir-format
 msgid "Stopped answering the question."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:996
+#: lib/ask_drive_web/live/chat_live.ex:1115
 #, elixir-autogen, elixir-format
 msgid "Summary stopped. Please check the excerpts below."
 msgstr ""
@@ -560,59 +562,59 @@ msgstr ""
 #: lib/ask_drive_web/live/admin_live.ex:4441
 #: lib/ask_drive_web/live/admin_live.ex:6405
 #: lib/ask_drive_web/live/admin_live.ex:7992
-#: lib/ask_drive_web/live/chat_live.ex:699
+#: lib/ask_drive_web/live/chat_live.ex:818
 #: lib/ask_drive_web/live/ollama_panel.ex:313
 #: lib/ask_drive_web/live/update_panel.ex:350
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1414
+#: lib/ask_drive_web/live/chat_live.ex:1594
 #, elixir-autogen, elixir-format
 msgid "Excerpts"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:816
+#: lib/ask_drive_web/live/chat_live.ex:935
 #, elixir-autogen, elixir-format
 msgid "From history"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:603
+#: lib/ask_drive_web/live/chat_live.ex:722
 #, elixir-autogen, elixir-format
 msgid "History"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:656
+#: lib/ask_drive_web/live/chat_live.ex:775
 #, elixir-autogen, elixir-format
 msgid "No questions match."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:655
+#: lib/ask_drive_web/live/chat_live.ex:774
 #, elixir-autogen, elixir-format
 msgid "No questions yet."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:629
+#: lib/ask_drive_web/live/chat_live.ex:748
 #, elixir-autogen, elixir-format
 msgid "Only you can see these. Open one to read its answer again."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:639
+#: lib/ask_drive_web/live/chat_live.ex:758
 #, elixir-autogen, elixir-format
 msgid "Search your questions"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:949
+#: lib/ask_drive_web/live/chat_live.ex:1068
 #, elixir-autogen, elixir-format
 msgid "The documents have been updated since, so the excerpts can't be shown. Sources at the time:"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1413
+#: lib/ask_drive_web/live/chat_live.ex:1593
 #, elixir-autogen, elixir-format
 msgid "Unanswered"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:626
+#: lib/ask_drive_web/live/chat_live.ex:745
 #, elixir-autogen, elixir-format
 msgid "Your earlier questions"
 msgstr ""
@@ -682,58 +684,58 @@ msgstr ""
 msgid "Use personal Gmail (@gmail.com) or allow any Google account."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:679
+#: lib/ask_drive_web/live/chat_live.ex:798
 #, elixir-autogen, elixir-format
 msgid "%{count} follow-ups"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1340
+#: lib/ask_drive_web/live/chat_live.ex:1516
 #, elixir-autogen, elixir-format
 msgid "Ask a follow-up"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1391
+#: lib/ask_drive_web/live/chat_live.ex:1567
 #, elixir-autogen, elixir-format
 msgid "Ask a follow-up about this answer"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1236
+#: lib/ask_drive_web/live/chat_live.ex:1412
 #, elixir-autogen, elixir-format
 msgid "Ask a new question about Google Drive documents..."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1330
+#: lib/ask_drive_web/live/chat_live.ex:1506
 #, elixir-autogen, elixir-format
 msgid "Ask more about this answer..."
 msgstr ""
 
 #: lib/ask_drive_web/live/admin_live.ex:4296
-#: lib/ask_drive_web/live/chat_live.ex:1348
+#: lib/ask_drive_web/live/chat_live.ex:1524
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:698
+#: lib/ask_drive_web/live/chat_live.ex:817
 #, elixir-autogen, elixir-format
 msgid "Delete this question and its follow-ups from your history?"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:809
+#: lib/ask_drive_web/live/chat_live.ex:928
 #, elixir-autogen, elixir-format
 msgid "Follow-up"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1259
+#: lib/ask_drive_web/live/chat_live.ex:1435
 #, elixir-autogen, elixir-format
 msgid "New question"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1218
+#: lib/ask_drive_web/live/chat_live.ex:1394
 #, elixir-autogen, elixir-format
 msgid "This starts a new question, unrelated to the ones above. To ask more about an answer, use \"Ask a follow-up about this answer\" under it."
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1128
+#: lib/ask_drive_web/live/chat_live.ex:1304
 #, elixir-autogen, elixir-format
 msgid "Click to show or hide the whole excerpt"
 msgstr ""
@@ -6251,7 +6253,7 @@ msgstr ""
 msgid "Installation"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1295
+#: lib/ask_drive_web/live/chat_live.ex:1471
 #, elixir-autogen, elixir-format
 msgid "AI responses may contain errors. Always verify critical information against the original Google Drive documents."
 msgstr ""
@@ -6594,12 +6596,12 @@ msgstr ""
 msgid "Marked solved by askers: %{solved} · followed up: %{followed}"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1380
+#: lib/ask_drive_web/live/chat_live.ex:1556
 #, elixir-autogen, elixir-format
 msgid "Solved"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1379
+#: lib/ask_drive_web/live/chat_live.ex:1555
 #, elixir-autogen, elixir-format
 msgid "Solved. Thank you!"
 msgstr ""
@@ -6625,7 +6627,7 @@ msgstr ""
 msgid "Use Google account authorization instead"
 msgstr ""
 
-#: lib/ask_drive_web/live/chat_live.ex:1289
+#: lib/ask_drive_web/live/chat_live.ex:1465
 #, elixir-autogen, elixir-format
 msgid "Enter to send, Shift+Enter for a new line"
 msgstr ""
@@ -6959,4 +6961,34 @@ msgstr ""
 #: lib/ask_drive_web/live/admin_live.ex:6822
 #, elixir-autogen, elixir-format
 msgid "Open the folder in Google Drive and paste the address bar's URL as it is. The folder ID is taken out of it when you save."
+msgstr ""
+
+#: lib/ask_drive_web/live/chat_live.ex:1184
+#, elixir-autogen, elixir-format
+msgid "Could not write the answer again. Please try later."
+msgstr ""
+
+#: lib/ask_drive_web/live/chat_live.ex:607
+#, elixir-autogen, elixir-format
+msgid "In more detail"
+msgstr ""
+
+#: lib/ask_drive_web/live/chat_live.ex:608
+#, elixir-autogen, elixir-format
+msgid "In simpler words"
+msgstr ""
+
+#: lib/ask_drive_web/live/chat_live.ex:604
+#, elixir-autogen, elixir-format
+msgid "More detail"
+msgstr ""
+
+#: lib/ask_drive_web/live/chat_live.ex:605
+#, elixir-autogen, elixir-format
+msgid "Say it more simply"
+msgstr ""
+
+#: lib/ask_drive_web/live/chat_live.ex:1191
+#, elixir-autogen, elixir-format
+msgid "Writing the answer again…"
 msgstr ""
