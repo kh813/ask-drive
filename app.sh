@@ -17,9 +17,11 @@ export PATH="${RUNTIME_BIN}:${RUNTIME_BREW}/bin:/opt/homebrew/bin:/usr/local/bin
 source "${SCRIPT_DIR}/scripts/lib/platform.sh"
 
 APP_NAME="ask_drive"
-# 常駐サービス: macOS は launchd (ユーザーエージェント)、Linux は systemd (システムサービス)
+# 常駐サービス: macOS は launchd (システムデーモン)、Linux は systemd (システムサービス)
 SERVICE_NAME="com.askdrive.server"
-PLIST_FILE="${HOME}/Library/LaunchAgents/${SERVICE_NAME}.plist"
+PLIST_FILE="/Library/LaunchDaemons/${SERVICE_NAME}.plist"
+LAUNCHD_TARGET="system/${SERVICE_NAME}"
+LEGACY_PLIST_FILE="${HOME}/Library/LaunchAgents/${SERVICE_NAME}.plist"
 SYSTEMD_UNIT="askdrive.service"
 SYSTEMD_UNIT_FILE="/etc/systemd/system/${SYSTEMD_UNIT}"
 SUDOERS_FILE="/etc/sudoers.d/askdrive"
@@ -75,8 +77,8 @@ AskDrive 管理スクリプト
                      --subject: ドメイン全体の委任でなりすます社内ユーザー (社内限定の共有ドライブ用)
 
 サービス管理 (macOS: launchd / Linux: systemd):
-  service install    常駐サービスを登録 (OS 起動時に自動起動。Linux は sudo が必要)
-  service uninstall  常駐サービスを解除 (Linux は sudo が必要)
+  service install    常駐サービスを登録 (OS 起動時に自動起動。sudo が必要)
+  service uninstall  常駐サービスを解除 (sudo が必要)
   service start      サービスを開始
   service stop       サービスを停止
   service restart    サービスを再起動
@@ -314,16 +316,18 @@ cmd_status() {
     fi
   else
     echo -n "launchd サービス (${SERVICE_NAME}): "
-    if launchctl list "${SERVICE_NAME}" > /dev/null 2>&1; then
-      local status_code
-      status_code="$(launchctl list "${SERVICE_NAME}" | awk '/"LastExitStatus"/ {print $3}' | tr -d ';')"
-      local pid
-      pid="$(launchctl list "${SERVICE_NAME}" | awk '/"PID"/ {print $3}' | tr -d ';')"
+    local print_out
+    if print_out="$(launchctl print "${LAUNCHD_TARGET}" 2>/dev/null)"; then
+      local pid status_code
+      pid="$(echo "${print_out}" | awk '/^[[:space:]]*pid = / {print $3; exit}')"
+      status_code="$(echo "${print_out}" | sed -n 's/^[[:space:]]*last exit code = //p' | head -n 1)"
       if [[ -n "${pid}" && "${pid}" != "0" ]]; then
         echo -e "${GREEN}常駐稼働中 (PID: ${pid})${NC}"
       else
         echo -e "${YELLOW}登録済み (停止中 / 最終終了コード: ${status_code:-0})${NC}"
       fi
+    elif launchd_legacy_registered; then
+      echo -e "${YELLOW}旧方式で登録済み (LaunchAgent: ./app.sh service install で LaunchDaemon に移行してください)${NC}"
     else
       echo -e "${BLUE}未登録${NC}"
     fi
@@ -646,100 +650,180 @@ cmd_update() {
   cmd_deploy
 }
 
-# --- launchd サービス管理 ---
+# --- launchd サービス管理 (macOS) ---
+#
+# システムデーモン (/Library/LaunchDaemons/com.askdrive.server.plist) として、このスクリプトを
+# 実行している一般ユーザーの権限（UserName / GroupName）で動かす。
+# macOS 15 以降の「ローカルネットワーク」プライバシー制限は LaunchAgent（ユーザーエージェント）の
+# 通信をブロックし、ヘッドレスプロセスでは許可ダイアログを出せないため、制限の対象外である
+# LaunchDaemon として登録する（Apple TN3179）。
+# 登録（install）と解除（uninstall）には sudo が必要。登録時に /etc/sudoers.d/askdrive を置き、
+# このユーザーが system/com.askdrive.server の kickstart / kill だけをパスワードなしで実行できる
+# ようにする。これにより、以降の ./app.sh deploy（再起動を含む）は管理者の介在なしに実行できる。
+
+launchd_daemon_registered() {
+  launchctl print "${LAUNCHD_TARGET}" >/dev/null 2>&1
+}
+
+launchd_legacy_registered() {
+  launchctl list "${SERVICE_NAME}" >/dev/null 2>&1
+}
+
+# 旧エージェントや既存のプロセスが終了し、ポートを手放すまで待つ
+wait_for_askdrive_stop() {
+  local i
+  for ((i = 0; i < 20; i++)); do
+    if [[ -z "$(pgrep -f "beam.*ask_drive" || true)" ]]; then
+      return 0
+    fi
+    sleep 1
+  done
+  cmd_stop
+}
 
 launchd_install() {
   ensure_dirs
-  echo -e "${GREEN}==> launchd サービスを生成・登録します: ${PLIST_FILE}${NC}"
-  
-  mkdir -p "${HOME}/Library/LaunchAgents"
-  
-  cat << EOF > "${PLIST_FILE}"
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>${SERVICE_NAME}</string>
-    <key>WorkingDirectory</key>
-    <string>${SCRIPT_DIR}</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>${SCRIPT_DIR}/app.sh</string>
-        <string>start</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <dict>
-        <key>SuccessfulExit</key>
-        <false/>
-    </dict>
-    <key>StandardOutPath</key>
-    <string>${SCRIPT_DIR}/log/ask_drive_stdout.log</string>
-    <key>StandardErrorPath</key>
-    <string>${SCRIPT_DIR}/log/ask_drive_stderr.log</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>PATH</key>
-        <string>${SCRIPT_DIR}/.runtime/bin:${SCRIPT_DIR}/.runtime/homebrew/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME}/.local/share/mise/shims:${HOME}/.asdf/shims</string>
-        <key>MIX_ENV</key>
-        <string>prod</string>
-        <key>PHX_SERVER</key>
-        <string>true</string>
-        <key>OLLAMA_MAX_LOADED_MODELS</key>
-        <string>1</string>
-        <key>OLLAMA_NUM_PARALLEL</key>
-        <string>1</string>
-        <key>OLLAMA_FLASH_ATTENTION</key>
-        <string>1</string>
-        <key>OLLAMA_KV_CACHE_TYPE</key>
-        <string>q8_0</string>
-    </dict>
-</dict>
-</plist>
-EOF
+  local user group plist_tmp sudoers_tmp
+  user="$(id -un)"
+  group="$(id -gn)"
+  plist_tmp="$(mktemp)"
+  sudoers_tmp="$(mktemp)"
 
-  launchctl unload "${PLIST_FILE}" 2>/dev/null || true
-  launchctl load -w "${PLIST_FILE}"
-  echo -e "${GREEN}launchd サービス (${SERVICE_NAME}) を登録・有効化しました。${NC}"
+  echo -e "${GREEN}==> launchd サービスを生成・登録します: ${PLIST_FILE}（sudo が必要です）${NC}"
+
+  launchd_plist_content "${SCRIPT_DIR}" "${user}" "${group}" "${HOME}" "${SERVICE_NAME}" > "${plist_tmp}"
+  launchd_sudoers_content "${user}" "/bin/launchctl" "${LAUNCHD_TARGET}" > "${sudoers_tmp}"
+
+  if ! plutil -lint "${plist_tmp}" >/dev/null; then
+    echo -e "${RED}plist の検証に失敗しました。登録を中止します。${NC}"
+    rm -f "${plist_tmp}" "${sudoers_tmp}"
+    return 1
+  fi
+
+  if ! sudo visudo -cf "${sudoers_tmp}" >/dev/null; then
+    echo -e "${RED}sudoers の検証に失敗しました。登録を中止します。${NC}"
+    rm -f "${plist_tmp}" "${sudoers_tmp}"
+    return 1
+  fi
+
+  # 旧エージェント（~/Library/LaunchAgents）が登録されていれば解除し、プロセスがポートを
+  # 手放すまで待ってからデーモンを登録する（ポート競合・二重起動の防止）
+  if launchd_legacy_registered || [[ -f "${LEGACY_PLIST_FILE}" ]]; then
+    echo -e "${YELLOW}旧 LaunchAgent (${LEGACY_PLIST_FILE}) を解除して LaunchDaemon に移行します...${NC}"
+    launchctl bootout "gui/$(id -u)" "${LEGACY_PLIST_FILE}" 2>/dev/null ||
+      launchctl bootout "gui/$(id -u)/${SERVICE_NAME}" 2>/dev/null ||
+      launchctl unload -w "${LEGACY_PLIST_FILE}" 2>/dev/null || true
+    rm -f "${LEGACY_PLIST_FILE}"
+    wait_for_askdrive_stop
+  fi
+
+  # 既にデーモンとして登録済みなら一度 bootout して入れ替える
+  if launchd_daemon_registered; then
+    sudo /bin/launchctl bootout system "${PLIST_FILE}" 2>/dev/null ||
+      sudo /bin/launchctl bootout "${LAUNCHD_TARGET}" 2>/dev/null || true
+    wait_for_askdrive_stop
+  fi
+
+  sudo install -o root -g wheel -m 0644 "${plist_tmp}" "${PLIST_FILE}"
+  sudo install -o root -g wheel -m 0440 "${sudoers_tmp}" "${SUDOERS_FILE}"
+  rm -f "${plist_tmp}" "${sudoers_tmp}"
+
+  sudo /bin/launchctl enable "${LAUNCHD_TARGET}" 2>/dev/null || true
+
+  # bootout の直後は bootstrap が一時的に失敗することがあるため、最大 5 回まで再試行する
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    if sudo /bin/launchctl bootstrap system "${PLIST_FILE}" 2>/dev/null; then
+      break
+    fi
+    if [[ "${attempt}" -eq 5 ]]; then
+      echo -e "${RED}launchctl bootstrap に失敗しました。${NC}"
+      sudo /bin/launchctl bootstrap system "${PLIST_FILE}"
+      return 1
+    fi
+    sleep 1
+  done
+
+  echo -e "${GREEN}launchd サービス (${SERVICE_NAME}) を登録・有効化しました。サーバー起動時に自動で開始します。${NC}"
 }
 
 launchd_uninstall() {
-  echo -e "${YELLOW}==> launchd サービスを解除します...${NC}"
-  if [[ -f "${PLIST_FILE}" ]]; then
-    launchctl unload -w "${PLIST_FILE}" 2>/dev/null || true
-    rm -f "${PLIST_FILE}"
-    echo -e "${GREEN}サービス設定ファイルを削除しました。${NC}"
-  else
-    echo "plist ファイルは存在しません。"
+  echo -e "${YELLOW}==> launchd サービスを解除します（sudo が必要です）...${NC}"
+  if launchd_daemon_registered || [[ -f "${PLIST_FILE}" ]]; then
+    sudo /bin/launchctl bootout system "${PLIST_FILE}" 2>/dev/null ||
+      sudo /bin/launchctl bootout "${LAUNCHD_TARGET}" 2>/dev/null || true
   fi
+  sudo rm -f "${PLIST_FILE}" "${SUDOERS_FILE}"
+
+  if launchd_legacy_registered || [[ -f "${LEGACY_PLIST_FILE}" ]]; then
+    launchctl bootout "gui/$(id -u)" "${LEGACY_PLIST_FILE}" 2>/dev/null ||
+      launchctl bootout "gui/$(id -u)/${SERVICE_NAME}" 2>/dev/null ||
+      launchctl unload -w "${LEGACY_PLIST_FILE}" 2>/dev/null || true
+    rm -f "${LEGACY_PLIST_FILE}"
+  fi
+  echo -e "${GREEN}サービスを解除しました。${NC}"
+}
+
+launchd_warn_legacy() {
+  echo -e "${YELLOW}旧方式（LaunchAgent）で登録されています。同一 LAN からの接続を許可するため、./app.sh service install を実行して LaunchDaemon に移行してください。${NC}"
 }
 
 launchd_start() {
   echo -e "${GREEN}==> launchd サービスを開始します...${NC}"
-  if [[ ! -f "${PLIST_FILE}" ]]; then
-    echo -e "${YELLOW}サービスが登録されていません。service install を先に実行します。${NC}"
-    launchd_install
+  if launchd_daemon_registered; then
+    sudo -n /bin/launchctl kickstart "${LAUNCHD_TARGET}" || {
+      echo -e "${RED}launchctl kickstart に失敗しました（sudo の許可設定がない場合は ./app.sh service install をやり直してください）。${NC}"
+      return 1
+    }
+    echo -e "${GREEN}開始コマンドを送信しました。${NC}"
+  elif launchd_legacy_registered; then
+    launchd_warn_legacy
+    launchctl start "${SERVICE_NAME}"
+    echo -e "${GREEN}開始コマンドを送信しました。${NC}"
+  else
+    echo -e "${YELLOW}サービスが登録されていません。./app.sh service install を先に実行してください。${NC}"
+    return 1
   fi
-  launchctl start "${SERVICE_NAME}"
-  echo -e "${GREEN}開始コマンドを送信しました。${NC}"
 }
 
 launchd_stop() {
   echo -e "${YELLOW}==> launchd サービスを停止します...${NC}"
-  launchctl stop "${SERVICE_NAME}" || true
-  echo -e "${GREEN}停止コマンドを送信しました。${NC}"
+  if launchd_daemon_registered; then
+    sudo -n /bin/launchctl kill SIGTERM "${LAUNCHD_TARGET}" || {
+      echo -e "${RED}launchctl kill に失敗しました（sudo の許可設定がない場合は ./app.sh service install をやり直してください）。${NC}"
+      return 1
+    }
+    echo -e "${GREEN}停止コマンドを送信しました。${NC}"
+  elif launchd_legacy_registered; then
+    launchd_warn_legacy
+    launchctl stop "${SERVICE_NAME}" || true
+    echo -e "${GREEN}停止コマンドを送信しました。${NC}"
+  else
+    echo -e "${YELLOW}サービスが登録されていません。./app.sh service install を先に実行してください。${NC}"
+    return 1
+  fi
 }
 
 launchd_restart() {
   echo -e "${GREEN}==> launchd サービスを再起動します...${NC}"
-  launchctl kickstart -k "gui/$(id -u)/${SERVICE_NAME}" 2>/dev/null || {
-    launchd_stop
-    sleep 2
-    launchd_start
-  }
-  echo -e "${GREEN}再起動完了しました。${NC}"
+  if launchd_daemon_registered; then
+    sudo -n /bin/launchctl kickstart -k "${LAUNCHD_TARGET}" || {
+      echo -e "${RED}launchctl kickstart -k に失敗しました（sudo の許可設定がない場合は ./app.sh service install をやり直してください）。${NC}"
+      return 1
+    }
+    echo -e "${GREEN}再起動完了しました。${NC}"
+  elif launchd_legacy_registered; then
+    launchd_warn_legacy
+    launchctl kickstart -k "gui/$(id -u)/${SERVICE_NAME}" 2>/dev/null || {
+      launchctl stop "${SERVICE_NAME}" || true
+      sleep 2
+      launchctl start "${SERVICE_NAME}"
+    }
+    echo -e "${GREEN}再起動完了しました。${NC}"
+  else
+    echo -e "${YELLOW}サービスが登録されていません。./app.sh service install を先に実行してください。${NC}"
+    return 1
+  fi
 }
 
 
@@ -828,7 +912,7 @@ service_registered() {
   if is_linux; then
     systemd_registered
   else
-    launchctl list "${SERVICE_NAME}" >/dev/null 2>&1
+    launchd_daemon_registered || launchd_legacy_registered
   fi
 }
 

@@ -1737,12 +1737,12 @@ Mac mini（Apple Silicon / macOS）または Linux（x64 / arm64、Ubuntu / Debi
 ./app.sh ollama <args>      # アプリ専用の Ollama を操作（例: ollama pull <model> / ollama list）
 
 # 常駐サービス管理（macOS: launchd / Linux: systemd）
-./app.sh service install    # 登録・常駐化（Linux は sudo が必要）
+./app.sh service install    # 登録・常駐化（sudo が必要）
 ./app.sh service start      # サービス開始
 ./app.sh service stop       # サービス停止
 ./app.sh service restart    # サービス再起動
 ./app.sh service status     # サービス稼働確認
-./app.sh service uninstall  # 登録解除
+./app.sh service uninstall  # 登録解除（sudo が必要）
 ```
 
 ### 12.2 デプロイ方式の概要
@@ -1851,8 +1851,8 @@ Mac mini（Apple Silicon / macOS）または Linux（x64 / arm64、Ubuntu / Debi
 | 項目 | macOS | Linux |
 |---|---|---|
 | OS 判定 | `uname -s` = Darwin → `ASKDRIVE_OS=macos` | Linux → `linux`（それ以外は setup を中止） |
-| 常駐 | launchd（`~/Library/LaunchAgents/com.askdrive.server.plist`、sudo 不要） | systemd システムサービス `/etc/systemd/system/askdrive.service`（`User=` は install を実行したユーザー、`Restart=on-failure`、`WantedBy=multi-user.target`、ログは `log/` に append） |
-| 権限 | 不要 | **sudo は初回のみ**: apt パッケージ導入と `service install`。install 時に `/etc/sudoers.d/askdrive` を作り（`visudo -cf` で検証してから配置）、`systemctl start/stop/restart askdrive.service` だけを NOPASSWD で許可する。以後の start/stop/restart は `sudo -n` で実行し、許可が無ければ即失敗する |
+| 常駐 | launchd システムデーモン `/Library/LaunchDaemons/com.askdrive.server.plist`（`UserName` / `GroupName` は install を実行したユーザー、`EnvironmentVariables` に `HOME`・`USER` を指定、`plutil -lint` で検証してから配置。macOS 15 以降の「ローカルネットワーク」プライバシー制限の対象外であるシステムデーモンとして登録し、同一 LAN からの接続がブロックされるのを防ぐ。旧 `~/Library/LaunchAgents` の登録があれば bootout・削除し、旧プロセスがポートを手放すのを待ってから登録） | systemd システムサービス `/etc/systemd/system/askdrive.service`（`User=` は install を実行したユーザー、`Restart=on-failure`、`WantedBy=multi-user.target`、ログは `log/` に append） |
+| 権限 | **sudo は `service install` / `uninstall` のみ**（`setup` は不要）。install 時に `/etc/sudoers.d/askdrive` を作り（`visudo -cf` で検証してから配置）、`/bin/launchctl kickstart`・`kickstart -k`・`kill SIGTERM system/com.askdrive.server` だけを NOPASSWD で許可する。以後の start/stop/restart は `sudo -n` で実行し、`deploy.sh` からはパスワードなしで再起動できる（旧 LaunchAgent 環境では移行を促しつつ `gui/<uid>` ドメインを操作） | **sudo は初回のみ**: apt パッケージ導入と `service install`。install 時に `/etc/sudoers.d/askdrive` を作り（`visudo -cf` で検証してから配置）、`systemctl start/stop/restart askdrive.service` だけを NOPASSWD で許可する。以後の start/stop/restart は `sudo -n` で実行し、許可が無ければ即失敗する |
 | Erlang/OTP・Elixir | Homebrew（`.runtime/homebrew`）または mise/asdf | hex.pm の Ubuntu 向けビルド済み OTP 28（`builds.hex.pm/builds/otp/{amd64,arm64}/ubuntu-{22.04,24.04}`、`./Install -minimal`）と Elixir 1.19 の zip を `.runtime/otp`・`.runtime/elixir` に配置 |
 | poppler・その他 | Homebrew | apt: `poppler-utils zstd unzip git curl openssl build-essential ca-certificates` |
 | pandoc | `pandoc-<ver>-{arm64,x86_64}-macOS.zip` | `pandoc-<ver>-linux-{amd64,arm64}.tar.gz` |
@@ -1865,9 +1865,10 @@ Mac mini（Apple Silicon / macOS）または Linux（x64 / arm64、Ubuntu / Debi
 
 ### 12.7 macOS 常駐（launchd）とスリープ管理
 
-1. **常駐 plist の設定例（`com.askdrive.server.plist`）**:
-   - 標準出力・標準エラーログを `log/ask_drive.log` にローテーション出力
-   - プロセス停止時の自動再起動
+1. **常駐 plist（`/Library/LaunchDaemons/com.askdrive.server.plist`）**:
+   - macOS 15 (Sequoia) 以降では、`~/Library/LaunchAgents`（ユーザーエージェント）として起動したヘッドレスプロセスのローカルネットワーク通信がプライバシー制限でブロックされ、同一 LAN セグメントの別端末から接続できなくなる（VPN の utun インターフェース経由だけは通る）。launchd が起動するシステムデーモン（`/Library/LaunchDaemons`）はこの制限の対象外であるため（Apple TN3179）、システムデーモンとして登録し、`UserName` / `GroupName` でインストール実行ユーザーの権限で動かす（root では動かさない）。なお、接続元の端末が macOS 15 以降の場合、接続元のブラウザにも「システム設定 → プライバシーとセキュリティ → ローカルネットワーク」の許可が必要である。
+   - 標準出力・標準エラーログを `log/ask_drive_stdout.log` / `log/ask_drive_stderr.log` に出力
+   - プロセス異常終了時の自動再起動（`KeepAlive.SuccessfulExit = false`）、OS 起動時の自動起動（ログイン前でも起動）
 2. **夜間バッチ中のスリープ抑止**:
    - バッチ実行中（既定 0:00〜）は `caffeinate -s` を GenServer 経由で呼び出し、処理完了までシステムスリープを一時抑止する。
 3. **バックアップ運用**:

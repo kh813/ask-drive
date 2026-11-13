@@ -61,7 +61,7 @@ Apple Silicon Mac (8GB〜) の単一マシン上で、Google Drive 内の共有�
   - macOS (Apple Silicon / Intel, Apple Silicon 推奨)
   - **Linux (x64 / arm64)**: Ubuntu 22.04 / 24.04、Debian 12 以降（systemd 必須）
 - **管理者権限 (sudo)**:
-  - macOS: **不要**（`./app.sh setup` がスタンドアロンバイナリおよびローカル環境 `.runtime` に必要なツール群を自動ダウンロード・セットアップします）
+  - macOS: `./app.sh setup` は**不要**（スタンドアロンバイナリおよびローカル環境 `.runtime` に必要なツール群を自動ダウンロード・セットアップします）。常駐サービスの登録（`./app.sh service install`）と解除のみ **初回に sudo が必要**で、以後の起動・停止・再起動・`./app.sh deploy` はパスワードなしで動きます（下記「macOS（launchd）」）
   - Linux: **初回のみ必要**（`./app.sh setup` の apt パッケージ導入と `./app.sh service install` の systemd 登録）。以後の起動・停止・再起動・`./app.sh deploy` は sudo のパスワードなしで動きます（下記「Linux（systemd）」）
 
 ---
@@ -150,12 +150,20 @@ Google Cloud のプロジェクト ID (空欄: 指定しない): my-project-123
 #### 常駐サービス登録・起動（推奨。macOS: launchd / Linux: systemd）:
 ```bash
 ./app.sh service install
-./app.sh service start
 ```
 サービス状態の確認:
 ```bash
 ./app.sh service status
 ```
+
+#### macOS（launchd）
+
+- `./app.sh service install` は **launchd のシステムデーモン** `/Library/LaunchDaemons/com.askdrive.server.plist` を作成し、登録・起動します（sudo のパスワードを聞かれるため、ターミナル.app や SSH など対話できる端末で実行してください）。サービスは `service install` を実行したユーザーの権限（`UserName`）で動き（root では動きません）、ログインしていなくても OS の起動時に立ち上がります。ログは `log/ask_drive_stdout.log` / `log/ask_drive_stderr.log` に出力されます。
+- **システムデーモンとして登録する理由**: macOS 15 (Sequoia) 以降には「ローカルネットワーク」プライバシー制限があり、`~/Library/LaunchAgents`（ユーザーエージェント）として起動したヘッドレスプロセスは同一 LAN セグメントの端末からの通信がブロックされます（VPN 経由だけは接続できる症状になります）。launchd が起動するシステムデーモンはこの制限の対象外です（Apple [TN3179](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy)）。
+- **旧バージョン（LaunchAgent）からの移行**: 以前に `~/Library/LaunchAgents` で登録していた環境は、`./app.sh service install` を 1 回実行し直すだけで、旧エージェントの解除・停止からデーモンへの登録・起動まで自動で行われます（移行前の環境でも `./app.sh deploy` からの再起動は従来どおり動きます）。
+- 同時に `/etc/sudoers.d/askdrive` を作成し、そのユーザーに **`/bin/launchctl kickstart`（開始・再起動）と `kill SIGTERM`（停止）だけ**をパスワードなしで許可します。これにより、以降の `./app.sh deploy`（再起動を含む）はパスワードなしで動きます。
+- 解除: `./app.sh service uninstall`（sudo が必要。`KeepAlive` が有効なため、完全に止めたいときは `uninstall` を使います）
+- **接続元の Mac から開けない場合**: 同じ制限は接続元の端末にもかかります。接続元の Mac が macOS 15 以降で、社内 LAN からブラウザで開けない場合（別のブラウザや `curl` では開けるのに特定のブラウザだけ開けない場合）は、その Mac の **「システム設定」→「プライバシーとセキュリティ」→「ローカルネットワーク」** で、お使いのブラウザをオンにしてください。
 
 #### Linux（systemd）
 
@@ -194,8 +202,8 @@ Google Cloud のプロジェクト ID (空欄: 指定しない): my-project-123
 | `./app.sh install-pandoc` | `.runtime/bin` に pandoc（Word・Excel・PowerPoint の本文抽出）の公式スタンドアロン版をインストールする（sudo 不要。全体管理の「インストールとアップデート」の「pandoc をインストール」が内部で使用） |
 | `./app.sh repair-ollama` | `.runtime` に Ollama をインストール / 再インストールし、デプロイする（あとで Ollama に切り替えるとき・推論ランナー欠落の修復） |
 | `./app.sh ollama <args>` | アプリ専用の Ollama を操作（例: `./app.sh ollama pull <モデル名>` / `./app.sh ollama list`） |
-| `./app.sh service install` | 常駐サービスを登録（macOS: launchd / Linux: systemd。Linux は sudo が必要） |
-| `./app.sh service uninstall` | 常駐サービスを解除 |
+| `./app.sh service install` | 常駐サービスを登録（macOS: launchd / Linux: systemd。sudo が必要） |
+| `./app.sh service uninstall` | 常駐サービスを解除（sudo が必要） |
 | `./app.sh service start` | 常駐サービスを開始 |
 | `./app.sh service stop` | 常駐サービスを停止 |
 | `./app.sh service restart` | 常駐サービスを再起動 |

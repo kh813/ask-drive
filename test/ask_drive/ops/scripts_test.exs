@@ -136,7 +136,9 @@ defmodule AskDrive.Ops.ScriptsTest do
     test "PATH in scripts and launchd service includes .runtime directories" do
       app_content = File.read!(@app_sh)
       assert app_content =~ ~s(${RUNTIME_BIN}:${RUNTIME_BREW}/bin)
-      assert app_content =~ ~s(${SCRIPT_DIR}/.runtime/bin:${SCRIPT_DIR}/.runtime/homebrew/bin)
+
+      platform_content = File.read!(@platform_sh)
+      assert platform_content =~ ~s(${dir}/.runtime/bin:${dir}/.runtime/homebrew/bin)
 
       setup_content = File.read!(@initial_setup_sh)
       assert setup_content =~ ~s(${RUNTIME_BIN}:${RUNTIME_BREW}/bin)
@@ -214,6 +216,47 @@ defmodule AskDrive.Ops.ScriptsTest do
 
       assert port.("PORT=5000") == "4000"
       assert port.("PORT=5000 ASK_DRIVE_HTTP_PORT=4100") == "4100"
+    end
+
+    test "the launchd daemon plist runs app.sh start as the given user, with HOME, USER and .runtime on PATH" do
+      plist =
+        run_platform(
+          ~s(launchd_plist_content /Users/admin/ask-drive admin staff /Users/admin com.askdrive.server)
+        )
+
+      assert plist =~ "<key>Label</key>\n    <string>com.askdrive.server</string>"
+      assert plist =~ "<key>UserName</key>\n    <string>admin</string>"
+      assert plist =~ "<key>GroupName</key>\n    <string>staff</string>"
+      assert plist =~ "<key>WorkingDirectory</key>\n    <string>/Users/admin/ask-drive</string>"
+      assert plist =~ "<string>/Users/admin/ask-drive/app.sh</string>"
+      assert plist =~ "<key>HOME</key>\n        <string>/Users/admin</string>"
+      assert plist =~ "<key>USER</key>\n        <string>admin</string>"
+
+      assert plist =~
+               "/Users/admin/ask-drive/.runtime/bin:/Users/admin/ask-drive/.runtime/homebrew/bin"
+
+      if System.find_executable("plutil") do
+        tmp =
+          Path.join(
+            System.tmp_dir!(),
+            "askdrive_plist_#{System.unique_integer([:positive])}.plist"
+          )
+
+        File.write!(tmp, plist)
+        {out, code} = System.cmd("plutil", ["-lint", tmp], stderr_to_stdout: true)
+        File.rm(tmp)
+        assert code == 0, "plutil -lint failed: #{out}"
+      end
+    end
+
+    test "the launchd sudoers rule allows only kickstart and kill SIGTERM of the daemon target" do
+      rule =
+        run_platform(~s(launchd_sudoers_content admin /bin/launchctl system/com.askdrive.server))
+
+      assert rule =~
+               "admin ALL=(root) NOPASSWD: /bin/launchctl kickstart system/com.askdrive.server, /bin/launchctl kickstart -k system/com.askdrive.server, /bin/launchctl kill SIGTERM system/com.askdrive.server"
+
+      refute rule =~ "ALL=(ALL)"
     end
 
     test "the systemd unit runs app.sh start as the given user, with .runtime on PATH" do

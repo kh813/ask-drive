@@ -207,6 +207,81 @@ install_beam_linux() {
   command -v erl >/dev/null 2>&1 && command -v mix >/dev/null 2>&1
 }
 
+# --- macOS: launchd daemon plist and sudoers rule (pure: print to stdout, testable without sudo) ---
+#
+# Registered in /Library/LaunchDaemons (system domain) rather than ~/Library/LaunchAgents so
+# macOS 15+ local network privacy does not block incoming LAN connections to a headless process
+# (Apple TN3179). UserName/GroupName run the service as the installing user (never root), and
+# HOME/USER are passed explicitly because launchd daemons do not inherit them.
+
+# launchd_plist_content <app_dir> <user> <group> <home> [service_name]
+launchd_plist_content() {
+  local dir="$1" user="$2" group="$3" home="$4" service="${5:-com.askdrive.server}"
+  cat << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${service}</string>
+    <key>UserName</key>
+    <string>${user}</string>
+    <key>GroupName</key>
+    <string>${group}</string>
+    <key>WorkingDirectory</key>
+    <string>${dir}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${dir}/app.sh</string>
+        <string>start</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>${dir}/log/ask_drive_stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>${dir}/log/ask_drive_stderr.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>${home}</string>
+        <key>USER</key>
+        <string>${user}</string>
+        <key>PATH</key>
+        <string>${dir}/.runtime/bin:${dir}/.runtime/homebrew/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${home}/.local/share/mise/shims:${home}/.asdf/shims</string>
+        <key>MIX_ENV</key>
+        <string>prod</string>
+        <key>PHX_SERVER</key>
+        <string>true</string>
+        <key>OLLAMA_MAX_LOADED_MODELS</key>
+        <string>1</string>
+        <key>OLLAMA_NUM_PARALLEL</key>
+        <string>1</string>
+        <key>OLLAMA_FLASH_ATTENTION</key>
+        <string>1</string>
+        <key>OLLAMA_KV_CACHE_TYPE</key>
+        <string>q8_0</string>
+    </dict>
+</dict>
+</plist>
+EOF
+}
+
+# launchd_sudoers_content <user> [launchctl_path] [target]: lets <user> start/stop/restart
+# only this launchd daemon without a password, so later deploys need no administrator
+launchd_sudoers_content() {
+  local user="$1" launchctl_bin="${2:-/bin/launchctl}" target="${3:-system/com.askdrive.server}"
+  cat << EOF
+# AskDrive: ${user} may start/stop/restart ${target} without a password
+${user} ALL=(root) NOPASSWD: ${launchctl_bin} kickstart ${target}, ${launchctl_bin} kickstart -k ${target}, ${launchctl_bin} kill SIGTERM ${target}
+EOF
+}
+
 # --- Linux: systemd unit and sudoers rule (pure: print to stdout, testable without sudo) ---
 
 # systemd_unit_content <app_dir> <user> <group> <home>
