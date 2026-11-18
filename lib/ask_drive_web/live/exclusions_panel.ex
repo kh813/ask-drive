@@ -150,6 +150,7 @@ defmodule AskDriveWeb.ExclusionsPanel do
     <details
       :if={not @excluded?}
       id={"exclude-menu-#{@doc.id}"}
+      phx-mounted={JS.ignore_attributes("open")}
       class="inline-block text-right"
     >
       <summary class="list-none cursor-pointer px-2 py-1 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-800 dark:hover:text-zinc-200 transition inline-flex items-center gap-1 [&::-webkit-details-marker]:hidden">

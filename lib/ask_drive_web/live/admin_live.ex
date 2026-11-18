@@ -5707,7 +5707,7 @@ defmodule AskDriveWeb.AdminLive do
                       class="rounded border-zinc-300"
                     /> {gettext("Delete the registered CA certificate")}
                   </label>
-                  <details class="text-xs">
+                  <details class="text-xs" phx-mounted={JS.ignore_attributes("open")}>
                     <summary class="cursor-pointer text-zinc-500">
                       {gettext("Access credentials (optional)")}
                     </summary>

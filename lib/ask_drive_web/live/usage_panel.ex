@@ -175,7 +175,11 @@ defmodule AskDriveWeb.UsagePanel do
                   {if person.solved_rate, do: "#{person.solved_rate}%", else: "-"}
                 </td>
                 <td :if={@scope == :platform} class="py-2.5 px-2">
-                  <details id={"usage-desks-#{person.user_id}"} class="group">
+                  <details
+                    id={"usage-desks-#{person.user_id}"}
+                    phx-mounted={JS.ignore_attributes("open")}
+                    class="group"
+                  >
                     <summary class="list-none cursor-pointer inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline [&::-webkit-details-marker]:hidden">
                       {gettext("%{count} desk(s)", count: length(person.desks))}
                       <.icon

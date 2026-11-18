@@ -109,7 +109,12 @@ defmodule AskDriveWeb.Layouts do
 
         <%!-- App switcher (spec 6.11): which desk this is, and a way to the others. Switching
               is plain navigation to the other app's URL — a fresh page, nothing carried over. --%>
-        <details :if={@app} id="app-switcher" class="relative">
+        <details
+          :if={@app}
+          id="app-switcher"
+          phx-mounted={JS.ignore_attributes("open")}
+          class="relative"
+        >
           <summary class="list-none cursor-pointer flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40">
             for {@app.name}
             <.icon :if={length(@apps) > 1} name="hero-chevron-down" class="w-3.5 h-3.5" />
